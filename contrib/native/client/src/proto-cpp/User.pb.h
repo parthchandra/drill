@@ -75,11 +75,13 @@ enum RpcType {
   CANCEL_QUERY = 4,
   REQUEST_RESULTS = 5,
   QUERY_RESULT = 6,
-  QUERY_HANDLE = 7
+  QUERY_HANDLE = 7,
+  REQ_META_FUNCTIONS = 8,
+  RESP_FUNCTION_LIST = 9
 };
 bool RpcType_IsValid(int value);
 const RpcType RpcType_MIN = HANDSHAKE;
-const RpcType RpcType_MAX = QUERY_HANDLE;
+const RpcType RpcType_MAX = RESP_FUNCTION_LIST;
 const int RpcType_ARRAYSIZE = RpcType_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* RpcType_descriptor();
