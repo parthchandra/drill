@@ -149,7 +149,7 @@ namespace Drill {
 
         public:
         DrillClientImpl():m_socket(m_io_service), m_strand(m_io_service), m_pListenerThread(NULL),
-        m_rbuf(1024), m_wbuf(1024), m_coordinationId(1) {
+        m_rbuf(1024), m_wbuf(1024), m_pendingRequests(0), m_coordinationId(1) {
             m_bIsConnected=false;
         };
 
@@ -225,6 +225,9 @@ namespace Drill {
 
         // query id to query result
         std::map<QueryId*, DrillClientQueryResult*, compareQueryId> m_queryResults;
+
+        size_t m_pendingRequests;   // number of outstanding read requests. 
+                                    // handleRead will keep asking for more results as long as this number is not zero.
 
         int m_coordinationId;
 

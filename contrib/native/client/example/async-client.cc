@@ -132,13 +132,22 @@ int main(int argc, char* argv[]) {
             apiType=argv[4];
             plan_filename = argv[5];
             if(argc==7){
-                plan2_filename = argv[5];
+                plan2_filename = argv[6];
             }
         }
 
         cerr << "Connecting to the Server..." << endl;
 
         UserServerEndPoint user_server(drill_addr,port);
+
+        ifstream f(plan_filename);
+        string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
+        cerr << "plan = " << plan << endl;
+
+        ifstream f2(plan2_filename);
+        string plan2((std::istreambuf_iterator<char>(f2)), (std::istreambuf_iterator<char>()));
+        cerr << "plan2 = " << plan2 << endl;
+
         if(apiType=="useinternalapi"){
             DrillClientImpl client;
             client.Connect(user_server);
@@ -146,12 +155,6 @@ int main(int argc, char* argv[]) {
             cerr << "Handshaking..." << endl;
             if (client.ValidateHandShake())
                 cerr << "Handshake Succeeded!\n" << endl;
-            ifstream f(plan_filename);
-            string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
-            cerr << "plan = " << plan << endl;
-            ifstream f2(plan2_filename);
-            string plan2((std::istreambuf_iterator<char>(f2)), (std::istreambuf_iterator<char>()));
-            cerr << "plan2 = " << plan2 << endl;
 
             DrillClientQueryResult* pClientQuery = NULL;
             DrillClientQueryResult* pClientQuery2 = NULL;
@@ -179,17 +182,16 @@ int main(int argc, char* argv[]) {
             DrillClient client;
             client.connect(user_server);
             cerr << "Connected!\n" << endl;
-            ifstream f(plan_filename);
-            string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
-            cerr << "plan = " << plan << endl;
 
             if(queryType=="sync"){
                 DrillClientError* err=NULL;
                 status_t ret;
                 RecordIterator* pIter = client.submitQuery(exec::user::PHYSICAL, plan, err);
+                RecordIterator* pIter2 = client.submitQuery(exec::user::PHYSICAL, plan2, err);
                 size_t row=0;
                 if(pIter){
                     // get fields.
+                    row=0;
                     std::vector<FieldMetadata*> fields = pIter->getColDefs();
                     while((ret=pIter->next())==QRY_SUCCESS){
                         row++;
@@ -208,13 +210,38 @@ int main(int argc, char* argv[]) {
                         printf("\n");
                     }
                 }
-                //delete pIter;
                 client.freeQueryIterator(&pIter);
+                if(pIter2){
+                    // get fields.
+                    row=0;
+                    std::vector<FieldMetadata*> fields = pIter2->getColDefs();
+                    while((ret=pIter2->next())==QRY_SUCCESS){
+                        row++;
+                        if(row%4095==0){
+                            for(size_t i=0; i<fields.size(); i++){
+                                std::string name= fields[i]->def().name(0).name();
+                                printf("%s\t", name.c_str());
+                            }
+                        }
+                        printf("ROW: %ld\t", row);
+                        for(size_t i=0; i<fields.size(); i++){
+                            void* pBuf; size_t sz;
+                            pIter2->getCol(i, &pBuf, &sz);
+                            print(fields[i], pBuf, sz);
+                        }
+                        printf("\n");
+                    }
+                }
+                client.freeQueryIterator(&pIter2);
             }else{
-                QueryHandle_t qryHandle=NULL;
-                client.submitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, &qryHandle);
+                QueryHandle_t qryHandle1=NULL, qryHandle2=NULL;
+                client.submitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, &qryHandle1);
+                if(!plan2_filename.empty()){
+                    client.submitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener, &qryHandle2);
+                }
                 client.waitForResults();
-                client.freeQueryResources(&qryHandle);
+                client.freeQueryResources(&qryHandle1);
+                client.freeQueryResources(&qryHandle2);
             }
             client.close();
         }
