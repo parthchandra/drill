@@ -100,9 +100,10 @@ void protobuf_AddDesc_Types_2eproto() {
     "R\020\025\022\017\n\013FIXED16CHAR\020\026\022\017\n\013FIXEDBINARY\020\027\022\013\n"
     "\007VARCHAR\020\030\022\r\n\tVAR16CHAR\020\031\022\r\n\tVARBINARY\020\032"
     "\022\t\n\005UINT1\020\035\022\t\n\005UINT2\020\036\022\t\n\005UINT4\020\037\022\t\n\005UIN"
-    "T8\020 \022\013\n\007UNKNOWN\020%*4\n\010DataMode\022\014\n\010OPTIONA"
-    "L\020\000\022\014\n\010REQUIRED\020\001\022\014\n\010REPEATED\020\002B-\n\035org.a"
-    "pache.drill.common.typesB\nTypeProtosH\001", 678);
+    "T8\020 \022\013\n\007UNKNOWN\020%*=\n\010DataMode\022\017\n\013DM_OPTI"
+    "ONAL\020\000\022\017\n\013DM_REQUIRED\020\001\022\017\n\013DM_REPEATED\020\002"
+    "B-\n\035org.apache.drill.common.typesB\nTypeP"
+    "rotosH\001", 687);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "Types.proto", &protobuf_RegisterTypes);
   MajorType::default_instance_ = new MajorType();

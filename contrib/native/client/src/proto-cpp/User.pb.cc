@@ -238,14 +238,15 @@ void protobuf_AddDesc_User_2eproto() {
     "2\033.exec.shared.RecordBatchDef\022\026\n\016schema_"
     "changed\030\013 \001(\010\"b\n\nQueryState\022\013\n\007PENDING\020\000"
     "\022\013\n\007RUNNING\020\001\022\r\n\tCOMPLETED\020\002\022\014\n\010CANCELED"
-    "\020\003\022\n\n\006FAILED\020\004\022\021\n\rUNKNOWN_QUERY\020\005*\210\001\n\007Rp"
+    "\020\003\022\n\n\006FAILED\020\004\022\021\n\rUNKNOWN_QUERY\020\005*\270\001\n\007Rp"
     "cType\022\r\n\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n\007GOODBYE"
     "\020\002\022\r\n\tRUN_QUERY\020\003\022\020\n\014CANCEL_QUERY\020\004\022\023\n\017R"
     "EQUEST_RESULTS\020\005\022\020\n\014QUERY_RESULT\020\006\022\020\n\014QU"
-    "ERY_HANDLE\020\007*/\n\tQueryType\022\007\n\003SQL\020\001\022\013\n\007LO"
-    "GICAL\020\002\022\014\n\010PHYSICAL\020\003*#\n\020QueryResultsMod"
-    "e\022\017\n\013STREAM_FULL\020\001B+\n\033org.apache.drill.e"
-    "xec.protoB\nUserProtosH\001", 1223);
+    "ERY_HANDLE\020\007\022\026\n\022REQ_META_FUNCTIONS\020\010\022\026\n\022"
+    "RESP_FUNCTION_LIST\020\t*/\n\tQueryType\022\007\n\003SQL"
+    "\020\001\022\013\n\007LOGICAL\020\002\022\014\n\010PHYSICAL\020\003*#\n\020QueryRe"
+    "sultsMode\022\017\n\013STREAM_FULL\020\001B+\n\033org.apache"
+    ".drill.exec.protoB\nUserProtosH\001", 1271);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "User.proto", &protobuf_RegisterTypes);
   UserToBitHandshake::default_instance_ = new UserToBitHandshake();
@@ -283,6 +284,8 @@ bool RpcType_IsValid(int value) {
     case 5:
     case 6:
     case 7:
+    case 8:
+    case 9:
       return true;
     default:
       return false;

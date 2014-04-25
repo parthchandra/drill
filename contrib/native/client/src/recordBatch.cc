@@ -18,36 +18,36 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
     switch (type) {
         case BIGINT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorInt64(b, f.value_count()); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorInt64(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorInt64(b); 
                     break;
             }
             break;
         case VARBINARY:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorVarBinary(b, f.value_count()); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case VARCHAR:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorVarChar(b, f.value_count()); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
@@ -56,168 +56,168 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
         /*  
         case TINYINT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case UINT1:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case UINT2:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case SMALLINT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case INT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case UINT4:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case FLOAT4:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case BIGINT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case UINT8:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case FLOAT8:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case VARBINARY:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case VARCHAR:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case VAR16CHAR:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }
             break;
         case BIT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     //v=new NullableValueVectorXXXX(b); 
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     //v=new RepeatedValueVectorXXXX(b); 
                     break;
             }

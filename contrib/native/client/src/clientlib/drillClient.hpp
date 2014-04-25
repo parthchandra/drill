@@ -19,6 +19,8 @@ using namespace exec::shared;
 #define DECLSPEC_DRILL_CLIENT
 #endif
 
+#define DECLSPEC_DRILL_CLIENT
+
 namespace Drill {
 
     struct UserServerEndPoint;
@@ -61,8 +63,11 @@ namespace Drill {
      * Query Results listener callback. This function is called for every record batch after it has 
      * been received and decoded. The listener function should return a status. 
      * If the listener returns failure, the query will be canceled.
+     *
+     * DrillClientQueryResult will hold a listener & listener contxt for the call back function
      */
     typedef status_t (*pfnQueryResultsListener)(QueryHandle_t ctx, RecordBatch* b, DrillClientError* err);
+
     /*
      * The schema change listener callback. This function is called if the record batch detects a
      * change in the schema. The client application can call getColDefs in the RecordIterator or 
@@ -80,7 +85,6 @@ namespace Drill {
         public:
 
         ~RecordIterator();
-        
             /* 
              * Returns a vector of column(i.e. field) definitions. The returned reference is guaranteed to be valid till the 
              * end of the query or until a schema change event is received. If a schema change event is received by the 
@@ -134,7 +138,7 @@ namespace Drill {
              * Submit a query asynchronously and wait for results to be returned thru a callback. A query context handle is passed 
              * back. The listener callback will return the handle in the ctx parameter.
              */
-            status_t submitQuery(exec::user::QueryType t, const string& plan, pfnQueryResultsListener listener, QueryHandle_t* qHandle);
+            status_t submitQuery(exec::user::QueryType t, const string& plan, pfnQueryResultsListener listener, void* listenerCtx, QueryHandle_t* qHandle);
 
             /*
              * Submit a query asynchronously and wait for results to be returned thru an iterator that returns

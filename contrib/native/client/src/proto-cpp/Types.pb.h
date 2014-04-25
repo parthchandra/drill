@@ -28,6 +28,7 @@
 // @@protoc_insertion_point(includes)
 
 namespace common {
+
 // Internal implementation detail -- do not call these.
 void  protobuf_AddDesc_Types_2eproto();
 void protobuf_AssignDesc_Types_2eproto();
@@ -85,14 +86,13 @@ inline bool MinorType_Parse(
     MinorType_descriptor(), name, value);
 }
 enum DataMode {
-#undef OPTIONAL
-  OPTIONAL = 0,
-  REQUIRED = 1,
-  REPEATED = 2
+  DM_OPTIONAL = 0,
+  DM_REQUIRED = 1,
+  DM_REPEATED = 2
 };
 bool DataMode_IsValid(int value);
-const DataMode DataMode_MIN = OPTIONAL;
-const DataMode DataMode_MAX = REPEATED;
+const DataMode DataMode_MIN = DM_OPTIONAL;
+const DataMode DataMode_MAX = DM_REPEATED;
 const int DataMode_ARRAYSIZE = DataMode_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* DataMode_descriptor();
