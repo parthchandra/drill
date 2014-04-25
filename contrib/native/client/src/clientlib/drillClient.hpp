@@ -42,7 +42,8 @@ namespace Drill {
         QRY_SUCCESS_WITH_INFO=2, 
         QRY_NO_MORE_DATA=3, 
         QRY_CANCEL=4, 
-        QRY_OUT_OF_BOUNDS=5
+        QRY_OUT_OF_BOUNDS=5,
+        QRY_CLIENT_OUTOFMEM=6
     } status_t;
 
     typedef enum{

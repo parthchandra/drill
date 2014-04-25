@@ -144,18 +144,10 @@ void DrillClientImpl::waitForResults(){
     delete this->m_pListenerThread; this->m_pListenerThread=NULL;
 }
 
-void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code& err, size_t bytes_transferred) {
-    //TODO: LOCK the queries container
-    //TODO: LOCK the buffers container
+status_t DrillClientImpl::readMsg(ByteBuf_t _buf, InBoundRpcMessage& msg, boost::system::error_code& error){
     size_t leftover=0;
-    boost::system::error_code error=err;
-    if (!error){
-        uint32_t rmsgLen;
-        ByteBuf_t currentBuffer;
-        DrillClientQueryResult* pDrillClientQueryResult=NULL;
-        InBoundRpcMessage msg;
-
-        BOOST_LOG_TRIVIAL(trace) << "Getting new message" << endl;
+    uint32_t rmsgLen;
+    ByteBuf_t currentBuffer;
         {
             // We need to protect the readLength and read buffer, and the pending requests counter, 
             // but we don't have to keep the lock while we decode the rest of the buffer.
@@ -170,7 +162,7 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code
                 BOOST_LOG_TRIVIAL(trace) << "Allocated and locked buffer." << endl;
                 currentBuffer=allocateBuffer(rmsgLen);
                 if(currentBuffer==NULL){
-                    //TODO: Throw out of memory exception
+                    return QRY_CLIENT_OUTOFMEM;
                 }
                 if(leftover){
                     memcpy(currentBuffer, _buf + bytes_read, leftover);
@@ -183,20 +175,29 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code
                     size_t dataBytesRead=this->m_socket.read_some(
                             boost::asio::buffer(b, bytesToRead), 
                             error);
+                    if(error) break;
                     BOOST_LOG_TRIVIAL(trace) << "Data Message: actual bytes read = " << dataBytesRead << endl;
                     if(dataBytesRead==bytesToRead) break;
                     bytesToRead-=dataBytesRead;
                     b+=dataBytesRead;
                 }
                 if(!error){
+                    // read data successfully
                     DrillClientImpl::s_decoder.Decode(currentBuffer, rmsgLen, msg);
                     BOOST_LOG_TRIVIAL(trace) << "Done decoding chunk. Coordination id: " <<msg.m_coord_id<< endl;
-                } // read data successfully
+                }else{
+                    return QRY_FAILURE;
+                }
+            }else{
+                return QRY_NO_MORE_DATA;
             }
         }
-          
-        if(!error && msg.m_rpc_type==QUERY_RESULT){
-            status_t ret;
+        return QRY_SUCCESS;
+}
+
+status_t DrillClientImpl::processQueryResult(InBoundRpcMessage& msg ){
+        DrillClientQueryResult* pDrillClientQueryResult=NULL;
+            status_t ret=QRY_SUCCESS;
             {
             boost::lock_guard<boost::mutex> bufferLock(this->m_bufferMutex);
             QueryResult* qr = new QueryResult; //Record Batch will own this object and free it up.
@@ -205,29 +206,29 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code
             //TODO: Check QueryResult.queryState. QueryResult could have an error.
             
             //Build Record Batch here 
-            //RecordBatch* pRecordBatch= new RecordBatch(qr.def(), qr.row_count(), msg.m_dbody);
             qr->ParseFromArray(msg.m_pbody.data(), msg.m_pbody.size());
 
             BOOST_LOG_TRIVIAL(trace) << qr->DebugString();
             
-            status_t r=QRY_SUCCESS;
+            //TODO: schema changed??
+            //status_t r=QRY_SUCCESS;
             //r=pDrillClientQueryResult->setupColumnDefs(qr);
 
             RecordBatch* pRecordBatch= new RecordBatch(qr, msg.m_dbody);
             pRecordBatch->build();
-            if(r==QRY_SUCCESS_WITH_INFO){
-                pRecordBatch->schemaChanged(true);
-            }
+
+            //TODO: schema changed??
+            //if(r==QRY_SUCCESS_WITH_INFO){
+            //    pRecordBatch->schemaChanged(true);
+            //}
             exec::shared::QueryId qid;
-            //qid.ParseFromArray(msg.m_pbody.data(), msg.m_pbody.size());
             qid.CopyFrom(qr->query_id());
-            //BOOST_LOG_TRIVIAL(trace) << qid.DebugString();
             std::map<QueryId*, DrillClientQueryResult*, compareQueryId>::iterator it;
             it=this->m_queryResults.find(&qid);
             if(it!=this->m_queryResults.end()){
                 pDrillClientQueryResult=(*it).second;
             }else{
-                //TODO: return QRY_ERROR;
+                //TODO: return QRY_FAILURE;
             }
             BOOST_LOG_TRIVIAL(trace) << "Drill Client Query Result - " << pDrillClientQueryResult << endl;
               
@@ -241,25 +242,37 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code
                 ret = pDrillClientQueryResult->defaultQueryResultsListener(pDrillClientQueryResult, pRecordBatch, NULL);
             }
             } // release lock
-            //TODO: check the return value and do not continue if the 
-            //client app returns FAILURE
             if(ret==QRY_FAILURE){
                 pDrillClientQueryResult->sendCancel(msg);
-                return;
+                {
+                    boost::lock_guard<boost::mutex> bufferLock(this->m_bufferMutex);
+                    m_pendingRequests--;
+                }
+                BOOST_LOG_TRIVIAL(trace) << "Client app canceled query.";
+                //if(m_pendingRequests!=0){
+                //    getNextResult();
+                //}
+                return ret;
             }
             if(pDrillClientQueryResult->m_bIsLastChunk){
                 {
                     boost::lock_guard<boost::mutex> bufferLock(this->m_bufferMutex);
                     m_pendingRequests--;
                 }
+                ret=QRY_NO_MORE_DATA;
                 BOOST_LOG_TRIVIAL(trace) << "Received last batch.";
-                if(m_pendingRequests!=0){
-                    getNextResult();
-                }
-                return;
+                //if(m_pendingRequests!=0){
+                //    getNextResult();
+                //}
+                return ret;
             }
             pDrillClientQueryResult->sendAck(msg);
-        }else if(!error && msg.m_rpc_type==QUERY_HANDLE){ 
+            return ret;
+}
+
+status_t DrillClientImpl::processQueryId(InBoundRpcMessage& msg ){
+        DrillClientQueryResult* pDrillClientQueryResult=NULL;
+            status_t ret=QRY_SUCCESS;
             boost::lock_guard<boost::mutex> bufferLock(this->m_bufferMutex);
             std::map<int,DrillClientQueryResult*>::iterator it;
             it=this->m_queryIds.find(msg.m_coord_id);
@@ -274,8 +287,44 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code
                 pDrillClientQueryResult->setQueryId(qid);
                 	;
             }else{
-                //TODO: return QRY_ERROR;
+                ret=QRY_FAILURE;
             }
+            return ret;
+}
+
+void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code& err, size_t bytes_transferred) {
+    //TODO: LOCK the queries container
+    //TODO: LOCK the buffers container
+    //size_t leftover=0;
+    boost::system::error_code error=err;
+    if (!error){
+        //uint32_t rmsgLen;
+        //ByteBuf_t currentBuffer;
+        //DrillClientQueryResult* pDrillClientQueryResult=NULL;
+        InBoundRpcMessage msg;
+
+        BOOST_LOG_TRIVIAL(trace) << "Getting new message" << endl;
+
+        if(readMsg(_buf, msg, error)!=QRY_SUCCESS){
+          //TODO:
+          return;  
+        } 
+          
+        if(!error && msg.m_rpc_type==QUERY_RESULT){
+            status_t ret;
+            ret=processQueryResult(msg);
+            //TODO: check the return value and do not continue if the 
+            //client app returns FAILURE
+            if(ret==QRY_FAILURE||ret==QRY_NO_MORE_DATA){
+                if(m_pendingRequests!=0){
+                    getNextResult();
+                }
+                return;
+            }
+        }else if(!error && msg.m_rpc_type==QUERY_HANDLE){ 
+        //DrillClientQueryResult* pDrillClientQueryResult=NULL;
+        status_t ret=processQueryId(msg);
+        //TODO: handle QRY_ERROR 
         }else{
             if(error){
                 //this->m_bIsQueryPending=false;
@@ -286,7 +335,7 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf, const boost::system::error_code
                 return;
             }else{
                 //TODO:If not QUERY_RESULT, then do appropriate error handling
-                pDrillClientQueryResult->m_bIsQueryPending=false; // any blocked listener threads will move on
+                //pDrillClientQueryResult->m_bIsQueryPending=false; // any blocked listener threads will move on
                 BOOST_LOG_TRIVIAL(trace) << "QueryResult returned " << msg.m_rpc_type;
                 return;
             }

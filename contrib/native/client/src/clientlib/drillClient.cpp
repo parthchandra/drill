@@ -21,7 +21,9 @@ RecordIterator::~RecordIterator(){
 vector<FieldMetadata*>&  RecordIterator::getColDefs(){
     //NOTE: if query is cancelled, return whatever you have. Client applications job to deal with it.
     if(this->m_pColDefs==NULL){
-        this->m_pQueryResult->waitForData();
+        if(this->m_pCurrentRecordBatch==NULL){
+            this->m_pQueryResult->waitForData();
+        }
         std::vector<FieldMetadata*>* pColDefs = new std::vector<FieldMetadata*>;
         {   //lock after we come out of the  wait.
             boost::lock_guard<boost::mutex> bufferLock(this->m_recordBatchMutex);
@@ -64,7 +66,7 @@ status_t RecordIterator::next(){
                 ret = QRY_NO_MORE_DATA;
             }
             if(this->m_pCurrentRecordBatch->hasSchemaChanged()){
-                ret-QRY_SUCCESS_WITH_INFO;
+                ret=QRY_SUCCESS_WITH_INFO;
             }
         }
     }else{

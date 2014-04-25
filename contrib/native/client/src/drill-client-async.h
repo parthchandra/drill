@@ -84,10 +84,6 @@ namespace Drill {
 
             void setQueryId(QueryId* q){this->m_pQueryId=q;}
 
-            //void setIsLastChunk(bool val){ this->m_bIsLastChunk=val;}
-            //void setQueryPending(bool val){ this->m_bIsQueryPending=val;}
-            //pfnQueryResultsListener getQueryResultsListener(){ return this->m_pResultsListener;}
-
         private:
 
             DrillClientImpl* m_pClient;
@@ -100,13 +96,7 @@ namespace Drill {
             std::queue<RecordBatch*> m_recordBatches;
             std::vector<FieldMetadata*> m_columnDefs;
 
-            //length ofthe current data msg being received
-            //uint32_t m_rmsgLen;
-            //Pointer to the current data buffer being received and processed
-            //ByteBuf_t m_currentBuffer;
-            //Byte_t m_readLengthBuf[LEN_PREFIX_BUFLEN];
-
-            // Mutex to protect read buffer. Is this needed???
+            // Mutex to protect read/write operations on the socket
             boost::mutex m_bufferMutex; 
             // Mutex to protect schema definitions
             boost::mutex m_schemaMutex; 
@@ -202,6 +192,9 @@ namespace Drill {
         void sendSync(OutBoundRpcMessage& msg);
         void recvSync(InBoundRpcMessage& msg);
         void getNextResult();
+        status_t readMsg(ByteBuf_t _buf, InBoundRpcMessage& msg, boost::system::error_code& error);
+        status_t processQueryResult(InBoundRpcMessage& msg);
+        status_t processQueryId(InBoundRpcMessage& msg );
         void handleRead(ByteBuf_t _buf, const boost::system::error_code & err, size_t bytes_transferred) ;
         ByteBuf_t allocateBuffer(size_t len){
             ByteBuf_t b = (ByteBuf_t)malloc(len); memset(b, 0, len); return b;

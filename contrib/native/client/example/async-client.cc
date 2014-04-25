@@ -1,54 +1,14 @@
-//#pragma warning (disable: 4996)
-
-//#include <cassert>
 #include <stdio.h>
-//#include <iostream>
 #include <fstream>
-//#include <cstring>
-
-//#include <boost/cstdint.hpp>
 #include <boost/asio.hpp>
-//#include <boost/bind.hpp>
-//#include <boost/thread.hpp>
-//#include <boost/log/trivial.hpp>
-//#include <google/protobuf/message_lite.h>
-//#include <google/protobuf/wire_format_lite.h>
-
-//#include "proto-cpp/GeneralRPC.pb.h"
-//#include "proto-cpp/SchemaDef.pb.h"
-//#include "proto-cpp/UserBitShared.pb.h"
-//#include "proto-cpp/User.pb.h"
-//#include "proto-cpp/ExecutionProtos.pb.h"
-
-
-
-
 #include "common.h"
 #include "drill-client-async.h"
 #include "recordBatch.h"
 #include "proto-cpp/Types.pb.h"
 #include "proto-cpp/User.pb.h"
 
-//#include "rpc-message.h"
-//using exec::rpc::RpcMode;
-
-
-//using std::cout;
-//using std::cerr;
-//using std::endl;
-
-//using std::ifstream;
-//using std::ostream;
-//using std::memmove;
-//using exec::rpc::RpcMode;
-
-//namespace asio = boost::asio;
-//
 using namespace exec;
 using namespace common;
-
-
-
 using namespace Drill;
 
 status_t QueryResultsListener(void* ctx, RecordBatch* b, DrillClientError* err){
@@ -110,13 +70,9 @@ int main(int argc, char* argv[]) {
         string drill_addr = "127.0.0.1";
         int port=31010;
         string plan_filename = "test1.json";
-        //string plan2_filename = "test2.json";
         string plan2_filename;
         string queryType="sync";
         string apiType="usepublicapi";
-
-        //string s;
-        //std::cin >> s ;
 
         if (argc < 4) {
             std::cout << "Usage: async_client <server> <port> <sync|async> <usepublicapi|useinternalapi> <plan> [<plan2>] \n";
@@ -251,4 +207,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-

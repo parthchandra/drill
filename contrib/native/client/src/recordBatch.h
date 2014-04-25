@@ -131,6 +131,10 @@ namespace Drill {
                 return 0;
             }
 
+            virtual bool isNull(size_t index) const {
+                return false;
+            }
+
         protected:
             SlicedByteBuf* m_pBuffer;
             size_t m_rowCount;
