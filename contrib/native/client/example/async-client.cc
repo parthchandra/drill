@@ -27,31 +27,31 @@ void print(const FieldMetadata* pFieldMetadata, void* buf, size_t sz){
     switch (type) {
         case BIGINT:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     sprintf((char*)printBuffer, "%lld", *(uint64_t*)buf);
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     break;
             }
             break;
         case VARBINARY:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     memcpy(printBuffer, buf, sz);
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     break;
             }
             break;
         case VARCHAR:
             switch (mode) {
-                case REQUIRED:
+                case DM_REQUIRED:
                     memcpy(printBuffer, buf, sz);
-                case OPTIONAL:
+                case DM_OPTIONAL:
                     break;
-                case REPEATED:
+                case DM_REPEATED:
                     break;
             }
             break;
@@ -75,9 +75,9 @@ int main(int argc, char* argv[]) {
         string apiType="usepublicapi";
 
         if (argc < 4) {
-            std::cout << "Usage: async_client <server> <port> <sync|async> <usepublicapi|useinternalapi> <plan> [<plan2>] \n";
+            std::cout << "Usage: async-client <server> <port> <sync|async> <usepublicapi|useinternalapi> <plan> [<plan2>] \n";
             std::cout << "Example:\n";
-            std::cout << "  async_client 127.0.0.1 31010 async usepublicapi  ../resources/parquet_scan_union_screen_physical.json\n";
+            std::cout << "  async-client 127.0.0.1 31010 async usepublicapi  ../resources/parquet_scan_union_screen_physical.json\n";
             return 1;
         }
 
@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
             DrillClientQueryResult* pClientQuery = NULL;
             DrillClientQueryResult* pClientQuery2 = NULL;
             if(queryType=="sync"){
-                pClientQuery = client.SubmitQuery(exec::user::PHYSICAL, plan, NULL);
+                pClientQuery = client.SubmitQuery(exec::user::PHYSICAL, plan, NULL, NULL);
                 RecordBatch* pR=NULL;
                 while((pR=pClientQuery->getNext())!=NULL){
                     pR->print(2);
@@ -123,9 +123,9 @@ int main(int argc, char* argv[]) {
                 }
                 client.waitForResults();
             }else{
-                pClientQuery = client.SubmitQuery(exec::user::PHYSICAL, plan, QueryResultsListener);
+                pClientQuery = client.SubmitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, NULL);
                 if(!plan2_filename.empty()){
-                    pClientQuery2 = client.SubmitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener);
+                    pClientQuery2 = client.SubmitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener, NULL);
                 }
                 client.waitForResults();
             }
@@ -191,9 +191,9 @@ int main(int argc, char* argv[]) {
                 client.freeQueryIterator(&pIter2);
             }else{
                 QueryHandle_t qryHandle1=NULL, qryHandle2=NULL;
-                client.submitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, &qryHandle1);
+                client.submitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, NULL, &qryHandle1);
                 if(!plan2_filename.empty()){
-                    client.submitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener, &qryHandle2);
+                    client.submitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener, NULL, &qryHandle2);
                 }
                 client.waitForResults();
                 client.freeQueryResources(&qryHandle1);

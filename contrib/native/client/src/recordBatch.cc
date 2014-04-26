@@ -9,226 +9,91 @@ using namespace exec::user;
 using namespace Drill;
 
 ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f, SlicedByteBuf* b){
-    ValueVectorBase* v=NULL;
     const FieldDef& fieldDef = f.def();
     const MajorType& majorType=fieldDef.major_type();
     int type = majorType.minor_type();
     int mode = majorType.mode();
 
-    switch (type) {
-        case BIGINT:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorInt64(b, f.value_count()); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorInt64(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorInt64(b); 
-                    break;
-            }
-            break;
-        case VARBINARY:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorVarBinary(b, f.value_count()); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case VARCHAR:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorVarChar(b, f.value_count()); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
+    switch (mode) {
 
-        /*  
-        case TINYINT:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case UINT1:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case UINT2:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case SMALLINT:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case INT:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case UINT4:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case FLOAT4:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case BIGINT:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case UINT8:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case FLOAT8:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case VARBINARY:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case VARCHAR:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case VAR16CHAR:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
-        case BIT:
-            switch (mode) {
-                case REQUIRED:
-                    v=new ValueVectorXXXX(b); break;
-                case OPTIONAL:
-                    //v=new NullableValueVectorXXXX(b); 
-                    break;
-                case REPEATED:
-                    //v=new RepeatedValueVectorXXXX(b); 
-                    break;
-            }
-            break;
+    case DM_REQUIRED:
+        switch (type)
+        {
+            case TINYINT:
+                return new ValueVectorFixed<int8_t>(b,f.value_count());
+            case SMALLINT:
+                return new ValueVectorFixed<int16_t>(b,f.value_count());
+            case INT:
+                return new ValueVectorFixed<int32_t>(b,f.value_count());
+            case BIGINT:
+                return new ValueVectorFixed<int64_t>(b,f.value_count());
+            /*
+            case DECIMAL4:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case DECIMAL8:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case DECIMAL12:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case DECIMAL16:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case MONEY:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case DATE:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case TIME:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case TIMETZ:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case TIMESTAMP:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case DATETIME:
+                return new ValueVectorFixed<>(b,f.value_count());
+            case INTERVAL:
+                return new ValueVectorFixed<>(b,f.value_count());
             */
-        default:
-                v=new ValueVectorBase(b, f.value_count());
-            break;
+            
+            case FLOAT4:
+                return new ValueVectorFixed<float>(b,f.value_count());
+            case FLOAT8:
+                return new ValueVectorFixed<double>(b,f.value_count());
+            case BIT:
+                return new ValueVectorBit(b,f.value_count());
+            case VARBINARY:
+                return new ValueVectorVarBinary(b, f.value_count()); 
+            case VARCHAR:
+                return new ValueVectorVarChar(b, f.value_count()); 
+            default:
+                return new ValueVectorBase(b, f.value_count()); 
+        }
+    case DM_OPTIONAL:
+        switch (type)
+        {
+            case TINYINT:
+                return new NullableValueVectorFixed<int8_t>(b,f.value_count());
+            case SMALLINT:
+                return new NullableValueVectorFixed<int16_t>(b,f.value_count());
+            case INT:
+                return new NullableValueVectorFixed<int32_t>(b,f.value_count());
+            case BIGINT:
+                return new NullableValueVectorFixed<int64_t>(b,f.value_count());
+            case FLOAT4:
+                return new NullableValueVectorFixed<float>(b,f.value_count());
+            case FLOAT8:
+                return new NullableValueVectorFixed<double>(b,f.value_count());
+            // not implemented yet
+            default:
+                return new ValueVectorBase(b, f.value_count()); 
+        }
+    case DM_REPEATED:
+        switch (type)
+        {
+             // not implemented yet
+            default:
+                return new ValueVectorBase(b, f.value_count()); 
+        }
+         
     }
 
-    return v;
 }
 
 
@@ -278,7 +143,11 @@ void RecordBatch::print(size_t num){
             const ValueVectorBase * v = m_fields[i]->getVector();
             char valueBuf[1024+1];
             memset(valueBuf, 0, sizeof(valueBuf)*sizeof(char));
-            v->getValueAt(n, valueBuf, (sizeof(valueBuf)-1)*sizeof(char));
+            if(v->isNull(n)){
+                strncpy(valueBuf,"null", (sizeof(valueBuf)-1)*sizeof(char));
+            } else{
+                v->getValueAt(n, valueBuf, (sizeof(valueBuf)-1)*sizeof(char));
+            }
             values+=valueBuf;
             values+="    ";
         } 

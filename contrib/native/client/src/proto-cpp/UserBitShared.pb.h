@@ -37,6 +37,7 @@ void  protobuf_AddDesc_UserBitShared_2eproto();
 void protobuf_AssignDesc_UserBitShared_2eproto();
 void protobuf_ShutdownFile_UserBitShared_2eproto();
 
+class UserCredentials;
 class QueryId;
 class DrillPBError;
 class ParsingError;
@@ -64,6 +65,93 @@ inline bool RpcChannel_Parse(
     RpcChannel_descriptor(), name, value);
 }
 // ===================================================================
+
+class UserCredentials : public ::google::protobuf::Message {
+ public:
+  UserCredentials();
+  virtual ~UserCredentials();
+
+  UserCredentials(const UserCredentials& from);
+
+  inline UserCredentials& operator=(const UserCredentials& from) {
+    CopyFrom(from);
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const UserCredentials& default_instance();
+
+  void Swap(UserCredentials* other);
+
+  // implements Message ----------------------------------------------
+
+  UserCredentials* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const UserCredentials& from);
+  void MergeFrom(const UserCredentials& from);
+  void Clear();
+  bool IsInitialized() const;
+
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+
+  ::google::protobuf::Metadata GetMetadata() const;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // optional string user_name = 1;
+  inline bool has_user_name() const;
+  inline void clear_user_name();
+  static const int kUserNameFieldNumber = 1;
+  inline const ::std::string& user_name() const;
+  inline void set_user_name(const ::std::string& value);
+  inline void set_user_name(const char* value);
+  inline void set_user_name(const char* value, size_t size);
+  inline ::std::string* mutable_user_name();
+  inline ::std::string* release_user_name();
+  inline void set_allocated_user_name(::std::string* user_name);
+
+  // @@protoc_insertion_point(class_scope:exec.shared.UserCredentials)
+ private:
+  inline void set_has_user_name();
+  inline void clear_has_user_name();
+
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+
+  ::std::string* user_name_;
+
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+
+  friend void  protobuf_AddDesc_UserBitShared_2eproto();
+  friend void protobuf_AssignDesc_UserBitShared_2eproto();
+  friend void protobuf_ShutdownFile_UserBitShared_2eproto();
+
+  void InitAsDefaultInstance();
+  static UserCredentials* default_instance_;
+};
+// -------------------------------------------------------------------
 
 class QueryId : public ::google::protobuf::Message {
  public:
@@ -650,6 +738,80 @@ class FieldMetadata : public ::google::protobuf::Message {
 
 
 // ===================================================================
+
+// UserCredentials
+
+// optional string user_name = 1;
+inline bool UserCredentials::has_user_name() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void UserCredentials::set_has_user_name() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void UserCredentials::clear_has_user_name() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void UserCredentials::clear_user_name() {
+  if (user_name_ != &::google::protobuf::internal::kEmptyString) {
+    user_name_->clear();
+  }
+  clear_has_user_name();
+}
+inline const ::std::string& UserCredentials::user_name() const {
+  return *user_name_;
+}
+inline void UserCredentials::set_user_name(const ::std::string& value) {
+  set_has_user_name();
+  if (user_name_ == &::google::protobuf::internal::kEmptyString) {
+    user_name_ = new ::std::string;
+  }
+  user_name_->assign(value);
+}
+inline void UserCredentials::set_user_name(const char* value) {
+  set_has_user_name();
+  if (user_name_ == &::google::protobuf::internal::kEmptyString) {
+    user_name_ = new ::std::string;
+  }
+  user_name_->assign(value);
+}
+inline void UserCredentials::set_user_name(const char* value, size_t size) {
+  set_has_user_name();
+  if (user_name_ == &::google::protobuf::internal::kEmptyString) {
+    user_name_ = new ::std::string;
+  }
+  user_name_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* UserCredentials::mutable_user_name() {
+  set_has_user_name();
+  if (user_name_ == &::google::protobuf::internal::kEmptyString) {
+    user_name_ = new ::std::string;
+  }
+  return user_name_;
+}
+inline ::std::string* UserCredentials::release_user_name() {
+  clear_has_user_name();
+  if (user_name_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = user_name_;
+    user_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+inline void UserCredentials::set_allocated_user_name(::std::string* user_name) {
+  if (user_name_ != &::google::protobuf::internal::kEmptyString) {
+    delete user_name_;
+  }
+  if (user_name) {
+    set_has_user_name();
+    user_name_ = user_name;
+  } else {
+    clear_has_user_name();
+    user_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  }
+}
+
+// -------------------------------------------------------------------
 
 // QueryId
 

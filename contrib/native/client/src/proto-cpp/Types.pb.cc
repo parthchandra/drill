@@ -36,12 +36,13 @@ void protobuf_AssignDesc_Types_2eproto() {
       "Types.proto");
   GOOGLE_CHECK(file != NULL);
   MajorType_descriptor_ = file->message_type(0);
-  static const int MajorType_offsets_[5] = {
+  static const int MajorType_offsets_[6] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(MajorType, minor_type_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(MajorType, mode_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(MajorType, width_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(MajorType, precision_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(MajorType, scale_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(MajorType, timezone_),
   };
   MajorType_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -86,23 +87,26 @@ void protobuf_AddDesc_Types_2eproto() {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
 
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-    "\n\013Types.proto\022\006common\"\203\001\n\tMajorType\022%\n\nm"
+    "\n\013Types.proto\022\006common\"\225\001\n\tMajorType\022%\n\nm"
     "inor_type\030\001 \001(\0162\021.common.MinorType\022\036\n\004mo"
     "de\030\002 \001(\0162\020.common.DataMode\022\r\n\005width\030\003 \001("
-    "\005\022\021\n\tprecision\030\004 \001(\005\022\r\n\005scale\030\005 \001(\005*\243\003\n\t"
-    "MinorType\022\010\n\004LATE\020\000\022\007\n\003MAP\020\001\022\r\n\tREPEATMA"
-    "P\020\002\022\013\n\007TINYINT\020\003\022\014\n\010SMALLINT\020\004\022\007\n\003INT\020\005\022"
-    "\n\n\006BIGINT\020\006\022\014\n\010DECIMAL4\020\007\022\014\n\010DECIMAL8\020\010\022"
-    "\r\n\tDECIMAL12\020\t\022\r\n\tDECIMAL16\020\n\022\t\n\005MONEY\020\013"
-    "\022\010\n\004DATE\020\014\022\010\n\004TIME\020\r\022\n\n\006TIMETZ\020\016\022\r\n\tTIME"
-    "STAMP\020\017\022\014\n\010DATETIME\020\020\022\014\n\010INTERVAL\020\021\022\n\n\006F"
-    "LOAT4\020\022\022\n\n\006FLOAT8\020\023\022\007\n\003BIT\020\024\022\r\n\tFIXEDCHA"
-    "R\020\025\022\017\n\013FIXED16CHAR\020\026\022\017\n\013FIXEDBINARY\020\027\022\013\n"
-    "\007VARCHAR\020\030\022\r\n\tVAR16CHAR\020\031\022\r\n\tVARBINARY\020\032"
-    "\022\t\n\005UINT1\020\035\022\t\n\005UINT2\020\036\022\t\n\005UINT4\020\037\022\t\n\005UIN"
-    "T8\020 \022\013\n\007UNKNOWN\020%*4\n\010DataMode\022\014\n\010OPTIONA"
-    "L\020\000\022\014\n\010REQUIRED\020\001\022\014\n\010REPEATED\020\002B-\n\035org.a"
-    "pache.drill.common.typesB\nTypeProtosH\001", 678);
+    "\005\022\021\n\tprecision\030\004 \001(\005\022\r\n\005scale\030\005 \001(\005\022\020\n\010t"
+    "imeZone\030\006 \001(\005*\376\003\n\tMinorType\022\010\n\004LATE\020\000\022\007\n"
+    "\003MAP\020\001\022\r\n\tREPEATMAP\020\002\022\013\n\007TINYINT\020\003\022\014\n\010SM"
+    "ALLINT\020\004\022\007\n\003INT\020\005\022\n\n\006BIGINT\020\006\022\014\n\010DECIMAL"
+    "9\020\007\022\r\n\tDECIMAL18\020\010\022\023\n\017DECIMAL28SPARSE\020\t\022"
+    "\023\n\017DECIMAL38SPARSE\020\n\022\t\n\005MONEY\020\013\022\010\n\004DATE\020"
+    "\014\022\010\n\004TIME\020\r\022\n\n\006TIMETZ\020\016\022\017\n\013TIMESTAMPTZ\020\017"
+    "\022\r\n\tTIMESTAMP\020\020\022\014\n\010INTERVAL\020\021\022\n\n\006FLOAT4\020"
+    "\022\022\n\n\006FLOAT8\020\023\022\007\n\003BIT\020\024\022\r\n\tFIXEDCHAR\020\025\022\017\n"
+    "\013FIXED16CHAR\020\026\022\017\n\013FIXEDBINARY\020\027\022\013\n\007VARCH"
+    "AR\020\030\022\r\n\tVAR16CHAR\020\031\022\r\n\tVARBINARY\020\032\022\t\n\005UI"
+    "NT1\020\035\022\t\n\005UINT2\020\036\022\t\n\005UINT4\020\037\022\t\n\005UINT8\020 \022\022"
+    "\n\016DECIMAL28DENSE\020!\022\022\n\016DECIMAL38DENSE\020\"\022\013"
+    "\n\007UNKNOWN\020%\022\020\n\014INTERVALYEAR\020&\022\017\n\013INTERVA"
+    "LDAY\020\'*=\n\010DataMode\022\017\n\013DM_OPTIONAL\020\000\022\017\n\013D"
+    "M_REQUIRED\020\001\022\017\n\013DM_REPEATED\020\002B-\n\035org.apa"
+    "che.drill.common.typesB\nTypeProtosH\001", 796);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "Types.proto", &protobuf_RegisterTypes);
   MajorType::default_instance_ = new MajorType();
@@ -153,7 +157,11 @@ bool MinorType_IsValid(int value) {
     case 30:
     case 31:
     case 32:
+    case 33:
+    case 34:
     case 37:
+    case 38:
+    case 39:
       return true;
     default:
       return false;
@@ -184,6 +192,7 @@ const int MajorType::kModeFieldNumber;
 const int MajorType::kWidthFieldNumber;
 const int MajorType::kPrecisionFieldNumber;
 const int MajorType::kScaleFieldNumber;
+const int MajorType::kTimeZoneFieldNumber;
 #endif  // !_MSC_VER
 
 MajorType::MajorType()
@@ -207,6 +216,7 @@ void MajorType::SharedCtor() {
   width_ = 0;
   precision_ = 0;
   scale_ = 0;
+  timezone_ = 0;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -247,6 +257,7 @@ void MajorType::Clear() {
     width_ = 0;
     precision_ = 0;
     scale_ = 0;
+    timezone_ = 0;
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -343,6 +354,22 @@ bool MajorType::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(48)) goto parse_timeZone;
+        break;
+      }
+
+      // optional int32 timeZone = 6;
+      case 6: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_timeZone:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
+                 input, &timezone_)));
+          set_has_timezone();
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -392,6 +419,11 @@ void MajorType::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt32(5, this->scale(), output);
   }
 
+  // optional int32 timeZone = 6;
+  if (has_timezone()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt32(6, this->timezone(), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -425,6 +457,11 @@ void MajorType::SerializeWithCachedSizes(
   // optional int32 scale = 5;
   if (has_scale()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(5, this->scale(), target);
+  }
+
+  // optional int32 timeZone = 6;
+  if (has_timezone()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(6, this->timezone(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -471,6 +508,13 @@ int MajorType::ByteSize() const {
           this->scale());
     }
 
+    // optional int32 timeZone = 6;
+    if (has_timezone()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::Int32Size(
+          this->timezone());
+    }
+
   }
   if (!unknown_fields().empty()) {
     total_size +=
@@ -513,6 +557,9 @@ void MajorType::MergeFrom(const MajorType& from) {
     if (from.has_scale()) {
       set_scale(from.scale());
     }
+    if (from.has_timezone()) {
+      set_timezone(from.timezone());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -541,6 +588,7 @@ void MajorType::Swap(MajorType* other) {
     std::swap(width_, other->width_);
     std::swap(precision_, other->precision_);
     std::swap(scale_, other->scale_);
+    std::swap(timezone_, other->timezone_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

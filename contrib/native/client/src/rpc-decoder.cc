@@ -1,4 +1,5 @@
 #include <google/protobuf/io/coded_stream.h>
+#include <iostream>
 #include "common.h"
 #include "rpc-encoder.h"
 #include "rpc-decoder.h"
@@ -37,7 +38,7 @@ int RpcDecoder::Decode(const uint8_t* buf, int length, InBoundRpcMessage& msg) {
     // if(!ctx.channel().isOpen()){ return; }
 
 #ifdef  EXTRA_DEBUGGING
-        cerr <<  "\nInbound rpc message received." << endl;
+        std::cerr <<  "\nInbound rpc message received." << std::endl;
 #endif
 
     CodedInputStream* cis = new CodedInputStream(buf, length);

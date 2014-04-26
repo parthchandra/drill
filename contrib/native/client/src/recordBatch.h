@@ -1,9 +1,9 @@
 #ifndef RECORDBATCH_H
 #define RECORDBATCH_H
 
-//using namespace exec::shared;
 #include <stdint.h>
 #include <vector>
+#include <sstream>
 #include <assert.h>
 #include <proto-cpp/User.pb.h>
 
@@ -97,6 +97,10 @@ namespace Drill {
                 return readAt<uint64_t>(index);
             }
 
+            bool getBit(uint32_t index){
+                // refer to BitVector.java http://bit.ly/Py1jof
+               return this->m_buffer[index/8] &  ( 1 << (index % 8) );
+            }
         private:
             ByteBuf_t m_buffer; // the backing store
             size_t  m_start;    //offset within the backing store where this slice begins
@@ -114,6 +118,13 @@ namespace Drill {
             virtual ~ValueVectorBase(){
             }
 
+            // test whether the value is null in the position index
+            virtual bool isNull(size_t index) const
+            {
+                return false;
+            }
+
+
             const char* get(size_t index) const {
                 return "NOT IMPLEMENTED YET";
             }
@@ -129,10 +140,6 @@ namespace Drill {
 
             virtual uint32_t getSize(size_t index) const {
                 return 0;
-            }
-
-            virtual bool isNull(size_t index) const {
-                return false;
             }
 
         protected:
@@ -159,64 +166,33 @@ namespace Drill {
             }
     };
 
-    
-    //<Template class??>
-    class ValueVectorInt32:public ValueVectorFixedWidth{
-        public:
-            ValueVectorInt32(SlicedByteBuf *b, size_t rowCount):ValueVectorFixedWidth(b, rowCount){
-            }
-            uint32_t get(size_t index) const {
-                return m_pBuffer->getUint32(index*sizeof(uint32_t));
-            }
-            void getValueAt(size_t index, char* buf, size_t nChars) const {
-                char str[64]; // Can't have more than 64 digits of precision
-                //could use itoa instead of sprintf which is slow,  but it is not portable
-                sprintf(str, "%d", this->get(index));
-                strncpy(buf, str, nChars);
-                return;
-            }
-            uint32_t getSize(size_t index) const {
-                return sizeof(uint32_t);
-            }
+    template <typename VALUE_TYPE>
+    class ValueVectorFixed : public ValueVectorFixedWidth
+    {
+    public:
+        ValueVectorFixed(SlicedByteBuf *b, size_t rowCount) :
+            ValueVectorFixedWidth(b, rowCount)
+        {}
+        
+        VALUE_TYPE get(size_t index) const
+        {
+            return m_pBuffer->readAt<VALUE_TYPE>(index * sizeof(VALUE_TYPE));
+        }
+
+        void getValueAt(size_t index, char* buf, size_t nChars) const
+        {
+            std::stringstream sstr;
+            VALUE_TYPE value = this->get(index);
+            sstr << value;
+            strncpy(buf, sstr.str().c_str(), nChars);
+        }
+
+        uint32_t getSize(size_t index) const
+        {
+            return sizeof(VALUE_TYPE);
+        }
     };
 
-    class ValueVectorInt64:public ValueVectorFixedWidth{
-        public:
-            ValueVectorInt64(SlicedByteBuf *b, size_t rowCount):ValueVectorFixedWidth(b, rowCount){
-            }
-            uint64_t get(size_t index) const {
-                return m_pBuffer->getUint64(index*sizeof(uint64_t));
-            }
-            void getValueAt(size_t index, char* buf, size_t nChars) const {
-                char str[64]; // Can't have more than 64 digits of precision
-                //could use itoa instead of sprintf which is slow,  but it is not portable
-                sprintf(str, "%lld", this->get(index));
-                strncpy(buf, str, nChars);
-                return;
-            }
-            uint32_t getSize(size_t index) const {
-                return sizeof(uint64_t);
-            }
-    };
-
-    class ValueVectorByte:public ValueVectorFixedWidth{
-        public:
-            ValueVectorByte(SlicedByteBuf *b, size_t rowCount):ValueVectorFixedWidth(b, rowCount){
-            }
-            uint8_t get(size_t index) const {
-                return m_pBuffer->getByte(index*sizeof(uint8_t));
-            }
-            void getValueAt(size_t index, char* buf, size_t nChars) const {
-                char str[64]; // Can't have more than 64 digits of precision
-                //could use itoa instead of sprintf which is slow,  but it is not portable
-                sprintf(str, "%x", this->get(index));
-                strncpy(buf, str, nChars);
-                return;
-            }
-            uint32_t getSize(size_t index) const {
-                return sizeof(uint8_t);
-            }
-    };
 
     class ValueVectorBit:public ValueVectorFixedWidth{
         public:
@@ -242,6 +218,64 @@ namespace Drill {
             uint32_t getSize(size_t index) const {
                 return sizeof(uint64_t);
             }
+    };
+
+
+    template <typename VALUE_TYPE>
+    class NullableValueVectorFixed : public ValueVectorBase
+    {
+    public:
+        
+        NullableValueVectorFixed(SlicedByteBuf *b, size_t rowCount):ValueVectorBase(b, rowCount){
+                size_t offsetEnd = rowCount/8 + 1; 
+                this->m_pBitmap= new SlicedByteBuf(*b, 0, offsetEnd);
+                this->m_pData= new SlicedByteBuf(*b, offsetEnd, b->getLength());
+                // TODO: testing boundary case(null columns)
+        }
+        ~NullableValueVectorFixed(){
+            delete this->m_pBitmap;
+            delete this->m_pData;
+        
+        }
+
+        // test whether the value is null in the position index
+        bool isNull(size_t index) const
+        {
+            return !(m_pBitmap->getBit(index));
+        }
+
+        VALUE_TYPE get(size_t index) const
+        {
+            // it should not be called if the value is null 
+            assert( "value is null" && !isNull(index));
+
+            // TODO: smarter method
+            // naive way to counting bit set from bitmap[0...index)
+            int cnt_bitset = 0;
+            for(int i =0; i< index ; i++ ){
+                if(!isNull(i)) cnt_bitset++;
+            }
+
+            return m_pData->readAt<VALUE_TYPE>(cnt_bitset * sizeof(VALUE_TYPE));
+        }
+
+        void getValueAt(size_t index, char* buf, size_t nChars) const
+        {
+            assert( "value is null" && !isNull(index));
+            std::stringstream sstr;
+            VALUE_TYPE value = this->get(index);
+            sstr << value;
+            strncpy(buf, sstr.str().c_str(), nChars);
+        }
+
+        uint32_t getSize(size_t index) const
+        {
+            assert("value is null" && !isNull(index));
+            return sizeof(VALUE_TYPE);
+        }
+    private:
+        SlicedByteBuf* m_pBitmap; 
+        SlicedByteBuf* m_pData;
     };
 
     class VarWidthWrapper{
@@ -406,6 +440,8 @@ namespace Drill {
 
             size_t getNumRecords(){ return m_numRecords;}
             std::vector<FieldBatch*>& getFields(){ return m_fields;}
+			size_t getNumFields() { return m_pRecordBatchDef->field_size(); }
+			bool isLastChunk() { return m_pQueryResult->is_last_chunk(); }
 
             std::vector<const FieldMetadata*>& getColumnDefs(){ return m_fieldDefs;}
 
