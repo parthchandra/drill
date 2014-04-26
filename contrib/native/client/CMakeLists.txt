@@ -41,4 +41,6 @@ set_property(
 
 message("ProtoCpp = " ${ProtoCpp})
 add_executable(async-client example/async-client.cc ${AsyncDrillClientCpp} ${ProtoCpp}) 
+add_executable(sqlClient example/sqlClient.cpp ${AsyncDrillClientCpp} ${ProtoCpp})
 target_link_libraries(async-client ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} drillClient)
+target_link_libraries(sqlClient ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} drillClient)

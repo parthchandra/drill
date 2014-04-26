@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
         if (argc < 4) {
             std::cout << "Usage: async-client <server> <port> <sync|async> <usepublicapi|useinternalapi> <plan> [<plan2>] \n";
             std::cout << "Example:\n";
-            std::cout << "  async_client 127.0.0.1 31010 async usepublicapi  ../resources/parquet_scan_union_screen_physical.json\n";
+            std::cout << "  async-client 127.0.0.1 31010 async usepublicapi  ../resources/parquet_scan_union_screen_physical.json\n";
             return 1;
         }
 
