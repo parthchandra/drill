@@ -622,6 +622,22 @@ class PlanFragment : public ::google::protobuf::Message {
   inline ::google::protobuf::int64 mem_max() const;
   inline void set_mem_max(::google::protobuf::int64 value);
 
+  // optional int64 query_start_time = 14;
+  inline bool has_query_start_time() const;
+  inline void clear_query_start_time();
+  static const int kQueryStartTimeFieldNumber = 14;
+  inline ::google::protobuf::int64 query_start_time() const;
+  inline void set_query_start_time(::google::protobuf::int64 value);
+
+  // optional .exec.shared.UserCredentials credentials = 15;
+  inline bool has_credentials() const;
+  inline void clear_credentials();
+  static const int kCredentialsFieldNumber = 15;
+  inline const ::exec::shared::UserCredentials& credentials() const;
+  inline ::exec::shared::UserCredentials* mutable_credentials();
+  inline ::exec::shared::UserCredentials* release_credentials();
+  inline void set_allocated_credentials(::exec::shared::UserCredentials* credentials);
+
   // @@protoc_insertion_point(class_scope:exec.bit.control.PlanFragment)
  private:
   inline void set_has_handle();
@@ -646,6 +662,10 @@ class PlanFragment : public ::google::protobuf::Message {
   inline void clear_has_mem_initial();
   inline void set_has_mem_max();
   inline void clear_has_mem_max();
+  inline void set_has_query_start_time();
+  inline void clear_has_query_start_time();
+  inline void set_has_credentials();
+  inline void clear_has_credentials();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
@@ -659,10 +679,12 @@ class PlanFragment : public ::google::protobuf::Message {
   ::exec::DrillbitEndpoint* foreman_;
   ::google::protobuf::int64 mem_initial_;
   ::google::protobuf::int64 mem_max_;
+  ::google::protobuf::int64 query_start_time_;
+  ::exec::shared::UserCredentials* credentials_;
   bool leaf_fragment_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(11 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(13 + 31) / 32];
 
   friend void  protobuf_AddDesc_BitControl_2eproto();
   friend void protobuf_AssignDesc_BitControl_2eproto();
@@ -1469,6 +1491,66 @@ inline ::google::protobuf::int64 PlanFragment::mem_max() const {
 inline void PlanFragment::set_mem_max(::google::protobuf::int64 value) {
   set_has_mem_max();
   mem_max_ = value;
+}
+
+// optional int64 query_start_time = 14;
+inline bool PlanFragment::has_query_start_time() const {
+  return (_has_bits_[0] & 0x00000800u) != 0;
+}
+inline void PlanFragment::set_has_query_start_time() {
+  _has_bits_[0] |= 0x00000800u;
+}
+inline void PlanFragment::clear_has_query_start_time() {
+  _has_bits_[0] &= ~0x00000800u;
+}
+inline void PlanFragment::clear_query_start_time() {
+  query_start_time_ = GOOGLE_LONGLONG(0);
+  clear_has_query_start_time();
+}
+inline ::google::protobuf::int64 PlanFragment::query_start_time() const {
+  return query_start_time_;
+}
+inline void PlanFragment::set_query_start_time(::google::protobuf::int64 value) {
+  set_has_query_start_time();
+  query_start_time_ = value;
+}
+
+// optional .exec.shared.UserCredentials credentials = 15;
+inline bool PlanFragment::has_credentials() const {
+  return (_has_bits_[0] & 0x00001000u) != 0;
+}
+inline void PlanFragment::set_has_credentials() {
+  _has_bits_[0] |= 0x00001000u;
+}
+inline void PlanFragment::clear_has_credentials() {
+  _has_bits_[0] &= ~0x00001000u;
+}
+inline void PlanFragment::clear_credentials() {
+  if (credentials_ != NULL) credentials_->::exec::shared::UserCredentials::Clear();
+  clear_has_credentials();
+}
+inline const ::exec::shared::UserCredentials& PlanFragment::credentials() const {
+  return credentials_ != NULL ? *credentials_ : *default_instance_->credentials_;
+}
+inline ::exec::shared::UserCredentials* PlanFragment::mutable_credentials() {
+  set_has_credentials();
+  if (credentials_ == NULL) credentials_ = new ::exec::shared::UserCredentials;
+  return credentials_;
+}
+inline ::exec::shared::UserCredentials* PlanFragment::release_credentials() {
+  clear_has_credentials();
+  ::exec::shared::UserCredentials* temp = credentials_;
+  credentials_ = NULL;
+  return temp;
+}
+inline void PlanFragment::set_allocated_credentials(::exec::shared::UserCredentials* credentials) {
+  delete credentials_;
+  credentials_ = credentials;
+  if (credentials) {
+    set_has_credentials();
+  } else {
+    clear_has_credentials();
+  }
 }
 
 // -------------------------------------------------------------------

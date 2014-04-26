@@ -406,6 +406,8 @@ namespace Drill {
 
             size_t getNumRecords(){ return m_numRecords;}
             std::vector<FieldBatch*>& getFields(){ return m_fields;}
+			size_t getNumFields() { return m_pRecordBatchDef->field_size(); }
+			bool isLastChunk() { return m_pQueryResult->is_last_chunk(); }
 
             std::vector<const FieldMetadata*>& getColumnDefs(){ return m_fieldDefs;}
 

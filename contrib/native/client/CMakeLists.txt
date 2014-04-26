@@ -31,7 +31,6 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/src/clientlib")
 
 include_directories(${CMAKE_SOURCE_DIR}/src)
 file(GLOB ProtoCpp src/proto-cpp/*.cc)
-file(GLOB DrillClientCpp src/drill-client.cc src/rpc-encoder.cc src/rpc-decoder.cc src/rpc-message.cc src/drill-client-async.cc)
 file(GLOB AsyncDrillClientCpp src/drill-client-async.cc src/rpc-encoder.cc src/rpc-decoder.cc src/rpc-message.cc src/recordBatch.cc)
 
 #add a DEBUG preprocessor macro
@@ -41,8 +40,5 @@ set_property(
     )
 
 message("ProtoCpp = " ${ProtoCpp})
-message("DrillClientCpp = " ${DrillClientCpp})
 add_executable(async-client example/async-client.cc ${AsyncDrillClientCpp} ${ProtoCpp}) 
-add_executable(client example/client.cc ${DrillClientCpp} ${ProtoCpp}) 
 target_link_libraries(async-client ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} drillClient)
-target_link_libraries(client ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY})
