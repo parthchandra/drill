@@ -106,7 +106,7 @@ void protobuf_AssignDesc_BitControl_2eproto() {
       sizeof(FragmentStatus));
   FragmentStatus_FragmentState_descriptor_ = FragmentStatus_descriptor_->enum_type(0);
   PlanFragment_descriptor_ = file->message_type(3);
-  static const int PlanFragment_offsets_[11] = {
+  static const int PlanFragment_offsets_[13] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, handle_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, network_cost_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, cpu_cost_),
@@ -118,6 +118,8 @@ void protobuf_AssignDesc_BitControl_2eproto() {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, foreman_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, mem_initial_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, mem_max_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, query_start_time_),
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(PlanFragment, credentials_),
   };
   PlanFragment_reflection_ =
     new ::google::protobuf::internal::GeneratedMessageReflection(
@@ -215,7 +217,7 @@ void protobuf_AddDesc_BitControl_2eproto() {
     "shared.DrillPBError\022\024\n\014running_time\030\t \001("
     "\003\"k\n\rFragmentState\022\013\n\007SENDING\020\000\022\027\n\023AWAIT"
     "ING_ALLOCATION\020\001\022\013\n\007RUNNING\020\002\022\014\n\010FINISHE"
-    "D\020\003\022\r\n\tCANCELLED\020\004\022\n\n\006FAILED\020\005\"\310\002\n\014PlanF"
+    "D\020\003\022\r\n\tCANCELLED\020\004\022\n\n\006FAILED\020\005\"\225\003\n\014PlanF"
     "ragment\022(\n\006handle\030\001 \001(\0132\030.exec.bit.Fragm"
     "entHandle\022\024\n\014network_cost\030\004 \001(\002\022\020\n\010cpu_c"
     "ost\030\005 \001(\002\022\021\n\tdisk_cost\030\006 \001(\002\022\023\n\013memory_c"
@@ -224,16 +226,18 @@ void protobuf_AddDesc_BitControl_2eproto() {
     "leaf_fragment\030\t \001(\010\022\'\n\007foreman\030\013 \001(\0132\026.e"
     "xec.DrillbitEndpoint\022\035\n\013mem_initial\030\014 \001("
     "\003:\01020000000\022\034\n\007mem_max\030\r \001(\003:\0132000000000"
-    "0\"f\n\017WorkQueueStatus\022(\n\010endpoint\030\001 \001(\0132\026"
-    ".exec.DrillbitEndpoint\022\024\n\014queue_length\030\002"
-    " \001(\005\022\023\n\013report_time\030\003 \001(\003*\332\001\n\007RpcType\022\r\n"
-    "\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n\007GOODBYE\020\002\022\033\n\027RE"
-    "Q_INIATILIZE_FRAGMENT\020\003\022\027\n\023REQ_CANCEL_FR"
-    "AGMENT\020\006\022\027\n\023REQ_FRAGMENT_STATUS\020\007\022\022\n\016REQ"
-    "_BIT_STATUS\020\010\022\030\n\024RESP_FRAGMENT_HANDLE\020\t\022"
-    "\030\n\024RESP_FRAGMENT_STATUS\020\n\022\023\n\017RESP_BIT_ST"
-    "ATUS\020\013B+\n\033org.apache.drill.exec.protoB\nB"
-    "itControlH\001", 1451);
+    "0\022\030\n\020query_start_time\030\016 \001(\003\0221\n\013credentia"
+    "ls\030\017 \001(\0132\034.exec.shared.UserCredentials\"f"
+    "\n\017WorkQueueStatus\022(\n\010endpoint\030\001 \001(\0132\026.ex"
+    "ec.DrillbitEndpoint\022\024\n\014queue_length\030\002 \001("
+    "\005\022\023\n\013report_time\030\003 \001(\003*\332\001\n\007RpcType\022\r\n\tHA"
+    "NDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n\007GOODBYE\020\002\022\033\n\027REQ_I"
+    "NIATILIZE_FRAGMENT\020\003\022\027\n\023REQ_CANCEL_FRAGM"
+    "ENT\020\006\022\027\n\023REQ_FRAGMENT_STATUS\020\007\022\022\n\016REQ_BI"
+    "T_STATUS\020\010\022\030\n\024RESP_FRAGMENT_HANDLE\020\t\022\030\n\024"
+    "RESP_FRAGMENT_STATUS\020\n\022\023\n\017RESP_BIT_STATU"
+    "S\020\013B+\n\033org.apache.drill.exec.protoB\nBitC"
+    "ontrolH\001", 1528);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "BitControl.proto", &protobuf_RegisterTypes);
   BitControlHandshake::default_instance_ = new BitControlHandshake();
@@ -1373,6 +1377,8 @@ const int PlanFragment::kLeafFragmentFieldNumber;
 const int PlanFragment::kForemanFieldNumber;
 const int PlanFragment::kMemInitialFieldNumber;
 const int PlanFragment::kMemMaxFieldNumber;
+const int PlanFragment::kQueryStartTimeFieldNumber;
+const int PlanFragment::kCredentialsFieldNumber;
 #endif  // !_MSC_VER
 
 PlanFragment::PlanFragment()
@@ -1384,6 +1390,7 @@ void PlanFragment::InitAsDefaultInstance() {
   handle_ = const_cast< ::exec::bit::FragmentHandle*>(&::exec::bit::FragmentHandle::default_instance());
   assignment_ = const_cast< ::exec::DrillbitEndpoint*>(&::exec::DrillbitEndpoint::default_instance());
   foreman_ = const_cast< ::exec::DrillbitEndpoint*>(&::exec::DrillbitEndpoint::default_instance());
+  credentials_ = const_cast< ::exec::shared::UserCredentials*>(&::exec::shared::UserCredentials::default_instance());
 }
 
 PlanFragment::PlanFragment(const PlanFragment& from)
@@ -1405,6 +1412,8 @@ void PlanFragment::SharedCtor() {
   foreman_ = NULL;
   mem_initial_ = GOOGLE_LONGLONG(20000000);
   mem_max_ = GOOGLE_LONGLONG(20000000000);
+  query_start_time_ = GOOGLE_LONGLONG(0);
+  credentials_ = NULL;
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
 }
 
@@ -1420,6 +1429,7 @@ void PlanFragment::SharedDtor() {
     delete handle_;
     delete assignment_;
     delete foreman_;
+    delete credentials_;
   }
 }
 
@@ -1469,6 +1479,10 @@ void PlanFragment::Clear() {
     }
     mem_initial_ = GOOGLE_LONGLONG(20000000);
     mem_max_ = GOOGLE_LONGLONG(20000000000);
+    query_start_time_ = GOOGLE_LONGLONG(0);
+    if (has_credentials()) {
+      if (credentials_ != NULL) credentials_->::exec::shared::UserCredentials::Clear();
+    }
   }
   ::memset(_has_bits_, 0, sizeof(_has_bits_));
   mutable_unknown_fields()->Clear();
@@ -1646,6 +1660,36 @@ bool PlanFragment::MergePartialFromCodedStream(
         } else {
           goto handle_uninterpreted;
         }
+        if (input->ExpectTag(112)) goto parse_query_start_time;
+        break;
+      }
+
+      // optional int64 query_start_time = 14;
+      case 14: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_VARINT) {
+         parse_query_start_time:
+          DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
+                   ::google::protobuf::int64, ::google::protobuf::internal::WireFormatLite::TYPE_INT64>(
+                 input, &query_start_time_)));
+          set_has_query_start_time();
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectTag(122)) goto parse_credentials;
+        break;
+      }
+
+      // optional .exec.shared.UserCredentials credentials = 15;
+      case 15: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+         parse_credentials:
+          DO_(::google::protobuf::internal::WireFormatLite::ReadMessageNoVirtual(
+               input, mutable_credentials()));
+        } else {
+          goto handle_uninterpreted;
+        }
         if (input->ExpectAtEnd()) return true;
         break;
       }
@@ -1730,6 +1774,17 @@ void PlanFragment::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt64(13, this->mem_max(), output);
   }
 
+  // optional int64 query_start_time = 14;
+  if (has_query_start_time()) {
+    ::google::protobuf::internal::WireFormatLite::WriteInt64(14, this->query_start_time(), output);
+  }
+
+  // optional .exec.shared.UserCredentials credentials = 15;
+  if (has_credentials()) {
+    ::google::protobuf::internal::WireFormatLite::WriteMessageMaybeToArray(
+      15, this->credentials(), output);
+  }
+
   if (!unknown_fields().empty()) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         unknown_fields(), output);
@@ -1802,6 +1857,18 @@ void PlanFragment::SerializeWithCachedSizes(
   // optional int64 mem_max = 13 [default = 20000000000];
   if (has_mem_max()) {
     target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(13, this->mem_max(), target);
+  }
+
+  // optional int64 query_start_time = 14;
+  if (has_query_start_time()) {
+    target = ::google::protobuf::internal::WireFormatLite::WriteInt64ToArray(14, this->query_start_time(), target);
+  }
+
+  // optional .exec.shared.UserCredentials credentials = 15;
+  if (has_credentials()) {
+    target = ::google::protobuf::internal::WireFormatLite::
+      WriteMessageNoVirtualToArray(
+        15, this->credentials(), target);
   }
 
   if (!unknown_fields().empty()) {
@@ -1884,6 +1951,20 @@ int PlanFragment::ByteSize() const {
           this->mem_max());
     }
 
+    // optional int64 query_start_time = 14;
+    if (has_query_start_time()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::Int64Size(
+          this->query_start_time());
+    }
+
+    // optional .exec.shared.UserCredentials credentials = 15;
+    if (has_credentials()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::MessageSizeNoVirtual(
+          this->credentials());
+    }
+
   }
   if (!unknown_fields().empty()) {
     total_size +=
@@ -1946,6 +2027,12 @@ void PlanFragment::MergeFrom(const PlanFragment& from) {
     if (from.has_mem_max()) {
       set_mem_max(from.mem_max());
     }
+    if (from.has_query_start_time()) {
+      set_query_start_time(from.query_start_time());
+    }
+    if (from.has_credentials()) {
+      mutable_credentials()->::exec::shared::UserCredentials::MergeFrom(from.credentials());
+    }
   }
   mutable_unknown_fields()->MergeFrom(from.unknown_fields());
 }
@@ -1980,6 +2067,8 @@ void PlanFragment::Swap(PlanFragment* other) {
     std::swap(foreman_, other->foreman_);
     std::swap(mem_initial_, other->mem_initial_);
     std::swap(mem_max_, other->mem_max_);
+    std::swap(query_start_time_, other->query_start_time_);
+    std::swap(credentials_, other->credentials_);
     std::swap(_has_bits_[0], other->_has_bits_[0]);
     _unknown_fields_.Swap(&other->_unknown_fields_);
     std::swap(_cached_size_, other->_cached_size_);

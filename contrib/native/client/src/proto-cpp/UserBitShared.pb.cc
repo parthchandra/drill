@@ -21,6 +21,9 @@ namespace shared {
 
 namespace {
 
+const ::google::protobuf::Descriptor* UserCredentials_descriptor_ = NULL;
+const ::google::protobuf::internal::GeneratedMessageReflection*
+  UserCredentials_reflection_ = NULL;
 const ::google::protobuf::Descriptor* QueryId_descriptor_ = NULL;
 const ::google::protobuf::internal::GeneratedMessageReflection*
   QueryId_reflection_ = NULL;
@@ -47,7 +50,22 @@ void protobuf_AssignDesc_UserBitShared_2eproto() {
     ::google::protobuf::DescriptorPool::generated_pool()->FindFileByName(
       "UserBitShared.proto");
   GOOGLE_CHECK(file != NULL);
-  QueryId_descriptor_ = file->message_type(0);
+  UserCredentials_descriptor_ = file->message_type(0);
+  static const int UserCredentials_offsets_[1] = {
+    GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(UserCredentials, user_name_),
+  };
+  UserCredentials_reflection_ =
+    new ::google::protobuf::internal::GeneratedMessageReflection(
+      UserCredentials_descriptor_,
+      UserCredentials::default_instance_,
+      UserCredentials_offsets_,
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(UserCredentials, _has_bits_[0]),
+      GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(UserCredentials, _unknown_fields_),
+      -1,
+      ::google::protobuf::DescriptorPool::generated_pool(),
+      ::google::protobuf::MessageFactory::generated_factory(),
+      sizeof(UserCredentials));
+  QueryId_descriptor_ = file->message_type(1);
   static const int QueryId_offsets_[2] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(QueryId, part1_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(QueryId, part2_),
@@ -63,7 +81,7 @@ void protobuf_AssignDesc_UserBitShared_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(QueryId));
-  DrillPBError_descriptor_ = file->message_type(1);
+  DrillPBError_descriptor_ = file->message_type(2);
   static const int DrillPBError_offsets_[5] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(DrillPBError, error_id_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(DrillPBError, endpoint_),
@@ -82,7 +100,7 @@ void protobuf_AssignDesc_UserBitShared_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(DrillPBError));
-  ParsingError_descriptor_ = file->message_type(2);
+  ParsingError_descriptor_ = file->message_type(3);
   static const int ParsingError_offsets_[4] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ParsingError, start_column_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(ParsingError, start_row_),
@@ -100,7 +118,7 @@ void protobuf_AssignDesc_UserBitShared_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(ParsingError));
-  RecordBatchDef_descriptor_ = file->message_type(3);
+  RecordBatchDef_descriptor_ = file->message_type(4);
   static const int RecordBatchDef_offsets_[3] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(RecordBatchDef, field_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(RecordBatchDef, record_count_),
@@ -117,7 +135,7 @@ void protobuf_AssignDesc_UserBitShared_2eproto() {
       ::google::protobuf::DescriptorPool::generated_pool(),
       ::google::protobuf::MessageFactory::generated_factory(),
       sizeof(RecordBatchDef));
-  FieldMetadata_descriptor_ = file->message_type(4);
+  FieldMetadata_descriptor_ = file->message_type(5);
   static const int FieldMetadata_offsets_[6] = {
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FieldMetadata, def_),
     GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(FieldMetadata, value_count_),
@@ -151,6 +169,8 @@ inline void protobuf_AssignDescriptorsOnce() {
 void protobuf_RegisterTypes(const ::std::string&) {
   protobuf_AssignDescriptorsOnce();
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
+    UserCredentials_descriptor_, &UserCredentials::default_instance());
+  ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     QueryId_descriptor_, &QueryId::default_instance());
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedMessage(
     DrillPBError_descriptor_, &DrillPBError::default_instance());
@@ -165,6 +185,8 @@ void protobuf_RegisterTypes(const ::std::string&) {
 }  // namespace
 
 void protobuf_ShutdownFile_UserBitShared_2eproto() {
+  delete UserCredentials::default_instance_;
+  delete UserCredentials_reflection_;
   delete QueryId::default_instance_;
   delete QueryId_reflection_;
   delete DrillPBError::default_instance_;
@@ -187,32 +209,35 @@ void protobuf_AddDesc_UserBitShared_2eproto() {
   ::exec::protobuf_AddDesc_SchemaDef_2eproto();
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
     "\n\023UserBitShared.proto\022\013exec.shared\032\022Coor"
-    "dination.proto\032\017SchemaDef.proto\"\'\n\007Query"
-    "Id\022\r\n\005part1\030\001 \001(\020\022\r\n\005part2\030\002 \001(\020\"\241\001\n\014Dri"
-    "llPBError\022\020\n\010error_id\030\001 \001(\t\022(\n\010endpoint\030"
-    "\002 \001(\0132\026.exec.DrillbitEndpoint\022\022\n\nerror_t"
-    "ype\030\003 \001(\005\022\017\n\007message\030\004 \001(\t\0220\n\rparsing_er"
-    "ror\030\005 \003(\0132\031.exec.shared.ParsingError\"\\\n\014"
-    "ParsingError\022\024\n\014start_column\030\002 \001(\005\022\021\n\tst"
-    "art_row\030\003 \001(\005\022\022\n\nend_column\030\004 \001(\005\022\017\n\007end"
-    "_row\030\005 \001(\005\"p\n\016RecordBatchDef\022)\n\005field\030\001 "
-    "\003(\0132\032.exec.shared.FieldMetadata\022\024\n\014recor"
-    "d_count\030\002 \001(\005\022\035\n\025is_selection_vector_2\030\003"
-    " \001(\010\"\261\001\n\rFieldMetadata\022\033\n\003def\030\001 \001(\0132\016.ex"
-    "ec.FieldDef\022\023\n\013value_count\030\002 \001(\005\022\027\n\017var_"
-    "byte_length\030\003 \001(\005\022\023\n\013group_count\030\004 \001(\005\022\025"
-    "\n\rbuffer_length\030\005 \001(\005\022)\n\005child\030\006 \003(\0132\032.e"
-    "xec.shared.FieldMetadata*5\n\nRpcChannel\022\017"
-    "\n\013BIT_CONTROL\020\000\022\014\n\010BIT_DATA\020\001\022\010\n\004USER\020\002B"
-    ".\n\033org.apache.drill.exec.protoB\rUserBitS"
-    "haredH\001", 767);
+    "dination.proto\032\017SchemaDef.proto\"$\n\017UserC"
+    "redentials\022\021\n\tuser_name\030\001 \001(\t\"\'\n\007QueryId"
+    "\022\r\n\005part1\030\001 \001(\020\022\r\n\005part2\030\002 \001(\020\"\241\001\n\014Drill"
+    "PBError\022\020\n\010error_id\030\001 \001(\t\022(\n\010endpoint\030\002 "
+    "\001(\0132\026.exec.DrillbitEndpoint\022\022\n\nerror_typ"
+    "e\030\003 \001(\005\022\017\n\007message\030\004 \001(\t\0220\n\rparsing_erro"
+    "r\030\005 \003(\0132\031.exec.shared.ParsingError\"\\\n\014Pa"
+    "rsingError\022\024\n\014start_column\030\002 \001(\005\022\021\n\tstar"
+    "t_row\030\003 \001(\005\022\022\n\nend_column\030\004 \001(\005\022\017\n\007end_r"
+    "ow\030\005 \001(\005\"p\n\016RecordBatchDef\022)\n\005field\030\001 \003("
+    "\0132\032.exec.shared.FieldMetadata\022\024\n\014record_"
+    "count\030\002 \001(\005\022\035\n\025is_selection_vector_2\030\003 \001"
+    "(\010\"\261\001\n\rFieldMetadata\022\033\n\003def\030\001 \001(\0132\016.exec"
+    ".FieldDef\022\023\n\013value_count\030\002 \001(\005\022\027\n\017var_by"
+    "te_length\030\003 \001(\005\022\023\n\013group_count\030\004 \001(\005\022\025\n\r"
+    "buffer_length\030\005 \001(\005\022)\n\005child\030\006 \003(\0132\032.exe"
+    "c.shared.FieldMetadata*5\n\nRpcChannel\022\017\n\013"
+    "BIT_CONTROL\020\000\022\014\n\010BIT_DATA\020\001\022\010\n\004USER\020\002B.\n"
+    "\033org.apache.drill.exec.protoB\rUserBitSha"
+    "redH\001", 805);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "UserBitShared.proto", &protobuf_RegisterTypes);
+  UserCredentials::default_instance_ = new UserCredentials();
   QueryId::default_instance_ = new QueryId();
   DrillPBError::default_instance_ = new DrillPBError();
   ParsingError::default_instance_ = new ParsingError();
   RecordBatchDef::default_instance_ = new RecordBatchDef();
   FieldMetadata::default_instance_ = new FieldMetadata();
+  UserCredentials::default_instance_->InitAsDefaultInstance();
   QueryId::default_instance_->InitAsDefaultInstance();
   DrillPBError::default_instance_->InitAsDefaultInstance();
   ParsingError::default_instance_->InitAsDefaultInstance();
@@ -240,6 +265,231 @@ bool RpcChannel_IsValid(int value) {
     default:
       return false;
   }
+}
+
+
+// ===================================================================
+
+#ifndef _MSC_VER
+const int UserCredentials::kUserNameFieldNumber;
+#endif  // !_MSC_VER
+
+UserCredentials::UserCredentials()
+  : ::google::protobuf::Message() {
+  SharedCtor();
+}
+
+void UserCredentials::InitAsDefaultInstance() {
+}
+
+UserCredentials::UserCredentials(const UserCredentials& from)
+  : ::google::protobuf::Message() {
+  SharedCtor();
+  MergeFrom(from);
+}
+
+void UserCredentials::SharedCtor() {
+  _cached_size_ = 0;
+  user_name_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+}
+
+UserCredentials::~UserCredentials() {
+  SharedDtor();
+}
+
+void UserCredentials::SharedDtor() {
+  if (user_name_ != &::google::protobuf::internal::kEmptyString) {
+    delete user_name_;
+  }
+  if (this != default_instance_) {
+  }
+}
+
+void UserCredentials::SetCachedSize(int size) const {
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+}
+const ::google::protobuf::Descriptor* UserCredentials::descriptor() {
+  protobuf_AssignDescriptorsOnce();
+  return UserCredentials_descriptor_;
+}
+
+const UserCredentials& UserCredentials::default_instance() {
+  if (default_instance_ == NULL) protobuf_AddDesc_UserBitShared_2eproto();
+  return *default_instance_;
+}
+
+UserCredentials* UserCredentials::default_instance_ = NULL;
+
+UserCredentials* UserCredentials::New() const {
+  return new UserCredentials;
+}
+
+void UserCredentials::Clear() {
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (has_user_name()) {
+      if (user_name_ != &::google::protobuf::internal::kEmptyString) {
+        user_name_->clear();
+      }
+    }
+  }
+  ::memset(_has_bits_, 0, sizeof(_has_bits_));
+  mutable_unknown_fields()->Clear();
+}
+
+bool UserCredentials::MergePartialFromCodedStream(
+    ::google::protobuf::io::CodedInputStream* input) {
+#define DO_(EXPRESSION) if (!(EXPRESSION)) return false
+  ::google::protobuf::uint32 tag;
+  while ((tag = input->ReadTag()) != 0) {
+    switch (::google::protobuf::internal::WireFormatLite::GetTagFieldNumber(tag)) {
+      // optional string user_name = 1;
+      case 1: {
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_LENGTH_DELIMITED) {
+          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
+                input, this->mutable_user_name()));
+          ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+            this->user_name().data(), this->user_name().length(),
+            ::google::protobuf::internal::WireFormat::PARSE);
+        } else {
+          goto handle_uninterpreted;
+        }
+        if (input->ExpectAtEnd()) return true;
+        break;
+      }
+
+      default: {
+      handle_uninterpreted:
+        if (::google::protobuf::internal::WireFormatLite::GetTagWireType(tag) ==
+            ::google::protobuf::internal::WireFormatLite::WIRETYPE_END_GROUP) {
+          return true;
+        }
+        DO_(::google::protobuf::internal::WireFormat::SkipField(
+              input, tag, mutable_unknown_fields()));
+        break;
+      }
+    }
+  }
+  return true;
+#undef DO_
+}
+
+void UserCredentials::SerializeWithCachedSizes(
+    ::google::protobuf::io::CodedOutputStream* output) const {
+  // optional string user_name = 1;
+  if (has_user_name()) {
+    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+      this->user_name().data(), this->user_name().length(),
+      ::google::protobuf::internal::WireFormat::SERIALIZE);
+    ::google::protobuf::internal::WireFormatLite::WriteString(
+      1, this->user_name(), output);
+  }
+
+  if (!unknown_fields().empty()) {
+    ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
+        unknown_fields(), output);
+  }
+}
+
+::google::protobuf::uint8* UserCredentials::SerializeWithCachedSizesToArray(
+    ::google::protobuf::uint8* target) const {
+  // optional string user_name = 1;
+  if (has_user_name()) {
+    ::google::protobuf::internal::WireFormat::VerifyUTF8String(
+      this->user_name().data(), this->user_name().length(),
+      ::google::protobuf::internal::WireFormat::SERIALIZE);
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
+        1, this->user_name(), target);
+  }
+
+  if (!unknown_fields().empty()) {
+    target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
+        unknown_fields(), target);
+  }
+  return target;
+}
+
+int UserCredentials::ByteSize() const {
+  int total_size = 0;
+
+  if (_has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    // optional string user_name = 1;
+    if (has_user_name()) {
+      total_size += 1 +
+        ::google::protobuf::internal::WireFormatLite::StringSize(
+          this->user_name());
+    }
+
+  }
+  if (!unknown_fields().empty()) {
+    total_size +=
+      ::google::protobuf::internal::WireFormat::ComputeUnknownFieldsSize(
+        unknown_fields());
+  }
+  GOOGLE_SAFE_CONCURRENT_WRITES_BEGIN();
+  _cached_size_ = total_size;
+  GOOGLE_SAFE_CONCURRENT_WRITES_END();
+  return total_size;
+}
+
+void UserCredentials::MergeFrom(const ::google::protobuf::Message& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  const UserCredentials* source =
+    ::google::protobuf::internal::dynamic_cast_if_available<const UserCredentials*>(
+      &from);
+  if (source == NULL) {
+    ::google::protobuf::internal::ReflectionOps::Merge(from, this);
+  } else {
+    MergeFrom(*source);
+  }
+}
+
+void UserCredentials::MergeFrom(const UserCredentials& from) {
+  GOOGLE_CHECK_NE(&from, this);
+  if (from._has_bits_[0 / 32] & (0xffu << (0 % 32))) {
+    if (from.has_user_name()) {
+      set_user_name(from.user_name());
+    }
+  }
+  mutable_unknown_fields()->MergeFrom(from.unknown_fields());
+}
+
+void UserCredentials::CopyFrom(const ::google::protobuf::Message& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+void UserCredentials::CopyFrom(const UserCredentials& from) {
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool UserCredentials::IsInitialized() const {
+
+  return true;
+}
+
+void UserCredentials::Swap(UserCredentials* other) {
+  if (other != this) {
+    std::swap(user_name_, other->user_name_);
+    std::swap(_has_bits_[0], other->_has_bits_[0]);
+    _unknown_fields_.Swap(&other->_unknown_fields_);
+    std::swap(_cached_size_, other->_cached_size_);
+  }
+}
+
+::google::protobuf::Metadata UserCredentials::GetMetadata() const {
+  protobuf_AssignDescriptorsOnce();
+  ::google::protobuf::Metadata metadata;
+  metadata.descriptor = UserCredentials_descriptor_;
+  metadata.reflection = UserCredentials_reflection_;
+  return metadata;
 }
 
 

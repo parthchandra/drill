@@ -44,16 +44,16 @@ enum MinorType {
   SMALLINT = 4,
   INT = 5,
   BIGINT = 6,
-  DECIMAL4 = 7,
-  DECIMAL8 = 8,
-  DECIMAL12 = 9,
-  DECIMAL16 = 10,
+  DECIMAL9 = 7,
+  DECIMAL18 = 8,
+  DECIMAL28SPARSE = 9,
+  DECIMAL38SPARSE = 10,
   MONEY = 11,
   DATE = 12,
   TIME = 13,
   TIMETZ = 14,
-  TIMESTAMP = 15,
-  DATETIME = 16,
+  TIMESTAMPTZ = 15,
+  TIMESTAMP = 16,
   INTERVAL = 17,
   FLOAT4 = 18,
   FLOAT8 = 19,
@@ -68,11 +68,15 @@ enum MinorType {
   UINT2 = 30,
   UINT4 = 31,
   UINT8 = 32,
-  UNKNOWN = 37
+  DECIMAL28DENSE = 33,
+  DECIMAL38DENSE = 34,
+  UNKNOWN = 37,
+  INTERVALYEAR = 38,
+  INTERVALDAY = 39
 };
 bool MinorType_IsValid(int value);
 const MinorType MinorType_MIN = LATE;
-const MinorType MinorType_MAX = UNKNOWN;
+const MinorType MinorType_MAX = INTERVALDAY;
 const int MinorType_ARRAYSIZE = MinorType_MAX + 1;
 
 const ::google::protobuf::EnumDescriptor* MinorType_descriptor();
@@ -196,6 +200,13 @@ class MajorType : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 scale() const;
   inline void set_scale(::google::protobuf::int32 value);
 
+  // optional int32 timeZone = 6;
+  inline bool has_timezone() const;
+  inline void clear_timezone();
+  static const int kTimeZoneFieldNumber = 6;
+  inline ::google::protobuf::int32 timezone() const;
+  inline void set_timezone(::google::protobuf::int32 value);
+
   // @@protoc_insertion_point(class_scope:common.MajorType)
  private:
   inline void set_has_minor_type();
@@ -208,6 +219,8 @@ class MajorType : public ::google::protobuf::Message {
   inline void clear_has_precision();
   inline void set_has_scale();
   inline void clear_has_scale();
+  inline void set_has_timezone();
+  inline void clear_has_timezone();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
@@ -216,9 +229,10 @@ class MajorType : public ::google::protobuf::Message {
   ::google::protobuf::int32 width_;
   ::google::protobuf::int32 precision_;
   ::google::protobuf::int32 scale_;
+  ::google::protobuf::int32 timezone_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(6 + 31) / 32];
 
   friend void  protobuf_AddDesc_Types_2eproto();
   friend void protobuf_AssignDesc_Types_2eproto();
@@ -344,6 +358,28 @@ inline ::google::protobuf::int32 MajorType::scale() const {
 inline void MajorType::set_scale(::google::protobuf::int32 value) {
   set_has_scale();
   scale_ = value;
+}
+
+// optional int32 timeZone = 6;
+inline bool MajorType::has_timezone() const {
+  return (_has_bits_[0] & 0x00000020u) != 0;
+}
+inline void MajorType::set_has_timezone() {
+  _has_bits_[0] |= 0x00000020u;
+}
+inline void MajorType::clear_has_timezone() {
+  _has_bits_[0] &= ~0x00000020u;
+}
+inline void MajorType::clear_timezone() {
+  timezone_ = 0;
+  clear_has_timezone();
+}
+inline ::google::protobuf::int32 MajorType::timezone() const {
+  return timezone_;
+}
+inline void MajorType::set_timezone(::google::protobuf::int32 value) {
+  set_has_timezone();
+  timezone_ = value;
 }
 
 

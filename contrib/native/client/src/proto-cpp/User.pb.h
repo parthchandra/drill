@@ -37,6 +37,8 @@ void  protobuf_AddDesc_User_2eproto();
 void protobuf_AssignDesc_User_2eproto();
 void protobuf_ShutdownFile_User_2eproto();
 
+class Property;
+class UserProperties;
 class UserToBitHandshake;
 class RequestResults;
 class RunQuery;
@@ -134,6 +136,193 @@ inline bool QueryResultsMode_Parse(
 }
 // ===================================================================
 
+class Property : public ::google::protobuf::Message {
+ public:
+  Property();
+  virtual ~Property();
+
+  Property(const Property& from);
+
+  inline Property& operator=(const Property& from) {
+    CopyFrom(from);
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const Property& default_instance();
+
+  void Swap(Property* other);
+
+  // implements Message ----------------------------------------------
+
+  Property* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const Property& from);
+  void MergeFrom(const Property& from);
+  void Clear();
+  bool IsInitialized() const;
+
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+
+  ::google::protobuf::Metadata GetMetadata() const;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // required string key = 1;
+  inline bool has_key() const;
+  inline void clear_key();
+  static const int kKeyFieldNumber = 1;
+  inline const ::std::string& key() const;
+  inline void set_key(const ::std::string& value);
+  inline void set_key(const char* value);
+  inline void set_key(const char* value, size_t size);
+  inline ::std::string* mutable_key();
+  inline ::std::string* release_key();
+  inline void set_allocated_key(::std::string* key);
+
+  // required string value = 2;
+  inline bool has_value() const;
+  inline void clear_value();
+  static const int kValueFieldNumber = 2;
+  inline const ::std::string& value() const;
+  inline void set_value(const ::std::string& value);
+  inline void set_value(const char* value);
+  inline void set_value(const char* value, size_t size);
+  inline ::std::string* mutable_value();
+  inline ::std::string* release_value();
+  inline void set_allocated_value(::std::string* value);
+
+  // @@protoc_insertion_point(class_scope:exec.user.Property)
+ private:
+  inline void set_has_key();
+  inline void clear_has_key();
+  inline void set_has_value();
+  inline void clear_has_value();
+
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+
+  ::std::string* key_;
+  ::std::string* value_;
+
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(2 + 31) / 32];
+
+  friend void  protobuf_AddDesc_User_2eproto();
+  friend void protobuf_AssignDesc_User_2eproto();
+  friend void protobuf_ShutdownFile_User_2eproto();
+
+  void InitAsDefaultInstance();
+  static Property* default_instance_;
+};
+// -------------------------------------------------------------------
+
+class UserProperties : public ::google::protobuf::Message {
+ public:
+  UserProperties();
+  virtual ~UserProperties();
+
+  UserProperties(const UserProperties& from);
+
+  inline UserProperties& operator=(const UserProperties& from) {
+    CopyFrom(from);
+    return *this;
+  }
+
+  inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const {
+    return _unknown_fields_;
+  }
+
+  inline ::google::protobuf::UnknownFieldSet* mutable_unknown_fields() {
+    return &_unknown_fields_;
+  }
+
+  static const ::google::protobuf::Descriptor* descriptor();
+  static const UserProperties& default_instance();
+
+  void Swap(UserProperties* other);
+
+  // implements Message ----------------------------------------------
+
+  UserProperties* New() const;
+  void CopyFrom(const ::google::protobuf::Message& from);
+  void MergeFrom(const ::google::protobuf::Message& from);
+  void CopyFrom(const UserProperties& from);
+  void MergeFrom(const UserProperties& from);
+  void Clear();
+  bool IsInitialized() const;
+
+  int ByteSize() const;
+  bool MergePartialFromCodedStream(
+      ::google::protobuf::io::CodedInputStream* input);
+  void SerializeWithCachedSizes(
+      ::google::protobuf::io::CodedOutputStream* output) const;
+  ::google::protobuf::uint8* SerializeWithCachedSizesToArray(::google::protobuf::uint8* output) const;
+  int GetCachedSize() const { return _cached_size_; }
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const;
+  public:
+
+  ::google::protobuf::Metadata GetMetadata() const;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // repeated .exec.user.Property properties = 1;
+  inline int properties_size() const;
+  inline void clear_properties();
+  static const int kPropertiesFieldNumber = 1;
+  inline const ::exec::user::Property& properties(int index) const;
+  inline ::exec::user::Property* mutable_properties(int index);
+  inline ::exec::user::Property* add_properties();
+  inline const ::google::protobuf::RepeatedPtrField< ::exec::user::Property >&
+      properties() const;
+  inline ::google::protobuf::RepeatedPtrField< ::exec::user::Property >*
+      mutable_properties();
+
+  // @@protoc_insertion_point(class_scope:exec.user.UserProperties)
+ private:
+
+  ::google::protobuf::UnknownFieldSet _unknown_fields_;
+
+  ::google::protobuf::RepeatedPtrField< ::exec::user::Property > properties_;
+
+  mutable int _cached_size_;
+  ::google::protobuf::uint32 _has_bits_[(1 + 31) / 32];
+
+  friend void  protobuf_AddDesc_User_2eproto();
+  friend void protobuf_AssignDesc_User_2eproto();
+  friend void protobuf_ShutdownFile_User_2eproto();
+
+  void InitAsDefaultInstance();
+  static UserProperties* default_instance_;
+};
+// -------------------------------------------------------------------
+
 class UserToBitHandshake : public ::google::protobuf::Message {
  public:
   UserToBitHandshake();
@@ -209,6 +398,24 @@ class UserToBitHandshake : public ::google::protobuf::Message {
   inline ::google::protobuf::int32 rpc_version() const;
   inline void set_rpc_version(::google::protobuf::int32 value);
 
+  // optional .exec.shared.UserCredentials credentials = 4;
+  inline bool has_credentials() const;
+  inline void clear_credentials();
+  static const int kCredentialsFieldNumber = 4;
+  inline const ::exec::shared::UserCredentials& credentials() const;
+  inline ::exec::shared::UserCredentials* mutable_credentials();
+  inline ::exec::shared::UserCredentials* release_credentials();
+  inline void set_allocated_credentials(::exec::shared::UserCredentials* credentials);
+
+  // optional .exec.user.UserProperties properties = 5;
+  inline bool has_properties() const;
+  inline void clear_properties();
+  static const int kPropertiesFieldNumber = 5;
+  inline const ::exec::user::UserProperties& properties() const;
+  inline ::exec::user::UserProperties* mutable_properties();
+  inline ::exec::user::UserProperties* release_properties();
+  inline void set_allocated_properties(::exec::user::UserProperties* properties);
+
   // @@protoc_insertion_point(class_scope:exec.user.UserToBitHandshake)
  private:
   inline void set_has_channel();
@@ -217,15 +424,21 @@ class UserToBitHandshake : public ::google::protobuf::Message {
   inline void clear_has_support_listening();
   inline void set_has_rpc_version();
   inline void clear_has_rpc_version();
+  inline void set_has_credentials();
+  inline void clear_has_credentials();
+  inline void set_has_properties();
+  inline void clear_has_properties();
 
   ::google::protobuf::UnknownFieldSet _unknown_fields_;
 
   int channel_;
   bool support_listening_;
+  ::exec::shared::UserCredentials* credentials_;
+  ::exec::user::UserProperties* properties_;
   ::google::protobuf::int32 rpc_version_;
 
   mutable int _cached_size_;
-  ::google::protobuf::uint32 _has_bits_[(3 + 31) / 32];
+  ::google::protobuf::uint32 _has_bits_[(5 + 31) / 32];
 
   friend void  protobuf_AddDesc_User_2eproto();
   friend void protobuf_AssignDesc_User_2eproto();
@@ -834,6 +1047,179 @@ class QueryResult : public ::google::protobuf::Message {
 
 // ===================================================================
 
+// Property
+
+// required string key = 1;
+inline bool Property::has_key() const {
+  return (_has_bits_[0] & 0x00000001u) != 0;
+}
+inline void Property::set_has_key() {
+  _has_bits_[0] |= 0x00000001u;
+}
+inline void Property::clear_has_key() {
+  _has_bits_[0] &= ~0x00000001u;
+}
+inline void Property::clear_key() {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
+    key_->clear();
+  }
+  clear_has_key();
+}
+inline const ::std::string& Property::key() const {
+  return *key_;
+}
+inline void Property::set_key(const ::std::string& value) {
+  set_has_key();
+  if (key_ == &::google::protobuf::internal::kEmptyString) {
+    key_ = new ::std::string;
+  }
+  key_->assign(value);
+}
+inline void Property::set_key(const char* value) {
+  set_has_key();
+  if (key_ == &::google::protobuf::internal::kEmptyString) {
+    key_ = new ::std::string;
+  }
+  key_->assign(value);
+}
+inline void Property::set_key(const char* value, size_t size) {
+  set_has_key();
+  if (key_ == &::google::protobuf::internal::kEmptyString) {
+    key_ = new ::std::string;
+  }
+  key_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* Property::mutable_key() {
+  set_has_key();
+  if (key_ == &::google::protobuf::internal::kEmptyString) {
+    key_ = new ::std::string;
+  }
+  return key_;
+}
+inline ::std::string* Property::release_key() {
+  clear_has_key();
+  if (key_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = key_;
+    key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+inline void Property::set_allocated_key(::std::string* key) {
+  if (key_ != &::google::protobuf::internal::kEmptyString) {
+    delete key_;
+  }
+  if (key) {
+    set_has_key();
+    key_ = key;
+  } else {
+    clear_has_key();
+    key_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  }
+}
+
+// required string value = 2;
+inline bool Property::has_value() const {
+  return (_has_bits_[0] & 0x00000002u) != 0;
+}
+inline void Property::set_has_value() {
+  _has_bits_[0] |= 0x00000002u;
+}
+inline void Property::clear_has_value() {
+  _has_bits_[0] &= ~0x00000002u;
+}
+inline void Property::clear_value() {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    value_->clear();
+  }
+  clear_has_value();
+}
+inline const ::std::string& Property::value() const {
+  return *value_;
+}
+inline void Property::set_value(const ::std::string& value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void Property::set_value(const char* value) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(value);
+}
+inline void Property::set_value(const char* value, size_t size) {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  value_->assign(reinterpret_cast<const char*>(value), size);
+}
+inline ::std::string* Property::mutable_value() {
+  set_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    value_ = new ::std::string;
+  }
+  return value_;
+}
+inline ::std::string* Property::release_value() {
+  clear_has_value();
+  if (value_ == &::google::protobuf::internal::kEmptyString) {
+    return NULL;
+  } else {
+    ::std::string* temp = value_;
+    value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+    return temp;
+  }
+}
+inline void Property::set_allocated_value(::std::string* value) {
+  if (value_ != &::google::protobuf::internal::kEmptyString) {
+    delete value_;
+  }
+  if (value) {
+    set_has_value();
+    value_ = value;
+  } else {
+    clear_has_value();
+    value_ = const_cast< ::std::string*>(&::google::protobuf::internal::kEmptyString);
+  }
+}
+
+// -------------------------------------------------------------------
+
+// UserProperties
+
+// repeated .exec.user.Property properties = 1;
+inline int UserProperties::properties_size() const {
+  return properties_.size();
+}
+inline void UserProperties::clear_properties() {
+  properties_.Clear();
+}
+inline const ::exec::user::Property& UserProperties::properties(int index) const {
+  return properties_.Get(index);
+}
+inline ::exec::user::Property* UserProperties::mutable_properties(int index) {
+  return properties_.Mutable(index);
+}
+inline ::exec::user::Property* UserProperties::add_properties() {
+  return properties_.Add();
+}
+inline const ::google::protobuf::RepeatedPtrField< ::exec::user::Property >&
+UserProperties::properties() const {
+  return properties_;
+}
+inline ::google::protobuf::RepeatedPtrField< ::exec::user::Property >*
+UserProperties::mutable_properties() {
+  return &properties_;
+}
+
+// -------------------------------------------------------------------
+
 // UserToBitHandshake
 
 // optional .exec.shared.RpcChannel channel = 1 [default = USER];
@@ -901,6 +1287,82 @@ inline ::google::protobuf::int32 UserToBitHandshake::rpc_version() const {
 inline void UserToBitHandshake::set_rpc_version(::google::protobuf::int32 value) {
   set_has_rpc_version();
   rpc_version_ = value;
+}
+
+// optional .exec.shared.UserCredentials credentials = 4;
+inline bool UserToBitHandshake::has_credentials() const {
+  return (_has_bits_[0] & 0x00000008u) != 0;
+}
+inline void UserToBitHandshake::set_has_credentials() {
+  _has_bits_[0] |= 0x00000008u;
+}
+inline void UserToBitHandshake::clear_has_credentials() {
+  _has_bits_[0] &= ~0x00000008u;
+}
+inline void UserToBitHandshake::clear_credentials() {
+  if (credentials_ != NULL) credentials_->::exec::shared::UserCredentials::Clear();
+  clear_has_credentials();
+}
+inline const ::exec::shared::UserCredentials& UserToBitHandshake::credentials() const {
+  return credentials_ != NULL ? *credentials_ : *default_instance_->credentials_;
+}
+inline ::exec::shared::UserCredentials* UserToBitHandshake::mutable_credentials() {
+  set_has_credentials();
+  if (credentials_ == NULL) credentials_ = new ::exec::shared::UserCredentials;
+  return credentials_;
+}
+inline ::exec::shared::UserCredentials* UserToBitHandshake::release_credentials() {
+  clear_has_credentials();
+  ::exec::shared::UserCredentials* temp = credentials_;
+  credentials_ = NULL;
+  return temp;
+}
+inline void UserToBitHandshake::set_allocated_credentials(::exec::shared::UserCredentials* credentials) {
+  delete credentials_;
+  credentials_ = credentials;
+  if (credentials) {
+    set_has_credentials();
+  } else {
+    clear_has_credentials();
+  }
+}
+
+// optional .exec.user.UserProperties properties = 5;
+inline bool UserToBitHandshake::has_properties() const {
+  return (_has_bits_[0] & 0x00000010u) != 0;
+}
+inline void UserToBitHandshake::set_has_properties() {
+  _has_bits_[0] |= 0x00000010u;
+}
+inline void UserToBitHandshake::clear_has_properties() {
+  _has_bits_[0] &= ~0x00000010u;
+}
+inline void UserToBitHandshake::clear_properties() {
+  if (properties_ != NULL) properties_->::exec::user::UserProperties::Clear();
+  clear_has_properties();
+}
+inline const ::exec::user::UserProperties& UserToBitHandshake::properties() const {
+  return properties_ != NULL ? *properties_ : *default_instance_->properties_;
+}
+inline ::exec::user::UserProperties* UserToBitHandshake::mutable_properties() {
+  set_has_properties();
+  if (properties_ == NULL) properties_ = new ::exec::user::UserProperties;
+  return properties_;
+}
+inline ::exec::user::UserProperties* UserToBitHandshake::release_properties() {
+  clear_has_properties();
+  ::exec::user::UserProperties* temp = properties_;
+  properties_ = NULL;
+  return temp;
+}
+inline void UserToBitHandshake::set_allocated_properties(::exec::user::UserProperties* properties) {
+  delete properties_;
+  properties_ = properties;
+  if (properties) {
+    set_has_properties();
+  } else {
+    clear_has_properties();
+  }
 }
 
 // -------------------------------------------------------------------
