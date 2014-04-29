@@ -39,7 +39,14 @@ int main(int argc, char* argv[]) {
 
 
 		std::vector<std::string> plans; 
-		plans.push_back("select * from `INFORMATION_SCHEMA`.`SCHEMATA`");
+		plans.push_back("select \
+                cast('1.123456' as DECIMAL(9,2)) as DEC9, \
+                cast('2.123456' as DECIMAL(18,2)) as DEC18, \
+                cast('3.123456' as DECIMAL(28,2)) as DEC28D, \
+                cast('4.123456' as DECIMAL(38,2)) as DEC38D, \
+                cast('1.0000' as DECIMAL(28,2))+cast('2.000' as DECIMAL(28,2)) as DEC28S, \
+                cast('3.00' as DECIMAL(38,2))+cast('4.00' as DECIMAL(28,2)) as DEC38S \
+                from `INFORMATION_SCHEMA`.`SCHEMATA`");
 		//plans.push_back("select * from `INFORMATION_SCHEMA`.`TABLES`");
 		//plans.push_back("select * from dfs.`/opt/drill/data/json/test.json`");
 		//plans.push_back("select * from `hivestg`.`integer_table`");
