@@ -1,6 +1,5 @@
 #include <boost/log/trivial.hpp>
 
-#include "common.h"
 #include "recordBatch.h"
 
 using namespace common;
@@ -164,17 +163,27 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new ValueVectorFixed<int32_t>(b,f.value_count());
             case BIGINT:
                 return new ValueVectorFixed<int64_t>(b,f.value_count());
+
+            // Decimal digits, width, max precision is defined in
+            //
+            // /exec/java-exec/src/main/codegen/data/ValueVectorTypes.tdd
+            // 
+            // Decimal Design Document: http://bit.ly/drilldecimal
+            case DECIMAL9:
+                return new ValueVectorDecimal9(b,f.value_count(), majorType.scale());
+            case DECIMAL18:
+                return new ValueVectorDecimal18(b,f.value_count(), majorType.scale());
+            case DECIMAL28DENSE:
+                return new ValueVectorDecimal28Dense(b,f.value_count(), majorType.scale());
+            case DECIMAL38DENSE:
+                return new ValueVectorDecimal38Dense(b,f.value_count(), majorType.scale());
+            case DECIMAL28SPARSE:
+                return new ValueVectorDecimal28Sparse(b,f.value_count(), majorType.scale());
+            case DECIMAL38SPARSE:
+                return new ValueVectorDecimal38Sparse(b,f.value_count(), majorType.scale());
             /*
-            case DECIMAL4:
-                return new ValueVectorFixed<>(b,f.value_count());
-            case DECIMAL8:
-                return new ValueVectorFixed<>(b,f.value_count());
-            case DECIMAL12:
-                return new ValueVectorFixed<>(b,f.value_count());
-            case DECIMAL16:
-                return new ValueVectorFixed<>(b,f.value_count());
+             * NOT IMPLEMENTED
             case MONEY:
-                return new ValueVectorFixed<>(b,f.value_count());
             */
             case DATE:
                 return new ValueVectorTyped<DateHolder, uint64_t>(b,f.value_count());
@@ -200,6 +209,7 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new ValueVectorVarBinary(b, f.value_count()); 
             case VARCHAR:
                 return new ValueVectorVarChar(b, f.value_count()); 
+
             default:
                 return new ValueVectorUnimplemented(b, f.value_count()); 
         }

@@ -1,11 +1,15 @@
 #ifndef RECORDBATCH_H
 #define RECORDBATCH_H
 
+#include "common.h"
+#include "decimalUtils.hpp"
+
 #include <stdint.h>
 #include <vector>
 #include <sstream>
 #include <assert.h>
 #include <proto-cpp/User.pb.h>
+#include <boost/lexical_cast.hpp>
 
 using namespace exec::shared;
 using namespace exec::user;
@@ -241,6 +245,88 @@ namespace Drill {
                 return sizeof(uint8_t);
             }
     };
+
+    template <int DECIMAL_DIGITS, int WIDTH_IN_BYTES, bool IS_SPARSE, int MAX_PRECISION = 0 >
+    class ValueVectorDecimal: public ValueVectorFixedWidth {
+    public:
+        ValueVectorDecimal(SlicedByteBuf* b, size_t rowCount, int32_t scale): 
+            ValueVectorFixedWidth(b, rowCount),
+            m_scale(scale)
+        {
+            ; // Do nothing
+        }
+
+        DecimalValue get(size_t index) const {
+            if (IS_SPARSE)
+            {
+                return getDecimalValueFromSparse(*m_pBuffer, index * WIDTH_IN_BYTES, DECIMAL_DIGITS, m_scale);
+            }
+            return getDecimalValueFromDense(*m_pBuffer, index * WIDTH_IN_BYTES, DECIMAL_DIGITS, m_scale, MAX_PRECISION, WIDTH_IN_BYTES);
+        }
+
+        void getValueAt(size_t index, char* buf, size_t nChars) const {
+            const DecimalValue& val = this->get(index);
+            const string& str = boost::lexical_cast<string>(val.m_unscaledValue);
+            size_t idxDecimalMark = str.length() - m_scale;
+            const string& decStr= str.substr(0, idxDecimalMark) + "." + str.substr(idxDecimalMark, m_scale);
+            strncpy(buf, decStr.c_str(), nChars);
+            return;
+        }
+
+        uint32_t getSize(size_t index) const {
+            return WIDTH_IN_BYTES;
+        }
+
+    private:
+        int32_t m_scale;
+    };
+
+    template<typename VALUE_TYPE>
+    class ValueVectorDecimalTrivial: public ValueVectorFixedWidth {
+    public:
+        ValueVectorDecimalTrivial(SlicedByteBuf* b, size_t rowCount, int32_t scale): 
+            ValueVectorFixedWidth(b, rowCount),
+            m_scale(scale)
+        {
+            ; // Do nothing
+        }
+
+        DecimalValue get(size_t index) const {
+            return DecimalValue(
+                    m_pBuffer->readAt<VALUE_TYPE>(index * sizeof(VALUE_TYPE)),
+                    m_scale); 
+        }
+        
+        void getValueAt(size_t index, char* buf, size_t nChars) const {
+            VALUE_TYPE value = m_pBuffer->readAt<VALUE_TYPE>(index * sizeof(VALUE_TYPE));
+            const string& str = boost::lexical_cast<string>(value);
+            size_t idxDecimalMark = str.length() - m_scale;
+            const string& decStr= str.substr(0, idxDecimalMark) + "." + str.substr(idxDecimalMark, m_scale);
+            strncpy(buf, decStr.c_str(), nChars);
+            return;
+        }
+
+        uint32_t getSize(size_t index) const {
+            return sizeof(VALUE_TYPE);
+        }
+
+    private:
+        int32_t m_scale;
+    };
+
+
+
+    // Aliases for Decimal Types:
+    // The definitions for decimal digits, width, max precision are defined in
+    // /exec/java-exec/src/main/codegen/data/ValueVectorTypes.tdd
+    // 
+    // Decimal9 and Decimal18 could be optimized, maybe write seperate classes?
+    typedef ValueVectorDecimalTrivial<int32_t> ValueVectorDecimal9;
+    typedef ValueVectorDecimalTrivial<int64_t> ValueVectorDecimal18;
+    typedef ValueVectorDecimal<3, 12, false, 28> ValueVectorDecimal28Dense;
+    typedef ValueVectorDecimal<4, 16, false, 38> ValueVectorDecimal38Dense;
+    typedef ValueVectorDecimal<5, 20, true, 28>  ValueVectorDecimal28Sparse;
+    typedef ValueVectorDecimal<6, 24, true, 38>  ValueVectorDecimal38Sparse;
 
 
     template <typename VALUE_TYPE>
