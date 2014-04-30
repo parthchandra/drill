@@ -692,13 +692,19 @@ namespace Drill {
 
     class RecordBatch{
         public:
-            RecordBatch(QueryResult* pResult, ByteBuf_t b){
-                m_pQueryResult=pResult;      
-                m_pRecordBatchDef=&pResult->def();
-                m_numRecords=pResult->row_count();
-                m_buffer=b;
-                m_numFields=pResult->def().field_size();
-                m_bHasSchemaChanged=false;
+            RecordBatch(QueryResult* pResult, ByteBuf_t b) :
+                m_pQueryResult(pResult),
+                m_pRecordBatchDef(&pResult->def()),
+                m_buffer(b),
+                m_queryState(QueryResult::UNKNOWN_QUERY),
+                m_numFields(pResult->def().field_size()),
+                m_numRecords(pResult->row_count()),
+                m_bHasSchemaChanged(false)
+            {
+                if (pResult->has_query_state())
+                {
+                    m_queryState = pResult->query_state();
+                }
             }
 
             ~RecordBatch(){
@@ -749,11 +755,16 @@ namespace Drill {
                 this->m_bHasSchemaChanged=b;
             }
 
+            QueryResult::QueryState getQueryState() const{
+                return m_queryState;
+            }
+
             bool hasSchemaChanged(){ return m_bHasSchemaChanged;}
         private:
             const QueryResult* m_pQueryResult;
             const RecordBatchDef* m_pRecordBatchDef;
             ByteBuf_t m_buffer;
+            QueryResult::QueryState m_queryState;
             //build the current schema out of the field metadata
             std::vector<const FieldMetadata*> m_fieldDefs;
             std::vector<FieldBatch*> m_fields;
