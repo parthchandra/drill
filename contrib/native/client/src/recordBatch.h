@@ -195,14 +195,7 @@ namespace Drill {
             ValueVectorBit(SlicedByteBuf *b, size_t rowCount):ValueVectorFixedWidth(b, rowCount){
             }
             uint8_t get(size_t index) const {
-#ifdef DEBUG
-                uint8_t b = m_pBuffer->getByte((index)/sizeof(uint8_t));
-                uint8_t bitOffset = index%sizeof(uint8_t);
-                uint8_t setBit = (1<<bitOffset); // sets the Nth bit.
-                uint8_t isSet = (b&setBit);
-#endif
-                return (m_pBuffer->getByte((index)/sizeof(uint8_t))) & (1<< (index%sizeof(uint8_t)) );
-
+               return m_pBuffer->getBit(index);
             }
             void getValueAt(size_t index, char* buf, size_t nChars) const {
                 char str[64]; // Can't have more than 64 digits of precision
@@ -212,7 +205,7 @@ namespace Drill {
                 return;
             }
             uint32_t getSize(size_t index) const {
-                return sizeof(uint64_t);
+                return sizeof(uint8_t);
             }
     };
 
