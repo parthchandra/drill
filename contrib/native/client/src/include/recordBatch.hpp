@@ -94,7 +94,7 @@ namespace Drill {
             //    }
             
 
-            template <typename T> T readAt(uint32_t index) const {
+            template <typename T> T readAt(size_t index) const {
                 // Type T can only be an integer type
                 // Type T cannot be a struct of fixed size
                 // Because struct alignment is compiler dependent
@@ -119,13 +119,13 @@ namespace Drill {
                 return readAt<uint64_t>(index);
             }
 
-            ByteBuf_t getAt(uint32_t index){
+            ByteBuf_t getAt(size_t index){
                return this->m_buffer+m_start+index;
             } 
 
-            bool getBit(uint32_t index){
+            bool getBit(size_t index){
                 // refer to BitVector.java http://bit.ly/Py1jof
-               return ((this->m_buffer[m_start+index/8] &  ( 1 << (index % 8) )) !=0);
+                return ((this->m_buffer[m_start+index/8] &  ( 1 << (index % 8) )) !=0);
             }
         private:
             ByteBuf_t m_buffer; // the backing store
