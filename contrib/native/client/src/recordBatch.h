@@ -15,7 +15,8 @@ namespace Drill {
     class FieldBatch;
     class ValueVectorBase;
 
-    //TODO: The base classes for value vectors should have abstract functions instead of implementations that return 'NOT IMPLEMENTED YET'
+    //TODO: The base classes for value vectors should have abstract functions instead of implementations 
+    //that return 'NOT IMPLEMENTED YET'
 
     // A Read Only Sliced byte buffer
     class SlicedByteBuf{
@@ -24,7 +25,7 @@ namespace Drill {
             SlicedByteBuf(const ByteBuf_t b, size_t offset, size_t length){
                 this->m_buffer=b;
                 this->m_start=offset;
-                this->m_end=offset+length;
+                this->m_end=offset+length-1;
                 this->m_length=length;
             }
 
@@ -69,20 +70,25 @@ namespace Drill {
             // ByteBuf_t getBuffer(){ return m_buffer;}
             ByteBuf_t getSliceStart(){ return this->m_buffer+this->m_start;}
 
-            //TODO: implement accessor functions
-            /*  
-                TYPE getTYPE(size_t index){
-                if(index>=m_length) return 0;
-                return (TYPE) m_buffer[offset+index];
-                }
-            */
+            //    accessor functions
+            //  
+            //    TYPE getTYPE(size_t index){
+            //    if(index>=m_length) return 0;
+            //      return (TYPE) m_buffer[offset+index];
+            //    }
+            
 
             template <typename T> T readAt(uint32_t index) const {
+                // Type T can only be an integer type
+                // Type T cannot be a struct of fixed size
+                // Because struct alignment is compiler dependent
+                // we can end up with a struct size that is larger 
+                // than the buffer in the sliced buf.  
+                assert((index + sizeof(T) <= this->m_length));
                 if(index + sizeof(T) <= this->m_length)
-                    //return *((T*)&(this->m_buffer+this->m_start)[index]);
-                    //return *((T*)&(this->m_buffer)[this->m_start+index]);
                     return *((T*)(this->m_buffer+this->m_start+index));
                 return 0;
+                    
             }
 
             uint8_t getByte(uint8_t index){
@@ -96,6 +102,10 @@ namespace Drill {
             uint64_t getUint64(uint64_t index){
                 return readAt<uint64_t>(index);
             }
+
+            ByteBuf_t getAt(uint32_t index){
+               return this->m_buffer+m_start+index;
+            } 
 
             bool getBit(uint32_t index){
                 // refer to BitVector.java http://bit.ly/Py1jof
@@ -124,22 +134,37 @@ namespace Drill {
             }
 
 
-            const char* get(size_t index) const {
-                return "NOT IMPLEMENTED YET";
-            }
-
-            virtual void getValueAt(size_t index, char* buf, size_t nChars) const {
-                strncpy(buf, "NOT IMPLEMENTED YET", nChars);
-                return;
-            }
+            const char* get(size_t index) const { return 0;}
+            virtual void getValueAt(size_t index, char* buf, size_t nChars) const =0;
 
             virtual const ByteBuf_t getRaw(size_t index) const {
-                return (ByteBuf_t)"NOT IMPLEMENTED YET";
+                return (ByteBuf_t)m_pBuffer->getSliceStart() ;
             }
 
-            virtual uint32_t getSize(size_t index) const {
-                return 0;
+            virtual uint32_t getSize(size_t index) const=0;
+            //virtual uint32_t getSize(size_t index) const {
+            //    return 0;
+            //}
+
+        protected:
+            SlicedByteBuf* m_pBuffer;
+            size_t m_rowCount;
+    };
+    
+    class ValueVectorUnimplemented:public ValueVectorBase{
+        public:
+            ValueVectorUnimplemented(SlicedByteBuf *b, size_t rowCount):ValueVectorBase(b,rowCount){
             }
+
+            virtual ~ValueVectorUnimplemented(){
+            }
+
+            const char* get(size_t index) const { return 0;};
+            virtual void getValueAt(size_t index, char* buf, size_t nChars) const{
+                *buf=0; return;
+            } 
+
+            virtual uint32_t getSize(size_t index) const{ return 0;};
 
         protected:
             SlicedByteBuf* m_pBuffer;
@@ -166,12 +191,10 @@ namespace Drill {
     };
 
     template <typename VALUE_TYPE>
-        class ValueVectorFixed : public ValueVectorFixedWidth
-    {
+        class ValueVectorFixed : public ValueVectorFixedWidth {
         public:
             ValueVectorFixed(SlicedByteBuf *b, size_t rowCount) :
-                ValueVectorFixedWidth(b, rowCount)
-        {}
+                ValueVectorFixedWidth(b, rowCount) {}
 
             VALUE_TYPE get(size_t index) const {
                 return m_pBuffer->readAt<VALUE_TYPE>(index * sizeof(VALUE_TYPE));
@@ -194,25 +217,26 @@ namespace Drill {
         public:
             ValueVectorBit(SlicedByteBuf *b, size_t rowCount):ValueVectorFixedWidth(b, rowCount){
             }
-            uint8_t get(size_t index) const {
+            bool get(size_t index) const {
 #ifdef DEBUG
-                uint8_t b = m_pBuffer->getByte((index)/sizeof(uint8_t));
-                uint8_t bitOffset = index%sizeof(uint8_t);
+                uint8_t b = m_pBuffer->getByte((index)/8);
+                uint8_t bitOffset = index%8;
                 uint8_t setBit = (1<<bitOffset); // sets the Nth bit.
                 uint8_t isSet = (b&setBit);
+                isSet;
 #endif
-                return (m_pBuffer->getByte((index)/sizeof(uint8_t))) & (1<< (index%sizeof(uint8_t)) );
+                return (bool)((m_pBuffer->getByte((index)/8)) & (1<< (index%8) ));
 
             }
             void getValueAt(size_t index, char* buf, size_t nChars) const {
                 char str[64]; // Can't have more than 64 digits of precision
                 //could use itoa instead of sprintf which is slow,  but it is not portable
-                sprintf(str, "%x", this->get(index));
+                sprintf(str, "%s", this->get(index)?"true":"false");
                 strncpy(buf, str, nChars);
                 return;
             }
             uint32_t getSize(size_t index) const {
-                return sizeof(uint64_t);
+                return sizeof(uint8_t);
             }
     };
 
@@ -267,18 +291,20 @@ namespace Drill {
         virtual void load() =0;
         virtual std::string toString()=0;
     };
-    struct DateWrapper: public virtual DateTimeBase{
-        DateWrapper(){};
-        DateWrapper(uint64_t d){m_datetime=d; load();}
+
+    struct DateHolder: public virtual DateTimeBase{
+        DateHolder(){};
+        DateHolder(uint64_t d){m_datetime=d; load();}
         uint32_t m_year;
         uint32_t m_month;
         uint32_t m_day;
         void load();
         std::string toString();
     };
-    struct TimeWrapper: public virtual DateTimeBase{
-        TimeWrapper(){};
-        TimeWrapper(uint32_t d){m_datetime=d; load();}
+
+    struct TimeHolder: public virtual DateTimeBase{
+        TimeHolder(){};
+        TimeHolder(uint32_t d){m_datetime=d; load();}
         uint32_t m_hr;
         uint32_t m_min;
         uint32_t m_sec;
@@ -286,35 +312,90 @@ namespace Drill {
         void load();
         std::string toString();
     };
-    struct DateTimeWrapper: public DateWrapper, public TimeWrapper{
-        DateTimeWrapper(uint64_t d){m_datetime=d; load();}
+
+    struct DateTimeHolder: public DateHolder, public TimeHolder{
+        DateTimeHolder(){};
+        DateTimeHolder(uint64_t d){m_datetime=d; load();}
         void load();
         std::string toString();
     };
 
+    struct DateTimeTZHolder: public DateTimeHolder{
+        DateTimeTZHolder(ByteBuf_t b){
+            m_datetime=*(uint64_t*)b;
+            m_tzIndex=*(uint32_t*)(b+sizeof(uint64_t));
+            load();
+        }
+        void load();
+        std::string toString();
+        int32_t m_tzIndex;
+        static uint32_t size(){ return sizeof(uint64_t)+sizeof(uint32_t); }
+
+    };
+
+    struct IntervalYearHolder{
+        IntervalYearHolder(ByteBuf_t b){
+            m_month=*(uint32_t*)b;
+            load();
+        }
+        void load(){};
+        std::string toString();
+        uint32_t m_month;
+        static uint32_t size(){ return sizeof(uint32_t); }
+    };
+
+    struct IntervalDayHolder{
+        IntervalDayHolder(ByteBuf_t b){
+            m_day=*(uint32_t*)(b);
+            m_ms=*(uint32_t*)(b+sizeof(uint32_t));
+            load();
+        }
+        void load(){};
+        std::string toString();
+        uint32_t m_day;
+        uint32_t m_ms;
+        static uint32_t size(){ return 2*sizeof(uint32_t)+4; }
+    };
+
+    struct IntervalHolder{
+        IntervalHolder(ByteBuf_t b){
+            m_month=*(uint32_t*)b;
+            m_day=*(uint32_t*)(b+sizeof(uint32_t));
+            m_ms=*(uint32_t*)(b+2*sizeof(uint32_t));
+            load();
+        }
+        void load(){};
+        std::string toString();
+        uint32_t m_month;
+        uint32_t m_day;
+        uint32_t m_ms;
+        static uint32_t size(){ return 3*sizeof(uint32_t)+4; }
+    };
+
     /*
-     * VALUE_CLASS_TYPE is a struct with a constructor that takes a parameter of type VALUE_TYPE (a primitive type)
-     * VALUE_CLASS_TYPE implements a toString function
-     * Note that VALUE_CLASS_TYPE is created on the stack and the copy reurned in the get function. So the class needs to 
-     * have the appropriate copy constructor or the default bitwise copy should work correctly.
+     * VALUEHOLDER_CLASS_TYPE is a struct with a constructor that takes a parameter of type VALUE_VECTOR_TYPE 
+     * (a primitive type)
+     * VALUEHOLDER_CLASS_TYPE implements a toString function
+     * Note that VALUEHOLDER_CLASS_TYPE is created on the stack and the copy returned in the get function. 
+     * So the class needs to have the appropriate copy constructor or the default bitwise copy should work 
+     * correctly.
      */
-    template <class VALUE_CLASS_TYPE, typename VALUE_TYPE>
+    template <class VALUEHOLDER_CLASS_TYPE, typename VALUE_TYPE>
         class ValueVectorTyped:public ValueVectorFixedWidth{
             public:
                 ValueVectorTyped(SlicedByteBuf *b, size_t rowCount) :
-                    ValueVectorFixedWidth(b, rowCount)
-            {}
+                    ValueVectorFixedWidth(b, rowCount) {}
 
 
-                VALUE_CLASS_TYPE get(size_t index) const {
+                VALUEHOLDER_CLASS_TYPE get(size_t index) const {
                     VALUE_TYPE v= m_pBuffer->readAt<VALUE_TYPE>(index * sizeof(VALUE_TYPE));
-                    VALUE_CLASS_TYPE r(v);
+                    VALUEHOLDER_CLASS_TYPE r(v);
                     return r;
                 }
 
                 void getValueAt(size_t index, char* buf, size_t nChars) const {
                     std::stringstream sstr;
-                    VALUE_CLASS_TYPE value = this->get(index);
+                    VALUEHOLDER_CLASS_TYPE value = this->get(index);
                     sstr << value.toString();
                     strncpy(buf, sstr.str().c_str(), nChars);
                 }
@@ -324,15 +405,40 @@ namespace Drill {
                 }
         };
 
-    template <class VALUE_CLASS_TYPE, class VALUE_VECTOR_TYPE>
+    template <class VALUEHOLDER_CLASS_TYPE>
+        class ValueVectorTypedComposite:public ValueVectorFixedWidth{
+            public:
+                ValueVectorTypedComposite(SlicedByteBuf *b, size_t rowCount) :
+                    ValueVectorFixedWidth(b, rowCount) {}
+
+
+                VALUEHOLDER_CLASS_TYPE get(size_t index) const {
+                    ByteBuf_t b= m_pBuffer->getAt(index * getSize(index));
+                    VALUEHOLDER_CLASS_TYPE r(b);
+                    return r;
+                }
+
+                void getValueAt(size_t index, char* buf, size_t nChars) const {
+                    std::stringstream sstr;
+                    VALUEHOLDER_CLASS_TYPE value = this->get(index);
+                    sstr << value.toString();
+                    strncpy(buf, sstr.str().c_str(), nChars);
+                }
+
+                uint32_t getSize(size_t index) const {
+                    return VALUEHOLDER_CLASS_TYPE::size();
+                }
+        };
+
+    template <class VALUEHOLDER_CLASS_TYPE, class VALUE_VECTOR_TYPE>
         class NullableValueVectorTyped : public ValueVectorBase {
             public:
 
                 NullableValueVectorTyped(SlicedByteBuf *b, size_t rowCount):ValueVectorBase(b, rowCount){
                     size_t offsetEnd = rowCount/8 + 1; 
                     this->m_pBitmap= new SlicedByteBuf(*b, 0, offsetEnd);
-                    this->m_pData= new SlicedByteBuf(*b, offsetEnd, b->getLength());
-                    this->m_pVector= new VALUE_VECTOR_TYPE(m_pData, b->getLength()-offsetEnd);
+                    this->m_pData= new SlicedByteBuf(*b, offsetEnd, b->getLength()-offsetEnd);
+                    this->m_pVector= new VALUE_VECTOR_TYPE(m_pData, rowCount);
                 }
 
                 ~NullableValueVectorTyped(){
@@ -345,7 +451,7 @@ namespace Drill {
                     return (m_pBitmap->getBit(index)==0);
                 }
 
-                VALUE_CLASS_TYPE get(size_t index) const {
+                VALUEHOLDER_CLASS_TYPE get(size_t index) const {
                     assert(!isNull(index));
                     return m_pVector->get(index);
                 }
@@ -370,8 +476,8 @@ namespace Drill {
                 SlicedByteBuf* m_pData;
                 VALUE_VECTOR_TYPE* m_pVector;
         };
-
-    class VarWidthWrapper{
+      
+    class VarWidthHolder{
         public:
             ByteBuf_t data;
             size_t size;
@@ -401,7 +507,7 @@ namespace Drill {
                 return dst;
             }
 
-            VarWidthWrapper get(size_t index) const {
+            VarWidthHolder get(size_t index) const {
                 size_t startIdx = this->m_pOffsetArray->getUint32(index*sizeof(uint32_t));
                 size_t endIdx = this->m_pOffsetArray->getUint32((index+1)*sizeof(uint32_t));
                 size_t length = endIdx - startIdx;
@@ -410,7 +516,7 @@ namespace Drill {
                 // copy and destroy the stack object. The optimizer will hopefully 
                 // elide this so we can return an object with no extra memory allocation
                 // and no copies.(SEE: http://en.wikipedia.org/wiki/Return_value_optimization) 
-                VarWidthWrapper dst;
+                VarWidthHolder dst;
                 dst.data=this->m_pData->getSliceStart()+startIdx;
                 dst.size=length;
                 return dst;
@@ -451,7 +557,7 @@ namespace Drill {
         public:
             ValueVectorVarChar(SlicedByteBuf *b, size_t rowCount):ValueVectorVarWidth(b, rowCount){
             }
-            VarWidthWrapper get(size_t index) const {
+            VarWidthHolder get(size_t index) const {
                 return ValueVectorVarWidth::get(index);
             }
     };
