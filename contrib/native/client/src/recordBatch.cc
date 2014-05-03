@@ -1,5 +1,6 @@
 #include <boost/log/trivial.hpp>
 
+#include "common.h"
 #include "recordBatch.h"
 
 using namespace common;
@@ -184,6 +185,7 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
             /*
              * NOT IMPLEMENTED
             case MONEY:
+                return new ValueVectorFixed<>(b,f.value_count());
             */
             case DATE:
                 return new ValueVectorTyped<DateHolder, uint64_t>(b,f.value_count());
@@ -209,7 +211,6 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new ValueVectorVarBinary(b, f.value_count()); 
             case VARCHAR:
                 return new ValueVectorVarChar(b, f.value_count()); 
-
             default:
                 return new ValueVectorUnimplemented(b, f.value_count()); 
         }
