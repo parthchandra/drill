@@ -113,7 +113,7 @@ namespace Drill {
 
             bool getBit(uint32_t index){
                 // refer to BitVector.java http://bit.ly/Py1jof
-               return this->m_buffer[m_start+index/8] &  ( 1 << (index % 8) );
+               return ((this->m_buffer[m_start+index/8] &  ( 1 << (index % 8) )) !=0);
             }
         private:
             ByteBuf_t m_buffer; // the backing store
