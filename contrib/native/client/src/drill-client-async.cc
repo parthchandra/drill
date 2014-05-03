@@ -264,6 +264,7 @@ status_t DrillClientImpl::processQueryResult(InBoundRpcMessage& msg ){
                 //if(m_pendingRequests!=0){
                 //    getNextResult();
                 //}
+                pDrillClientQueryResult->sendAck(msg);
                 return ret;
             }
             pDrillClientQueryResult->sendAck(msg);

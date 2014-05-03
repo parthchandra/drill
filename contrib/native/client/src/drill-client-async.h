@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <queue>
+#include <stdlib.h>
+#include <time.h>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 
@@ -147,6 +149,8 @@ namespace Drill {
         public:
         DrillClientImpl():m_socket(m_io_service), m_strand(m_io_service), m_pListenerThread(NULL),
         m_rbuf(1024), m_wbuf(1024), m_pendingRequests(0), m_coordinationId(1) {
+            srand (time(NULL));
+            m_coordinationId=rand()%1729+1;
             m_bIsConnected=false;
         };
 
