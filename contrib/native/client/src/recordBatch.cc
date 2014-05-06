@@ -235,7 +235,8 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new NullableValueVectorTyped<DateTimeHolder, 
                        ValueVectorTyped<DateTimeHolder, uint64_t> >(b,f.value_count());
             case TIME:
-                return new ValueVectorTyped<TimeHolder, uint32_t>(b,f.value_count());
+                return new NullableValueVectorTyped<TimeHolder,
+                    ValueVectorTyped<TimeHolder, uint32_t> >(b,f.value_count());
             case TIMESTAMPTZ:
                 return new NullableValueVectorTyped<DateTimeTZHolder, 
                        ValueVectorTypedComposite<DateTimeTZHolder> >(b,f.value_count());
@@ -249,7 +250,7 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new NullableValueVectorTyped<IntervalYearHolder, 
                        ValueVectorTypedComposite<IntervalYearHolder> >(b,f.value_count());
             case BIT:
-                return new NullableValueVectorTyped<VarWidthHolder, 
+                return new NullableValueVectorTyped<uint8_t, 
                        ValueVectorBit >(b,f.value_count());
             case VARBINARY:
                 //TODO: Varbinary is untested

@@ -43,7 +43,7 @@ DecimalValue getDecimalValueFromByteBuf(SlicedByteBuf& data, int startIndex, int
 
     // Initialize the BigDecimal, first digit in the ByteBuf has the sign so mask it out
     cpp_int decimalDigits = (needsEndiannessSwap ? 
-        bswap_32(data.getUint32(startIndex) & 0x7FFFFFFF) :
+        bswap_32(data.getUint32(startIndex)) & 0x7FFFFFFF :
         (data.getUint32(startIndex) & 0x7FFFFFFF));
     
     cpp_int base(DIGITS_BASE);
