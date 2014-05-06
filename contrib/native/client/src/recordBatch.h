@@ -313,20 +313,6 @@ namespace Drill {
     };
 
 
-
-    // Aliases for Decimal Types:
-    // The definitions for decimal digits, width, max precision are defined in
-    // /exec/java-exec/src/main/codegen/data/ValueVectorTypes.tdd
-    // 
-    // Decimal9 and Decimal18 could be optimized, maybe write seperate classes?
-    typedef ValueVectorDecimalTrivial<int32_t> ValueVectorDecimal9;
-    typedef ValueVectorDecimalTrivial<int64_t> ValueVectorDecimal18;
-    typedef ValueVectorDecimal<3, 12, false, 28> ValueVectorDecimal28Dense;
-    typedef ValueVectorDecimal<4, 16, false, 38> ValueVectorDecimal38Dense;
-    typedef ValueVectorDecimal<5, 20, true, 28>  ValueVectorDecimal28Sparse;
-    typedef ValueVectorDecimal<6, 24, true, 38>  ValueVectorDecimal38Sparse;
-
-
     template <typename VALUE_TYPE>
         class NullableValueVectorFixed : public ValueVectorBase
     {
@@ -653,6 +639,44 @@ namespace Drill {
             ValueVectorVarBinary(SlicedByteBuf *b, size_t rowCount):ValueVectorVarWidth(b, rowCount){
             }
     };
+    // --------------------------------------------------------------------------------------
+    // TODO: alias for all value vector types
+    // --------------------------------------------------------------------------------------
+    typedef NullableValueVectorTyped<int, ValueVectorBit > NullableValueVectorBit;
+    // Aliases for Decimal Types:
+    // The definitions for decimal digits, width, max precision are defined in
+    // /exec/java-exec/src/main/codegen/data/ValueVectorTypes.tdd
+    // 
+    // Decimal9 and Decimal18 could be optimized, maybe write seperate classes?
+    typedef ValueVectorDecimalTrivial<int32_t> ValueVectorDecimal9;
+    typedef ValueVectorDecimalTrivial<int64_t> ValueVectorDecimal18;
+    typedef ValueVectorDecimal<3, 12, false, 28> ValueVectorDecimal28Dense;
+    typedef ValueVectorDecimal<4, 16, false, 38> ValueVectorDecimal38Dense;
+    typedef ValueVectorDecimal<5, 20, true, 28>  ValueVectorDecimal28Sparse;
+    typedef ValueVectorDecimal<6, 24, true, 38>  ValueVectorDecimal38Sparse;
+
+    typedef NullableValueVectorTyped<int32_t, ValueVectorDecimal9> NullableValueVectorDecimal9;
+    typedef NullableValueVectorTyped<int64_t, ValueVectorDecimal18> NullableValueVectorDecimal18;
+    typedef NullableValueVectorTyped<DecimalValue , ValueVectorDecimal28Dense> NullableValueVectorDecimal28Dense;
+    typedef NullableValueVectorTyped<DecimalValue , ValueVectorDecimal38Dense> NullableValueVectorDecimal38Dense;
+    typedef NullableValueVectorTyped<DecimalValue , ValueVectorDecimal28Sparse> NullableValueVectorDecimal28Sparse;
+    typedef NullableValueVectorTyped<DecimalValue , ValueVectorDecimal38Sparse> NullableValueVectorDecimal38Sparse;
+
+    typedef ValueVectorTyped<DateHolder, uint64_t> ValueVectorDate;
+    typedef ValueVectorTyped<DateTimeHolder, uint64_t> ValueVectorTimestamp;
+    typedef ValueVectorTyped<TimeHolder, uint32_t> ValueVectorTime;
+    typedef ValueVectorTypedComposite<DateTimeTZHolder> ValueVectorTimestampTZ;
+    typedef ValueVectorTypedComposite<IntervalHolder> ValueVectorInterval;
+    typedef ValueVectorTypedComposite<IntervalDayHolder> ValueVectorIntervalDay;
+    typedef ValueVectorTypedComposite<IntervalYearHolder> ValueVectorIntervalYear;
+
+    typedef NullableValueVectorTyped<DateHolder, ValueVectorDate> NullableValueVecorDate;
+    typedef NullableValueVectorTyped<DateTimeHolder, ValueVectorTimestamp> NullableValueVecorTimestamp;
+    typedef NullableValueVectorTyped<TimeHolder, ValueVectorTime>  NuallableValueVectorDateTime;
+    typedef NullableValueVectorTyped<DateTimeTZHolder, ValueVectorTimestampTZ>  NuallableValueVectorTimeTZ; 
+    typedef NullableValueVectorTyped<IntervalHolder, ValueVectorInterval>  NuallableValueVectorInterval; 
+    typedef NullableValueVectorTyped<IntervalDayHolder, ValueVectorIntervalDay>  NuallableValueVectorIntervalDay; 
+    typedef NullableValueVectorTyped<IntervalYearHolder, ValueVectorIntervalYear>  NuallableValueVectorIntervalYear; 
 
     class FieldBatch{
         public:
