@@ -689,13 +689,13 @@ namespace Drill {
     typedef ValueVectorTypedComposite<IntervalDayHolder> ValueVectorIntervalDay;
     typedef ValueVectorTypedComposite<IntervalYearHolder> ValueVectorIntervalYear;
 
-    typedef NullableValueVectorTyped<DateHolder, ValueVectorDate> NullableValueVecorDate;
-    typedef NullableValueVectorTyped<DateTimeHolder, ValueVectorTimestamp> NullableValueVecorTimestamp;
-    typedef NullableValueVectorTyped<TimeHolder, ValueVectorTime>  NuallableValueVectorDateTime;
-    typedef NullableValueVectorTyped<DateTimeTZHolder, ValueVectorTimestampTZ>  NuallableValueVectorTimeTZ; 
-    typedef NullableValueVectorTyped<IntervalHolder, ValueVectorInterval>  NuallableValueVectorInterval; 
-    typedef NullableValueVectorTyped<IntervalDayHolder, ValueVectorIntervalDay>  NuallableValueVectorIntervalDay; 
-    typedef NullableValueVectorTyped<IntervalYearHolder, ValueVectorIntervalYear>  NuallableValueVectorIntervalYear; 
+    typedef NullableValueVectorTyped<DateHolder, ValueVectorDate> NullableValueVectorDate;
+    typedef NullableValueVectorTyped<DateTimeHolder, ValueVectorTimestamp> NullableValueVectorTimestamp;
+    typedef NullableValueVectorTyped<TimeHolder, ValueVectorTime>  NullableValueVectorTime;
+    typedef NullableValueVectorTyped<DateTimeTZHolder, ValueVectorTimestampTZ>  NullableValueVectorTimestampTZ;
+    typedef NullableValueVectorTyped<IntervalHolder, ValueVectorInterval>  NullableValueVectorInterval;
+    typedef NullableValueVectorTyped<IntervalDayHolder, ValueVectorIntervalDay>  NullableValueVectorIntervalDay;
+    typedef NullableValueVectorTyped<IntervalYearHolder, ValueVectorIntervalYear>  NullableValueVectorIntervalYear;
 
     class DECLSPEC_DRILL_CLIENT FieldMetadata{
         public:
