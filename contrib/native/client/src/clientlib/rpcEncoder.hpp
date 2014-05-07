@@ -1,6 +1,7 @@
 #ifndef RPC_ENCODER_H
 #define RPC_ENCODER_H
-#include "rpc-message.h"
+
+#include "rpcMessage.hpp"
 namespace Drill {
 
 class RpcEncoder {

@@ -96,9 +96,10 @@ int main(int argc, char* argv[]) {
 
         UserServerEndPoint user_server(drill_addr,port);
 
-        ifstream f(plan_filename);
-        string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
-        cerr << "plan = " << plan << endl;
+        //ifstream f(plan_filename);
+        //string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
+        //cerr << "plan = " << plan << endl;
+        string plan=plan_filename;
 
         ifstream f2(plan2_filename);
         string plan2((std::istreambuf_iterator<char>(f2)), (std::istreambuf_iterator<char>()));
@@ -123,7 +124,7 @@ int main(int argc, char* argv[]) {
                 }
                 client.waitForResults();
             }else{
-                pClientQuery = client.SubmitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, NULL);
+                pClientQuery = client.SubmitQuery(exec::user::SQL, plan, QueryResultsListener, NULL);
                 if(!plan2_filename.empty()){
                     pClientQuery2 = client.SubmitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener, NULL);
                 }
@@ -191,7 +192,7 @@ int main(int argc, char* argv[]) {
                 client.freeQueryIterator(&pIter2);
             }else{
                 QueryHandle_t qryHandle1=NULL, qryHandle2=NULL;
-                client.submitQuery(exec::user::PHYSICAL, plan, QueryResultsListener, NULL, &qryHandle1);
+                client.submitQuery(exec::user::SQL, plan, QueryResultsListener, NULL, &qryHandle1);
                 if(!plan2_filename.empty()){
                     client.submitQuery(exec::user::PHYSICAL, plan2, QueryResultsListener, NULL, &qryHandle2);
                 }

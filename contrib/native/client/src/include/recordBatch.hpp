@@ -1,18 +1,28 @@
 #ifndef RECORDBATCH_H
 #define RECORDBATCH_H
 
-#include "common.h"
-#include "decimalUtils.hpp"
 
-#include <stdint.h>
-#include <vector>
-#include <sstream>
 #include <assert.h>
-#include <proto-cpp/User.pb.h>
+#include <stdint.h>
+#include <sstream>
+#include <vector>
 #include <boost/lexical_cast.hpp>
+#include "common.hpp"
+#include "decimalUtils.hpp"
+#include "User.pb.h"
 
 using namespace exec::shared;
 using namespace exec::user;
+
+#ifdef WIN32
+#ifdef DRILL_CLIENT_EXPORTS
+#define DECLSPEC_DRILL_CLIENT __declspec(dllexport)
+#else
+#define DECLSPEC_DRILL_CLIENT __declspec(dllimport)
+#endif
+#else
+#define DECLSPEC_DRILL_CLIENT
+#endif
 
 namespace Drill {
 
@@ -122,7 +132,7 @@ namespace Drill {
             size_t  m_length;   //length
     };
 
-    class ValueVectorBase{
+    class DECLSPEC_DRILL_CLIENT ValueVectorBase{
         public:
             ValueVectorBase(SlicedByteBuf *b, size_t rowCount){
                 m_pBuffer=b;
@@ -155,7 +165,7 @@ namespace Drill {
             size_t m_rowCount;
     };
     
-    class ValueVectorUnimplemented:public ValueVectorBase{
+    class DECLSPEC_DRILL_CLIENT ValueVectorUnimplemented:public ValueVectorBase{
         public:
             ValueVectorUnimplemented(SlicedByteBuf *b, size_t rowCount):ValueVectorBase(b,rowCount){
             }
@@ -175,7 +185,7 @@ namespace Drill {
             size_t m_rowCount;
     };
 
-    class ValueVectorFixedWidth:public ValueVectorBase{
+    class DECLSPEC_DRILL_CLIENT ValueVectorFixedWidth:public ValueVectorBase{
         public:
             ValueVectorFixedWidth(SlicedByteBuf *b, size_t rowCount):ValueVectorBase(b, rowCount){
             }
@@ -217,7 +227,7 @@ namespace Drill {
     };
 
 
-    class ValueVectorBit:public ValueVectorFixedWidth{
+    class DECLSPEC_DRILL_CLIENT ValueVectorBit:public ValueVectorFixedWidth{
         public:
             ValueVectorBit(SlicedByteBuf *b, size_t rowCount):ValueVectorFixedWidth(b, rowCount){
             }
@@ -549,13 +559,13 @@ namespace Drill {
                 VALUE_VECTOR_TYPE* m_pVector;
         };
       
-    class VarWidthHolder{
+    class DECLSPEC_DRILL_CLIENT VarWidthHolder{
         public:
             ByteBuf_t data;
             size_t size;
     };
 
-    class ValueVectorVarWidth:public ValueVectorBase{
+    class DECLSPEC_DRILL_CLIENT ValueVectorVarWidth:public ValueVectorBase{
         public:
             ValueVectorVarWidth(SlicedByteBuf *b, size_t rowCount):ValueVectorBase(b, rowCount){
                 size_t offsetEnd = (rowCount+1)*sizeof(uint32_t);
@@ -625,7 +635,7 @@ namespace Drill {
             SlicedByteBuf* m_pData;
     };
 
-    class ValueVectorVarChar:public ValueVectorVarWidth{
+    class DECLSPEC_DRILL_CLIENT ValueVectorVarChar:public ValueVectorVarWidth{
         public:
             ValueVectorVarChar(SlicedByteBuf *b, size_t rowCount):ValueVectorVarWidth(b, rowCount){
             }
@@ -634,11 +644,18 @@ namespace Drill {
             }
     };
 
-    class ValueVectorVarBinary:public ValueVectorVarWidth{
+    class DECLSPEC_DRILL_CLIENT ValueVectorVarBinary:public ValueVectorVarWidth{
         public:
             ValueVectorVarBinary(SlicedByteBuf *b, size_t rowCount):ValueVectorVarWidth(b, rowCount){
             }
     };
+    //
+    //TODO: For windows, we have to export instantiations of the template class. 
+    //see: http://msdn.microsoft.com/en-us/library/twa2aw10.aspx
+    //for example: 
+    //template class __declspec(dllexport) B<int>;
+    //class __declspec(dllexport) D : public B<int> {
+    //
     // --------------------------------------------------------------------------------------
     // TODO: alias for all value vector types
     // --------------------------------------------------------------------------------------
@@ -714,7 +731,7 @@ namespace Drill {
             static ValueVectorBase* allocateValueVector(const FieldMetadata & fmd, SlicedByteBuf *b);
     };
 
-    class RecordBatch{
+    class DECLSPEC_DRILL_CLIENT RecordBatch{
         public:
             RecordBatch(QueryResult* pResult, ByteBuf_t b){
                 m_pQueryResult=pResult;      

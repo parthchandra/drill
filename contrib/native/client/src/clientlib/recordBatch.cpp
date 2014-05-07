@@ -1,7 +1,7 @@
 #include <boost/log/trivial.hpp>
 
-#include "common.h"
-#include "recordBatch.h"
+#include "common.hpp"
+#include "recordBatch.hpp"
 
 using namespace common;
 using namespace exec;
@@ -164,11 +164,12 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new ValueVectorFixed<int32_t>(b,f.value_count());
             case BIGINT:
                 return new ValueVectorFixed<int64_t>(b,f.value_count());
-
+            case FLOAT4:
+                return new ValueVectorFixed<float>(b,f.value_count());
+            case FLOAT8:
+                return new ValueVectorFixed<double>(b,f.value_count());
             // Decimal digits, width, max precision is defined in
-            //
             // /exec/java-exec/src/main/codegen/data/ValueVectorTypes.tdd
-            // 
             // Decimal Design Document: http://bit.ly/drilldecimal
             case DECIMAL9:
                 return new ValueVectorDecimal9(b,f.value_count(), majorType.scale());
@@ -182,11 +183,6 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new ValueVectorDecimal28Sparse(b,f.value_count(), majorType.scale());
             case DECIMAL38SPARSE:
                 return new ValueVectorDecimal38Sparse(b,f.value_count(), majorType.scale());
-            /*
-             * NOT IMPLEMENTED
-            case MONEY:
-                return new ValueVectorFixed<>(b,f.value_count());
-            */
             case DATE:
                 return new ValueVectorTyped<DateHolder, uint64_t>(b,f.value_count());
             case TIMESTAMP:
@@ -201,16 +197,13 @@ ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f
                 return new ValueVectorTypedComposite<IntervalDayHolder>(b,f.value_count());
             case INTERVALYEAR:
                 return new ValueVectorTypedComposite<IntervalYearHolder>(b,f.value_count());
-            case FLOAT4:
-                return new ValueVectorFixed<float>(b,f.value_count());
-            case FLOAT8:
-                return new ValueVectorFixed<double>(b,f.value_count());
             case BIT:
                 return new ValueVectorBit(b,f.value_count());
             case VARBINARY:
                 return new ValueVectorVarBinary(b, f.value_count()); 
             case VARCHAR:
                 return new ValueVectorVarChar(b, f.value_count()); 
+            case MONEY:
             default:
                 return new ValueVectorUnimplemented(b, f.value_count()); 
         }

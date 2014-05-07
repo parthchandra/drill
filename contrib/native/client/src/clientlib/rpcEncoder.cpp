@@ -1,11 +1,11 @@
-#include <google/protobuf/message_lite.h>
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+#include <google/protobuf/message_lite.h>
 #include <google/protobuf/wire_format_lite.h>
 
-#include "common.h"
-#include "rpc-encoder.h"
-#include "rpc-message.h"
+#include "common.hpp"
+#include "rpcEncoder.hpp"
+#include "rpcMessage.hpp"
 
 using namespace Drill;
 using exec::rpc::RpcHeader;

@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <fstream>
 #include <boost/asio.hpp>
-#include "common.h"
-#include "clientlib/drillClient.hpp"
-#include "recordBatch.h"
-#include "proto-cpp/Types.pb.h"
-#include "proto-cpp/User.pb.h"
+#include "common.hpp"
+#include "drillClient.hpp"
+#include "recordBatch.hpp"
+#include "Types.pb.h"
+#include "User.pb.h"
 
 using namespace exec;
 using namespace common;

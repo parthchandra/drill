@@ -1,19 +1,18 @@
 #ifndef DRILL_CLIENT_ASYNC_H
 #define DRILL_CLIENT_ASYNC_H
 
-#include <vector>
-#include <queue>
 #include <stdlib.h>
 #include <time.h>
+#include <queue>
+#include <vector>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
-
-#include "proto-cpp/User.pb.h"
-#include "proto-cpp/UserBitShared.pb.h"
-#include "common.h"
-#include "rpc-encoder.h"
-#include "rpc-decoder.h"
+#include "common.hpp"
 #include "drillClient.hpp"
+#include "rpcEncoder.hpp"
+#include "rpcDecoder.hpp"
+#include "User.pb.h"
+#include "UserBitShared.pb.h"
 
 using namespace std;
 using namespace boost;

@@ -13,10 +13,6 @@ using std::vector;
 
 typedef vector<uint8_t> DataBuf;
 
-
-//typedef void MQueryResult; // TODO expand later
-//typedef void QueryResultHandle;
-
 #ifdef _DEBUG
     #define EXTRA_DEBUGGING
     #define CODER_DEBUGGING 

@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <boost/thread.hpp>
-#include "common.h"
-#include "../proto-cpp/User.pb.h"
+#include "common.hpp"
+#include "User.pb.h"
 
 using namespace std;
 using namespace exec::shared;

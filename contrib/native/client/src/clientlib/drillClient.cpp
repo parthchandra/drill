@@ -1,9 +1,9 @@
 #include <vector>
 #include <boost/log/trivial.hpp>
 #include "drillClient.hpp"
-#include "../recordBatch.h"
-#include "../drill-client-async.h"
-#include "../proto-cpp/SchemaDef.pb.h"
+#include "recordBatch.hpp"
+#include "drillClientImpl.hpp"
+#include "SchemaDef.pb.h"
 
 using namespace std;
 using namespace Drill;

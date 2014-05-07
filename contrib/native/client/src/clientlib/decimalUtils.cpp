@@ -1,7 +1,7 @@
-#include "decimalUtils.hpp"
-
-#include "recordBatch.h"
 #include <vector>
+
+#include "decimalUtils.hpp"
+#include "recordBatch.hpp"
 
 #ifdef _WIN32
 #define bswap_16                    _byteswap_ushort

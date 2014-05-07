@@ -1,9 +1,9 @@
-#include <google/protobuf/io/coded_stream.h>
 #include <iostream>
-#include "common.h"
-#include "rpc-encoder.h"
-#include "rpc-decoder.h"
-#include "rpc-message.h"
+#include <google/protobuf/io/coded_stream.h>
+#include "common.hpp"
+#include "rpcEncoder.hpp"
+#include "rpcDecoder.hpp"
+#include "rpcMessage.hpp"
 using namespace Drill;
 using google::protobuf::io::CodedInputStream;
 

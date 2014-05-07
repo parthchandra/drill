@@ -6,13 +6,12 @@
 #include <boost/log/trivial.hpp>
 
 #include "drillClient.hpp"
-#include "proto-cpp/UserBitShared.pb.h"
-#include "drill-client-async.h"
-//#include "common.h"
-#include "rpc-encoder.h"
-#include "rpc-decoder.h"
-#include "rpc-message.h"
-#include "recordBatch.h"
+#include "drillClientImpl.hpp"
+#include "rpcEncoder.hpp"
+#include "rpcDecoder.hpp"
+#include "rpcMessage.hpp"
+#include "recordBatch.hpp"
+#include "UserBitShared.pb.h"
 
 #ifdef DEBUG
 #define BOOST_ASIO_ENABLE_HANDLER_TRACKING
@@ -22,6 +21,7 @@ using namespace std;
 using namespace boost;
 using namespace Drill;
 using namespace exec::user;
+using boost::asio::ip::tcp;
 
 RpcEncoder DrillClientImpl::s_encoder;
 RpcDecoder DrillClientImpl::s_decoder;
@@ -30,6 +30,16 @@ void DrillClientImpl::Connect(const UserServerEndPoint& userver){
     // connect the endpoint
     //TODO: Handle connection failure
     if(!this->m_bIsConnected){
+        /*  
+             // boost::asio::io_service io_service;
+         
+             tcp::resolver resolver(m_io_service);
+             tcp::resolver::query query(tcp::v4(), userver.m_addr, userver.m_port);
+             tcp::resolver::iterator iterator = resolver.resolve(query);
+             // tcp::socket s(io_service);
+             boost::asio::connect(m_socket, iterator);
+        */
+
         boost::asio::ip::tcp::endpoint endpoint(boost::asio::ip::address::from_string(userver.m_addr), userver.m_port);
         m_socket.connect(endpoint);
     }

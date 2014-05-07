@@ -1,5 +1,5 @@
-#include "common.h"
-#include "rpc-message.h"
+#include "common.hpp"
+#include "rpcMessage.hpp"
 using Drill::InBoundRpcMessage;
 using Drill::OutBoundRpcMessage;
 ostream& Drill::operator<< (ostream & out, InBoundRpcMessage & msg) {

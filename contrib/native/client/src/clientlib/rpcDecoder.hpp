@@ -1,7 +1,7 @@
 #ifndef RPC_DECODER_H
 #define RPC_DECODER_H
 
-#include "rpc-message.h"
+#include "rpcMessage.hpp"
 
 namespace Drill {
 class RpcDecoder {
