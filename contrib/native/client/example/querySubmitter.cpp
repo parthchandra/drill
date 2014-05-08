@@ -2,11 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <boost/asio.hpp>
-#include "common.hpp"
-#include "drillClient.hpp"
-#include "recordBatch.hpp"
-#include "Types.pb.h"
-#include "User.pb.h"
+#include "drillc.hpp"
 
 using namespace exec;
 using namespace common;
