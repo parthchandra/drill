@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sstream>
 #include <vector>
 #include <boost/lexical_cast.hpp>
@@ -11,6 +12,7 @@
 #include "decimalUtils.hpp"
 #include "User.pb.h"
 
+using namespace common;
 using namespace exec::shared;
 using namespace exec::user;
 
@@ -695,9 +697,48 @@ namespace Drill {
     typedef NullableValueVectorTyped<IntervalDayHolder, ValueVectorIntervalDay>  NuallableValueVectorIntervalDay; 
     typedef NullableValueVectorTyped<IntervalYearHolder, ValueVectorIntervalYear>  NuallableValueVectorIntervalYear; 
 
+    class DECLSPEC_DRILL_CLIENT FieldMetadata{
+        public:
+            FieldMetadata(){};
+            void set(const exec::shared::FieldMetadata& f){ 
+                m_name=f.def().name(0).name();
+                m_minorType=f.def().major_type().minor_type();
+                m_dataMode=f.def().major_type().mode();
+                m_valueCount=f.value_count();
+                m_scale=f.def().major_type().scale();
+                m_precision=f.def().major_type().precision();
+                m_bufferLength=f.buffer_length();
+            }
+            const std::string& getName(){ return m_name;}
+            MinorType getMinorType() const{ return m_minorType;}
+            DataMode getDataMode() const{return m_dataMode;}
+            uint32_t getValueCount() const{return m_valueCount;}
+            uint32_t getScale() const{return m_scale;}
+            uint32_t getBufferLength() const{return m_bufferLength;}
+            void copy(Drill::FieldMetadata& f){
+                m_name=f.m_name;
+                m_minorType=f.m_minorType;
+                m_dataMode=f.m_dataMode;
+                m_valueCount=f.m_valueCount;
+                m_scale=f.m_scale;
+                m_precision=f.m_precision;
+                m_bufferLength=f.m_bufferLength;
+            }
+
+        private:
+            //exec::shared::FieldMetadata* m_pFieldMetadata;
+            std::string m_name;
+            MinorType m_minorType;
+            DataMode m_dataMode;
+            uint32_t m_valueCount;
+            uint32_t m_scale;
+            uint32_t m_precision;
+            uint32_t m_bufferLength;
+    };
+
     class FieldBatch{
         public:
-            FieldBatch(const FieldMetadata& fmd, const ByteBuf_t data, size_t start, size_t length):
+            FieldBatch(const Drill::FieldMetadata& fmd, const ByteBuf_t data, size_t start, size_t length):
                 m_fieldMetadata(fmd){
                     m_pValueVector=NULL;
                     m_pFieldData=new SlicedByteBuf(data, start, length);
@@ -720,7 +761,7 @@ namespace Drill {
             }
 
         private:
-            const FieldMetadata& m_fieldMetadata;
+            const Drill::FieldMetadata& m_fieldMetadata;
             ValueVectorBase * m_pValueVector;
             SlicedByteBuf   * m_pFieldData;
 
@@ -728,7 +769,7 @@ namespace Drill {
 
     class ValueVectorFactory{
         public:
-            static ValueVectorBase* allocateValueVector(const FieldMetadata & fmd, SlicedByteBuf *b);
+            static ValueVectorBase* allocateValueVector(const Drill::FieldMetadata & fmd, SlicedByteBuf *b);
     };
 
     class DECLSPEC_DRILL_CLIENT RecordBatch{
@@ -749,19 +790,17 @@ namespace Drill {
                     delete *it;    
                 }
                 m_fields.clear();
-                // we don't free memory for FieldMetadata objects saved in m_fieldDefs since the memory is 
-                // owned by the QueryResult object; (see the build() function). Note that the vector contains 
-                // a const FieldMetadata* anyway, so it cannot be deleted.
-                //for(std::vector<FieldMetadata*>::iterator it = m_fieldDefs.begin(); it != m_fieldDefs.end(); ++it){
-                //    delete *it;    
-                //}
+                for(std::vector<Drill::FieldMetadata*>::iterator it = m_fieldDefs.begin(); it != m_fieldDefs.end(); ++it){
+                    delete *it;    
+                }
                 m_fieldDefs.clear();
                 delete m_pQueryResult;
             }
 
             // get the ith field metadata
-            const FieldMetadata& getFieldMetadata(size_t index){
-                return this->m_pRecordBatchDef->field(index);
+            const Drill::FieldMetadata& getFieldMetadata(size_t index){
+                //return this->m_pRecordBatchDef->field(index);
+                return *(m_fieldDefs[index]); 
             }
 
             size_t getNumRecords(){ return m_numRecords;}
@@ -769,7 +808,7 @@ namespace Drill {
 			size_t getNumFields() { return m_pRecordBatchDef->field_size(); }
 			bool isLastChunk() { return m_pQueryResult->is_last_chunk(); }
 
-            std::vector<const FieldMetadata*>& getColumnDefs(){ return m_fieldDefs;}
+            std::vector<Drill::FieldMetadata*>& getColumnDefs(){ return m_fieldDefs;}
 
             // 
             // build the record batch: i.e. fill up the value vectors from the buffer.
@@ -796,7 +835,7 @@ namespace Drill {
             const RecordBatchDef* m_pRecordBatchDef;
             ByteBuf_t m_buffer;
             //build the current schema out of the field metadata
-            std::vector<const FieldMetadata*> m_fieldDefs;
+            std::vector<Drill::FieldMetadata*> m_fieldDefs;
             std::vector<FieldBatch*> m_fields;
             size_t m_numFields;
             size_t m_numRecords;

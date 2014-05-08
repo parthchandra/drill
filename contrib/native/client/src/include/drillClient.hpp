@@ -7,7 +7,7 @@
 #include "User.pb.h"
 
 using namespace std;
-using namespace exec::shared;
+//using namespace exec::shared;
 
 #ifdef WIN32
 #ifdef DRILL_CLIENT_EXPORTS
@@ -27,6 +27,7 @@ namespace Drill {
     class  DrillClientImpl;
     class  DrillClientQueryResult;
     class  FieldDefinition;
+    class  FieldMetadata;
     class  RecordBatch;
     class  SchemaDef;
 
@@ -90,7 +91,7 @@ namespace Drill {
              * end of the query or until a schema change event is received. If a schema change event is received by the 
              * application, the application should discard the reference it currently holds and call this function again. 
              */
-            vector<FieldMetadata*>& getColDefs();
+            vector<Drill::FieldMetadata*>& getColDefs();
             
             /* Move the current pointer to the next record. */
             status_t next();
@@ -115,7 +116,7 @@ namespace Drill {
             size_t m_currentRecord;
             RecordBatch* m_pCurrentRecordBatch;
             boost::mutex m_recordBatchMutex; 
-            vector<FieldMetadata*>* m_pColDefs; // Copy of the latest column defs made from the 
+            vector<Drill::FieldMetadata*>* m_pColDefs; // Copy of the latest column defs made from the 
                                                 // first record batch with this definition
             //bool m_cancel;
     };

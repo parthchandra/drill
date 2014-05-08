@@ -146,127 +146,129 @@ static char timezoneMap[][36]={
         "UTC", "Universal", "W-SU", "WET", "Zulu"
 };
 
-ValueVectorBase* ValueVectorFactory::allocateValueVector(const FieldMetadata & f, SlicedByteBuf* b){
-    const FieldDef& fieldDef = f.def();
-    const MajorType& majorType=fieldDef.major_type();
-    int type = majorType.minor_type();
-    int mode = majorType.mode();
+ValueVectorBase* ValueVectorFactory::allocateValueVector(const Drill::FieldMetadata & f, SlicedByteBuf* b){
+    //const FieldDef& fieldDef = f.def();
+    //const MajorType& majorType=fieldDef.major_type();
+    //int type = majorType.minor_type();
+    //int mode = majorType.mode();
+    MinorType type = f.getMinorType();
+    DataMode mode = f.getDataMode();
 
     switch (mode) {
 
     case DM_REQUIRED:
         switch (type) {
             case TINYINT:
-                return new ValueVectorFixed<int8_t>(b,f.value_count());
+                return new ValueVectorFixed<int8_t>(b,f.getValueCount());
             case SMALLINT:
-                return new ValueVectorFixed<int16_t>(b,f.value_count());
+                return new ValueVectorFixed<int16_t>(b,f.getValueCount());
             case INT:
-                return new ValueVectorFixed<int32_t>(b,f.value_count());
+                return new ValueVectorFixed<int32_t>(b,f.getValueCount());
             case BIGINT:
-                return new ValueVectorFixed<int64_t>(b,f.value_count());
+                return new ValueVectorFixed<int64_t>(b,f.getValueCount());
             case FLOAT4:
-                return new ValueVectorFixed<float>(b,f.value_count());
+                return new ValueVectorFixed<float>(b,f.getValueCount());
             case FLOAT8:
-                return new ValueVectorFixed<double>(b,f.value_count());
+                return new ValueVectorFixed<double>(b,f.getValueCount());
             // Decimal digits, width, max precision is defined in
             // /exec/java-exec/src/main/codegen/data/ValueVectorTypes.tdd
             // Decimal Design Document: http://bit.ly/drilldecimal
             case DECIMAL9:
-                return new ValueVectorDecimal9(b,f.value_count(), majorType.scale());
+                return new ValueVectorDecimal9(b,f.getValueCount(), f.getScale());
             case DECIMAL18:
-                return new ValueVectorDecimal18(b,f.value_count(), majorType.scale());
+                return new ValueVectorDecimal18(b,f.getValueCount(), f.getScale());
             case DECIMAL28DENSE:
-                return new ValueVectorDecimal28Dense(b,f.value_count(), majorType.scale());
+                return new ValueVectorDecimal28Dense(b,f.getValueCount(), f.getScale());
             case DECIMAL38DENSE:
-                return new ValueVectorDecimal38Dense(b,f.value_count(), majorType.scale());
+                return new ValueVectorDecimal38Dense(b,f.getValueCount(), f.getScale());
             case DECIMAL28SPARSE:
-                return new ValueVectorDecimal28Sparse(b,f.value_count(), majorType.scale());
+                return new ValueVectorDecimal28Sparse(b,f.getValueCount(), f.getScale());
             case DECIMAL38SPARSE:
-                return new ValueVectorDecimal38Sparse(b,f.value_count(), majorType.scale());
+                return new ValueVectorDecimal38Sparse(b,f.getValueCount(), f.getScale());
             case DATE:
-                return new ValueVectorTyped<DateHolder, uint64_t>(b,f.value_count());
+                return new ValueVectorTyped<DateHolder, uint64_t>(b,f.getValueCount());
             case TIMESTAMP:
-                return new ValueVectorTyped<DateTimeHolder, uint64_t>(b,f.value_count());
+                return new ValueVectorTyped<DateTimeHolder, uint64_t>(b,f.getValueCount());
             case TIME:
-                return new ValueVectorTyped<TimeHolder, uint32_t>(b,f.value_count());
+                return new ValueVectorTyped<TimeHolder, uint32_t>(b,f.getValueCount());
             case TIMESTAMPTZ:
-                return new ValueVectorTypedComposite<DateTimeTZHolder>(b,f.value_count());
+                return new ValueVectorTypedComposite<DateTimeTZHolder>(b,f.getValueCount());
             case INTERVAL:
-                return new ValueVectorTypedComposite<IntervalHolder>(b,f.value_count());
+                return new ValueVectorTypedComposite<IntervalHolder>(b,f.getValueCount());
             case INTERVALDAY:
-                return new ValueVectorTypedComposite<IntervalDayHolder>(b,f.value_count());
+                return new ValueVectorTypedComposite<IntervalDayHolder>(b,f.getValueCount());
             case INTERVALYEAR:
-                return new ValueVectorTypedComposite<IntervalYearHolder>(b,f.value_count());
+                return new ValueVectorTypedComposite<IntervalYearHolder>(b,f.getValueCount());
             case BIT:
-                return new ValueVectorBit(b,f.value_count());
+                return new ValueVectorBit(b,f.getValueCount());
             case VARBINARY:
-                return new ValueVectorVarBinary(b, f.value_count()); 
+                return new ValueVectorVarBinary(b, f.getValueCount()); 
             case VARCHAR:
-                return new ValueVectorVarChar(b, f.value_count()); 
+                return new ValueVectorVarChar(b, f.getValueCount()); 
             case MONEY:
             default:
-                return new ValueVectorUnimplemented(b, f.value_count()); 
+                return new ValueVectorUnimplemented(b, f.getValueCount()); 
         }
     case DM_OPTIONAL:
         switch (type) {
             case TINYINT:
-                return new NullableValueVectorFixed<int8_t>(b,f.value_count());
+                return new NullableValueVectorFixed<int8_t>(b,f.getValueCount());
             case SMALLINT:
-                return new NullableValueVectorFixed<int16_t>(b,f.value_count());
+                return new NullableValueVectorFixed<int16_t>(b,f.getValueCount());
             case INT:
-                return new NullableValueVectorFixed<int32_t>(b,f.value_count());
+                return new NullableValueVectorFixed<int32_t>(b,f.getValueCount());
             case BIGINT:
-                return new NullableValueVectorFixed<int64_t>(b,f.value_count());
+                return new NullableValueVectorFixed<int64_t>(b,f.getValueCount());
             case FLOAT4:
-                return new NullableValueVectorFixed<float>(b,f.value_count());
+                return new NullableValueVectorFixed<float>(b,f.getValueCount());
             case FLOAT8:
-                return new NullableValueVectorFixed<double>(b,f.value_count());
+                return new NullableValueVectorFixed<double>(b,f.getValueCount());
             case DATE:
                 return new NullableValueVectorTyped<DateHolder, 
-                       ValueVectorTyped<DateHolder, uint64_t> >(b,f.value_count());
+                       ValueVectorTyped<DateHolder, uint64_t> >(b,f.getValueCount());
             case TIMESTAMP:
                 return new NullableValueVectorTyped<DateTimeHolder, 
-                       ValueVectorTyped<DateTimeHolder, uint64_t> >(b,f.value_count());
+                       ValueVectorTyped<DateTimeHolder, uint64_t> >(b,f.getValueCount());
             case TIME:
                 return new NullableValueVectorTyped<TimeHolder,
-                    ValueVectorTyped<TimeHolder, uint32_t> >(b,f.value_count());
+                    ValueVectorTyped<TimeHolder, uint32_t> >(b,f.getValueCount());
             case TIMESTAMPTZ:
                 return new NullableValueVectorTyped<DateTimeTZHolder, 
-                       ValueVectorTypedComposite<DateTimeTZHolder> >(b,f.value_count());
+                       ValueVectorTypedComposite<DateTimeTZHolder> >(b,f.getValueCount());
             case INTERVAL:
                 return new NullableValueVectorTyped<IntervalHolder, 
-                       ValueVectorTypedComposite<IntervalHolder> >(b,f.value_count());
+                       ValueVectorTypedComposite<IntervalHolder> >(b,f.getValueCount());
             case INTERVALDAY:
                 return new NullableValueVectorTyped<IntervalDayHolder, 
-                       ValueVectorTypedComposite<IntervalDayHolder> >(b,f.value_count());
+                       ValueVectorTypedComposite<IntervalDayHolder> >(b,f.getValueCount());
             case INTERVALYEAR:
                 return new NullableValueVectorTyped<IntervalYearHolder, 
-                       ValueVectorTypedComposite<IntervalYearHolder> >(b,f.value_count());
+                       ValueVectorTypedComposite<IntervalYearHolder> >(b,f.getValueCount());
             case BIT:
                 return new NullableValueVectorTyped<uint8_t, 
-                       ValueVectorBit >(b,f.value_count());
+                       ValueVectorBit >(b,f.getValueCount());
             case VARBINARY:
                 //TODO: Varbinary is untested
-                return new NullableValueVectorTyped<VarWidthHolder, ValueVectorVarBinary >(b,f.value_count());
+                return new NullableValueVectorTyped<VarWidthHolder, ValueVectorVarBinary >(b,f.getValueCount());
             case VARCHAR:
-                return new NullableValueVectorTyped<VarWidthHolder, ValueVectorVarChar >(b,f.value_count());
+                return new NullableValueVectorTyped<VarWidthHolder, ValueVectorVarChar >(b,f.getValueCount());
             // not implemented yet
             default:
-                return new ValueVectorUnimplemented(b, f.value_count()); 
+                return new ValueVectorUnimplemented(b, f.getValueCount()); 
         }
     case DM_REPEATED:
         switch (type) {
              // not implemented yet
             default:
-                return new ValueVectorUnimplemented(b, f.value_count()); 
+                return new ValueVectorUnimplemented(b, f.getValueCount()); 
         }
     }
-    return new ValueVectorUnimplemented(b, f.value_count()); 
+    return new ValueVectorUnimplemented(b, f.getValueCount()); 
 }
 
 
 int FieldBatch::load(){
-    const FieldMetadata& fmd = this->m_fieldMetadata;
+    const Drill::FieldMetadata& fmd = this->m_fieldMetadata;
     this->m_pValueVector=ValueVectorFactory::allocateValueVector(fmd, this->m_pFieldData);
     return 0;
 }
@@ -282,13 +284,16 @@ int RecordBatch::build(){
     size_t startOffset=0;
     //TODO: handle schema changes here. Call a client provided callback?
     for(int i=0; i<this->m_numFields; i++){
-        const FieldMetadata& fmd=this->m_pRecordBatchDef->field(i);
-        size_t len=fmd.buffer_length();
-        FieldBatch* pField = new FieldBatch(fmd, this->m_buffer, startOffset, len) ;
+        const exec::shared::FieldMetadata f=this->m_pRecordBatchDef->field(i);
+        //TODO: free this??
+        Drill::FieldMetadata* pFmd = new Drill::FieldMetadata;
+        pFmd->set(f);
+        size_t len=pFmd->getBufferLength();
+        FieldBatch* pField = new FieldBatch(*pFmd, this->m_buffer, startOffset, len) ;
         startOffset+=len;
         pField->load(); // set up the value vectors
         this->m_fields.push_back(pField);
-        this->m_fieldDefs.push_back(&fmd);
+        this->m_fieldDefs.push_back(pFmd);
     }
     return 0;
 }
@@ -296,8 +301,8 @@ int RecordBatch::build(){
 void RecordBatch::print(size_t num){
     std::string nameList;
     for(std::vector<FieldBatch*>::size_type i = 0; i != this->m_fields.size(); i++) {
-        FieldMetadata fmd=this->getFieldMetadata(i);
-        std::string name= fmd.def().name(0).name();
+        Drill::FieldMetadata fmd=this->getFieldMetadata(i);
+        std::string name= fmd.getName();
         nameList+=name;
         nameList+="    ";
     } 

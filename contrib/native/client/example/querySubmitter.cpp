@@ -18,11 +18,9 @@ status_t QueryResultsListener(void* ctx, RecordBatch* b, DrillClientError* err){
     return QRY_SUCCESS ;
 }
 
-void print(const FieldMetadata* pFieldMetadata, void* buf, size_t sz){
-    const FieldDef& fieldDef = pFieldMetadata->def();
-    const MajorType& majorType=fieldDef.major_type();
-    int type = majorType.minor_type();
-    int mode = majorType.mode();
+void print(const Drill::FieldMetadata* pFieldMetadata, void* buf, size_t sz){
+    int type = pFieldMetadata->getMinorType();
+    int mode = pFieldMetadata->getDataMode();
     unsigned char printBuffer[10240];
     memset(printBuffer, 0, sizeof(printBuffer));
     switch (type) {
@@ -72,7 +70,7 @@ struct Option{
     char desc[128];
     bool required;
 }qsOptions[]= { 
-    {"file", "Plan files separated by semicolons", false},
+    {"plan", "Plan files separated by semicolons", false},
     {"query", "Query strings, separated by semicolons", false},
     {"type", "Query type [physical|logical|sql]", true},
     {"url", "Connect url", true},
@@ -152,7 +150,7 @@ int readPlans(const string& planList, vector<string>& plans){
     vector<string>::iterator iter;
     splitString(planList, ';', planFiles);
     for(iter = planFiles.begin(); iter != planFiles.end(); iter++) {
-        ifstream f(*iter);
+        ifstream f((*iter).c_str());
         string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
         cout << "plan:" << plan << endl;
         plans.push_back(plan);
@@ -257,12 +255,12 @@ int main(int argc, char* argv[]) {
                 // get fields.
                 row=0;
                 RecordIterator* pRecIter=*recordIterIter;
-                std::vector<FieldMetadata*> fields = pRecIter->getColDefs();
+                std::vector<Drill::FieldMetadata*> fields = pRecIter->getColDefs();
                 while((ret=pRecIter->next())==QRY_SUCCESS){
                     row++;
                     if(row%4095==0){
                         for(size_t i=0; i<fields.size(); i++){
-                            std::string name= fields[i]->def().name(0).name();
+                            std::string name= fields[i]->getName();
                             printf("%s\t", name.c_str());
                         }
                     }

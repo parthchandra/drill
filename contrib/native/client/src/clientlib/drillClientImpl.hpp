@@ -20,10 +20,11 @@ using namespace exec::shared;
 using namespace exec::user;
 namespace asio = boost::asio;
 
+class vector;
+class queue;
+
 namespace Drill {
 
-    class vector;
-    class queue;
     class DrillClientImpl;
     class InBoundRpcMessage;
     class OutBoundRpcMessage;
@@ -73,9 +74,9 @@ namespace Drill {
             void waitForData();
 
             // placeholder to return an empty col def vector when calls are made out of order.
-            static std::vector<const FieldMetadata*> s_emptyColDefs;
+            static std::vector<Drill::FieldMetadata*> s_emptyColDefs;
 
-            std::vector<FieldMetadata*>& getColumnDefs(){ 
+            std::vector<Drill::FieldMetadata*>& getColumnDefs(){ 
                 boost::lock_guard<boost::mutex> bufferLock(this->m_schemaMutex);
                 return this->m_columnDefs;
             }
@@ -98,7 +99,7 @@ namespace Drill {
             // Each data buffer is decoded into a RecordBatch
             std::vector<ByteBuf_t> m_dataBuffers;
             std::queue<RecordBatch*> m_recordBatches;
-            std::vector<FieldMetadata*> m_columnDefs;
+            std::vector<Drill::FieldMetadata*> m_columnDefs;
 
             // Mutex to protect read/write operations on the socket
             boost::mutex m_bufferMutex; 
@@ -194,8 +195,6 @@ namespace Drill {
         boost::mutex m_bufferMutex; 
         // Mutex to protect coordinationId
         boost::mutex m_coordMutex; 
-
-        Byte_t m_readLengthBuf[LEN_PREFIX_BUFLEN];
 
         int getNextCoordinationId(){ return ++m_coordinationId; };
         // end and receive synchronous messages

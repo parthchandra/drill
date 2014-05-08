@@ -9,7 +9,7 @@ using namespace std;
 using namespace Drill;
 
 RecordIterator::~RecordIterator(){
-    for(std::vector<FieldMetadata*>::iterator it=m_pColDefs->begin(); it!=m_pColDefs->end(); ++it){
+    for(std::vector<Drill::FieldMetadata*>::iterator it=m_pColDefs->begin(); it!=m_pColDefs->end(); ++it){
         delete *it;
     }
     delete this->m_pColDefs;
@@ -18,16 +18,16 @@ RecordIterator::~RecordIterator(){
     this->m_pQueryResult=NULL;
 }
 
-std::vector<FieldMetadata*>&  RecordIterator::getColDefs(){
+std::vector<Drill::FieldMetadata*>&  RecordIterator::getColDefs(){
     //NOTE: if query is cancelled, return whatever you have. Client applications job to deal with it.
     if(this->m_pColDefs==NULL){
         if(this->m_pCurrentRecordBatch==NULL){
             this->m_pQueryResult->waitForData();
         }
-        std::vector<FieldMetadata*>* pColDefs = new std::vector<FieldMetadata*>;
+        std::vector<Drill::FieldMetadata*>* pColDefs = new std::vector<Drill::FieldMetadata*>;
         {   //lock after we come out of the  wait.
             boost::lock_guard<boost::mutex> bufferLock(this->m_recordBatchMutex);
-            std::vector<const FieldMetadata*>&  currentColDefs=DrillClientQueryResult::s_emptyColDefs;
+            std::vector<Drill::FieldMetadata*>&  currentColDefs=DrillClientQueryResult::s_emptyColDefs;
             if(this->m_pCurrentRecordBatch!=NULL){
                 currentColDefs=this->m_pCurrentRecordBatch->getColumnDefs();
             }else{
@@ -38,9 +38,9 @@ std::vector<FieldMetadata*>&  RecordIterator::getColDefs(){
                     currentColDefs=pR->getColumnDefs();
                 }
             }
-            for(std::vector<const FieldMetadata*>::iterator it=currentColDefs.begin(); it!=currentColDefs.end(); ++it){
-                FieldMetadata* fmd= new FieldMetadata();
-                fmd->CopyFrom(*(*it));//Yup, that's 2 stars
+            for(std::vector<Drill::FieldMetadata*>::iterator it=currentColDefs.begin(); it!=currentColDefs.end(); ++it){
+                Drill::FieldMetadata* fmd= new Drill::FieldMetadata;
+                fmd->copy(*(*it));//Yup, that's 2 stars
                 pColDefs->push_back(fmd);
             }
         }
