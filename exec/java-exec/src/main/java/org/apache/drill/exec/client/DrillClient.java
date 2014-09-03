@@ -54,6 +54,7 @@ import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.user.ConnectionThrottle;
 import org.apache.drill.exec.rpc.user.QueryResultBatch;
 import org.apache.drill.exec.rpc.user.UserClient;
+import org.apache.drill.exec.rpc.user.UserQueryPlanResultListener;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 
 import com.google.common.util.concurrent.AbstractCheckedFuture;
@@ -256,6 +257,11 @@ public class DrillClient implements Closeable, ConnectionThrottle{
    */
   public void runQuery(QueryType type, String plan, UserResultsListener resultsListener){
     client.submitQuery(resultsListener, newBuilder().setResultsMode(STREAM_FULL).setType(type).setPlan(plan).build());
+  }
+
+  public void planQuery(String query, UserQueryPlanResultListener listener) {
+    UserProtos.RunQuery runQuery = newBuilder().setResultsMode(STREAM_FULL).setType(QueryType.GET_PLAN).setPlan(query).build();
+    client.submitPlanQuery(runQuery, listener);
   }
 
   private class ListHoldingResultsListener implements UserResultsListener {

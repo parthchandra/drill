@@ -6,6 +6,7 @@ option optimize_for = SPEED;
 
 import "SchemaDef.proto";
 import "UserBitShared.proto";
+import "ExecutionProtos.proto";
 
 ////// UserToBit RPC ///////
 enum RpcType {
@@ -24,6 +25,12 @@ enum RpcType {
 
   REQ_META_FUNCTIONS = 8;
   RESP_FUNCTION_LIST = 9;
+
+  // user to bit
+  GET_QUERY_PLAN_FRAGMENTS = 10;
+
+  // bit to user
+  QUERY_PLAN_FRAGMENTS = 11;
 }
 
 message Property {
@@ -53,6 +60,11 @@ message RunQuery {
   optional QueryResultsMode results_mode = 1;
   optional exec.shared.QueryType type = 2;
   optional string plan = 3;
+}
+
+message QueryPlanFragments {
+  required exec.shared.QueryId query_id = 1;
+  repeated exec.bit.PlanFragment fragments = 2;
 }
 
 enum QueryResultsMode {

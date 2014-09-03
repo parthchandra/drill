@@ -21,6 +21,7 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
+import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
@@ -34,6 +35,9 @@ public class UserRpcConfig {
       .add(RpcType.RUN_QUERY, RunQuery.class, RpcType.QUERY_HANDLE, QueryId.class) //user to bit
       .add(RpcType.CANCEL_QUERY, QueryId.class, RpcType.ACK, Ack.class) //user to bit
       .add(RpcType.QUERY_RESULT, QueryResult.class, RpcType.ACK, Ack.class) //bit to user
+      .add(RpcType.QUERY_RESULT, QueryResult.class, RpcType.ACK, Ack.class) //bit to user
+      .add(RpcType.GET_QUERY_PLAN_FRAGMENTS, RunQuery.class, RpcType.QUERY_HANDLE, QueryId.class) // user to bit
+      .add(RpcType.QUERY_PLAN_FRAGMENTS, QueryPlanFragments.class, RpcType.ACK, Ack.class) //bit to user
       .build();
 
   public static int RPC_VERSION = 2;

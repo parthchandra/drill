@@ -45,7 +45,7 @@ import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.memory.TopLevelAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
-import org.apache.drill.exec.proto.BitControl;
+import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.rpc.user.UserServer;
@@ -548,7 +548,7 @@ public class ParquetRecordReaderTest extends BaseTestQuery{
                               @Injectable UserServer.UserClientConnection connection) throws Exception {
     DrillConfig c = DrillConfig.create();
     FunctionImplementationRegistry registry = new FunctionImplementationRegistry(c);
-    FragmentContext context = new FragmentContext(bitContext, BitControl.PlanFragment.getDefaultInstance(), connection, registry);
+    FragmentContext context = new FragmentContext(bitContext, PlanFragment.getDefaultInstance(), connection, registry);
 
 //    new NonStrictExpectations() {
 //      {

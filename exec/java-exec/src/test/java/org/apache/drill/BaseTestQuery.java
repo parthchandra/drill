@@ -29,6 +29,7 @@ import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ExecTest;
 import org.apache.drill.exec.client.DrillClient;
+import org.apache.drill.exec.client.PrintingQueryPlanResultListener;
 import org.apache.drill.exec.client.PrintingResultsListener;
 import org.apache.drill.exec.client.QuerySubmitter;
 import org.apache.drill.exec.client.QuerySubmitter.Format;
@@ -192,6 +193,13 @@ public class BaseTestQuery extends ExecTest{
 
   protected int testSql(String query) throws Exception{
     return testRunAndPrint(QueryType.SQL, query);
+  }
+
+  protected void testGetQueryPlan(String query) throws Exception {
+    query = query.replace("[WORKING_PATH]", TestTools.getWorkingPath());
+    PrintingQueryPlanResultListener resultListener = new PrintingQueryPlanResultListener();
+    client.planQuery(query, resultListener);
+    resultListener.await();
   }
 
   protected void testPhysicalFromFile(String file) throws Exception{

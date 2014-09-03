@@ -13,3 +13,21 @@ message FragmentHandle {
 	optional int32 minor_fragment_id = 3;
 }
 
+message PlanFragment {
+    optional FragmentHandle handle = 1;
+    optional float network_cost = 4;
+    optional float cpu_cost = 5;
+    optional float disk_cost = 6;
+    optional float memory_cost = 7;
+    optional string fragment_json = 8;
+    optional DrillbitEndpoint assignment = 10;
+    optional bool leaf_fragment = 9;
+    optional DrillbitEndpoint foreman = 11;
+    optional int64 mem_initial = 12 [default = 20000000]; // 20 megs
+    optional int64 mem_max = 13 [default = 2000000000]; // 20 gigs
+    optional int64 query_start_time = 14; // start time of query in milliseconds
+    optional exec.shared.UserCredentials credentials = 15;
+    optional int32 time_zone = 16;
+    optional string options_json = 17;
+}
+

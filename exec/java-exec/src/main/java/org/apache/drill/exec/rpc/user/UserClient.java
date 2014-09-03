@@ -43,6 +43,7 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserClient.class);
 
   private final QueryResultHandler queryResultHandler = new QueryResultHandler();
+  private final QueryPlanResultHandler queryPlanResultHandler = new QueryPlanResultHandler();
 
   private boolean supportComplexTypes = true;
 
@@ -53,6 +54,10 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
 
   public void submitQuery(UserResultsListener resultsListener, RunQuery query) {
     send(queryResultHandler.getWrappedListener(resultsListener), RpcType.RUN_QUERY, query, QueryId.class);
+  }
+
+  public void submitPlanQuery(RunQuery query, UserQueryPlanResultListener listener) {
+    send(queryPlanResultHandler.getWrappedListener(listener), RpcType.GET_QUERY_PLAN_FRAGMENTS, query, QueryId.class);
   }
 
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)
@@ -88,6 +93,9 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
     switch (rpcType) {
     case RpcType.QUERY_RESULT_VALUE:
       queryResultHandler.batchArrived(throttle, pBody, dBody);
+      return new Response(RpcType.ACK, Ack.getDefaultInstance());
+    case RpcType.QUERY_PLAN_FRAGMENTS_VALUE:
+      queryPlanResultHandler.batchArrived(throttle, pBody, dBody);
       return new Response(RpcType.ACK, Ack.getDefaultInstance());
     default:
       throw new RpcException(String.format("Unknown Rpc Type %d. ", rpcType));

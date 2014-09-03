@@ -19,6 +19,7 @@ package org.apache.drill.exec.rpc.user;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
+import io.netty.buffer.EmptyByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 
@@ -29,11 +30,11 @@ import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
+import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
-import org.apache.drill.exec.rpc.Acks;
 import org.apache.drill.exec.rpc.BasicServer;
 import org.apache.drill.exec.rpc.OutOfMemoryHandler;
 import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
@@ -75,6 +76,7 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
     switch (rpcType) {
 
     case RpcType.RUN_QUERY_VALUE:
+    case RpcType.GET_QUERY_PLAN_FRAGMENTS_VALUE:
       logger.debug("Received query to run.  Returning query handle.");
       try {
         RunQuery query = RunQuery.PARSER.parseFrom(new ByteBufInputStream(pBody));
@@ -136,6 +138,11 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
     public void sendResult(RpcOutcomeListener<Ack> listener, QueryWritableBatch result, boolean allowInEventThread){
       logger.trace("Sending result to client with {}", result);
       send(listener, this, RpcType.QUERY_RESULT, result.getHeader(), Ack.class, allowInEventThread, result.getBuffers());
+    }
+
+    public void sendPlan(RpcOutcomeListener<Ack> listener, QueryPlanFragments fragments) {
+      logger.trace("Sending plan result to client with {}", fragments);
+      send(listener, this, RpcType.QUERY_PLAN_FRAGMENTS, fragments, Ack.class);
     }
 
     @Override
