@@ -49,12 +49,12 @@ import org.apache.drill.exec.work.foreman.Foreman;
 import org.apache.drill.exec.work.foreman.QueryStatus;
 import org.apache.drill.exec.work.fragment.FragmentExecutor;
 import org.apache.drill.exec.work.fragment.FragmentManager;
-import org.apache.drill.exec.work.user.UserWorker;
 
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Queues;
+import org.apache.drill.exec.work.user.UserWorker;
 
 public class WorkManager implements Closeable {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(WorkManager.class);

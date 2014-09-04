@@ -41,9 +41,11 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.proto.UserProtos;
+import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.Property;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.UserProperties;
+import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.rpc.BasicClientWithConnection.ServerConnection;
 import org.apache.drill.exec.rpc.ChannelClosedException;
@@ -54,7 +56,6 @@ import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.user.ConnectionThrottle;
 import org.apache.drill.exec.rpc.user.QueryResultBatch;
 import org.apache.drill.exec.rpc.user.UserClient;
-import org.apache.drill.exec.rpc.user.UserQueryPlanResultListener;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 
 import com.google.common.util.concurrent.AbstractCheckedFuture;
@@ -259,9 +260,9 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     client.submitQuery(resultsListener, newBuilder().setResultsMode(STREAM_FULL).setType(type).setPlan(plan).build());
   }
 
-  public void planQuery(String query, UserQueryPlanResultListener listener) {
-    UserProtos.RunQuery runQuery = newBuilder().setResultsMode(STREAM_FULL).setType(QueryType.GET_PLAN).setPlan(query).build();
-    client.submitPlanQuery(runQuery, listener);
+  public QueryPlanFragments planQuery(String query) throws RpcException {
+    GetQueryPlanFragments runQuery = GetQueryPlanFragments.newBuilder().setQuery(query).build();
+    return client.submitPlanQuery(runQuery);
   }
 
   private class ListHoldingResultsListener implements UserResultsListener {

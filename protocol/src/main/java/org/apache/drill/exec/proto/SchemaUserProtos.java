@@ -650,6 +650,117 @@ public final class SchemaUserProtos
         }
     }
 
+    public static final class GetQueryPlanFragments
+    {
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.MessageSchema WRITE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.MessageSchema();
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.BuilderSchema MERGE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.BuilderSchema();
+        
+        public static class MessageSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments>
+        {
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments message) throws java.io.IOException
+            {
+                if(message.hasQuery())
+                    output.writeString(1, message.getQuery(), false);
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments message)
+            {
+                return message.isInitialized();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.class.getName();
+            }
+            //unused
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments message) throws java.io.IOException {}
+            public org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments newMessage() { return null; }
+        }
+        public static class BuilderSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder>
+        {
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder builder) throws java.io.IOException
+            {
+                for(int number = input.readFieldNumber(this);; number = input.readFieldNumber(this))
+                {
+                    switch(number)
+                    {
+                        case 0:
+                            return;
+                        case 1:
+                            builder.setQuery(input.readString());
+                            break;
+                        default:
+                            input.handleUnknownField(number, this);
+                    }
+                }
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder builder)
+            {
+                return builder.isInitialized();
+            }
+            public org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder newMessage()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.newBuilder();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.GetQueryPlanFragments.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.class.getName();
+            }
+            //unused
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments.Builder builder) throws java.io.IOException {}
+        }
+        public static java.lang.String getFieldName(int number)
+        {
+            switch(number)
+            {
+                case 1: return "query";
+                default: return null;
+            }
+        }
+        public static int getFieldNumber(java.lang.String name)
+        {
+            java.lang.Integer number = fieldMap.get(name);
+            return number == null ? 0 : number.intValue();
+        }
+        private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+        static
+        {
+            fieldMap.put("query", 1);
+        }
+    }
+
     public static final class QueryPlanFragments
     {
         public static final org.apache.drill.exec.proto.SchemaUserProtos.QueryPlanFragments.MessageSchema WRITE =
@@ -666,6 +777,11 @@ public final class SchemaUserProtos
 
                 for(org.apache.drill.exec.proto.ExecProtos.PlanFragment fragments : message.getFragmentsList())
                     output.writeObject(2, fragments, org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.WRITE, true);
+
+                if(message.hasStatus())
+                    output.writeEnum(3, message.getStatus().getNumber(), false);
+                if(message.hasError())
+                    output.writeObject(4, message.getError(), org.apache.drill.exec.proto.SchemaUserBitShared.DrillPBError.WRITE, false);
 
             }
             public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.QueryPlanFragments message)
@@ -714,6 +830,13 @@ public final class SchemaUserProtos
                             builder.addFragments(input.mergeObject(org.apache.drill.exec.proto.ExecProtos.PlanFragment.newBuilder(), org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.MERGE));
 
                             break;
+                        case 3:
+                            builder.setStatus(org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.valueOf(input.readEnum()));
+                            break;
+                        case 4:
+                            builder.setError(input.mergeObject(org.apache.drill.exec.proto.UserBitShared.DrillPBError.newBuilder(), org.apache.drill.exec.proto.SchemaUserBitShared.DrillPBError.MERGE));
+
+                            break;
                         default:
                             input.handleUnknownField(number, this);
                     }
@@ -756,6 +879,8 @@ public final class SchemaUserProtos
             {
                 case 1: return "queryId";
                 case 2: return "fragments";
+                case 3: return "status";
+                case 4: return "error";
                 default: return null;
             }
         }
@@ -769,6 +894,8 @@ public final class SchemaUserProtos
         {
             fieldMap.put("queryId", 1);
             fieldMap.put("fragments", 2);
+            fieldMap.put("status", 3);
+            fieldMap.put("error", 4);
         }
     }
 

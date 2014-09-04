@@ -55,14 +55,13 @@ import org.apache.drill.exec.planner.fragment.SimpleParallelizer;
 import org.apache.drill.exec.planner.fragment.StatsCollector;
 import org.apache.drill.exec.planner.sql.DirectPlan;
 import org.apache.drill.exec.planner.sql.DrillSqlWorker;
-import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
+import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.DrillPBError;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
-import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
@@ -127,17 +126,14 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     }
 
     this.initiatingClient = connection;
+    this.fragmentManager = new QueryManager(queryId, queryRequest, bee.getContext().getPersistentStoreProvider(), new ForemanManagerListener(), dContext.getController(), this);
     this.bee = bee;
-
-    this.fragmentManager = new QueryManager(queryId, queryRequest, bee.getContext().getPersistentStoreProvider(),
-        new ForemanManagerListener(), dContext.getController(), this);
 
     this.state = new AtomicState<QueryState>(QueryState.PENDING) {
       protected QueryState getStateFromNumber(int i) {
         return QueryState.valueOf(i);
       }
     };
-
   }
 
   public QueryContext getContext() {
@@ -210,26 +206,21 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
 
     final String originalThread = Thread.currentThread().getName();
     Thread.currentThread().setName(QueryIdHelper.getQueryId(queryId) + ":foreman");
-
     fragmentManager.getStatus().setStartTime(System.currentTimeMillis());
-
-    try {
-      // convert a run query request into action
+    // convert a run query request into action
+    try{
       switch (queryRequest.getType()) {
-        case LOGICAL:
-          parseAndRunLogicalPlan(queryRequest.getPlan());
-          break;
-        case PHYSICAL:
-          parseAndRunPhysicalPlan(queryRequest.getPlan());
-          break;
-        case SQL:
-          runSQL(queryRequest.getPlan());
-          break;
-        case GET_PLAN:
-          planQuery(queryRequest.getPlan());
-          break;
-        default:
-          throw new UnsupportedOperationException();
+      case LOGICAL:
+        parseAndRunLogicalPlan(queryRequest.getPlan());
+        break;
+      case PHYSICAL:
+        parseAndRunPhysicalPlan(queryRequest.getPlan());
+        break;
+      case SQL:
+        runSQL(queryRequest.getPlan());
+        break;
+      default:
+        throw new UnsupportedOperationException();
       }
     }catch(AssertionError | Exception ex){
       fail("Failure while setting up Foreman.", ex);
@@ -240,29 +231,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     }finally{
       releaseLease();
       Thread.currentThread().setName(originalThread);
-    }
-  }
-
-  private void executeQuery() {
-
-  }
-
-  // Plan the query and send plan fragments as response to client
-  private void planQuery(String query) {
-    try {
-      DrillSqlWorker sqlWorker = new DrillSqlWorker(context);
-      Pointer<String> textPlan = new Pointer<>();
-      PhysicalPlan plan = sqlWorker.getPlan(query, textPlan);
-      fragmentManager.getStatus().setPlanText(textPlan.value);
-      List<PlanFragment> fragments = getPlanFragments(plan);
-      QueryPlanFragments.Builder responseBuilder = QueryPlanFragments.newBuilder();
-      responseBuilder.setQueryId(queryId);
-      for(int i = 0; i < fragments.size(); i++) {
-        responseBuilder.addFragments(fragments.get(i));
-      }
-      initiatingClient.sendPlan(new BaseRpcOutcomeListener(), responseBuilder.build());
-    }catch(Exception e){
-      fail("Failure while planning sql query.", e);
     }
   }
 
@@ -345,70 +313,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     } catch (IOException e) {
       fail("Failure while parsing physical plan.", e);
     }
-  }
-
-  private List<PlanFragment> getPlanFragments(PhysicalPlan plan) {
-    if(plan.getProperties().resultMode != ResultMode.EXEC){
-      fail(String.format("Failure running plan.  You requested a result mode of %s and a physical plan can only be output as EXEC", plan.getProperties().resultMode), new Exception());
-    }
-    PhysicalOperator rootOperator = plan.getSortedOperators(false).iterator().next();
-
-    MakeFragmentsVisitor makeFragmentsVisitor = new MakeFragmentsVisitor();
-    Fragment rootFragment;
-    try {
-      rootFragment = rootOperator.accept(makeFragmentsVisitor, null);
-    } catch (FragmentSetupException e) {
-      fail("Failure while fragmenting query.", e);
-      return null;
-    }
-
-    int sortCount = 0;
-    for (PhysicalOperator op : plan.getSortedOperators()) {
-      if (op instanceof ExternalSort) sortCount++;
-    }
-
-    if (sortCount > 0) {
-      long maxWidthPerNode = context.getOptions().getOption(ExecConstants.MAX_WIDTH_PER_NODE_KEY).num_val;
-      long maxAllocPerNode = Math.min(DrillConfig.getMaxDirectMemory(), context.getConfig().getLong(ExecConstants.TOP_LEVEL_MAX_ALLOC));
-      maxAllocPerNode = Math.min(maxAllocPerNode, context.getOptions().getOption(ExecConstants.MAX_QUERY_MEMORY_PER_NODE_KEY).num_val);
-      long maxSortAlloc = maxAllocPerNode / (sortCount * maxWidthPerNode);
-      logger.debug("Max sort alloc: {}", maxSortAlloc);
-      for (PhysicalOperator op : plan.getSortedOperators()) {
-        if (op instanceof  ExternalSort) {
-          ((ExternalSort)op).setMaxAllocation(maxSortAlloc);
-        }
-      }
-    }
-
-    PlanningSet planningSet = StatsCollector.collectStats(rootFragment);
-    SimpleParallelizer parallelizer = new SimpleParallelizer(context);
-
-    try {
-
-      double size = 0;
-      for(PhysicalOperator ops : plan.getSortedOperators()){
-        size += ops.getCost();
-      }
-      if(queuingEnabled){
-        if(size > this.queueThreshold){
-          this.lease = largeSemaphore.acquire(this.queueTimeout, TimeUnit.MILLISECONDS);
-        }else{
-          this.lease = smallSemaphore.acquire(this.queueTimeout, TimeUnit.MILLISECONDS);
-        }
-      }
-
-      QueryWorkUnit work = parallelizer.getFragments(context.getOptions().getOptionList(), context.getCurrentEndpoint(),
-          queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
-
-      List<PlanFragment> fragments = Lists.newArrayList();
-      fragments.add(work.getRootFragment());
-      fragments.addAll(work.getFragments());
-      return fragments;
-    } catch (Exception e) {
-      fail("Failure while setting up query.", e);
-    }
-
-    return null;
   }
 
   private void runPhysicalPlan(PhysicalPlan plan) {

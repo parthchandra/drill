@@ -62,9 +62,15 @@ message RunQuery {
   optional string plan = 3;
 }
 
+message GetQueryPlanFragments {
+  required string query = 1;
+}
+
 message QueryPlanFragments {
   required exec.shared.QueryId query_id = 1;
   repeated exec.bit.PlanFragment fragments = 2;
+  required exec.shared.QueryResult.QueryState status = 3;
+  optional exec.shared.DrillPBError error = 4;
 }
 
 enum QueryResultsMode {

@@ -19,7 +19,6 @@ package org.apache.drill.exec.rpc.user;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.EmptyByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 
@@ -30,6 +29,7 @@ import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
+import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
@@ -76,7 +76,6 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
     switch (rpcType) {
 
     case RpcType.RUN_QUERY_VALUE:
-    case RpcType.GET_QUERY_PLAN_FRAGMENTS_VALUE:
       logger.debug("Received query to run.  Returning query handle.");
       try {
         RunQuery query = RunQuery.PARSER.parseFrom(new ByteBufInputStream(pBody));
@@ -98,6 +97,14 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
       try {
         QueryId queryId = QueryId.PARSER.parseFrom(new ByteBufInputStream(pBody));
         return new Response(RpcType.ACK, worker.cancelQuery(queryId));
+      } catch (InvalidProtocolBufferException e) {
+        throw new RpcException("Failure while decoding QueryId body.", e);
+      }
+
+    case RpcType.GET_QUERY_PLAN_FRAGMENTS_VALUE:
+      try {
+        GetQueryPlanFragments req = GetQueryPlanFragments.PARSER.parseFrom(new ByteBufInputStream(pBody));
+        return new Response(RpcType.QUERY_PLAN_FRAGMENTS, worker.getQueryPlan(connection, req));
       } catch (InvalidProtocolBufferException e) {
         throw new RpcException("Failure while decoding QueryId body.", e);
       }

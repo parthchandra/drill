@@ -20,17 +20,21 @@ package org.apache.drill.exec.rpc.user;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.EventLoopGroup;
 
+import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
+import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.UserProperties;
 import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
+import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.rpc.BasicClientWithConnection;
+import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.OutOfMemoryHandler;
 import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
 import org.apache.drill.exec.rpc.Response;
@@ -39,11 +43,12 @@ import org.apache.drill.exec.rpc.RpcException;
 
 import com.google.protobuf.MessageLite;
 
+import java.util.concurrent.ExecutionException;
+
 public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHandshake, BitToUserHandshake> {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserClient.class);
 
   private final QueryResultHandler queryResultHandler = new QueryResultHandler();
-  private final QueryPlanResultHandler queryPlanResultHandler = new QueryPlanResultHandler();
 
   private boolean supportComplexTypes = true;
 
@@ -56,8 +61,13 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
     send(queryResultHandler.getWrappedListener(resultsListener), RpcType.RUN_QUERY, query, QueryId.class);
   }
 
-  public void submitPlanQuery(RunQuery query, UserQueryPlanResultListener listener) {
-    send(queryPlanResultHandler.getWrappedListener(listener), RpcType.GET_QUERY_PLAN_FRAGMENTS, query, QueryId.class);
+  public QueryPlanFragments submitPlanQuery(GetQueryPlanFragments req) throws RpcException {
+    try {
+      DrillRpcFuture<QueryPlanFragments> future = send(RpcType.GET_QUERY_PLAN_FRAGMENTS, req, QueryPlanFragments.class);
+      return future.get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RpcException("Failed to get query plan", e);
+    }
   }
 
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)
@@ -85,6 +95,8 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
       return QueryId.getDefaultInstance();
     case RpcType.QUERY_RESULT_VALUE:
       return QueryResult.getDefaultInstance();
+    case RpcType.QUERY_PLAN_FRAGMENTS_VALUE:
+      return QueryPlanFragments.getDefaultInstance();
     }
     throw new RpcException(String.format("Unable to deal with RpcType of %d", rpcType));
   }
@@ -93,9 +105,6 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
     switch (rpcType) {
     case RpcType.QUERY_RESULT_VALUE:
       queryResultHandler.batchArrived(throttle, pBody, dBody);
-      return new Response(RpcType.ACK, Ack.getDefaultInstance());
-    case RpcType.QUERY_PLAN_FRAGMENTS_VALUE:
-      queryPlanResultHandler.batchArrived(throttle, pBody, dBody);
       return new Response(RpcType.ACK, Ack.getDefaultInstance());
     default:
       throw new RpcException(String.format("Unknown Rpc Type %d. ", rpcType));
