@@ -25,6 +25,7 @@ public class TestGetQueryPlan extends BaseTestQuery {
   @Test
   public void test() throws Exception {
     testSql("alter session set `planner.slice_target`=1");
-    testGetQueryPlan("Select * from dfs_test.`[WORKING_PATH]/../../sample-data/nation.parquet` order by N_NATIONKEY");
+    testGetQueryPlan("SELECT `N_REGIONKEY`, COUNT(*) FROM " +
+        "dfs_test.`[WORKING_PATH]/../../sample-data/nation.parquet` GROUP BY `N_REGIONKEY`");
   }
 }

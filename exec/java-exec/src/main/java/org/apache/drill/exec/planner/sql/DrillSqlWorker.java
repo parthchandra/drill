@@ -52,10 +52,10 @@ import org.eigenbase.sql.parser.SqlParseException;
 public class DrillSqlWorker {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillSqlWorker.class);
 
-  private final Planner planner;
+  protected final Planner planner;
   public final static int LOGICAL_RULES = 0;
   public final static int PHYSICAL_MEM_RULES = 1;
-  private final QueryContext context;
+  protected final QueryContext context;
 
 
   public DrillSqlWorker(QueryContext context) throws Exception {

@@ -30,7 +30,7 @@ import org.apache.drill.exec.planner.fragment.MakeFragmentsVisitor;
 import org.apache.drill.exec.planner.fragment.PlanningSet;
 import org.apache.drill.exec.planner.fragment.SimpleParallelizer;
 import org.apache.drill.exec.planner.fragment.StatsCollector;
-import org.apache.drill.exec.planner.sql.DrillSqlWorker;
+import org.apache.drill.exec.planner.sql.DrillParallelSqlWorker;
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.UserBitShared.DrillPBError;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
@@ -39,7 +39,6 @@ import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import org.apache.drill.exec.server.DrillbitContext;
-import org.apache.drill.exec.util.Pointer;
 import org.apache.drill.exec.work.ErrorHelper;
 import org.apache.drill.exec.work.QueryWorkUnit;
 
@@ -58,9 +57,8 @@ public class QueryPlannerHelper {
     QueryPlanFragments.Builder responseBuilder = QueryPlanFragments.newBuilder();
     QueryContext context = new QueryContext(connection.getSession(), queryId, dContext);
     try {
-      DrillSqlWorker sqlWorker = new DrillSqlWorker(context);
-      Pointer<String> textPlan = new Pointer<>();
-      PhysicalPlan plan = sqlWorker.getPlan(req.getQuery(), textPlan);
+      DrillParallelSqlWorker sqlWorker = new DrillParallelSqlWorker(context);
+      PhysicalPlan plan = sqlWorker.getPlan(req.getQuery());
       List<PlanFragment> fragments = getPlanFragments(plan, context, queryId);
 
       responseBuilder.setQueryId(queryId);
