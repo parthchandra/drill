@@ -196,7 +196,7 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     return false;
   }
 
-  private void connect(DrillbitEndpoint endpoint) throws RpcException {
+  public void connect(DrillbitEndpoint endpoint) throws RpcException {
     FutureHandler f = new FutureHandler();
     try {
       client.connect(f, endpoint, props);
@@ -260,7 +260,7 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     client.submitQuery(resultsListener, newBuilder().setResultsMode(STREAM_FULL).setType(type).setPlan(plan).build());
   }
 
-  public QueryPlanFragments planQuery(String query) throws RpcException {
+  public DrillRpcFuture<QueryPlanFragments> planQuery(String query) {
     GetQueryPlanFragments runQuery = GetQueryPlanFragments.newBuilder().setQuery(query).build();
     return client.submitPlanQuery(runQuery);
   }

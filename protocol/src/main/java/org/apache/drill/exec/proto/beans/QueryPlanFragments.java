@@ -50,9 +50,9 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
     static final QueryPlanFragments DEFAULT_INSTANCE = new QueryPlanFragments();
 
     
+    private QueryResult.QueryState status;
     private QueryId queryId;
     private List<PlanFragment> fragments;
-    private QueryResult.QueryState status;
     private DrillPBError error;
 
     public QueryPlanFragments()
@@ -61,15 +61,26 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
     }
 
     public QueryPlanFragments(
-        QueryId queryId,
         QueryResult.QueryState status
     )
     {
-        this.queryId = queryId;
         this.status = status;
     }
 
     // getters and setters
+
+    // status
+
+    public QueryResult.QueryState getStatus()
+    {
+        return status;
+    }
+
+    public QueryPlanFragments setStatus(QueryResult.QueryState status)
+    {
+        this.status = status;
+        return this;
+    }
 
     // queryId
 
@@ -94,19 +105,6 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
     public QueryPlanFragments setFragmentsList(List<PlanFragment> fragments)
     {
         this.fragments = fragments;
-        return this;
-    }
-
-    // status
-
-    public QueryResult.QueryState getStatus()
-    {
-        return status;
-    }
-
-    public QueryPlanFragments setStatus(QueryResult.QueryState status)
-    {
-        this.status = status;
         return this;
     }
 
@@ -167,8 +165,7 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
     public boolean isInitialized(QueryPlanFragments message)
     {
         return 
-            message.queryId != null 
-            && message.status != null;
+            message.status != null;
     }
 
     public void mergeFrom(Input input, QueryPlanFragments message) throws IOException
@@ -180,18 +177,18 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
                 case 0:
                     return;
                 case 1:
+                    message.status = QueryResult.QueryState.valueOf(input.readEnum());
+                    break;
+                case 2:
                     message.queryId = input.mergeObject(message.queryId, QueryId.getSchema());
                     break;
 
-                case 2:
+                case 3:
                     if(message.fragments == null)
                         message.fragments = new ArrayList<PlanFragment>();
                     message.fragments.add(input.mergeObject(null, PlanFragment.getSchema()));
                     break;
 
-                case 3:
-                    message.status = QueryResult.QueryState.valueOf(input.readEnum());
-                    break;
                 case 4:
                     message.error = input.mergeObject(message.error, DrillPBError.getSchema());
                     break;
@@ -205,9 +202,12 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
 
     public void writeTo(Output output, QueryPlanFragments message) throws IOException
     {
-        if(message.queryId == null)
+        if(message.status == null)
             throw new UninitializedMessageException(message);
-        output.writeObject(1, message.queryId, QueryId.getSchema(), false);
+        output.writeEnum(1, message.status.number, false);
+
+        if(message.queryId != null)
+             output.writeObject(2, message.queryId, QueryId.getSchema(), false);
 
 
         if(message.fragments != null)
@@ -215,14 +215,10 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
             for(PlanFragment fragments : message.fragments)
             {
                 if(fragments != null)
-                    output.writeObject(2, fragments, PlanFragment.getSchema(), true);
+                    output.writeObject(3, fragments, PlanFragment.getSchema(), true);
             }
         }
 
-
-        if(message.status == null)
-            throw new UninitializedMessageException(message);
-        output.writeEnum(3, message.status.number, false);
 
         if(message.error != null)
              output.writeObject(4, message.error, DrillPBError.getSchema(), false);
@@ -233,9 +229,9 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
     {
         switch(number)
         {
-            case 1: return "queryId";
-            case 2: return "fragments";
-            case 3: return "status";
+            case 1: return "status";
+            case 2: return "queryId";
+            case 3: return "fragments";
             case 4: return "error";
             default: return null;
         }
@@ -250,9 +246,9 @@ public final class QueryPlanFragments implements Externalizable, Message<QueryPl
     private static final java.util.HashMap<String,Integer> __fieldMap = new java.util.HashMap<String,Integer>();
     static
     {
-        __fieldMap.put("queryId", 1);
-        __fieldMap.put("fragments", 2);
-        __fieldMap.put("status", 3);
+        __fieldMap.put("status", 1);
+        __fieldMap.put("queryId", 2);
+        __fieldMap.put("fragments", 3);
         __fieldMap.put("error", 4);
     }
     

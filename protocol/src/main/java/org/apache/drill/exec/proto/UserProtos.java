@@ -4408,54 +4408,54 @@ public final class UserProtos {
   public interface QueryPlanFragmentsOrBuilder
       extends com.google.protobuf.MessageOrBuilder {
 
-    // required .exec.shared.QueryId query_id = 1;
+    // required .exec.shared.QueryResult.QueryState status = 1;
     /**
-     * <code>required .exec.shared.QueryId query_id = 1;</code>
+     * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+     */
+    boolean hasStatus();
+    /**
+     * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+     */
+    org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState getStatus();
+
+    // optional .exec.shared.QueryId query_id = 2;
+    /**
+     * <code>optional .exec.shared.QueryId query_id = 2;</code>
      */
     boolean hasQueryId();
     /**
-     * <code>required .exec.shared.QueryId query_id = 1;</code>
+     * <code>optional .exec.shared.QueryId query_id = 2;</code>
      */
     org.apache.drill.exec.proto.UserBitShared.QueryId getQueryId();
     /**
-     * <code>required .exec.shared.QueryId query_id = 1;</code>
+     * <code>optional .exec.shared.QueryId query_id = 2;</code>
      */
     org.apache.drill.exec.proto.UserBitShared.QueryIdOrBuilder getQueryIdOrBuilder();
 
-    // repeated .exec.bit.PlanFragment fragments = 2;
+    // repeated .exec.bit.PlanFragment fragments = 3;
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     java.util.List<org.apache.drill.exec.proto.ExecProtos.PlanFragment> 
         getFragmentsList();
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     org.apache.drill.exec.proto.ExecProtos.PlanFragment getFragments(int index);
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     int getFragmentsCount();
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     java.util.List<? extends org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder> 
         getFragmentsOrBuilderList();
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder getFragmentsOrBuilder(
         int index);
-
-    // required .exec.shared.QueryResult.QueryState status = 3;
-    /**
-     * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-     */
-    boolean hasStatus();
-    /**
-     * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-     */
-    org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState getStatus();
 
     // optional .exec.shared.DrillPBError error = 4;
     /**
@@ -4522,9 +4522,20 @@ public final class UserProtos {
               }
               break;
             }
-            case 10: {
+            case 8: {
+              int rawValue = input.readEnum();
+              org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState value = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.valueOf(rawValue);
+              if (value == null) {
+                unknownFields.mergeVarintField(1, rawValue);
+              } else {
+                bitField0_ |= 0x00000001;
+                status_ = value;
+              }
+              break;
+            }
+            case 18: {
               org.apache.drill.exec.proto.UserBitShared.QueryId.Builder subBuilder = null;
-              if (((bitField0_ & 0x00000001) == 0x00000001)) {
+              if (((bitField0_ & 0x00000002) == 0x00000002)) {
                 subBuilder = queryId_.toBuilder();
               }
               queryId_ = input.readMessage(org.apache.drill.exec.proto.UserBitShared.QueryId.PARSER, extensionRegistry);
@@ -4532,26 +4543,15 @@ public final class UserProtos {
                 subBuilder.mergeFrom(queryId_);
                 queryId_ = subBuilder.buildPartial();
               }
-              bitField0_ |= 0x00000001;
+              bitField0_ |= 0x00000002;
               break;
             }
-            case 18: {
-              if (!((mutable_bitField0_ & 0x00000002) == 0x00000002)) {
+            case 26: {
+              if (!((mutable_bitField0_ & 0x00000004) == 0x00000004)) {
                 fragments_ = new java.util.ArrayList<org.apache.drill.exec.proto.ExecProtos.PlanFragment>();
-                mutable_bitField0_ |= 0x00000002;
+                mutable_bitField0_ |= 0x00000004;
               }
               fragments_.add(input.readMessage(org.apache.drill.exec.proto.ExecProtos.PlanFragment.PARSER, extensionRegistry));
-              break;
-            }
-            case 24: {
-              int rawValue = input.readEnum();
-              org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState value = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.valueOf(rawValue);
-              if (value == null) {
-                unknownFields.mergeVarintField(3, rawValue);
-              } else {
-                bitField0_ |= 0x00000002;
-                status_ = value;
-              }
               break;
             }
             case 34: {
@@ -4575,7 +4575,7 @@ public final class UserProtos {
         throw new com.google.protobuf.InvalidProtocolBufferException(
             e.getMessage()).setUnfinishedMessage(this);
       } finally {
-        if (((mutable_bitField0_ & 0x00000002) == 0x00000002)) {
+        if (((mutable_bitField0_ & 0x00000004) == 0x00000004)) {
           fragments_ = java.util.Collections.unmodifiableList(fragments_);
         }
         this.unknownFields = unknownFields.build();
@@ -4610,78 +4610,78 @@ public final class UserProtos {
     }
 
     private int bitField0_;
-    // required .exec.shared.QueryId query_id = 1;
-    public static final int QUERY_ID_FIELD_NUMBER = 1;
-    private org.apache.drill.exec.proto.UserBitShared.QueryId queryId_;
+    // required .exec.shared.QueryResult.QueryState status = 1;
+    public static final int STATUS_FIELD_NUMBER = 1;
+    private org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState status_;
     /**
-     * <code>required .exec.shared.QueryId query_id = 1;</code>
+     * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
      */
-    public boolean hasQueryId() {
+    public boolean hasStatus() {
       return ((bitField0_ & 0x00000001) == 0x00000001);
     }
     /**
-     * <code>required .exec.shared.QueryId query_id = 1;</code>
+     * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+     */
+    public org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState getStatus() {
+      return status_;
+    }
+
+    // optional .exec.shared.QueryId query_id = 2;
+    public static final int QUERY_ID_FIELD_NUMBER = 2;
+    private org.apache.drill.exec.proto.UserBitShared.QueryId queryId_;
+    /**
+     * <code>optional .exec.shared.QueryId query_id = 2;</code>
+     */
+    public boolean hasQueryId() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>optional .exec.shared.QueryId query_id = 2;</code>
      */
     public org.apache.drill.exec.proto.UserBitShared.QueryId getQueryId() {
       return queryId_;
     }
     /**
-     * <code>required .exec.shared.QueryId query_id = 1;</code>
+     * <code>optional .exec.shared.QueryId query_id = 2;</code>
      */
     public org.apache.drill.exec.proto.UserBitShared.QueryIdOrBuilder getQueryIdOrBuilder() {
       return queryId_;
     }
 
-    // repeated .exec.bit.PlanFragment fragments = 2;
-    public static final int FRAGMENTS_FIELD_NUMBER = 2;
+    // repeated .exec.bit.PlanFragment fragments = 3;
+    public static final int FRAGMENTS_FIELD_NUMBER = 3;
     private java.util.List<org.apache.drill.exec.proto.ExecProtos.PlanFragment> fragments_;
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     public java.util.List<org.apache.drill.exec.proto.ExecProtos.PlanFragment> getFragmentsList() {
       return fragments_;
     }
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     public java.util.List<? extends org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder> 
         getFragmentsOrBuilderList() {
       return fragments_;
     }
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     public int getFragmentsCount() {
       return fragments_.size();
     }
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     public org.apache.drill.exec.proto.ExecProtos.PlanFragment getFragments(int index) {
       return fragments_.get(index);
     }
     /**
-     * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+     * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
      */
     public org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder getFragmentsOrBuilder(
         int index) {
       return fragments_.get(index);
-    }
-
-    // required .exec.shared.QueryResult.QueryState status = 3;
-    public static final int STATUS_FIELD_NUMBER = 3;
-    private org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState status_;
-    /**
-     * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-     */
-    public boolean hasStatus() {
-      return ((bitField0_ & 0x00000002) == 0x00000002);
-    }
-    /**
-     * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-     */
-    public org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState getStatus() {
-      return status_;
     }
 
     // optional .exec.shared.DrillPBError error = 4;
@@ -4707,9 +4707,9 @@ public final class UserProtos {
     }
 
     private void initFields() {
+      status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
       queryId_ = org.apache.drill.exec.proto.UserBitShared.QueryId.getDefaultInstance();
       fragments_ = java.util.Collections.emptyList();
-      status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
       error_ = org.apache.drill.exec.proto.UserBitShared.DrillPBError.getDefaultInstance();
     }
     private byte memoizedIsInitialized = -1;
@@ -4717,10 +4717,6 @@ public final class UserProtos {
       byte isInitialized = memoizedIsInitialized;
       if (isInitialized != -1) return isInitialized == 1;
 
-      if (!hasQueryId()) {
-        memoizedIsInitialized = 0;
-        return false;
-      }
       if (!hasStatus()) {
         memoizedIsInitialized = 0;
         return false;
@@ -4733,13 +4729,13 @@ public final class UserProtos {
                         throws java.io.IOException {
       getSerializedSize();
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
-        output.writeMessage(1, queryId_);
-      }
-      for (int i = 0; i < fragments_.size(); i++) {
-        output.writeMessage(2, fragments_.get(i));
+        output.writeEnum(1, status_.getNumber());
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
-        output.writeEnum(3, status_.getNumber());
+        output.writeMessage(2, queryId_);
+      }
+      for (int i = 0; i < fragments_.size(); i++) {
+        output.writeMessage(3, fragments_.get(i));
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         output.writeMessage(4, error_);
@@ -4755,15 +4751,15 @@ public final class UserProtos {
       size = 0;
       if (((bitField0_ & 0x00000001) == 0x00000001)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(1, queryId_);
-      }
-      for (int i = 0; i < fragments_.size(); i++) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeMessageSize(2, fragments_.get(i));
+          .computeEnumSize(1, status_.getNumber());
       }
       if (((bitField0_ & 0x00000002) == 0x00000002)) {
         size += com.google.protobuf.CodedOutputStream
-          .computeEnumSize(3, status_.getNumber());
+          .computeMessageSize(2, queryId_);
+      }
+      for (int i = 0; i < fragments_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(3, fragments_.get(i));
       }
       if (((bitField0_ & 0x00000004) == 0x00000004)) {
         size += com.google.protobuf.CodedOutputStream
@@ -4888,20 +4884,20 @@ public final class UserProtos {
 
       public Builder clear() {
         super.clear();
+        status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
+        bitField0_ = (bitField0_ & ~0x00000001);
         if (queryIdBuilder_ == null) {
           queryId_ = org.apache.drill.exec.proto.UserBitShared.QueryId.getDefaultInstance();
         } else {
           queryIdBuilder_.clear();
         }
-        bitField0_ = (bitField0_ & ~0x00000001);
+        bitField0_ = (bitField0_ & ~0x00000002);
         if (fragmentsBuilder_ == null) {
           fragments_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000002);
+          bitField0_ = (bitField0_ & ~0x00000004);
         } else {
           fragmentsBuilder_.clear();
         }
-        status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
-        bitField0_ = (bitField0_ & ~0x00000004);
         if (errorBuilder_ == null) {
           error_ = org.apache.drill.exec.proto.UserBitShared.DrillPBError.getDefaultInstance();
         } else {
@@ -4939,24 +4935,24 @@ public final class UserProtos {
         if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
           to_bitField0_ |= 0x00000001;
         }
+        result.status_ = status_;
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
+        }
         if (queryIdBuilder_ == null) {
           result.queryId_ = queryId_;
         } else {
           result.queryId_ = queryIdBuilder_.build();
         }
         if (fragmentsBuilder_ == null) {
-          if (((bitField0_ & 0x00000002) == 0x00000002)) {
+          if (((bitField0_ & 0x00000004) == 0x00000004)) {
             fragments_ = java.util.Collections.unmodifiableList(fragments_);
-            bitField0_ = (bitField0_ & ~0x00000002);
+            bitField0_ = (bitField0_ & ~0x00000004);
           }
           result.fragments_ = fragments_;
         } else {
           result.fragments_ = fragmentsBuilder_.build();
         }
-        if (((from_bitField0_ & 0x00000004) == 0x00000004)) {
-          to_bitField0_ |= 0x00000002;
-        }
-        result.status_ = status_;
         if (((from_bitField0_ & 0x00000008) == 0x00000008)) {
           to_bitField0_ |= 0x00000004;
         }
@@ -4981,6 +4977,9 @@ public final class UserProtos {
 
       public Builder mergeFrom(org.apache.drill.exec.proto.UserProtos.QueryPlanFragments other) {
         if (other == org.apache.drill.exec.proto.UserProtos.QueryPlanFragments.getDefaultInstance()) return this;
+        if (other.hasStatus()) {
+          setStatus(other.getStatus());
+        }
         if (other.hasQueryId()) {
           mergeQueryId(other.getQueryId());
         }
@@ -4988,7 +4987,7 @@ public final class UserProtos {
           if (!other.fragments_.isEmpty()) {
             if (fragments_.isEmpty()) {
               fragments_ = other.fragments_;
-              bitField0_ = (bitField0_ & ~0x00000002);
+              bitField0_ = (bitField0_ & ~0x00000004);
             } else {
               ensureFragmentsIsMutable();
               fragments_.addAll(other.fragments_);
@@ -5001,7 +5000,7 @@ public final class UserProtos {
               fragmentsBuilder_.dispose();
               fragmentsBuilder_ = null;
               fragments_ = other.fragments_;
-              bitField0_ = (bitField0_ & ~0x00000002);
+              bitField0_ = (bitField0_ & ~0x00000004);
               fragmentsBuilder_ = 
                 com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders ?
                    getFragmentsFieldBuilder() : null;
@@ -5009,9 +5008,6 @@ public final class UserProtos {
               fragmentsBuilder_.addAllMessages(other.fragments_);
             }
           }
-        }
-        if (other.hasStatus()) {
-          setStatus(other.getStatus());
         }
         if (other.hasError()) {
           mergeError(other.getError());
@@ -5021,10 +5017,6 @@ public final class UserProtos {
       }
 
       public final boolean isInitialized() {
-        if (!hasQueryId()) {
-          
-          return false;
-        }
         if (!hasStatus()) {
           
           return false;
@@ -5051,18 +5043,54 @@ public final class UserProtos {
       }
       private int bitField0_;
 
-      // required .exec.shared.QueryId query_id = 1;
+      // required .exec.shared.QueryResult.QueryState status = 1;
+      private org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
+      /**
+       * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+       */
+      public boolean hasStatus() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      /**
+       * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState getStatus() {
+        return status_;
+      }
+      /**
+       * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+       */
+      public Builder setStatus(org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState value) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        bitField0_ |= 0x00000001;
+        status_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>required .exec.shared.QueryResult.QueryState status = 1;</code>
+       */
+      public Builder clearStatus() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
+        onChanged();
+        return this;
+      }
+
+      // optional .exec.shared.QueryId query_id = 2;
       private org.apache.drill.exec.proto.UserBitShared.QueryId queryId_ = org.apache.drill.exec.proto.UserBitShared.QueryId.getDefaultInstance();
       private com.google.protobuf.SingleFieldBuilder<
           org.apache.drill.exec.proto.UserBitShared.QueryId, org.apache.drill.exec.proto.UserBitShared.QueryId.Builder, org.apache.drill.exec.proto.UserBitShared.QueryIdOrBuilder> queryIdBuilder_;
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public boolean hasQueryId() {
-        return ((bitField0_ & 0x00000001) == 0x00000001);
+        return ((bitField0_ & 0x00000002) == 0x00000002);
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public org.apache.drill.exec.proto.UserBitShared.QueryId getQueryId() {
         if (queryIdBuilder_ == null) {
@@ -5072,7 +5100,7 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public Builder setQueryId(org.apache.drill.exec.proto.UserBitShared.QueryId value) {
         if (queryIdBuilder_ == null) {
@@ -5084,11 +5112,11 @@ public final class UserProtos {
         } else {
           queryIdBuilder_.setMessage(value);
         }
-        bitField0_ |= 0x00000001;
+        bitField0_ |= 0x00000002;
         return this;
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public Builder setQueryId(
           org.apache.drill.exec.proto.UserBitShared.QueryId.Builder builderForValue) {
@@ -5098,15 +5126,15 @@ public final class UserProtos {
         } else {
           queryIdBuilder_.setMessage(builderForValue.build());
         }
-        bitField0_ |= 0x00000001;
+        bitField0_ |= 0x00000002;
         return this;
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public Builder mergeQueryId(org.apache.drill.exec.proto.UserBitShared.QueryId value) {
         if (queryIdBuilder_ == null) {
-          if (((bitField0_ & 0x00000001) == 0x00000001) &&
+          if (((bitField0_ & 0x00000002) == 0x00000002) &&
               queryId_ != org.apache.drill.exec.proto.UserBitShared.QueryId.getDefaultInstance()) {
             queryId_ =
               org.apache.drill.exec.proto.UserBitShared.QueryId.newBuilder(queryId_).mergeFrom(value).buildPartial();
@@ -5117,11 +5145,11 @@ public final class UserProtos {
         } else {
           queryIdBuilder_.mergeFrom(value);
         }
-        bitField0_ |= 0x00000001;
+        bitField0_ |= 0x00000002;
         return this;
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public Builder clearQueryId() {
         if (queryIdBuilder_ == null) {
@@ -5130,19 +5158,19 @@ public final class UserProtos {
         } else {
           queryIdBuilder_.clear();
         }
-        bitField0_ = (bitField0_ & ~0x00000001);
+        bitField0_ = (bitField0_ & ~0x00000002);
         return this;
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public org.apache.drill.exec.proto.UserBitShared.QueryId.Builder getQueryIdBuilder() {
-        bitField0_ |= 0x00000001;
+        bitField0_ |= 0x00000002;
         onChanged();
         return getQueryIdFieldBuilder().getBuilder();
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       public org.apache.drill.exec.proto.UserBitShared.QueryIdOrBuilder getQueryIdOrBuilder() {
         if (queryIdBuilder_ != null) {
@@ -5152,7 +5180,7 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>required .exec.shared.QueryId query_id = 1;</code>
+       * <code>optional .exec.shared.QueryId query_id = 2;</code>
        */
       private com.google.protobuf.SingleFieldBuilder<
           org.apache.drill.exec.proto.UserBitShared.QueryId, org.apache.drill.exec.proto.UserBitShared.QueryId.Builder, org.apache.drill.exec.proto.UserBitShared.QueryIdOrBuilder> 
@@ -5168,13 +5196,13 @@ public final class UserProtos {
         return queryIdBuilder_;
       }
 
-      // repeated .exec.bit.PlanFragment fragments = 2;
+      // repeated .exec.bit.PlanFragment fragments = 3;
       private java.util.List<org.apache.drill.exec.proto.ExecProtos.PlanFragment> fragments_ =
         java.util.Collections.emptyList();
       private void ensureFragmentsIsMutable() {
-        if (!((bitField0_ & 0x00000002) == 0x00000002)) {
+        if (!((bitField0_ & 0x00000004) == 0x00000004)) {
           fragments_ = new java.util.ArrayList<org.apache.drill.exec.proto.ExecProtos.PlanFragment>(fragments_);
-          bitField0_ |= 0x00000002;
+          bitField0_ |= 0x00000004;
          }
       }
 
@@ -5182,7 +5210,7 @@ public final class UserProtos {
           org.apache.drill.exec.proto.ExecProtos.PlanFragment, org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder, org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder> fragmentsBuilder_;
 
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public java.util.List<org.apache.drill.exec.proto.ExecProtos.PlanFragment> getFragmentsList() {
         if (fragmentsBuilder_ == null) {
@@ -5192,7 +5220,7 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public int getFragmentsCount() {
         if (fragmentsBuilder_ == null) {
@@ -5202,7 +5230,7 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public org.apache.drill.exec.proto.ExecProtos.PlanFragment getFragments(int index) {
         if (fragmentsBuilder_ == null) {
@@ -5212,7 +5240,7 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder setFragments(
           int index, org.apache.drill.exec.proto.ExecProtos.PlanFragment value) {
@@ -5229,7 +5257,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder setFragments(
           int index, org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder builderForValue) {
@@ -5243,7 +5271,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder addFragments(org.apache.drill.exec.proto.ExecProtos.PlanFragment value) {
         if (fragmentsBuilder_ == null) {
@@ -5259,7 +5287,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder addFragments(
           int index, org.apache.drill.exec.proto.ExecProtos.PlanFragment value) {
@@ -5276,7 +5304,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder addFragments(
           org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder builderForValue) {
@@ -5290,7 +5318,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder addFragments(
           int index, org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder builderForValue) {
@@ -5304,7 +5332,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder addAllFragments(
           java.lang.Iterable<? extends org.apache.drill.exec.proto.ExecProtos.PlanFragment> values) {
@@ -5318,12 +5346,12 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder clearFragments() {
         if (fragmentsBuilder_ == null) {
           fragments_ = java.util.Collections.emptyList();
-          bitField0_ = (bitField0_ & ~0x00000002);
+          bitField0_ = (bitField0_ & ~0x00000004);
           onChanged();
         } else {
           fragmentsBuilder_.clear();
@@ -5331,7 +5359,7 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public Builder removeFragments(int index) {
         if (fragmentsBuilder_ == null) {
@@ -5344,14 +5372,14 @@ public final class UserProtos {
         return this;
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder getFragmentsBuilder(
           int index) {
         return getFragmentsFieldBuilder().getBuilder(index);
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder getFragmentsOrBuilder(
           int index) {
@@ -5361,7 +5389,7 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public java.util.List<? extends org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder> 
            getFragmentsOrBuilderList() {
@@ -5372,14 +5400,14 @@ public final class UserProtos {
         }
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder addFragmentsBuilder() {
         return getFragmentsFieldBuilder().addBuilder(
             org.apache.drill.exec.proto.ExecProtos.PlanFragment.getDefaultInstance());
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder addFragmentsBuilder(
           int index) {
@@ -5387,7 +5415,7 @@ public final class UserProtos {
             index, org.apache.drill.exec.proto.ExecProtos.PlanFragment.getDefaultInstance());
       }
       /**
-       * <code>repeated .exec.bit.PlanFragment fragments = 2;</code>
+       * <code>repeated .exec.bit.PlanFragment fragments = 3;</code>
        */
       public java.util.List<org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder> 
            getFragmentsBuilderList() {
@@ -5400,48 +5428,12 @@ public final class UserProtos {
           fragmentsBuilder_ = new com.google.protobuf.RepeatedFieldBuilder<
               org.apache.drill.exec.proto.ExecProtos.PlanFragment, org.apache.drill.exec.proto.ExecProtos.PlanFragment.Builder, org.apache.drill.exec.proto.ExecProtos.PlanFragmentOrBuilder>(
                   fragments_,
-                  ((bitField0_ & 0x00000002) == 0x00000002),
+                  ((bitField0_ & 0x00000004) == 0x00000004),
                   getParentForChildren(),
                   isClean());
           fragments_ = null;
         }
         return fragmentsBuilder_;
-      }
-
-      // required .exec.shared.QueryResult.QueryState status = 3;
-      private org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
-      /**
-       * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-       */
-      public boolean hasStatus() {
-        return ((bitField0_ & 0x00000004) == 0x00000004);
-      }
-      /**
-       * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-       */
-      public org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState getStatus() {
-        return status_;
-      }
-      /**
-       * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-       */
-      public Builder setStatus(org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState value) {
-        if (value == null) {
-          throw new NullPointerException();
-        }
-        bitField0_ |= 0x00000004;
-        status_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>required .exec.shared.QueryResult.QueryState status = 3;</code>
-       */
-      public Builder clearStatus() {
-        bitField0_ = (bitField0_ & ~0x00000004);
-        status_ = org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.PENDING;
-        onChanged();
-        return this;
       }
 
       // optional .exec.shared.DrillPBError error = 4;
@@ -6034,10 +6026,10 @@ public final class UserProtos {
       "exec.user.QueryResultsMode\022$\n\004type\030\002 \001(\016" +
       "2\026.exec.shared.QueryType\022\014\n\004plan\030\003 \001(\t\"&" +
       "\n\025GetQueryPlanFragments\022\r\n\005query\030\001 \002(\t\"\306" +
-      "\001\n\022QueryPlanFragments\022&\n\010query_id\030\001 \002(\0132" +
-      "\024.exec.shared.QueryId\022)\n\tfragments\030\002 \003(\013" +
-      "2\026.exec.bit.PlanFragment\0223\n\006status\030\003 \002(\016",
-      "2#.exec.shared.QueryResult.QueryState\022(\n" +
+      "\001\n\022QueryPlanFragments\0223\n\006status\030\001 \002(\0162#." +
+      "exec.shared.QueryResult.QueryState\022&\n\010qu" +
+      "ery_id\030\002 \001(\0132\024.exec.shared.QueryId\022)\n\tfr",
+      "agments\030\003 \003(\0132\026.exec.bit.PlanFragment\022(\n" +
       "\005error\030\004 \001(\0132\031.exec.shared.DrillPBError\"" +
       ")\n\022BitToUserHandshake\022\023\n\013rpc_version\030\002 \001" +
       "(\005*\360\001\n\007RpcType\022\r\n\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013" +
@@ -6096,7 +6088,7 @@ public final class UserProtos {
           internal_static_exec_user_QueryPlanFragments_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exec_user_QueryPlanFragments_descriptor,
-              new java.lang.String[] { "QueryId", "Fragments", "Status", "Error", });
+              new java.lang.String[] { "Status", "QueryId", "Fragments", "Error", });
           internal_static_exec_user_BitToUserHandshake_descriptor =
             getDescriptor().getMessageTypes().get(7);
           internal_static_exec_user_BitToUserHandshake_fieldAccessorTable = new

@@ -40,6 +40,7 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.record.RecordBatchLoader;
+import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.user.ConnectionThrottle;
 import org.apache.drill.exec.rpc.user.QueryResultBatch;
@@ -196,16 +197,9 @@ public class BaseTestQuery extends ExecTest{
     return testRunAndPrint(QueryType.SQL, query);
   }
 
-  protected void testGetQueryPlan(String query) throws Exception {
+  protected QueryPlanFragments testGetQueryPlan(String query) throws Exception {
     query = query.replace("[WORKING_PATH]", TestTools.getWorkingPath());
-    QueryPlanFragments planFragments = client.planQuery(query);
-    System.out.println("QueryId: " + planFragments.getQueryId());
-    for(int i = 0; i < planFragments.getFragmentsList().size(); i++) {
-      FragmentHandle handle = planFragments.getFragments(i).getHandle();
-      System.out.println(handle.getMajorFragmentId() + ":" + handle.getMinorFragmentId());
-      System.out.println(planFragments.getFragments(i).getFragmentJson());
-      System.out.println("-------");
-    }
+    return client.planQuery(query).get();
   }
 
   protected void testPhysicalFromFile(String file) throws Exception{

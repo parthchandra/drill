@@ -61,13 +61,8 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
     send(queryResultHandler.getWrappedListener(resultsListener), RpcType.RUN_QUERY, query, QueryId.class);
   }
 
-  public QueryPlanFragments submitPlanQuery(GetQueryPlanFragments req) throws RpcException {
-    try {
-      DrillRpcFuture<QueryPlanFragments> future = send(RpcType.GET_QUERY_PLAN_FRAGMENTS, req, QueryPlanFragments.class);
-      return future.get();
-    } catch (InterruptedException | ExecutionException e) {
-      throw new RpcException("Failed to get query plan", e);
-    }
+  public DrillRpcFuture<QueryPlanFragments> submitPlanQuery(GetQueryPlanFragments req) {
+    return send(RpcType.GET_QUERY_PLAN_FRAGMENTS, req, QueryPlanFragments.class);
   }
 
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)

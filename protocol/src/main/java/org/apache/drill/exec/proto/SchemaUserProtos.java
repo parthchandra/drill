@@ -772,14 +772,14 @@ public final class SchemaUserProtos
         {
             public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.QueryPlanFragments message) throws java.io.IOException
             {
+                if(message.hasStatus())
+                    output.writeEnum(1, message.getStatus().getNumber(), false);
                 if(message.hasQueryId())
-                    output.writeObject(1, message.getQueryId(), org.apache.drill.exec.proto.SchemaUserBitShared.QueryId.WRITE, false);
+                    output.writeObject(2, message.getQueryId(), org.apache.drill.exec.proto.SchemaUserBitShared.QueryId.WRITE, false);
 
                 for(org.apache.drill.exec.proto.ExecProtos.PlanFragment fragments : message.getFragmentsList())
-                    output.writeObject(2, fragments, org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.WRITE, true);
+                    output.writeObject(3, fragments, org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.WRITE, true);
 
-                if(message.hasStatus())
-                    output.writeEnum(3, message.getStatus().getNumber(), false);
                 if(message.hasError())
                     output.writeObject(4, message.getError(), org.apache.drill.exec.proto.SchemaUserBitShared.DrillPBError.WRITE, false);
 
@@ -823,15 +823,15 @@ public final class SchemaUserProtos
                         case 0:
                             return;
                         case 1:
+                            builder.setStatus(org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.valueOf(input.readEnum()));
+                            break;
+                        case 2:
                             builder.setQueryId(input.mergeObject(org.apache.drill.exec.proto.UserBitShared.QueryId.newBuilder(), org.apache.drill.exec.proto.SchemaUserBitShared.QueryId.MERGE));
 
                             break;
-                        case 2:
+                        case 3:
                             builder.addFragments(input.mergeObject(org.apache.drill.exec.proto.ExecProtos.PlanFragment.newBuilder(), org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.MERGE));
 
-                            break;
-                        case 3:
-                            builder.setStatus(org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState.valueOf(input.readEnum()));
                             break;
                         case 4:
                             builder.setError(input.mergeObject(org.apache.drill.exec.proto.UserBitShared.DrillPBError.newBuilder(), org.apache.drill.exec.proto.SchemaUserBitShared.DrillPBError.MERGE));
@@ -877,9 +877,9 @@ public final class SchemaUserProtos
         {
             switch(number)
             {
-                case 1: return "queryId";
-                case 2: return "fragments";
-                case 3: return "status";
+                case 1: return "status";
+                case 2: return "queryId";
+                case 3: return "fragments";
                 case 4: return "error";
                 default: return null;
             }
@@ -892,9 +892,9 @@ public final class SchemaUserProtos
         private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
         static
         {
-            fieldMap.put("queryId", 1);
-            fieldMap.put("fragments", 2);
-            fieldMap.put("status", 3);
+            fieldMap.put("status", 1);
+            fieldMap.put("queryId", 2);
+            fieldMap.put("fragments", 3);
             fieldMap.put("error", 4);
         }
     }

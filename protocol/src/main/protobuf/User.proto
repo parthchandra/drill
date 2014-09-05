@@ -67,9 +67,9 @@ message GetQueryPlanFragments {
 }
 
 message QueryPlanFragments {
-  required exec.shared.QueryId query_id = 1;
-  repeated exec.bit.PlanFragment fragments = 2;
-  required exec.shared.QueryResult.QueryState status = 3;
+  required exec.shared.QueryResult.QueryState status = 1;
+  optional exec.shared.QueryId query_id = 2;
+  repeated exec.bit.PlanFragment fragments = 3;
   optional exec.shared.DrillPBError error = 4;
 }
 
