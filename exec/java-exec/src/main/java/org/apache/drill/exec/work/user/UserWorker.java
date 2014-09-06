@@ -80,6 +80,10 @@ public class UserWorker{
     return Acks.OK;
   }
 
+  public boolean setClientConnection(FragmentHandle handle, UserClientConnection connection) {
+    return bee.setClientConnection(handle, connection);
+  }
+
   public SchemaFactory getSchemaFactory(){
     return bee.getContext().getSchemaFactory();
   }

@@ -46,6 +46,7 @@ import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.options.FragmentOptionManager;
 import org.apache.drill.exec.server.options.OptionList;
 import org.apache.drill.exec.server.options.OptionManager;
+import org.apache.drill.exec.work.FragmentConnectionManager;
 import org.apache.drill.exec.work.batch.IncomingBuffers;
 
 import java.io.Closeable;
@@ -79,6 +80,7 @@ public class FragmentContext implements Closeable {
   private final int rootFragmentTimeZone;
   private final OptionManager fragmentOptions;
   private LongObjectOpenHashMap<DrillBuf> managedBuffers = new LongObjectOpenHashMap<>();
+  private FragmentConnectionManager fragmentConnectionManager;
 
   private volatile Throwable failureCause;
   private volatile boolean failed = false;
@@ -288,4 +290,11 @@ public class FragmentContext implements Closeable {
     return newBuf;
   }
 
+  public void setConnectionManager(FragmentConnectionManager fragmentConnectionManager) {
+    this.fragmentConnectionManager = fragmentConnectionManager;
+  }
+
+  public FragmentConnectionManager getConnectionManager() {
+    return fragmentConnectionManager;
+  }
 }

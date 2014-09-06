@@ -40,6 +40,7 @@ import org.apache.drill.exec.rpc.control.WorkEventBus;
 import org.apache.drill.exec.rpc.data.DataConnectionCreator;
 import org.apache.drill.exec.rpc.data.DataResponseHandler;
 import org.apache.drill.exec.rpc.data.DataResponseHandlerImpl;
+import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import org.apache.drill.exec.server.BootStrapContext;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.sys.PStoreProvider;
@@ -65,6 +66,7 @@ public class WorkManager implements Closeable {
   private LinkedBlockingQueue<RunnableWrapper> pendingTasks = Queues.newLinkedBlockingQueue();
 
   private Map<FragmentHandle, FragmentExecutor> runningFragments = Maps.newConcurrentMap();
+  private FragmentConnectionManager fragmentConnectionManager = new FragmentConnectionManager();
 
   private ConcurrentMap<QueryId, Foreman> queries = Maps.newConcurrentMap();
 
@@ -203,6 +205,10 @@ public class WorkManager implements Closeable {
       return dContext;
     }
 
+    public boolean setClientConnection(FragmentHandle handle, UserClientConnection connection) {
+      return fragmentConnectionManager.setConnection(handle, connection);
+    }
+
   }
 
   private class EventThread extends Thread {
@@ -221,6 +227,7 @@ public class WorkManager implements Closeable {
             logger.debug("Starting pending task {}", r);
             if (r.inner instanceof FragmentExecutor) {
               FragmentExecutor fragmentExecutor = (FragmentExecutor) r.inner;
+              fragmentExecutor.getContext().setConnectionManager(fragmentConnectionManager);
               runningFragments.put(fragmentExecutor.getContext().getHandle(), fragmentExecutor);
             }
             executor.execute(r);
