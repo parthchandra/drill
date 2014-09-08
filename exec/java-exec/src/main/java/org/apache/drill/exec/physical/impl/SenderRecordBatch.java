@@ -58,6 +58,7 @@ public class SenderRecordBatch extends AbstractRecordBatch<Writer> {
   private int counter = 0;
   private final RecordBatch incoming;
   private UserClientConnection connection;
+  private RecordMaterializer materializer;
   private boolean first = true;
   private boolean processed = false;
   private String fragmentUniqueId;
@@ -116,31 +117,34 @@ public class SenderRecordBatch extends AbstractRecordBatch<Writer> {
           if (upstream == IterOutcome.STOP)
             return upstream;
           break;
+        case OK_NEW_SCHEMA:
+          materializer = new VectorRecordMaterializer(context, incoming);
+          // fall through.
         case OK:
-        	RecordMaterializer materializer = new VectorRecordMaterializer(context, incoming);
-            QueryWritableBatch batch = materializer.convertNext(false);
-            updateStats(batch);
-            stats.startWait();
-            try {
-            	FragmentConnectionManager connManager = 
-            			context.getConnectionManager();
-            	if ( connManager != null ) {
-            	  // TODO getConnection is blocking
-            	  // do we need to continue processing - accumulating RecordBatches
-            	  // while waiting for connection?
-            		connection = connManager.getConnection(context.getHandle());
-            	}
-              connection.sendResult(listener, batch);
-            } finally {
-              stats.stopWait();
-            }
-            sendCount.increment();
+          QueryWritableBatch batch = materializer.convertNext(false);
+          updateStats(batch);
+          stats.startWait();
+          try {
+          	FragmentConnectionManager connManager = 
+          			context.getConnectionManager();
+          	if ( connManager != null ) {
+          	  // TODO getConnection is blocking
+          	  // do we need to continue processing - accumulating RecordBatches
+          	  // while waiting for connection?
+          		connection = connManager.getConnection(context.getHandle());
+          	}
+            connection.sendResult(listener, batch);
+            counter += incoming.getRecordCount();
+          } finally {
+            stats.stopWait();
+          }
+          sendCount.increment();
 
-          for(VectorWrapper v : incoming)
-            v.getValueVector().clear();
+        for(VectorWrapper v : incoming)
+          v.getValueVector().clear();
 
-          break;
-
+        break;
+        
         default:
           throw new UnsupportedOperationException();
       }
