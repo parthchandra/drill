@@ -218,7 +218,11 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     // convert a run query request into action
     try{
       if (fragmentExecution != null) {
-        runFragments(fragmentExecution.getFragmentsList());
+        List<PlanFragment> nonRootFragments = Lists.newArrayList();
+        for(int i=1; i<fragmentExecution.getFragmentsCount(); i++) {
+          nonRootFragments.add(fragmentExecution.getFragments(i));
+        }
+        runFragments(fragmentExecution.getFragments(0), nonRootFragments);
       } else {
         switch (queryRequest.getType()) {
         case LOGICAL:
@@ -385,7 +389,9 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
           queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
 
       this.context.getWorkBus().setFragmentStatusListener(work.getRootFragment().getHandle().getQueryId(), fragmentManager);
-      runFragments(work.getFragments());
+
+      List<PlanFragment> fragmentsIncludingRoot = Lists.newArrayList();
+      runFragments(work.getRootFragment(), work.getFragments());
     } catch (Exception e) {
       fail("Failure while setting up query.", e);
     }
@@ -404,7 +410,7 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     }
   }
 
-  private void runFragments(List<PlanFragment> fragmentList) throws Exception {
+  private void runFragments(PlanFragment rootFragment, List<PlanFragment> fragmentList) throws Exception {
     try {
       List<PlanFragment> leafFragments = Lists.newArrayList();
       List<PlanFragment> intermediateFragments = Lists.newArrayList();
@@ -436,7 +442,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
       logger.debug("Fragments stored.");
 
       logger.debug("Submitting fragments to run.");
-      PlanFragment rootFragment = fragmentList.get(0);
       FragmentRoot rootOperator = bee.getContext().getPlanReader().readFragmentOperator(rootFragment.getFragmentJson());
       fragmentManager.runFragments(bee, rootFragment, rootOperator, initiatingClient, leafFragments, intermediateFragments);
 
