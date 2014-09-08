@@ -44,6 +44,7 @@ import org.apache.drill.exec.exception.OptimizerException;
 import org.apache.drill.exec.ops.QueryContext;
 import org.apache.drill.exec.opt.BasicOptimizer;
 import org.apache.drill.exec.physical.PhysicalPlan;
+import org.apache.drill.exec.physical.base.FragmentRoot;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.ExternalSort;
 import org.apache.drill.exec.physical.impl.SendingAccountor;
@@ -55,6 +56,7 @@ import org.apache.drill.exec.planner.fragment.SimpleParallelizer;
 import org.apache.drill.exec.planner.fragment.StatsCollector;
 import org.apache.drill.exec.planner.sql.DirectPlan;
 import org.apache.drill.exec.planner.sql.DrillSqlWorker;
+import org.apache.drill.exec.proto.BitControl.FragmentExecution;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
@@ -93,6 +95,7 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
 
   private QueryId queryId;
   private RunQuery queryRequest;
+  private FragmentExecution fragmentExecution;
   private QueryContext context;
   private QueryManager fragmentManager;
   private WorkerBee bee;
@@ -134,6 +137,11 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
         return QueryState.valueOf(i);
       }
     };
+  }
+  
+  public Foreman(WorkerBee bee, DrillbitContext dContext, QueryId queryId, FragmentExecution fragmentExecution) {
+    this(bee, dContext, null, queryId, null);
+    this.fragmentExecution = fragmentExecution;
   }
 
   public QueryContext getContext() {
@@ -209,18 +217,22 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     fragmentManager.getStatus().setStartTime(System.currentTimeMillis());
     // convert a run query request into action
     try{
-      switch (queryRequest.getType()) {
-      case LOGICAL:
-        parseAndRunLogicalPlan(queryRequest.getPlan());
-        break;
-      case PHYSICAL:
-        parseAndRunPhysicalPlan(queryRequest.getPlan());
-        break;
-      case SQL:
-        runSQL(queryRequest.getPlan());
-        break;
-      default:
-        throw new UnsupportedOperationException();
+      if (fragmentExecution != null) {
+        runFragments(fragmentExecution.getFragmentsList());
+      } else {
+        switch (queryRequest.getType()) {
+        case LOGICAL:
+          parseAndRunLogicalPlan(queryRequest.getPlan());
+          break;
+        case PHYSICAL:
+          parseAndRunPhysicalPlan(queryRequest.getPlan());
+          break;
+        case SQL:
+          runSQL(queryRequest.getPlan());
+          break;
+        default:
+          throw new UnsupportedOperationException();
+        }
       }
     }catch(AssertionError | Exception ex){
       fail("Failure while setting up Foreman.", ex);
@@ -373,15 +385,35 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
           queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
 
       this.context.getWorkBus().setFragmentStatusListener(work.getRootFragment().getHandle().getQueryId(), fragmentManager);
+      runFragments(work.getFragments());
+    } catch (Exception e) {
+      fail("Failure while setting up query.", e);
+    }
+
+  }
+
+  private void runSQL(String sql) {
+    try{
+      DrillSqlWorker sqlWorker = new DrillSqlWorker(context);
+      Pointer<String> textPlan = new Pointer<>();
+      PhysicalPlan plan = sqlWorker.getPlan(sql, textPlan);
+      fragmentManager.getStatus().setPlanText(textPlan.value);
+      runPhysicalPlan(plan);
+    }catch(Exception e){
+      fail("Failure while parsing sql.", e);
+    }
+  }
+
+  private void runFragments(List<PlanFragment> fragmentList) throws Exception {
+    try {
       List<PlanFragment> leafFragments = Lists.newArrayList();
       List<PlanFragment> intermediateFragments = Lists.newArrayList();
 
       // store fragments in distributed grid.
       logger.debug("Storing fragments");
       List<Future<PlanFragment>> queue = new LinkedList<>();
-      for (PlanFragment f : work.getFragments()) {
+      for (PlanFragment f : fragmentList) {
         // store all fragments in grid since they are part of handshake.
-
         queue.add(context.getCache().getMap(FRAGMENT_CACHE).put(f.getHandle(), f));
         if (f.getLeafFragment()) {
           leafFragments.add(f);
@@ -404,26 +436,14 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
       logger.debug("Fragments stored.");
 
       logger.debug("Submitting fragments to run.");
-      fragmentManager.runFragments(bee, work.getRootFragment(), work.getRootOperator(), initiatingClient, leafFragments, intermediateFragments);
+      PlanFragment rootFragment = fragmentList.get(0);
+      FragmentRoot rootOperator = bee.getContext().getPlanReader().readFragmentOperator(rootFragment.getFragmentJson());
+      fragmentManager.runFragments(bee, rootFragment, rootOperator, initiatingClient, leafFragments, intermediateFragments);
 
       logger.debug("Fragments running.");
       state.updateState(QueryState.PENDING, QueryState.RUNNING);
-
     } catch (Exception e) {
-      fail("Failure while setting up query.", e);
-    }
-
-  }
-
-  private void runSQL(String sql) {
-    try{
-      DrillSqlWorker sqlWorker = new DrillSqlWorker(context);
-      Pointer<String> textPlan = new Pointer<>();
-      PhysicalPlan plan = sqlWorker.getPlan(sql, textPlan);
-      fragmentManager.getStatus().setPlanText(textPlan.value);
-      runPhysicalPlan(plan);
-    }catch(Exception e){
-      fail("Failure while parsing sql.", e);
+      throw e;
     }
   }
 

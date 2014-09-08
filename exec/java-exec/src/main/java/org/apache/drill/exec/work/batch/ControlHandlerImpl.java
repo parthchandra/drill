@@ -21,6 +21,7 @@ import static org.apache.drill.exec.rpc.RpcBus.get;
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.exception.FragmentSetupException;
@@ -31,6 +32,7 @@ import org.apache.drill.exec.physical.base.FragmentRoot;
 import org.apache.drill.exec.physical.impl.ImplCreator;
 import org.apache.drill.exec.physical.impl.RootExec;
 import org.apache.drill.exec.proto.BitControl.FinishedReceiver;
+import org.apache.drill.exec.proto.BitControl.FragmentExecution;
 import org.apache.drill.exec.proto.BitControl.FragmentStatus;
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.BitControl.RpcType;
@@ -96,6 +98,12 @@ public class ControlHandlerImpl implements ControlMessageHandler {
         return new Response(RpcType.ACK, Acks.FAIL);
       }
 
+    case RpcType.REQ_FRAGMENT_EXECUTION_VALUE:
+      FragmentExecution fragmentExecution = get(pBody, FragmentExecution.PARSER);
+      Foreman newForeman = new Foreman(bee, bee.getContext(), fragmentExecution.getFragments(0).getHandle().getQueryId(), fragmentExecution);
+      bee.addNewForeman(newForeman);
+      return DataRpcConfig.OK;
+      
     case RpcType.REQ_QUERY_STATUS_VALUE:
       QueryId queryId = get(pBody, QueryId.PARSER);
       Foreman foreman = bee.getForemanForQueryId(queryId);

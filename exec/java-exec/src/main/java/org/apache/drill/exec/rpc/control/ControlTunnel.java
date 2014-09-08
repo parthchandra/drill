@@ -17,7 +17,10 @@
  */
 package org.apache.drill.exec.rpc.control;
 
+import java.util.List;
+
 import org.apache.drill.exec.proto.BitControl.FinishedReceiver;
+import org.apache.drill.exec.proto.BitControl.FragmentExecution;
 import org.apache.drill.exec.proto.BitControl.FragmentStatus;
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.BitControl.RpcType;
@@ -26,6 +29,7 @@ import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryProfile;
+import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.FutureBitCommand;
 import org.apache.drill.exec.rpc.ListeningCommand;
@@ -52,6 +56,15 @@ public class ControlTunnel {
     manager.runCommand(b);
   }
 
+  public void sendPlanFragments(List<PlanFragment> fragments){
+    FragmentExecution.Builder requestBuilder = FragmentExecution.newBuilder();
+    for (PlanFragment fragment:fragments) {
+      requestBuilder.addFragments(fragment);
+    }
+    SendPlanFragments b = new SendPlanFragments(requestBuilder.build()); 
+    manager.runCommand(b); 
+  }
+  
   public void cancelFragment(RpcOutcomeListener<Ack> outcomeListener, FragmentHandle handle){
     CancelFragment b = new CancelFragment(outcomeListener, handle);
     manager.runCommand(b);
@@ -133,6 +146,19 @@ public class ControlTunnel {
       connection.send(outcomeListener, RpcType.REQ_INIATILIZE_FRAGMENT, fragment, Ack.class);
     }
 
+  }
+  
+  public static class SendPlanFragments extends FutureBitCommand<Ack, ControlConnection>  {
+    final FragmentExecution fragments;
+
+    public SendPlanFragments(FragmentExecution fragments) {
+      this.fragments = fragments;
+    }
+    
+    @Override
+    public void doRpcCall(RpcOutcomeListener<Ack> outcomeListener, ControlConnection connection) {
+      connection.send(outcomeListener, RpcType.REQ_FRAGMENT_EXECUTION, fragments, Ack.class);
+    }
   }
 
   public static class RequestProfile extends FutureBitCommand<QueryProfile, ControlConnection> {

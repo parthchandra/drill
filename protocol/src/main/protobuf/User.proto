@@ -31,6 +31,9 @@ enum RpcType {
 
   // bit to user
   QUERY_PLAN_FRAGMENTS = 11;
+
+  // user to bit
+  READ_FRAGMENT_DATA = 12;
 }
 
 message Property {
@@ -71,6 +74,11 @@ message QueryPlanFragments {
   optional exec.shared.QueryId query_id = 2;
   repeated exec.bit.PlanFragment fragments = 3;
   optional exec.shared.DrillPBError error = 4;
+}
+
+message QueryFragmentQuery {
+  repeated exec.bit.PlanFragment fragments = 1;
+  optional exec.bit.FragmentHandle fragmentHandle = 2; 
 }
 
 enum QueryResultsMode {

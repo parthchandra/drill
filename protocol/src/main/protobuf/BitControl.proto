@@ -23,14 +23,19 @@ enum RpcType {
   REQ_FRAGMENT_STATUS = 8; // send a fragment status, return Ack
   REQ_BIT_STATUS = 9; // get bit status.
   REQ_QUERY_STATUS = 10;
-      
+
     // bit responses
   RESP_FRAGMENT_HANDLE = 11;
   RESP_FRAGMENT_STATUS = 12;
   RESP_BIT_STATUS = 13;
   RESP_QUERY_STATUS = 14;
+  
+  REQ_FRAGMENT_EXECUTION = 15;
 }
 
+message FragmentExecution{
+  repeated exec.bit.PlanFragment fragments = 1;
+}
 
 message BitControlHandshake{
   optional int32 rpc_version = 1;

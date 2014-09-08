@@ -24,6 +24,119 @@ package org.apache.drill.exec.proto;
 public final class SchemaBitControl
 {
 
+    public static final class FragmentExecution
+    {
+        public static final org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.MessageSchema WRITE =
+            new org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.MessageSchema();
+        public static final org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.BuilderSchema MERGE =
+            new org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.BuilderSchema();
+        
+        public static class MessageSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.BitControl.FragmentExecution>
+        {
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.BitControl.FragmentExecution message) throws java.io.IOException
+            {
+                for(org.apache.drill.exec.proto.ExecProtos.PlanFragment fragments : message.getFragmentsList())
+                    output.writeObject(1, fragments, org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.WRITE, true);
+
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.BitControl.FragmentExecution message)
+            {
+                return message.isInitialized();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.BitControl.FragmentExecution> typeClass()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.class.getName();
+            }
+            //unused
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.BitControl.FragmentExecution message) throws java.io.IOException {}
+            public org.apache.drill.exec.proto.BitControl.FragmentExecution newMessage() { return null; }
+        }
+        public static class BuilderSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder>
+        {
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder builder) throws java.io.IOException
+            {
+                for(int number = input.readFieldNumber(this);; number = input.readFieldNumber(this))
+                {
+                    switch(number)
+                    {
+                        case 0:
+                            return;
+                        case 1:
+                            builder.addFragments(input.mergeObject(org.apache.drill.exec.proto.ExecProtos.PlanFragment.newBuilder(), org.apache.drill.exec.proto.SchemaExecProtos.PlanFragment.MERGE));
+
+                            break;
+                        default:
+                            input.handleUnknownField(number, this);
+                    }
+                }
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder builder)
+            {
+                return builder.isInitialized();
+            }
+            public org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder newMessage()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.newBuilder();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaBitControl.FragmentExecution.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder> typeClass()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.BitControl.FragmentExecution.class.getName();
+            }
+            //unused
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.BitControl.FragmentExecution.Builder builder) throws java.io.IOException {}
+        }
+        public static java.lang.String getFieldName(int number)
+        {
+            switch(number)
+            {
+                case 1: return "fragments";
+                default: return null;
+            }
+        }
+        public static int getFieldNumber(java.lang.String name)
+        {
+            java.lang.Integer number = fieldMap.get(name);
+            return number == null ? 0 : number.intValue();
+        }
+        private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+        static
+        {
+            fieldMap.put("fragments", 1);
+        }
+    }
+
     public static final class BitControlHandshake
     {
         public static final org.apache.drill.exec.proto.SchemaBitControl.BitControlHandshake.MessageSchema WRITE =

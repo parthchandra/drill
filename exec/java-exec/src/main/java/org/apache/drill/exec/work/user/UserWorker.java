@@ -25,10 +25,12 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.rpc.Acks;
+import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.store.SchemaFactory;
@@ -51,6 +53,16 @@ public class UserWorker{
     QueryId id = QueryId.newBuilder().setPart1(uuid.getMostSignificantBits()).setPart2(uuid.getLeastSignificantBits()).build();
     Foreman foreman = new Foreman(bee, bee.getContext(), connection, id, query);
     bee.addNewForeman(foreman);
+    return id;
+  }
+  
+  public QueryId submitReadFragmentWork(UserClientConnection connection, QueryFragmentQuery query) {
+    QueryId id = query.getFragmentHandle().getQueryId();
+    boolean isRunning = setClientConnection(query.getFragmentHandle(), connection);
+    if (isRunning == false) {
+      ControlTunnel ct = bee.getContext().getController().getTunnel(query.getFragments(0).getForeman());
+      ct.sendPlanFragments(query.getFragmentsList());
+    }
     return id;
   }
 
