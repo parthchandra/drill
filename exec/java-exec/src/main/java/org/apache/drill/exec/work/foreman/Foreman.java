@@ -219,10 +219,13 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     try{
       if (fragmentExecution != null) {
         List<PlanFragment> nonRootFragments = Lists.newArrayList();
+        PlanFragment rootFragment = fragmentExecution.getFragments(0);
         for(int i=1; i<fragmentExecution.getFragmentsCount(); i++) {
           nonRootFragments.add(fragmentExecution.getFragments(i));
         }
-        runFragments(fragmentExecution.getFragments(0), nonRootFragments);
+        FragmentRoot rootOperator =
+            bee.getContext().getPlanReader().readFragmentOperator(rootFragment.getFragmentJson());
+        runFragments(rootFragment, rootOperator, nonRootFragments);
       } else {
         switch (queryRequest.getType()) {
         case LOGICAL:
@@ -389,9 +392,7 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
           queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
 
       this.context.getWorkBus().setFragmentStatusListener(work.getRootFragment().getHandle().getQueryId(), fragmentManager);
-
-      List<PlanFragment> fragmentsIncludingRoot = Lists.newArrayList();
-      runFragments(work.getRootFragment(), work.getFragments());
+      runFragments(work.getRootFragment(), work.getRootOperator(), work.getFragments());
     } catch (Exception e) {
       fail("Failure while setting up query.", e);
     }
@@ -410,7 +411,8 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     }
   }
 
-  private void runFragments(PlanFragment rootFragment, List<PlanFragment> fragmentList) throws Exception {
+  private void runFragments(PlanFragment rootFragment, FragmentRoot rootOperator, List<PlanFragment> fragmentList)
+      throws Exception {
     try {
       List<PlanFragment> leafFragments = Lists.newArrayList();
       List<PlanFragment> intermediateFragments = Lists.newArrayList();
@@ -442,7 +444,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
       logger.debug("Fragments stored.");
 
       logger.debug("Submitting fragments to run.");
-      FragmentRoot rootOperator = bee.getContext().getPlanReader().readFragmentOperator(rootFragment.getFragmentJson());
       fragmentManager.runFragments(bee, rootFragment, rootOperator, initiatingClient, leafFragments, intermediateFragments);
 
       logger.debug("Fragments running.");
