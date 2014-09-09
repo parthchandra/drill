@@ -46,6 +46,7 @@ import org.apache.drill.exec.proto.UserProtos.Property;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.UserProperties;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.rpc.BasicClientWithConnection.ServerConnection;
 import org.apache.drill.exec.rpc.ChannelClosedException;
@@ -258,6 +259,10 @@ public class DrillClient implements Closeable, ConnectionThrottle{
    */
   public void runQuery(QueryType type, String plan, UserResultsListener resultsListener){
     client.submitQuery(resultsListener, newBuilder().setResultsMode(STREAM_FULL).setType(type).setPlan(plan).build());
+  }
+
+  public void submitReadFragmentRequest(QueryFragmentQuery req, UserResultsListener resultsListener){
+    client.submitReadFragmentRequest(resultsListener, req);
   }
 
   public DrillRpcFuture<QueryPlanFragments> planQuery(String query) {

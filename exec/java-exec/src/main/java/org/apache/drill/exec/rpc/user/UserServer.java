@@ -113,7 +113,7 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
     case RpcType.READ_FRAGMENT_DATA_VALUE:
       try {
         QueryFragmentQuery req = QueryFragmentQuery.PARSER.parseFrom(new ByteBufInputStream(pBody));
-        return new Response(RpcType.QUERY_RESULT, worker.submitReadFragmentWork(connection, req));
+        return new Response(RpcType.QUERY_HANDLE, worker.submitReadFragmentWork(connection, req));
       } catch (InvalidProtocolBufferException e) {
         throw new RpcException("Failure while decoding QueryId body.", e);
       }

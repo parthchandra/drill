@@ -28,6 +28,7 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.UserProperties;
@@ -63,6 +64,11 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
 
   public DrillRpcFuture<QueryPlanFragments> submitPlanQuery(GetQueryPlanFragments req) {
     return send(RpcType.GET_QUERY_PLAN_FRAGMENTS, req, QueryPlanFragments.class);
+  }
+
+  public void submitReadFragmentRequest(UserResultsListener resultsListener, QueryFragmentQuery readReq) {
+    // TODO: return value QueryId needs to be changed through out the RPC call chain
+    send(queryResultHandler.getWrappedListener(resultsListener), RpcType.READ_FRAGMENT_DATA, readReq, QueryId.class);
   }
 
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)
