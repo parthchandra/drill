@@ -20,6 +20,7 @@ package org.apache.drill.exec.rpc.control;
 
 import org.apache.drill.exec.proto.BitControl.BitControlHandshake;
 import org.apache.drill.exec.proto.BitControl.FinishedReceiver;
+import org.apache.drill.exec.proto.BitControl.FragmentExecution;
 import org.apache.drill.exec.proto.BitControl.FragmentStatus;
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.BitControl.RpcType;
@@ -41,6 +42,7 @@ public class ControlRpcConfig {
       .add(RpcType.REQ_RECEIVER_FINISHED, FinishedReceiver.class, RpcType.ACK, Ack.class)
       .add(RpcType.REQ_FRAGMENT_STATUS, FragmentStatus.class, RpcType.ACK, Ack.class)
       .add(RpcType.REQ_QUERY_STATUS, QueryId.class, RpcType.RESP_QUERY_STATUS, QueryProfile.class)
+      .add(RpcType.REQ_FRAGMENT_EXECUTION, FragmentExecution.class, RpcType.ACK, Ack.class)
       .build();
   
   public static int RPC_VERSION = 2;
