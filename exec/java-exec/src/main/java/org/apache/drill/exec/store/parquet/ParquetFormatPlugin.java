@@ -32,6 +32,7 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.base.AbstractWriter;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
+import org.apache.drill.exec.physical.impl.SenderRecordBatch;
 import org.apache.drill.exec.physical.impl.WriterRecordBatch;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.record.RecordBatch;
@@ -141,11 +142,11 @@ public class ParquetFormatPlugin implements FormatPlugin{
 
   public RecordBatch getWriterBatch(FragmentContext context, RecordBatch incoming, ParquetWriter writer)
           throws ExecutionSetupException {
-    try {
-      return new WriterRecordBatch(writer, incoming, context, getRecordWriter(context, writer));
-    } catch(IOException e) {
-      throw new ExecutionSetupException(String.format("Failed to create the WriterRecordBatch. %s", e.getMessage()), e);
-    }
+    //try {
+      return new SenderRecordBatch(writer, incoming, context, null);
+    //} catch(IOException e) {
+    //  throw new ExecutionSetupException(String.format("Failed to create the WriterRecordBatch. %s", e.getMessage()), e);
+    //}
   }
 
   @Override

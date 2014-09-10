@@ -80,7 +80,7 @@ public class ScreenCreator implements RootCreator<Screen>{
     
     public ScreenRoot(FragmentContext context, RecordBatch incoming, Screen config) throws OutOfMemoryException {
       super(context, config);
-      assert context.getConnection() != null : "A screen root should only be run on the driving node which is connected directly to the client.  As such, this should always be true.";
+      // assert context.getConnection() != null : "A screen root should only be run on the driving node which is connected directly to the client.  As such, this should always be true.";
       this.context = context;
       this.incoming = incoming;
       this.connection = context.getConnection();
@@ -113,7 +113,9 @@ public class ScreenCreator implements RootCreator<Screen>{
           QueryWritableBatch batch = new QueryWritableBatch(header);
           stats.startWait();
           try {
-            connection.sendResult(listener, batch);
+            if (connection != null) {
+              connection.sendResult(listener, batch);
+            }
           } finally {
             stats.stopWait();
           }
@@ -137,7 +139,9 @@ public class ScreenCreator implements RootCreator<Screen>{
         }
         stats.startWait();
         try {
-          connection.sendResult(listener, batch);
+          if (connection != null) {
+            connection.sendResult(listener, batch);
+          }
         } finally {
           stats.stopWait();
         }
@@ -155,7 +159,9 @@ public class ScreenCreator implements RootCreator<Screen>{
         updateStats(batch);
         stats.startWait();
         try {
-          connection.sendResult(listener, batch);
+          if (connection != null) {
+            connection.sendResult(listener, batch);
+          }
         } finally {
           stats.stopWait();
         }

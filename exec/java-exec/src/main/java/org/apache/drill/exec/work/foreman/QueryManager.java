@@ -36,6 +36,7 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
@@ -65,19 +66,17 @@ public class QueryManager implements FragmentStatusListener{
   private WorkEventBus workBus;
   private QueryId queryId;
   private FragmentExecutor rootRunner;
-  private RunQuery query;
   private volatile boolean running = false;
   private volatile boolean cancelled = false;
   private volatile boolean stopped = false;
 
-  public QueryManager(QueryId id, RunQuery query, PStoreProvider pStoreProvider, ForemanManagerListener foremanManagerListener, Controller controller, Foreman foreman) {
+  public QueryManager(QueryId id, QueryType type, String plan, PStoreProvider pStoreProvider, ForemanManagerListener foremanManagerListener, Controller controller, Foreman foreman) {
     super();
     this.foremanManagerListener = foremanManagerListener;
-    this.query = query;
     this.queryId =  id;
     this.controller = controller;
     this.remainingFragmentCount = new AtomicInteger(0);
-    this.status = new QueryStatus(query, id, pStoreProvider, foreman);
+    this.status = new QueryStatus(type, plan, id, pStoreProvider, foreman);
   }
 
   public QueryStatus getStatus(){

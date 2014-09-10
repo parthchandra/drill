@@ -59,6 +59,8 @@ public class QueryResultHandler {
     final QueryResultBatch batch = new QueryResultBatch(result, (DrillBuf) dBody);
     final boolean failed = (batch.getHeader().getQueryState() == QueryState.FAILED);
 
+    logger.debug("Batch arrived");
+
     assert failed || batch.getHeader().getErrorCount() == 0 : "Error count for the query batch is non-zero but QueryState != FAILED";
 
     UserResultsListener l = resultsListener.get(result.getQueryId());

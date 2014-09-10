@@ -62,6 +62,7 @@ import org.apache.drill.exec.proto.UserBitShared.DrillPBError;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.proto.UserBitShared.UserCredentials;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
@@ -149,7 +150,15 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
         this.queueTimeout = 0;
       }
     this.initiatingClient = connection;
-    this.fragmentManager = new QueryManager(queryId, queryRequest, bee.getContext().getPersistentStoreProvider(), new ForemanManagerListener(), dContext.getController(), this);
+
+    if (fragmentExecution == null) {
+      this.fragmentManager = new QueryManager(queryId, queryRequest.getType(), queryRequest.getPlan(),
+          bee.getContext().getPersistentStoreProvider(), new ForemanManagerListener(), dContext.getController(), this);
+    } else {
+      this.fragmentManager = new QueryManager(queryId, QueryType.PHYSICAL,
+          fragmentExecution.getFragments(0).getFragmentJson(),
+          bee.getContext().getPersistentStoreProvider(), new ForemanManagerListener(), dContext.getController(), this);
+    }
     this.bee = bee;
 
     this.state = new AtomicState<QueryState>(QueryState.PENDING) {

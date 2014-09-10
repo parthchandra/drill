@@ -29,6 +29,7 @@ import org.apache.drill.exec.proto.UserBitShared.MajorFragmentProfile;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryProfile;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 
@@ -56,7 +57,8 @@ public class QueryStatus {
 
   private final String queryId;
   private final QueryId id;
-  private RunQuery query;
+  private final QueryType type;
+  private final String plan;
   private String planText;
   private Foreman foreman;
   private long startTime;
@@ -66,9 +68,10 @@ public class QueryStatus {
 
   private final PStore<QueryProfile> profileCache;
 
-  public QueryStatus(RunQuery query, QueryId id, PStoreProvider provider, Foreman foreman){
+  public QueryStatus(QueryType type, String plan, QueryId id, PStoreProvider provider, Foreman foreman){
     this.id = id;
-    this.query = query;
+    this.type = type;
+    this.plan = plan;
     this.queryId = QueryIdHelper.getQueryId(id);
     try {
       this.profileCache = provider.getPStore(QUERY_PROFILE);
@@ -189,8 +192,8 @@ public class QueryStatus {
 
   public QueryProfile getAsProfile(boolean fullStatus){
     QueryProfile.Builder b = QueryProfile.newBuilder();
-    b.setQuery(query.getPlan());
-    b.setType(query.getType());
+    b.setQuery(plan);
+    b.setType(type);
     if(planText != null) b.setPlan(planText);
     b.setId(id);
     if (fullStatus) {
