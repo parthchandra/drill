@@ -35,6 +35,7 @@ import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
+import org.apache.drill.exec.proto.UserBitShared.UserCredentials;
 import org.apache.drill.exec.server.options.OptionList;
 import org.apache.drill.exec.work.QueryWorkUnit;
 
@@ -88,13 +89,13 @@ public class SimpleParallelizer {
    * @return The list of generated PlanFragment protobuf objects to be assigned out to the individual nodes.
    * @throws ExecutionSetupException
    */
-  public QueryWorkUnit getFragments(OptionList options, DrillbitEndpoint foremanNode, QueryId queryId, Collection<DrillbitEndpoint> activeEndpoints,
+  public QueryWorkUnit getFragments(UserCredentials credentials, OptionList options, DrillbitEndpoint foremanNode, QueryId queryId, Collection<DrillbitEndpoint> activeEndpoints,
       PhysicalPlanReader reader, Fragment rootNode, PlanningSet planningSet) throws ExecutionSetupException {
     assignEndpoints(activeEndpoints, planningSet);
-    return generateWorkUnit(options, foremanNode, queryId, reader, rootNode, planningSet);
+    return generateWorkUnit(credentials, options, foremanNode, queryId, reader, rootNode, planningSet);
   }
 
-  private QueryWorkUnit generateWorkUnit(OptionList options, DrillbitEndpoint foremanNode, QueryId queryId, PhysicalPlanReader reader, Fragment rootNode,
+  private QueryWorkUnit generateWorkUnit(UserCredentials credentials, OptionList options, DrillbitEndpoint foremanNode, QueryId queryId, PhysicalPlanReader reader, Fragment rootNode,
                                          PlanningSet planningSet) throws ExecutionSetupException {
 
     List<PlanFragment> fragments = Lists.newArrayList();
@@ -152,6 +153,7 @@ public class SimpleParallelizer {
             .setAssignment(wrapper.getAssignedEndpoint(minorFragmentId)) //
             .setLeafFragment(isLeafFragment) //
             .setQueryStartTime(queryStartTime)
+            .setCredentials(credentials)
             .setTimeZone(timeZone)//
             .setMemInitial(wrapper.getInitialAllocation())//
             .setMemMax(wrapper.getMaxAllocation())

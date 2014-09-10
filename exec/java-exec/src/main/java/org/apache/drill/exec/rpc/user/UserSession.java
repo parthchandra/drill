@@ -96,6 +96,10 @@ public class UserSession {
   public DrillUser getUser(){
     return user;
   }
+  
+  public UserCredentials getUserCredentials() {
+	  return credentials;
+  }
 
   /**
    * Update the schema path for the session.

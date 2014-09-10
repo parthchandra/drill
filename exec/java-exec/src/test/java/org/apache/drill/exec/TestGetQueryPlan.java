@@ -41,6 +41,7 @@ public class TestGetQueryPlan extends BaseTestQuery {
       FragmentHandle handle = planFragments.getFragments(i).getHandle();
       System.out.println(handle.getMajorFragmentId() + ":" + handle.getMinorFragmentId());
       System.out.println(planFragments.getFragments(i).getFragmentJson());
+      System.out.println("Credentials: " + planFragments.getFragments(i).getCredentials());
       System.out.println("-------");
     }
   }

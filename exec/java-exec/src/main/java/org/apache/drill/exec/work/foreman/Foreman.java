@@ -23,7 +23,6 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +33,6 @@ import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.logical.LogicalPlan;
 import org.apache.drill.common.logical.PlanProperties.Generator.ResultMode;
 import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.cache.CachedVectorContainer;
 import org.apache.drill.exec.cache.DistributedCache.CacheConfig;
 import org.apache.drill.exec.cache.DistributedCache.SerializationMode;
 import org.apache.drill.exec.coord.DistributedSemaphore;
@@ -64,15 +62,16 @@ import org.apache.drill.exec.proto.UserBitShared.DrillPBError;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserBitShared.UserCredentials;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.rpc.BaseRpcOutcomeListener;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.rpc.user.UserSession;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import org.apache.drill.exec.server.DrillbitContext;
-import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.util.AtomicState;
 import org.apache.drill.exec.util.Pointer;
 import org.apache.drill.exec.work.ErrorHelper;
@@ -110,24 +109,43 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
 
   public Foreman(WorkerBee bee, DrillbitContext dContext, UserClientConnection connection, QueryId queryId,
       RunQuery queryRequest) {
+    this(bee, dContext, queryId, connection, queryRequest, null);
+  }
+
+  public Foreman(WorkerBee bee, DrillbitContext dContext, QueryId queryId, FragmentExecution fragmentExecution) {
+    this(bee, dContext, queryId, null, null, fragmentExecution);
+  }
+
+  private Foreman(WorkerBee bee, DrillbitContext dContext, QueryId queryId, UserClientConnection connection,
+      RunQuery queryRequest, FragmentExecution fragmentExecution) {
     this.queryId = queryId;
     this.queryRequest = queryRequest;
-    this.context = new QueryContext(connection.getSession(), queryId, dContext);
-    this.queuingEnabled = context.getOptions().getOption(ExecConstants.ENABLE_QUEUE_KEY).bool_val;
-    if(queuingEnabled){
-      int smallQueue = context.getOptions().getOption(ExecConstants.SMALL_QUEUE_KEY).num_val.intValue();
-      int largeQueue = context.getOptions().getOption(ExecConstants.LARGE_QUEUE_KEY).num_val.intValue();
-      this.largeSemaphore = dContext.getClusterCoordinator().getSemaphore("query.large", largeQueue);
-      this.smallSemaphore = dContext.getClusterCoordinator().getSemaphore("query.small", smallQueue);
-      this.queueThreshold = context.getOptions().getOption(ExecConstants.QUEUE_THRESHOLD_KEY).num_val;
-      this.queueTimeout = context.getOptions().getOption(ExecConstants.QUEUE_TIMEOUT_KEY).num_val;
-    }else{
-      this.largeSemaphore = null;
-      this.smallSemaphore = null;
-      this.queueThreshold = 0;
-      this.queueTimeout = 0;
+    UserSession session = null;
+    if (connection != null) {
+      session = connection.getSession();
+    } else {
+      if (fragmentExecution != null) {
+        UserCredentials credentials = fragmentExecution.getFragments(0).getCredentials();
+        session = UserSession.Builder.newBuilder()
+          .withCredentials(credentials).build();
+      }
     }
-
+    this.context = new QueryContext(session, queryId, dContext);
+    this.queuingEnabled = context.getOptions().getOption(ExecConstants.ENABLE_QUEUE_KEY).bool_val;
+    this.fragmentExecution = fragmentExecution;
+    if(queuingEnabled){
+        int smallQueue = context.getOptions().getOption(ExecConstants.SMALL_QUEUE_KEY).num_val.intValue();
+        int largeQueue = context.getOptions().getOption(ExecConstants.LARGE_QUEUE_KEY).num_val.intValue();
+        this.largeSemaphore = dContext.getClusterCoordinator().getSemaphore("query.large", largeQueue);
+        this.smallSemaphore = dContext.getClusterCoordinator().getSemaphore("query.small", smallQueue);
+        this.queueThreshold = context.getOptions().getOption(ExecConstants.QUEUE_THRESHOLD_KEY).num_val;
+        this.queueTimeout = context.getOptions().getOption(ExecConstants.QUEUE_TIMEOUT_KEY).num_val;
+      }else{
+        this.largeSemaphore = null;
+        this.smallSemaphore = null;
+        this.queueThreshold = 0;
+        this.queueTimeout = 0;
+      }
     this.initiatingClient = connection;
     this.fragmentManager = new QueryManager(queryId, queryRequest, bee.getContext().getPersistentStoreProvider(), new ForemanManagerListener(), dContext.getController(), this);
     this.bee = bee;
@@ -137,11 +155,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
         return QueryState.valueOf(i);
       }
     };
-  }
-  
-  public Foreman(WorkerBee bee, DrillbitContext dContext, QueryId queryId, FragmentExecution fragmentExecution) {
-    this(bee, dContext, null, queryId, null);
-    this.fragmentExecution = fragmentExecution;
   }
 
   public QueryContext getContext() {
@@ -156,7 +169,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
     default:
       return true;
     }
-
   }
 
   private void fail(String message, Throwable t) {
@@ -387,8 +399,11 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
           this.lease = smallSemaphore.acquire(this.queueTimeout, TimeUnit.MILLISECONDS);
         }
       }
-
-      QueryWorkUnit work = parallelizer.getFragments(context.getOptions().getOptionList(), context.getCurrentEndpoint(),
+      UserCredentials credentials = null;
+      if (context.getSession()!= null) {
+        credentials = context.getSession().getUserCredentials();
+      }
+      QueryWorkUnit work = parallelizer.getFragments(credentials, context.getOptions().getOptionList(), context.getCurrentEndpoint(),
           queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
 
       this.context.getWorkBus().setFragmentStatusListener(work.getRootFragment().getHandle().getQueryId(), fragmentManager);

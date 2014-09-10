@@ -18,6 +18,7 @@
 package org.apache.drill.exec.work.user;
 
 import com.google.common.collect.Lists;
+
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.ExecConstants;
@@ -35,6 +36,7 @@ import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
 import org.apache.drill.exec.proto.UserBitShared.DrillPBError;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserBitShared.UserCredentials;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
@@ -109,7 +111,11 @@ public class QueryPlannerHelper {
 
     PlanningSet planningSet = StatsCollector.collectStats(rootFragment);
     SimpleParallelizer parallelizer = new SimpleParallelizer(context);
-    QueryWorkUnit work = parallelizer.getFragments(context.getOptions().getOptionList(), context.getCurrentEndpoint(),
+    UserCredentials credentials = null;
+    if (context.getSession() != null) {
+      credentials = context.getSession().getUserCredentials();
+    }
+    QueryWorkUnit work = parallelizer.getFragments(credentials, context.getOptions().getOptionList(), context.getCurrentEndpoint(),
         queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
 
     List<PlanFragment> fragments = Lists.newArrayList();
