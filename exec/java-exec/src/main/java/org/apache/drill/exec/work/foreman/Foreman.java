@@ -127,7 +127,9 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
       if (fragmentExecution != null) {
         UserCredentials credentials = fragmentExecution.getFragments(0).getCredentials();
         session = UserSession.Builder.newBuilder()
-          .withCredentials(credentials).build();
+            .withCredentials(credentials)
+            .withOptionManager(bee.getContext().getOptionManager())
+            .build();
       }
     }
     this.context = new QueryContext(session, queryId, dContext);
@@ -406,7 +408,6 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
       QueryWorkUnit work = parallelizer.getFragments(credentials, context.getOptions().getOptionList(), context.getCurrentEndpoint(),
           queryId, context.getActiveEndpoints(), context.getPlanReader(), rootFragment, planningSet);
 
-      this.context.getWorkBus().setFragmentStatusListener(work.getRootFragment().getHandle().getQueryId(), fragmentManager);
       runFragments(work.getRootFragment(), work.getRootOperator(), work.getFragments());
     } catch (Exception e) {
       fail("Failure while setting up query.", e);
@@ -457,6 +458,8 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
       fragmentManager.getStatus().setTotalFragments(totalFragments);
       fragmentManager.getStatus().updateCache();
       logger.debug("Fragments stored.");
+
+      this.context.getWorkBus().setFragmentStatusListener(rootFragment.getHandle().getQueryId(), fragmentManager);
 
       logger.debug("Submitting fragments to run.");
       fragmentManager.runFragments(bee, rootFragment, rootOperator, initiatingClient, leafFragments, intermediateFragments);
