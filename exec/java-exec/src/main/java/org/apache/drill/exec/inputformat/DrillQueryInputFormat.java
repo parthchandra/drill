@@ -17,95 +17,90 @@
  */
 package org.apache.drill.exec.inputformat;
 
-import com.google.common.collect.Lists;
-import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.exec.client.DrillClient;
-import org.apache.drill.exec.client.PrintingResultsListener;
-import org.apache.drill.exec.client.QuerySubmitter.Format;
-import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
-import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
-import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
-import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
-import org.apache.drill.exec.rpc.DrillRpcFuture;
-import org.apache.drill.exec.rpc.RpcException;
-import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.mapred.InputSplit;
-import org.apache.hadoop.mapred.JobConf;
-import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.Reporter;
-
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
-public class DrillQueryInputFormat implements InputFormat<Object, Object> {
+import org.apache.drill.exec.client.DrillClient;
+import org.apache.drill.exec.proto.ExecProtos.PlanFragment;
+import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
+import org.apache.drill.exec.rpc.DrillRpcFuture;
+import org.apache.drill.exec.rpc.RpcException;
+import org.apache.drill.exec.vector.complex.reader.FieldReader;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapreduce.InputFormat;
+import org.apache.hadoop.mapreduce.InputSplit;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
+
+public class DrillQueryInputFormat extends InputFormat<Void, FieldReader> {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillQueryInputFormat.class);
 
-  private final DrillClient client;
+  private DrillClient client;
 
-  public DrillQueryInputFormat(DrillClient client) throws RpcException {
-    this.client = client;
+  @VisibleForTesting
+  public DrillQueryInputFormat(DrillClient clientForInitialPlanning){
+    this.client = clientForInitialPlanning;
+  }
+
+  public DrillQueryInputFormat() throws RpcException {
   }
 
   @Override
-  public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-    String drillQuery = job.get("drill.query");
-    logger.debug("Getting splits for query '{}'", drillQuery);
+  public DrillRecordReader createRecordReader(InputSplit split, TaskAttemptContext arg1)
+      throws IOException, InterruptedException {
+    return new DrillRecordReader();
+  }
 
-    QueryPlanFragments fragments;
-    try {
-      DrillRpcFuture<QueryPlanFragments> future = client.planQuery(drillQuery);
-      fragments = future.get();
-    } catch (InterruptedException | ExecutionException ex) {
-      logger.error("Failed to get splits for query '{}'", drillQuery);
-      throw new IOException("Failed to get splits", ex);
-    }
+  @Override
+  public List<InputSplit> getSplits(JobContext job) throws IOException, InterruptedException {
+    DrillClient cl = this.client == null ? new DrillClient() : this.client;
+    try (DrillClient client = cl) {
+      if(this.client == null) client.connect(); // zookeeper work.
 
-    if (fragments.getStatus() != QueryState.COMPLETED) {
-      throw new IOException(String.format("Query plan failed '[%s]'", fragments.getStatus()));
-    }
+      String drillQuery = job.getConfiguration().get("drill.query");
+      logger.debug("Getting splits for query '{}'", drillQuery);
 
-    // TODO: this is not good, need a better way to find the root fragments
-    List<DrillQueryInputSplit> splits = Lists.newArrayList();
-    for(int i=0; i<fragments.getFragmentsCount(); i++) {
-      PlanFragment fragment = fragments.getFragments(i);
-      if (fragment.getFragmentJson().toLowerCase().contains("-writer")) {
-        splits.add(new DrillQueryInputSplit(job, fragments, fragment));
+      QueryPlanFragments fragments;
+      try {
+        DrillRpcFuture<QueryPlanFragments> future = client.planQuery(drillQuery);
+        fragments = future.get();
+      } catch (InterruptedException | ExecutionException ex) {
+        logger.error("Failed to get splits for query '{}'", drillQuery);
+        throw new IOException("Failed to get splits", ex);
       }
-    }
 
-    return splits.toArray(new DrillQueryInputSplit[0]);
+      if (fragments.getStatus() != QueryState.COMPLETED) {
+        throw new IOException(String.format("Query plan failed '[%s]'", fragments.getStatus()));
+      }
+
+      // TODO: this is not good, need a better way to find the root fragments
+      List<InputSplit> splits = Lists.newArrayList();
+      for (int i = 0; i < fragments.getFragmentsCount(); i++) {
+        PlanFragment fragment = fragments.getFragments(i);
+        if (fragment.getFragmentJson().toLowerCase().contains("-writer")) {
+          splits.add(new DrillQueryInputSplit(fragments, fragment));
+        }
+      }
+
+      return splits;
+    }
   }
 
-  @Override
-  public RecordReader<Object, Object> getRecordReader(InputSplit split, JobConf job, Reporter reporter)
-      throws IOException {
-    try {
-      DrillQueryInputSplit drillInputSplit = (DrillQueryInputSplit) split;
-      QueryFragmentQuery.Builder reqBuilder = QueryFragmentQuery.newBuilder();
-      reqBuilder.addAllFragments(drillInputSplit.getQueryPlanFragments().getFragmentsList());
-      reqBuilder.setFragmentHandle(drillInputSplit.getAssignedFragment().getHandle());
+  public class DrillQueryInputSplit extends InputSplit implements Writable {
+    private QueryPlanFragments fragments;
+    private PlanFragment assignedFragment;
 
-      PrintingResultsListener listener = new PrintingResultsListener(DrillConfig.create(), Format.CSV, 10);
-      client.submitReadFragmentRequest(reqBuilder.build(), listener);
-      listener.await();
-    } catch (Exception e) {
-      throw new IOException("Failed to make QueryFragmentQuery request", e);
+    public DrillQueryInputSplit() {
     }
 
-    return null;
-  }
-
-  public class DrillQueryInputSplit implements InputSplit {
-    private final JobConf conf;
-    private final QueryPlanFragments fragments;
-    private final PlanFragment assignedFragment;
-
-
-    public DrillQueryInputSplit(JobConf conf, QueryPlanFragments fragments, PlanFragment assignedFragment) {
-      this.conf = conf;
+    public DrillQueryInputSplit(QueryPlanFragments fragments, PlanFragment assignedFragment) {
       this.fragments = fragments;
       this.assignedFragment = assignedFragment;
     }
@@ -123,12 +118,27 @@ public class DrillQueryInputFormat implements InputFormat<Object, Object> {
 
     @Override
     public void write(DataOutput out) throws IOException {
-      throw new UnsupportedOperationException("TODO: DrillQueryInputSplit.write()");
+      byte[] assignment = assignedFragment.toByteArray();
+      out.writeInt(assignment.length);
+      out.write(assignment);
+
+      byte[] frags = fragments.toByteArray();
+      out.writeInt(frags.length);
+      out.write(frags);
     }
 
     @Override
     public void readFields(DataInput in) throws IOException {
-      throw new UnsupportedOperationException("TODO: DrillQueryInputSplit.readFields()");
+      int assignment = in.readInt();
+      byte[] aBytes = new byte[assignment];
+      in.readFully(aBytes);
+      this.assignedFragment = PlanFragment.parseFrom(aBytes);
+
+      int frags = in.readInt();
+      byte[] fBytes = new byte[frags];
+      in.readFully(fBytes);
+      this.fragments = QueryPlanFragments.parseFrom(fBytes);
+
     }
 
     public String getFragmentJson() {

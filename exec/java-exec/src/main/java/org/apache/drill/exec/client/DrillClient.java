@@ -197,7 +197,7 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     return false;
   }
 
-  public void connect(DrillbitEndpoint endpoint) throws RpcException {
+  public synchronized void connect(DrillbitEndpoint endpoint) throws RpcException {
     FutureHandler f = new FutureHandler();
     try {
       client.connect(f, endpoint, props);
