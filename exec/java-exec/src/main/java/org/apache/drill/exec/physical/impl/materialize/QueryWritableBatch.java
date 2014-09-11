@@ -80,13 +80,16 @@ public class QueryWritableBatch {
     return new QueryWritableBatch(header);
   }
 
-  public void clear() {
+  public void release() {
     if (buffers == null) {
       return;
     }
 
-    for(ByteBuf buf : buffers) {
-      buf.clear();
+    for(int i=0; i<buffers.length; i++) {
+      if (buffers[i] != null) {
+        buffers[i].release();
+        buffers[i] = null;
+      }
     }
   }
 }

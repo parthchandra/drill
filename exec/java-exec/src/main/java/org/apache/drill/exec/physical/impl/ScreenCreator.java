@@ -116,12 +116,14 @@ public class ScreenCreator implements RootCreator<Screen>{
             if (connection != null) {
               connection.sendResult(listener, batch);
             } else {
-              batch.clear();
+              batch.release();
             }
           } finally {
             stats.stopWait();
           }
-          sendCount.increment();
+          if (connection != null) {
+            sendCount.increment();
+          }
 
           return false;
       }
@@ -144,12 +146,14 @@ public class ScreenCreator implements RootCreator<Screen>{
           if (connection != null) {
             connection.sendResult(listener, batch);
           } else {
-            batch.clear();
+            batch.release();
           }
         } finally {
           stats.stopWait();
         }
-        sendCount.increment();
+        if (connection != null) {
+          sendCount.increment();
+        }
 
         return false;
       }
@@ -166,12 +170,14 @@ public class ScreenCreator implements RootCreator<Screen>{
           if (connection != null) {
             connection.sendResult(listener, batch);
           } else {
-            batch.clear();
+            batch.release();
           }
         } finally {
           stats.stopWait();
         }
-        sendCount.increment();
+        if (connection != null) {
+          sendCount.increment();
+        }
 
         first = false;
         return true;

@@ -151,10 +151,10 @@ public class SenderRecordBatch extends AbstractRecordBatch<Writer> {
           }
           sendCount.increment();
 
-        for(VectorWrapper v : incoming)
-          v.getValueVector().clear();
+          for(VectorWrapper v : incoming)
+            v.getValueVector().clear();
 
-        break;
+          break;
         
         default:
           throw new UnsupportedOperationException();

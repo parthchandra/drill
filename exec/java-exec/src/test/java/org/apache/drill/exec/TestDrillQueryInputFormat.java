@@ -44,7 +44,7 @@ public class TestDrillQueryInputFormat {
     String query = String.format("SELECT `N_REGIONKEY`, COUNT(*) FROM "
         + "dfs_test.`%s/../../sample-data/nation.parquet` GROUP BY `N_REGIONKEY`", TestTools.getWorkingPath());
 
-    //query = "SELECT `N_REGIONKEY`, COUNT(*) FROM " + "cp.`employee.json` GROUP BY `N_REGIONKEY`";
+    query = "SELECT `education_level`, count(*) FROM cp.`employee.json` GROUP BY `education_level`";
 
     JobConf job = new JobConf();
     job.set("drill.query", query);
