@@ -24,6 +24,8 @@ import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import java.util.Map;
 
 public class FragmentConnectionManager {
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(FragmentConnectionManager.class);
+
   private final Map<FragmentHandle, UserClientConnection> pendingCnxs = Maps.newConcurrentMap();
   private final Map<FragmentHandle, ThreadHolder> waitingThreads = Maps.newConcurrentMap();
   private final Object lock = new Object();
@@ -32,11 +34,13 @@ public class FragmentConnectionManager {
     ThreadHolder threadHolder;
     synchronized (lock) {
       pendingCnxs.put(handle, connection);
+      logger.debug("Adding connection for fragment [{}]", handle);
       threadHolder = waitingThreads.remove(handle);
     }
 
     if (threadHolder != null) {
       synchronized (threadHolder) {
+        logger.debug("Notifying thread [{}]", threadHolder.getThread().getId());
         threadHolder.notify();
       }
       return true;
@@ -50,6 +54,7 @@ public class FragmentConnectionManager {
     synchronized (lock) {
       UserClientConnection clientConnection = pendingCnxs.remove(handle);
       if (clientConnection != null) {
+        logger.debug("Fragment [{}] got connection from pending connection list", handle);
         return clientConnection;
       }
 
@@ -59,12 +64,14 @@ public class FragmentConnectionManager {
 
     try {
       synchronized (threadHolder) {
+        logger.debug("Fragment [{}] is waiting for connection", handle);
         threadHolder.wait();
       }
     } catch(InterruptedException e) {
       throw new RuntimeException(e);
     }
 
+    logger.debug("Fragment [{}] got connection after waiting", handle);
     return pendingCnxs.remove(handle);
   }
 

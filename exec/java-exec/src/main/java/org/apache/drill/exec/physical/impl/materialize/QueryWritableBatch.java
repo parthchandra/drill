@@ -79,5 +79,14 @@ public class QueryWritableBatch {
             .build();
     return new QueryWritableBatch(header);
   }
-  
+
+  public void clear() {
+    if (buffers == null) {
+      return;
+    }
+
+    for(ByteBuf buf : buffers) {
+      buf.clear();
+    }
+  }
 }

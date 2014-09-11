@@ -57,7 +57,7 @@ public class DrillRecordReader extends RecordReader<Void, FieldReader>{
     reqBuilder.addAllFragments(drillInputSplit.getQueryPlanFragments().getFragmentsList());
     reqBuilder.setFragmentHandle(drillInputSplit.getAssignedFragment().getHandle());
 
-    PrintingResultsListener listener = new PrintingResultsListener(DrillConfig.create(), Format.CSV, 10);
+    listener = new PrintingResultsListener(DrillConfig.create(), Format.CSV, 10);
     client.submitReadFragmentRequest(reqBuilder.build(), listener);
 
   }

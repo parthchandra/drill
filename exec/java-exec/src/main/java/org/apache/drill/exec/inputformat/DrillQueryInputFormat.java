@@ -61,8 +61,9 @@ public class DrillQueryInputFormat extends InputFormat<Void, FieldReader> {
   @Override
   public List<InputSplit> getSplits(JobContext job) throws IOException, InterruptedException {
     DrillClient cl = this.client == null ? new DrillClient() : this.client;
-    try (DrillClient client = cl) {
-      if(this.client == null) client.connect(); // zookeeper work.
+    //try (DrillClient client = cl) {
+    DrillClient client = cl;
+    if(this.client == null) client.connect(); // zookeeper work.
 
       String drillQuery = job.getConfiguration().get("drill.query");
       logger.debug("Getting splits for query '{}'", drillQuery);
@@ -90,7 +91,7 @@ public class DrillQueryInputFormat extends InputFormat<Void, FieldReader> {
       }
 
       return splits;
-    }
+    //}
   }
 
   public class DrillQueryInputSplit extends InputSplit implements Writable {

@@ -34,6 +34,9 @@ import org.apache.drill.exec.physical.impl.materialize.RecordMaterializer;
 import org.apache.drill.exec.physical.impl.materialize.VectorRecordMaterializer;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
+import org.apache.drill.exec.proto.UserBitShared.QueryResult;
+import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
+import org.apache.drill.exec.proto.UserBitShared.RecordBatchDef;
 import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.MaterializedField;
@@ -114,6 +117,15 @@ public class SenderRecordBatch extends AbstractRecordBatch<Writer> {
         case NONE:
         case STOP:
           cleanup();
+          QueryResult header = QueryResult.newBuilder()
+              .setQueryId(context.getHandle().getQueryId())
+              .setRowCount(0)
+              .setQueryState(QueryState.COMPLETED)
+              .setDef(RecordBatchDef.getDefaultInstance())
+              .setIsLastChunk(true)
+              .build();
+          QueryWritableBatch lastBatch = new QueryWritableBatch(header);
+          connection.sendResult(listener, lastBatch);
           if (upstream == IterOutcome.STOP)
             return upstream;
           break;
@@ -125,14 +137,13 @@ public class SenderRecordBatch extends AbstractRecordBatch<Writer> {
           updateStats(batch);
           stats.startWait();
           try {
-          	FragmentConnectionManager connManager = 
-          			context.getConnectionManager();
-          	if ( connManager != null ) {
-          	  // TODO getConnection is blocking
-          	  // do we need to continue processing - accumulating RecordBatches
-          	  // while waiting for connection?
-          		connection = connManager.getConnection(context.getHandle());
-          	}
+            FragmentConnectionManager connManager = context.getConnectionManager();
+            if ( connManager != null ) {
+              // TODO getConnection is blocking
+              // do we need to continue processing - accumulating RecordBatches
+              // while waiting for connection?
+              connection = connManager.getConnection(context.getHandle());
+            }
             connection.sendResult(listener, batch);
             counter += incoming.getRecordCount();
           } finally {

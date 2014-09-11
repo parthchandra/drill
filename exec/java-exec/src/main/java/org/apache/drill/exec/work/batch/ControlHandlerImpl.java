@@ -101,16 +101,18 @@ public class ControlHandlerImpl implements ControlMessageHandler {
     case RpcType.REQ_FRAGMENT_EXECUTION_VALUE:
       FragmentExecution fragmentExecution = get(pBody, FragmentExecution.PARSER);
       QueryId queryId = fragmentExecution.getFragments(0).getHandle().getQueryId();
-      Foreman foreman = bee.getForemanForQueryId(queryId);
-      if (foreman == null) {
-        foreman = new Foreman(bee, bee.getContext(), queryId, fragmentExecution);
-        bee.addNewForeman(foreman);
+      synchronized (this) {
+        Foreman foreman = bee.getForemanForQueryId(queryId);
+        if (foreman == null) {
+          foreman = new Foreman(bee, bee.getContext(), queryId, fragmentExecution);
+          bee.addNewForeman(foreman);
+        }
       }
       return DataRpcConfig.OK;
 
     case RpcType.REQ_QUERY_STATUS_VALUE:
       queryId = get(pBody, QueryId.PARSER);
-      foreman = bee.getForemanForQueryId(queryId);
+      Foreman foreman = bee.getForemanForQueryId(queryId);
       QueryProfile profile;
       if (foreman == null) {
         try {

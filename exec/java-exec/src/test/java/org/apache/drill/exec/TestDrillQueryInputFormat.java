@@ -19,6 +19,7 @@ package org.apache.drill.exec;
 
 import java.util.List;
 
+import com.google.common.collect.Lists;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.client.DrillClient;
@@ -26,6 +27,7 @@ import org.apache.drill.exec.inputformat.DrillQueryInputFormat;
 import org.apache.drill.exec.inputformat.DrillQueryInputFormat.DrillQueryInputSplit;
 import org.apache.drill.exec.inputformat.DrillRecordReader;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
+import org.apache.drill.exec.rpc.user.QueryResultBatch;
 import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.RemoteServiceSet;
 import org.apache.hadoop.mapred.JobConf;
@@ -42,7 +44,7 @@ public class TestDrillQueryInputFormat {
     String query = String.format("SELECT `N_REGIONKEY`, COUNT(*) FROM "
         + "dfs_test.`%s/../../sample-data/nation.parquet` GROUP BY `N_REGIONKEY`", TestTools.getWorkingPath());
 
-    query = "SELECT `N_REGIONKEY`, COUNT(*) FROM " + "cp.`employee.json` GROUP BY `N_REGIONKEY`";
+    //query = "SELECT `N_REGIONKEY`, COUNT(*) FROM " + "cp.`employee.json` GROUP BY `N_REGIONKEY`";
 
     JobConf job = new JobConf();
     job.set("drill.query", query);
@@ -59,9 +61,12 @@ public class TestDrillQueryInputFormat {
       bit2.run();
       client.connect();
 
-      client.runQuery(QueryType.SQL, "alter session set `planner.slice_target`=1");
+      List<QueryResultBatch> results = client.runQuery(QueryType.SQL, "alter session set `planner.slice_target`=1");
+      for(QueryResultBatch batch : results) {
+        batch.release();
+      }
 
-      DrillQueryInputFormat inputFormat = new DrillQueryInputFormat();
+      DrillQueryInputFormat inputFormat = new DrillQueryInputFormat(client);
       List<InputSplit> inputSplits = inputFormat.getSplits(context);
 
       System.out.println("Number of splits: " + inputSplits.size());
@@ -71,10 +76,20 @@ public class TestDrillQueryInputFormat {
         System.out.println("-------------");
       }
 
+      List<DrillRecordReader> readers = Lists.newArrayList();
+
       for (InputSplit split : inputSplits) {
         DrillRecordReader reader = inputFormat.createRecordReader(split, null);
-        reader.nextKeyValue();
+        reader.initialize(split, null);
+        readers.add(reader);
       }
+
+      for(DrillRecordReader reader : readers) {
+        reader.nextKeyValue();
+        reader.close();
+      }
+
+      Thread.sleep(3000);
     }
   }
 }

@@ -115,6 +115,8 @@ public class ScreenCreator implements RootCreator<Screen>{
           try {
             if (connection != null) {
               connection.sendResult(listener, batch);
+            } else {
+              batch.clear();
             }
           } finally {
             stats.stopWait();
@@ -141,6 +143,8 @@ public class ScreenCreator implements RootCreator<Screen>{
         try {
           if (connection != null) {
             connection.sendResult(listener, batch);
+          } else {
+            batch.clear();
           }
         } finally {
           stats.stopWait();
@@ -161,6 +165,8 @@ public class ScreenCreator implements RootCreator<Screen>{
         try {
           if (connection != null) {
             connection.sendResult(listener, batch);
+          } else {
+            batch.clear();
           }
         } finally {
           stats.stopWait();

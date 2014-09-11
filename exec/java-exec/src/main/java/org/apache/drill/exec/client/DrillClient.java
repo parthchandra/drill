@@ -200,6 +200,8 @@ public class DrillClient implements Closeable, ConnectionThrottle{
   public synchronized void connect(DrillbitEndpoint endpoint) throws RpcException {
     FutureHandler f = new FutureHandler();
     try {
+      this.client = new UserClient(supportComplexTypes, allocator,
+          TransportCheck.createEventLoopGroup(config.getInt(ExecConstants.CLIENT_RPC_THREADS), "Client-"));
       client.connect(f, endpoint, props);
       f.checkedGet();
     } catch (InterruptedException e) {
@@ -219,7 +221,9 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     if(this.ownsAllocator && allocator != null) allocator.close();
     if(ownsZkConnection){
       try {
-        this.clusterCoordinator.close();
+        if (this.clusterCoordinator != null) {
+          this.clusterCoordinator.close();
+        }
       } catch (IOException e) {
         logger.warn("Error while closing Cluster Coordinator.", e);
       }

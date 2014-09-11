@@ -217,7 +217,15 @@ public class Foreman implements Runnable, Closeable, Comparable<Object>{
 
   void cleanupAndSendResult(QueryResult result){
     bee.retireForeman(this);
-    initiatingClient.sendResult(new ResponseSendListener(), new QueryWritableBatch(result), true);
+    if (initiatingClient != null) {
+      initiatingClient.sendResult(new ResponseSendListener(), new QueryWritableBatch(result), true);
+    } else {
+      if (result.getErrorCount() != 0) {
+        logger.error("Query failed: " + result.getErrorList());
+      } else {
+        logger.debug("Query completed");
+      }
+    }
     state.updateState(QueryState.RUNNING, QueryState.COMPLETED);
   }
 
