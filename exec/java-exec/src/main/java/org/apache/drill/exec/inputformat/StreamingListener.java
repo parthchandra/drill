@@ -40,7 +40,8 @@ public class StreamingListener implements UserResultsListener {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StreamingListener.class);
   private static final int MAX = 100;
   private volatile RpcException ex;
-  private volatile boolean completed = false;
+  private volatile boolean failure = false;
+  private volatile boolean success = false;
   private volatile boolean autoread = true;
   private volatile ConnectionThrottle throttle;
   private volatile boolean closed = false;
@@ -48,14 +49,30 @@ public class StreamingListener implements UserResultsListener {
 
   final LinkedBlockingDeque<QueryResultBatch> queue = Queues.newLinkedBlockingDeque();
 
-  public boolean isCompleted() {
-    return completed;
+  public boolean isSuccess() {
+    return success;
+  }
+
+  public boolean isFailure() {
+    return failure;
+  }
+
+  public boolean isComplete() {
+    return success || failure;
+  }
+
+  public boolean hasNext() {
+    return !(success && failure);
+  }
+
+  public Throwable getFailure() {
+    return ex;
   }
 
   @Override
   public void submissionFailed(RpcException ex) {
     this.ex = ex;
-    completed = true;
+    failure = true;
     close();
     System.out.println("Query failed: " + ex.getMessage());
   }
@@ -68,7 +85,7 @@ public class StreamingListener implements UserResultsListener {
         result.getHeader().getQueryState() == QueryState.COMPLETED && 
         result.getHeader().getRowCount() == 0) {
       if (result.getHeader().getIsLastChunk()) {
-        completed = true;
+        success = true;
       }
       result.release();
       return;
@@ -77,7 +94,7 @@ public class StreamingListener implements UserResultsListener {
     // if we're in a closed state, just release the message.
     if (closed) {
       result.release();
-      completed = true;
+      success = true;
       return;
     }
 
@@ -96,7 +113,7 @@ public class StreamingListener implements UserResultsListener {
     }
 
     if (result.getHeader().getIsLastChunk()) {
-      completed = true;
+      success = true;
     }
 
     if (result.getHeader().getErrorCount() > 0) {
@@ -108,7 +125,7 @@ public class StreamingListener implements UserResultsListener {
     while (true) {
       if (ex != null)
         throw ex;
-      if (completed && queue.isEmpty()) {
+      if (success && queue.isEmpty()) {
         return null;
       } else {
         QueryResultBatch q = queue.poll(50, TimeUnit.MILLISECONDS);
@@ -126,13 +143,12 @@ public class StreamingListener implements UserResultsListener {
     }
   }
 
-  void close() {
+  public void close() {
     closed = true;
     while (!queue.isEmpty()) {
       QueryResultBatch qrb = queue.poll();
       if(qrb != null && qrb.getData() != null) qrb.getData().release();
     }
-    completed = true;
   }
 
   @Override

@@ -217,6 +217,7 @@
           <options>
             <option>-dontobfuscate</option>
             <option>-dontoptimize</option>
+            <option>-dontshrink</option>
             <option>-ignorewarnings</option>
             <option>-keep class org.apache.drill.exec.proto.** { *; }</option>
             <option>-keep class org.apache.drill.common.types.** { *; }</option>
