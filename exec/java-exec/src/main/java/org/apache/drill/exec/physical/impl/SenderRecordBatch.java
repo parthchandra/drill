@@ -137,12 +137,14 @@ public class SenderRecordBatch extends AbstractRecordBatch<Writer> {
           updateStats(batch);
           stats.startWait();
           try {
-            FragmentConnectionManager connManager = context.getConnectionManager();
-            if ( connManager != null ) {
-              // TODO getConnection is blocking
-              // do we need to continue processing - accumulating RecordBatches
-              // while waiting for connection?
-              connection = connManager.getConnection(context.getHandle());
+            if ( connection == null ) {
+              FragmentConnectionManager connManager = context.getConnectionManager();
+              if ( connManager != null ) {
+                // TODO getConnection is blocking
+                // do we need to continue processing - accumulating RecordBatches
+                // while waiting for connection?
+                connection = connManager.getConnection(context.getHandle());
+              }
             }
             connection.sendResult(listener, batch);
             counter += incoming.getRecordCount();
