@@ -26,15 +26,13 @@ public class CombinedMapVector extends MapVector {
    * 
    */
   public void load() {
-    if ( loader.getRecordCount() > 0 ) {
-      for (VectorWrapper<?> vectorWrapper : loader) {
-        ValueVector vv = vectorWrapper.getValueVector();
-        String name = vv.getField().getLastName();
-        try {
-          super.put(name, vv);
-        } catch (IllegalStateException e) {
-          logger.warn("Most likely schema changed with additional columns: {}", name);
-        }
+    for (VectorWrapper<?> vectorWrapper : loader) {
+      ValueVector vv = vectorWrapper.getValueVector();
+      String name = vv.getField().getLastName();
+      try {
+        super.put(name, vv);
+      } catch (IllegalStateException e) {
+        logger.warn("Most likely schema changed with additional columns: {}", name);
       }
     }
     // just to get readers into SingleMapReader

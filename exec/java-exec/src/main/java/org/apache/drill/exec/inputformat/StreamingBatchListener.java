@@ -123,7 +123,7 @@ public class StreamingBatchListener implements UserResultsListener {
       if (ex != null)
         throw ex;
       if (success && queue.isEmpty()) {
-        throw new NoSuchElementException();
+        return null;
       } else {
         QueryResultBatch q = queue.poll(50, TimeUnit.MILLISECONDS);
         if (q != null) {

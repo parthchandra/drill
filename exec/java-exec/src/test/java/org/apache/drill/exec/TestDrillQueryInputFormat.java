@@ -17,9 +17,12 @@
  */
 package org.apache.drill.exec;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
+
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.client.DrillClient;
@@ -30,6 +33,8 @@ import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.rpc.user.QueryResultBatch;
 import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.RemoteServiceSet;
+import org.apache.drill.exec.vector.complex.fn.JsonWriter;
+import org.apache.drill.exec.vector.complex.reader.FieldReader;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.JobID;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -45,6 +50,7 @@ public class TestDrillQueryInputFormat {
         + "dfs_test.`%s/../../sample-data/nation.parquet` GROUP BY `N_REGIONKEY`", TestTools.getWorkingPath());
 
     query = "SELECT `education_level`, count(*) FROM cp.`employee.json` GROUP BY `education_level`";
+    //query = "SELECT * FROM cp.`employee.json`";
 
     JobConf job = new JobConf();
     job.set("drill.query", query);
@@ -85,7 +91,27 @@ public class TestDrillQueryInputFormat {
       }
 
       for(DrillRecordReader reader : readers) {
-        reader.nextKeyValue();
+        int i = 0;
+        while ( reader.nextKeyValue() ) {
+          FieldReader fr = reader.getCurrentValue();
+          if ( i % 100 == 0 ) {
+            System.out.println();
+            for ( String name : fr ) {
+              System.out.print(name + ", ");
+            }            
+            System.out.println();
+          }
+          System.out.print("Row#: " + ++i + ", ");
+          for ( String name : fr ) {
+            FieldReader frChild = fr.reader(name);
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            JsonWriter jsonWriter = new JsonWriter(stream, true);
+            jsonWriter.write(frChild);
+            System.out.print(new String(stream.toByteArray(), Charsets.UTF_8) + ", ");
+            stream.close();
+           }
+          System.out.println();
+        }
         reader.close();
       }
 
