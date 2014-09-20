@@ -27,7 +27,7 @@ package org.apache.drill.exec.vector.complex.impl;
 <#include "/@includes/vv_imports.ftl" />
 
 @SuppressWarnings("unused")
-abstract class AbstractFieldWriter extends AbstractBaseWriter implements FieldWriter{
+public abstract class AbstractFieldWriter extends AbstractBaseWriter implements FieldWriter{
   
   AbstractFieldWriter(FieldWriter parent){
     super(parent);

@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.inputformat;
 
+import java.util.NoSuchElementException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -35,9 +36,9 @@ import com.google.common.collect.Queues;
  * can get QueryResultBatch for it's consumption
  *
  */
-public class StreamingListener implements UserResultsListener {
+public class StreamingBatchListener implements UserResultsListener {
 
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StreamingListener.class);
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StreamingBatchListener.class);
   private static final int MAX = 100;
   private volatile RpcException ex;
   private volatile boolean failure = false;
@@ -59,10 +60,6 @@ public class StreamingListener implements UserResultsListener {
 
   public boolean isComplete() {
     return success || failure;
-  }
-
-  public boolean hasNext() {
-    return !(success && failure);
   }
 
   public Throwable getFailure() {
@@ -126,7 +123,7 @@ public class StreamingListener implements UserResultsListener {
       if (ex != null)
         throw ex;
       if (success && queue.isEmpty()) {
-        return null;
+        throw new NoSuchElementException();
       } else {
         QueryResultBatch q = queue.poll(50, TimeUnit.MILLISECONDS);
         if (q != null) {

@@ -2,7 +2,7 @@ package org.apache.drill.rdd.sql
 
 import java.io.{InputStream, Reader}
 import java.math.BigDecimal
-import java.sql.{Timestamp, Time, Date}
+import java.sql.{Date, Time, Timestamp}
 import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.drill.exec.expr.TypeHelper

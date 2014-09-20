@@ -35,7 +35,6 @@
     <module>storage-hbase</module>
     <module>storage-hive</module>
     <module>sqlline</module>
-    <module>drill-on-spark</module>
     <module>data</module>
   </modules>
 </project>

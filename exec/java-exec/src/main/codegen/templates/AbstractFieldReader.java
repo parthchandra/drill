@@ -27,7 +27,7 @@ package org.apache.drill.exec.vector.complex.impl;
 <#include "/@includes/vv_imports.ftl" />
 
 @SuppressWarnings("unused")
-abstract class AbstractFieldReader extends AbstractBaseReader implements FieldReader{
+public abstract class AbstractFieldReader extends AbstractBaseReader implements FieldReader{
   
   AbstractFieldReader(){
     super();
