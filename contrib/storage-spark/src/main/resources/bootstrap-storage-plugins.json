@@ -1,0 +1,10 @@
+{
+  "storage":{
+    spark : {
+      type: "spark",
+      enabled: false,
+      config : {
+      }
+    }
+  }
+}

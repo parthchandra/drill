@@ -36,5 +36,6 @@
     <module>storage-hive</module>
     <module>sqlline</module>
     <module>data</module>
+    <module>storage-spark</module>
   </modules>
 </project>
