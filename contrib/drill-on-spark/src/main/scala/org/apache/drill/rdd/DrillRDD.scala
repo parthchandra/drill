@@ -1,5 +1,7 @@
 package org.apache.drill.rdd
 
+import org.apache.drill.common.config.DrillConfig
+import org.apache.drill.exec.memory.{TopLevelAllocator, BufferAllocator}
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments
 import org.apache.drill.rdd.DrillConversions._
@@ -18,13 +20,21 @@ class DrillRDD[T:ClassTag](sc:SparkContext, sql:String,
                timeout:Duration=10 seconds)
   extends RDD[T](sc, Nil) {
 
+//  private val config = DrillConfig.createClient
+//  private val allocatorRef:Option[BufferAllocator] = None
+//
+//  private val allocator:Option[BufferAllocator] = allocatorRef match {
+//    case None => Some(new TopLevelAllocator(config))
+//    case a:Some[BufferAllocator] => a
+//  }
+
   private val logger = LoggerFactory.getLogger(getClass)
 
   override protected def getPartitions: Array[Partition] = {
-    val client = new ExtendedDrillClient()
+    val client = new ExtendedDrillClient
     val partitions = client.connect()
       .flatMap(c=>c.getPlanFor(sql))
-      .flatMap(p=>Try((0 until p.getFragmentsCount).map(i=>DrillPartition(p, i))))
+      .map(p=>(0 until p.getFragmentsCount).map(i=>DrillPartition(p, i)))
     client.close()
     partitions.get.toArray
   }

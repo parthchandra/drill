@@ -1,6 +1,8 @@
 package org.apache.drill.rdd.query
 
+import org.apache.drill.common.config.DrillConfig
 import org.apache.drill.exec.client.DrillClient
+import org.apache.drill.exec.memory.BufferAllocator
 import org.apache.drill.exec.proto.CoordinationProtos
 import org.apache.drill.exec.proto.UserProtos.{QueryFragmentQuery, QueryPlanFragments}
 import org.apache.drill.exec.rpc.user.UserResultsListener
@@ -8,8 +10,17 @@ import org.apache.drill.exec.rpc.user.UserResultsListener
 import scala.util.Try
 
 
-class ExtendedDrillClient {
-  private val client = new DrillClient
+class ExtendedDrillClient(config:DrillConfig, allocator:BufferAllocator) {
+
+  def this(allocator:BufferAllocator) = {
+    this(DrillConfig.createClient(), allocator)
+  }
+
+  def this() = {
+    this(null)
+  }
+
+  private val client = new DrillClient(config, null, allocator)
 
   def connect(endpoint:Option[CoordinationProtos.DrillbitEndpoint]=None):Try[ExtendedDrillClient] = {
     Try(

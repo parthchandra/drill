@@ -8,16 +8,16 @@ import org.apache.drill.exec.record.RecordBatchLoader
 import org.apache.drill.exec.vector.complex.MapVector
 import org.apache.drill.exec.vector.complex.reader.BaseReader
 import org.apache.drill.exec.vector.complex.reader.BaseReader.{ListReader, MapReader}
-import org.apache.drill.rdd.query.StreamingQueryManager
-import org.apache.drill.rdd.sql.DrillRecord
+import org.apache.drill.rdd.query.{QueryContext, StreamingQueryManager}
+import org.apache.drill.rdd.sql.{RecordInfo, Record, DrillRecord}
 import org.apache.spark.SparkContext
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 object DrillConversions {
 
-  private val recordFactory = (vector:MapVector, row:Int) => {
-    new DrillRecord(vector.getAccessor.getReader, row)
+  private val recordFactory = (info:RecordInfo) => {
+    new DrillRecord(info)
   }
 
   /*
@@ -27,7 +27,7 @@ object DrillConversions {
       val conf = DrillConfig.createClient()
       val allocator = new TopLevelAllocator(conf)
       val loader = new RecordBatchLoader(allocator)
-      new StreamingQueryManager[DrillRowType](loader, recordFactory)
+      new StreamingQueryManager[DrillRowType](QueryContext(loader, recordFactory))
   }
 
   implicit class DrillSparkContext(sc: SparkContext) {

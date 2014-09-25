@@ -292,14 +292,16 @@ public class MapVector extends AbstractContainerVector {
     valueCount = metadata.getValueCount();
 
     int bufOffset = 0;
+    boolean newVector = false;
     for (SerializedField fmd : fields) {
+      newVector = false;
       MaterializedField fieldDef = MaterializedField.create(fmd);
 
       ValueVector v = vectors.get(fieldDef.getLastName());
       if(v == null) {
         // if we arrive here, we didn't have a matching vector.
-
         v = TypeHelper.getNewVector(fieldDef, allocator);
+        newVector=true;
       }
       if (fmd.getValueCount() == 0){
         v.clear();
@@ -307,7 +309,9 @@ public class MapVector extends AbstractContainerVector {
         v.load(fmd, buf.slice(bufOffset, fmd.getBufferLength()));
       }
       bufOffset += fmd.getBufferLength();
-      put(fieldDef.getLastName(), v);
+      if (newVector) {
+        put(fieldDef.getLastName(), v);
+      }
     }
   }
 

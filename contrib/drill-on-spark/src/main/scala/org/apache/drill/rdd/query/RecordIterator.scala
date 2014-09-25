@@ -1,10 +1,13 @@
 package org.apache.drill.rdd.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
+import org.apache.drill.exec.physical.impl.sort.RecordBatchData
 import org.apache.drill.exec.record.RecordBatchLoader
+import org.apache.drill.exec.rpc.user.QueryResultBatch
 import org.apache.drill.exec.vector.ValueVector
 import org.apache.drill.exec.vector.complex.MapVector
 import org.apache.drill.exec.vector.complex.impl.CombinedMapVector
+import org.apache.drill.rdd.sql.RecordInfo
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
@@ -15,37 +18,43 @@ trait RecordIterator[T] extends Iterator[T]
 /**
  * A record iterator that works on streaming {{RecordBatch}}es
  *
- * @param loader record batch loader
+ * @param ctx query context
  * @param listener streaming batch listener
- * @param recordFactory creates an instance of record
  * @tparam T record type
  */
-class StreamingRecordIterator[T:ClassTag](loader: RecordBatchLoader,
-                                 listener: StreamingBatchListener,
-                                 recordFactory: (MapVector, Int)=>T) extends RecordIterator[T] {
+class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: StreamingBatchListener)
+  extends RecordIterator[T] {
 
   private val logger = LoggerFactory.getLogger(getClass)
   private var delegate:Iterator[T] = null
-  private val vector = new CombinedMapVector(loader)
+  private val vector = new CombinedMapVector(ctx.loader)
+  private val empty = Array[T]().iterator
+  var batch = 0
+  var loaded = false
 
   override def hasNext: Boolean = {
     if (delegate == null || !delegate.hasNext) {
       delegate = Try(listener.getNext)
         .flatMap { qrb =>
-          Try(loader.load(qrb.getHeader.getDef, qrb.getData))
-            .flatMap(_ => Try(loader))
-      } flatMap { loader =>
-          //TODO: handle schema changes?
-          vector.load()
-          val rowCount = loader.getRecordCount
-          Try((0 until rowCount) map(row=>recordFactory(vector, row)) iterator)
-        } match {
-          case Success(it)=>it
-          case Failure(t)=>
-            if (!t.isInstanceOf[NoSuchElementException]) {
-              logger.error("Error while creating the iterator", t)
+          Try {
+            if (qrb == null) {
+              ctx.loader.clear()
+            } else {
+              ctx.loader.load(qrb.getHeader.getDef, qrb.getData)
+              vector.load()
             }
-            Array[T]().iterator
+            val rowCount = ctx.loader.getRecordCount
+            logger.info(s"loader got $rowCount records")
+            batch += 1
+            (0 until rowCount) map {
+              row => ctx.recordFactory(RecordInfo(vector.getAccessor.getReader, row, batch))
+            } iterator
+          }
+        } match {
+          case Success(it) => it
+          case Failure(t) =>
+            logger.error("error while iterating over record batches", t)
+            empty
         }
     }
 
