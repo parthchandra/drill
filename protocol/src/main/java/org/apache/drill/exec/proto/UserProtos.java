@@ -106,6 +106,14 @@ public final class UserProtos {
      * </pre>
      */
     READ_FRAGMENT_DATA(12, 12),
+    /**
+     * <code>WRITE_FRAGMENT_DATA = 13;</code>
+     *
+     * <pre>
+     * user to bit
+     * </pre>
+     */
+    WRITE_FRAGMENT_DATA(13, 13),
     ;
 
     /**
@@ -180,6 +188,14 @@ public final class UserProtos {
      * </pre>
      */
     public static final int READ_FRAGMENT_DATA_VALUE = 12;
+    /**
+     * <code>WRITE_FRAGMENT_DATA = 13;</code>
+     *
+     * <pre>
+     * user to bit
+     * </pre>
+     */
+    public static final int WRITE_FRAGMENT_DATA_VALUE = 13;
 
 
     public final int getNumber() { return value; }
@@ -199,6 +215,7 @@ public final class UserProtos {
         case 10: return GET_QUERY_PLAN_FRAGMENTS;
         case 11: return QUERY_PLAN_FRAGMENTS;
         case 12: return READ_FRAGMENT_DATA;
+        case 13: return WRITE_FRAGMENT_DATA;
         default: return null;
       }
     }
@@ -6925,16 +6942,17 @@ public final class UserProtos {
       "q\n\022QueryFragmentQuery\022)\n\tfragments\030\001 \003(\013" +
       "2\026.exec.bit.PlanFragment\0220\n\016fragmentHand" +
       "le\030\002 \001(\0132\030.exec.bit.FragmentHandle\")\n\022Bi" +
-      "tToUserHandshake\022\023\n\013rpc_version\030\002 \001(\005*\210\002" +
+      "tToUserHandshake\022\023\n\013rpc_version\030\002 \001(\005*\241\002" +
       "\n\007RpcType\022\r\n\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n\007GOO" +
       "DBYE\020\002\022\r\n\tRUN_QUERY\020\003\022\020\n\014CANCEL_QUERY\020\004\022" +
       "\023\n\017REQUEST_RESULTS\020\005\022\020\n\014QUERY_RESULT\020\006\022\020" +
       "\n\014QUERY_HANDLE\020\007\022\026\n\022REQ_META_FUNCTIONS\020\010",
       "\022\026\n\022RESP_FUNCTION_LIST\020\t\022\034\n\030GET_QUERY_PL" +
       "AN_FRAGMENTS\020\n\022\030\n\024QUERY_PLAN_FRAGMENTS\020\013" +
-      "\022\026\n\022READ_FRAGMENT_DATA\020\014*#\n\020QueryResults" +
-      "Mode\022\017\n\013STREAM_FULL\020\001B+\n\033org.apache.dril" +
-      "l.exec.protoB\nUserProtosH\001"
+      "\022\026\n\022READ_FRAGMENT_DATA\020\014\022\027\n\023WRITE_FRAGME" +
+      "NT_DATA\020\r*#\n\020QueryResultsMode\022\017\n\013STREAM_" +
+      "FULL\020\001B+\n\033org.apache.drill.exec.protoB\nU" +
+      "serProtosH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {

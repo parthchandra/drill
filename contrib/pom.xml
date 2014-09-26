@@ -37,5 +37,6 @@
     <module>sqlline</module>
     <module>data</module>
     <module>storage-spark</module>
+    <module>drill-on-spark</module>
   </modules>
 </project>

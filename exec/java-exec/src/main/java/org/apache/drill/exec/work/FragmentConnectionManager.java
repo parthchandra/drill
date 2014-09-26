@@ -75,7 +75,7 @@ public class FragmentConnectionManager {
     return pendingCnxs.remove(handle);
   }
 
-  private class ThreadHolder {
+  private static class ThreadHolder {
     private Thread t;
 
     ThreadHolder(Thread t) {

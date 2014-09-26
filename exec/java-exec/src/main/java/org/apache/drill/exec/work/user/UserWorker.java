@@ -17,8 +17,12 @@
  */
 package org.apache.drill.exec.work.user;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.DrillBuf;
+
 import java.util.UUID;
 
+import org.apache.drill.exec.proto.BitData.FragmentRecordBatch;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
@@ -29,6 +33,7 @@ import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
+import org.apache.drill.exec.record.RawFragmentBatch;
 import org.apache.drill.exec.rpc.Acks;
 import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
@@ -37,6 +42,8 @@ import org.apache.drill.exec.store.SchemaFactory;
 import org.apache.drill.exec.work.WorkManager.WorkerBee;
 import org.apache.drill.exec.work.foreman.Foreman;
 import org.apache.drill.exec.work.fragment.FragmentExecutor;
+
+import com.google.protobuf.MessageLite;
 
 public class UserWorker{
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserWorker.class);
@@ -103,4 +110,13 @@ public class UserWorker{
   public OptionManager getSystemOptions(){
     return bee.getContext().getOptionManager();
   }
+
+  public Ack submitWriteFragmentWork(UserClientConnection connection,
+      FragmentRecordBatch header, ByteBuf dBody) {
+    RawFragmentBatch rawFragmentBatch = new RawFragmentBatch(connection, header, (DrillBuf) dBody, 
+        null);
+    
+    return Acks.OK;
+  }
+
 }

@@ -34,6 +34,9 @@ enum RpcType {
 
   // user to bit
   READ_FRAGMENT_DATA = 12;
+
+  // user to bit
+  WRITE_FRAGMENT_DATA = 13;
 }
 
 message Property {

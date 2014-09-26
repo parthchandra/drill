@@ -26,6 +26,7 @@ import java.io.IOException;
 
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
+import org.apache.drill.exec.proto.BitData.FragmentRecordBatch;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
@@ -118,6 +119,14 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
         throw new RpcException("Failure while decoding QueryId body.", e);
       }
 
+    case RpcType.WRITE_FRAGMENT_DATA_VALUE:
+      try {
+        FragmentRecordBatch header = FragmentRecordBatch.PARSER.parseFrom(new ByteBufInputStream(pBody));
+        return new Response(RpcType.ACK, worker.submitWriteFragmentWork(connection, header, dBody));
+      } catch (InvalidProtocolBufferException e) {
+        throw new RpcException("Failure while decoding QueryId body.", e);
+      }
+
     default:
       throw new UnsupportedOperationException(String.format("UserServer received rpc of unknown type.  Type was %d.", rpcType));
     }
@@ -150,7 +159,7 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
       logger.trace("Sending result to client with {}", result);
       send(listener, this, RpcType.QUERY_RESULT, result.getHeader(), Ack.class, false, result.getBuffers());
     }
-
+    
     public void sendResult(RpcOutcomeListener<Ack> listener, QueryWritableBatch result, boolean allowInEventThread){
       logger.trace("Sending result to client with {}", result);
       send(listener, this, RpcType.QUERY_RESULT, result.getHeader(), Ack.class, allowInEventThread, result.getBuffers());

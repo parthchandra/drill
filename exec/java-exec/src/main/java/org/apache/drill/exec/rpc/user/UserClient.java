@@ -22,6 +22,7 @@ import io.netty.channel.EventLoopGroup;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.proto.BitData.FragmentRecordBatch;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
@@ -34,6 +35,8 @@ import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.UserProperties;
 import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
+import org.apache.drill.exec.record.FragmentWritableBatch;
+import org.apache.drill.exec.record.WritableBatch;
 import org.apache.drill.exec.rpc.BasicClientWithConnection;
 import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.OutOfMemoryHandler;
@@ -44,6 +47,7 @@ import org.apache.drill.exec.rpc.RpcException;
 
 import com.google.protobuf.MessageLite;
 
+import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
 
 public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHandshake, BitToUserHandshake> {
@@ -71,6 +75,10 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
     send(queryResultHandler.getWrappedListener(resultsListener), RpcType.READ_FRAGMENT_DATA, readReq, QueryId.class);
   }
 
+  public void submitWriteFragmentDataRequest(FragmentWritableBatch wBatch) {
+    send(RpcType.WRITE_FRAGMENT_DATA, wBatch.getHeader(), FragmentRecordBatch.class, wBatch.getBuffers());    
+  }
+  
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)
       throws RpcException, InterruptedException {
     UserToBitHandshake.Builder hsBuilder = UserToBitHandshake.newBuilder()

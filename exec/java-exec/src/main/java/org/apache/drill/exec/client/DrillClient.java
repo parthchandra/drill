@@ -48,6 +48,7 @@ import org.apache.drill.exec.proto.UserProtos.UserProperties;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
+import org.apache.drill.exec.record.FragmentWritableBatch;
 import org.apache.drill.exec.rpc.BasicClientWithConnection.ServerConnection;
 import org.apache.drill.exec.rpc.ChannelClosedException;
 import org.apache.drill.exec.rpc.DrillRpcFuture;
@@ -274,6 +275,10 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     return client.submitPlanQuery(runQuery);
   }
 
+  public void submitDataPushRequest(FragmentWritableBatch wBatch) {
+    client.submitWriteFragmentDataRequest(wBatch);
+  }
+  
   private class ListHoldingResultsListener implements UserResultsListener {
     private Vector<QueryResultBatch> results = new Vector<QueryResultBatch>();
     private SettableFuture<List<QueryResultBatch>> future = SettableFuture.create();

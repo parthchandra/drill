@@ -34,7 +34,8 @@ public enum RpcType implements com.dyuproject.protostuff.EnumLite<RpcType>
     RESP_FUNCTION_LIST(9),
     GET_QUERY_PLAN_FRAGMENTS(10),
     QUERY_PLAN_FRAGMENTS(11),
-    READ_FRAGMENT_DATA(12);
+    READ_FRAGMENT_DATA(12),
+    WRITE_FRAGMENT_DATA(13);
     
     public final int number;
     
@@ -65,6 +66,7 @@ public enum RpcType implements com.dyuproject.protostuff.EnumLite<RpcType>
             case 10: return GET_QUERY_PLAN_FRAGMENTS;
             case 11: return QUERY_PLAN_FRAGMENTS;
             case 12: return READ_FRAGMENT_DATA;
+            case 13: return WRITE_FRAGMENT_DATA;
             default: return null;
         }
     }
