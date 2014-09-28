@@ -17,21 +17,17 @@
  */
 package org.apache.drill.exec.store.spark;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Set;
-
 import org.apache.drill.exec.planner.logical.DrillTable;
+import org.apache.drill.exec.planner.types.RelDataTypeDrillImpl;
+import org.apache.drill.exec.planner.types.RelDataTypeHolder;
 import org.apache.drill.exec.store.spark.SparkGroupScan.SparkGroupScanSpec;
-import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.eigenbase.reltype.RelDataType;
 import org.eigenbase.reltype.RelDataTypeFactory;
-import org.eigenbase.sql.type.SqlTypeName;
 
 public class DrillSparkTable extends DrillTable {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillSparkTable.class);
+
+  private RelDataTypeHolder holder = new RelDataTypeHolder();
 
   public DrillSparkTable(String storageEngineName, SparkStoragePlugin plugin, SparkGroupScanSpec scanSpec) {
     super(storageEngineName, plugin, scanSpec);
@@ -39,8 +35,8 @@ public class DrillSparkTable extends DrillTable {
 
   @Override
   public RelDataType getRowType(RelDataTypeFactory typeFactory) {
-    // TODO: Depends on how we interpret the type of records in RDD
-    return null;
+    // TODO: consider the table schema type as dynamic. We can change this later if we pass down the schema info
+    // from Spark to Drill with in the augmented Spark table (RDD) name
+    return new RelDataTypeDrillImpl(holder, typeFactory);
   }
-
 }

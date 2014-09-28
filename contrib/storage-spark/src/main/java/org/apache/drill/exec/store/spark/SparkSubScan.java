@@ -20,12 +20,13 @@ package org.apache.drill.exec.store.spark;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.google.common.collect.Iterators;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.common.graph.GraphVisitor;
 import org.apache.drill.exec.physical.base.AbstractBase;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.PhysicalVisitor;
 import org.apache.drill.exec.physical.base.SubScan;
+import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
 
 import java.util.Iterator;
 import java.util.List;
@@ -46,39 +47,50 @@ public class SparkSubScan extends AbstractBase implements SubScan {
 
   @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) throws ExecutionSetupException {
-    // TODO:
-    return null;
-  }
-
-  @Override
-  public void accept(GraphVisitor<PhysicalOperator> visitor) {
-    // TODO:
-    super.accept(visitor);
+    return new SparkSubScan(subScanSpec);
   }
 
   @Override
   public <T, X, E extends Throwable> T accept(PhysicalVisitor<T, X, E> physicalVisitor, X value) throws E {
-    // TODO:
-    return null;
+    return physicalVisitor.visitSubScan(this, value);
   }
 
   @Override
   public Iterator<PhysicalOperator> iterator() {
-    // TODO:
-    return null;
+    return Iterators.emptyIterator();
   }
 
   @Override
   public int getOperatorType() {
-    // TODO:
-    return 0;
+    return CoreOperatorType.SPARK_SUB_SCAN_VALUE;
   }
 
   public static class SparkSubScanSpec {
-    private int partitionId;
+    private int[] partitionIds;
+    private RDDTableSpec tableSpec;
 
-    public SparkSubScanSpec(int partitionId) {
-      this.partitionId = partitionId;
+    public SparkSubScanSpec(@JsonProperty("tableSpec") RDDTableSpec tableSpec,
+                            @JsonProperty("partitionIds") int[] partitionIds) {
+      this.tableSpec = tableSpec;
+      this.partitionIds = partitionIds;
+    }
+
+    public SparkSubScanSpec(RDDTableSpec tableSpec, List<Integer> partitionIds) {
+      this.tableSpec = tableSpec;
+      this.partitionIds = new int[partitionIds.size()];
+      for (int i=0; i<partitionIds.size(); i++) {
+        this.partitionIds[i] = partitionIds.get(i);
+      }
+    }
+
+    @JsonProperty
+    public RDDTableSpec getTableSpec() {
+      return tableSpec;
+    }
+
+    @JsonProperty
+    public int[] getPartitionIds() {
+      return partitionIds;
     }
   }
 }

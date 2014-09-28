@@ -73,7 +73,14 @@ public class SparkSchemaFactory implements SchemaFactory {
 
     @Override
     public Table getTable(String name) {
-      return new DrillSparkTable(schemaName, plugin, new SparkGroupScanSpec(name, sparkConfOveride));
+      try {
+        RDDTableSpec table = plugin.getContext().getConfig().getMapper().readValue(name, RDDTableSpec.class);
+        return new DrillSparkTable(schemaName, plugin, new SparkGroupScanSpec(table, sparkConfOveride));
+      } catch(Exception ex) {
+        logger.error("Failed to parse RDD info from the given table name '{}'", name, ex);
+      }
+
+      return null;
     }
 
     @Override

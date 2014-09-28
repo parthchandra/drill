@@ -53,19 +53,21 @@ public class SparkStoragePlugin extends AbstractStoragePlugin {
     return config;
   }
 
-  public String getName(){
-    return name;
-  }
-
   public DrillbitContext getContext() {
     return context;
   }
 
   @Override
   public SparkGroupScan getPhysicalScan(JSONOptions selection, List<SchemaPath> columns) throws IOException {
-    SparkGroupScanSpec scanSpec = selection.getListWith(new ObjectMapper(), new TypeReference<SparkGroupScanSpec>(){});
-    return new SparkGroupScan(scanSpec);
+    try {
+      SparkGroupScanSpec scanSpec = selection.getListWith(new ObjectMapper(), new TypeReference<SparkGroupScanSpec>() {
+      });
+      return new SparkGroupScan(scanSpec, name, context.getStorage());
+    } catch (ExecutionSetupException ex) {
+      throw new IOException("Failed to create SparkGroupScan.", ex);
+    }
   }
+
 
   @Override
   public void registerSchemas(UserSession session, SchemaPlus parent) {
