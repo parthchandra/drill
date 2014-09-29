@@ -40,6 +40,7 @@ import org.apache.drill.exec.server.Drillbit;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.RemoteServiceSet;
 import org.apache.drill.exec.store.StoragePluginRegistry;
+import org.junit.Ignore;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
@@ -47,6 +48,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 
+@Ignore
 public class TestAllocators {
 
   private static final Properties TEST_CONFIGURATIONS = new Properties() {
