@@ -104,9 +104,9 @@ public class AtomicRemainder {
 
       // If we need to allocate memory beyond the allowed Fragment Limit
       if(applyFragmentLimitForChild && this.applyFragmentLimit && this.hasLimit && (getUsed()+size > this.limit)){
-        logger.debug("No more memory. Fragment limit ("+this.limit +
+        logger.warn("Hit Fragment limit ("+this.limit +
           " bytes) reached. Trying to allocate "+size+ " bytes. "+getUsed()+" bytes already allocated.");
-        return false;
+//        return false;
       }
 
       // attempt to get shared memory, if fails, return false.
