@@ -25,7 +25,6 @@
 #include "drill/common.hpp"
 #include "drill/protobuf/Types.pb.h"
 
-
 #if defined _WIN32 || defined __CYGWIN__
   #ifdef DRILL_CLIENT_EXPORTS
       #define DECLSPEC_DRILL_CLIENT __declspec(dllexport)
@@ -47,7 +46,6 @@
 namespace exec{
     namespace shared{
         class DrillPBError;
-        enum QueryType;
     };
 };
 
