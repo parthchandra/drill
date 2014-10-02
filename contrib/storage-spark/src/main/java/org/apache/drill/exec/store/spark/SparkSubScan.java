@@ -66,20 +66,20 @@ public class SparkSubScan extends AbstractBase implements SubScan {
   }
 
   public static class SparkSubScanSpec {
-    private int[] partitionIds;
+    private int[] assignedPartitions;
     private RDDTableSpec tableSpec;
 
     public SparkSubScanSpec(@JsonProperty("tableSpec") RDDTableSpec tableSpec,
-                            @JsonProperty("partitionIds") int[] partitionIds) {
+                            @JsonProperty("assignedPartitions") int[] assignedPartitions) {
       this.tableSpec = tableSpec;
-      this.partitionIds = partitionIds;
+      this.assignedPartitions = assignedPartitions;
     }
 
-    public SparkSubScanSpec(RDDTableSpec tableSpec, List<Integer> partitionIds) {
+    public SparkSubScanSpec(RDDTableSpec tableSpec, List<Integer> assignedPartitions) {
       this.tableSpec = tableSpec;
-      this.partitionIds = new int[partitionIds.size()];
-      for (int i=0; i<partitionIds.size(); i++) {
-        this.partitionIds[i] = partitionIds.get(i);
+      this.assignedPartitions = new int[assignedPartitions.size()];
+      for (int i=0; i<assignedPartitions.size(); i++) {
+        this.assignedPartitions[i] = assignedPartitions.get(i);
       }
     }
 
@@ -89,8 +89,8 @@ public class SparkSubScan extends AbstractBase implements SubScan {
     }
 
     @JsonProperty
-    public int[] getPartitionIds() {
-      return partitionIds;
+    public int[] getAssignedPartitions() {
+      return assignedPartitions;
     }
   }
 }

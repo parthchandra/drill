@@ -95,7 +95,7 @@ public class SparkGroupScan extends AbstractGroupScan {
     int count = endpoints.size();
     RDDTableSpec table = scanSpec.getTable();
     for (int i = 0; i < table.getNumPartitions(); i++) {
-      mappings.get(i % count).add(table.getPartitionId(i));
+      mappings.get(i % count).add(i);
     }
   }
 
@@ -132,7 +132,7 @@ public class SparkGroupScan extends AbstractGroupScan {
 
   @Override
   public String toString() {
-    return "SparkGroupScan [RDD table name=" + scanSpec.getTable() + "]";
+    return "SparkGroupScan [RDD table=" + scanSpec.getTable() + "]";
   }
 
   @Override

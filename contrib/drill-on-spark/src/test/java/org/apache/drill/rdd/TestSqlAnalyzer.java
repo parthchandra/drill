@@ -19,7 +19,6 @@ package org.apache.drill.rdd;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import org.apache.drill.exec.store.spark.RDDTableSpec;
 import org.junit.Test;
 
@@ -40,32 +39,30 @@ public class TestSqlAnalyzer {
 
   @Test
   public void testSimpleExpansionQuery() throws Exception {
-    SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from RddTable1", ImmutableSet.<String>of("RDDTABLE1"));
+    SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from RddTable1", ImmutableSet.of("RDDTABLE1"));
     assertTrue(sqlAnalyzer.needsSqlExpansion());
-    Map<String, RDDTableSpec> mapTable2Spec = Maps.newHashMap();
-    mapTable2Spec.put("RDDTABLE1", new RDDTableSpec("SC1", 1, new int[] {0, 1, 2}));
+    Map<String, RDDTableSpec> mapTable2Spec = ImmutableMap.of("RDDTABLE1", new RDDTableSpec("RDDTABLE1", 3));
 
     String expectedExpandedQuery = "SELECT *\n" +
-        "FROM `{\"scId\":\"SC1\",\"rddId\":1,\"partitionIds\":[0,1,2]}`";
+        "FROM `{\"name\":\"RDDTABLE1\",\"numPartitions\":3}`";
     assertEquals("Expanded query is not valid", expectedExpandedQuery, sqlAnalyzer.getExpandedSql(mapTable2Spec));
   }
 
 
   @Test
   public void testMultipleRDDNamesExpansionQuery() throws Exception {
-    Set<String> rddTableNameSet = ImmutableSet.<String>of("RDDTABLE1", "RDDTABLE2");
+    Set<String> rddTableNameSet = ImmutableSet.of("RDDTABLE1", "RDDTABLE2");
     Map<String, RDDTableSpec> mapTable2Spec = ImmutableMap.of(
-        "RDDTABLE1", new RDDTableSpec("SC1", 1, new int[]{0, 1, 2}),
-        "RDDTABLE2", new RDDTableSpec("SC1", 2, new int[]{0, 1, 2, 3, 4, 5, 6}));
+        "RDDTABLE1", new RDDTableSpec("RDDTABLE1", 3),
+        "RDDTABLE2", new RDDTableSpec("RDDTABLE2", 5));
 
     SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from RddTable1 join RddTable2 join drillTable1", rddTableNameSet);
     assertTrue(sqlAnalyzer.needsSqlExpansion());
 
     String expectedExpandedQuery = "SELECT *\n" +
-        "FROM `{\"scId\":\"SC1\",\"rddId\":1,\"partitionIds\":[0,1,2]}`\n" +
-        "INNER JOIN `{\"scId\":\"SC1\",\"rddId\":2,\"partitionIds\":[0,1,2,3,4,5,6]}`\n" +
+        "FROM `{\"name\":\"RDDTABLE1\",\"numPartitions\":3}`\n" +
+        "INNER JOIN `{\"name\":\"RDDTABLE2\",\"numPartitions\":5}`\n" +
         "INNER JOIN `drillTable1`";
-
     assertEquals("Expanded query is not valid", expectedExpandedQuery, sqlAnalyzer.getExpandedSql(mapTable2Spec));
   }
 }
