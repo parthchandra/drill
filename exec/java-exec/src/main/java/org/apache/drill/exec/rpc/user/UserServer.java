@@ -31,6 +31,7 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
@@ -121,7 +122,7 @@ public class UserServer extends BasicServer<RpcType, UserServer.UserClientConnec
 
     case RpcType.WRITE_FRAGMENT_DATA_VALUE:
       try {
-        FragmentRecordBatch header = FragmentRecordBatch.PARSER.parseFrom(new ByteBufInputStream(pBody));
+        PushDataRequestHeader header = PushDataRequestHeader.PARSER.parseFrom(new ByteBufInputStream(pBody));
         return new Response(RpcType.ACK, worker.submitWriteFragmentWork(connection, header, dBody));
       } catch (InvalidProtocolBufferException e) {
         throw new RpcException("Failure while decoding QueryId body.", e);

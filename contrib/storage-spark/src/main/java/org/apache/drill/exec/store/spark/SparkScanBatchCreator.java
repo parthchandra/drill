@@ -20,6 +20,7 @@ package org.apache.drill.exec.store.spark;
 import java.util.List;
 
 import com.google.common.collect.ImmutableList;
+
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.impl.BatchCreator;

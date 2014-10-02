@@ -29,21 +29,25 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.RequestResults;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.record.RawFragmentBatch;
+import org.apache.drill.exec.record.RawFragmentExtendedBatch;
 import org.apache.drill.exec.rpc.Acks;
+import org.apache.drill.exec.rpc.Response;
+import org.apache.drill.exec.rpc.ResponseSender;
 import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.store.SchemaFactory;
 import org.apache.drill.exec.work.WorkManager.WorkerBee;
+import org.apache.drill.exec.work.batch.UnlimitedRawBatchBuffer;
 import org.apache.drill.exec.work.foreman.Foreman;
 import org.apache.drill.exec.work.fragment.FragmentExecutor;
 
-import com.google.protobuf.MessageLite;
 
 public class UserWorker{
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserWorker.class);
@@ -111,11 +115,27 @@ public class UserWorker{
     return bee.getContext().getOptionManager();
   }
 
+  /**
+   * api to handle data receiving from DrillClient
+   * @param connection
+   * @param header - protobuf header of the message
+   * @param dBody - ByteBuf - byte buffers - body data
+   * @return Acknowledgment
+   */
   public Ack submitWriteFragmentWork(UserClientConnection connection,
-      FragmentRecordBatch header, ByteBuf dBody) {
-    RawFragmentBatch rawFragmentBatch = new RawFragmentBatch(connection, header, (DrillBuf) dBody, 
-        null);
-    
+      PushDataRequestHeader header, ByteBuf dBody) {
+    // submit query for execution is needed
+    submitReadFragmentWork(connection, header.getQueryFragmentPlan());
+    FragmentHandle fHandle = header.getFragmentRecordBatch().getHandle();
+    RawFragmentBatch rawBatch = new RawFragmentBatch(connection, header.getFragmentRecordBatch(), 
+        (DrillBuf) dBody, new ResponseSender() {
+
+      @Override
+      public void send(Response r) {
+        // do nothing for now
+        
+      }});
+    bee.enqueueRecordBatch(fHandle, rawBatch);
     return Acks.OK;
   }
 

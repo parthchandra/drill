@@ -17,42 +17,81 @@
  */
 package org.apache.drill.exec.store.spark;
 
+
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
+import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
+import org.apache.drill.exec.record.RawFragmentBatch;
+import org.apache.drill.exec.record.RecordBatchLoader;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.spark.SparkSubScan.SparkSubScanSpec;
+import org.apache.drill.exec.work.DataPushConnectionManager;
+import org.apache.drill.exec.work.batch.UnlimitedRawBatchBufferNoAck;
 
+/**
+ * SparkrecordReader is the class that is responsible for reading
+ * data that is received from Spark via DrillClient protocol
+ * not read from disk or some metastore
+ *
+ */
 public class SparkRecordReader extends AbstractRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SparkRecordReader.class);
 
   private SparkSubScanSpec subScanSpec;
   private FragmentContext fragmentContext;
+  private OperatorContext operatorContext;
+  private UnlimitedRawBatchBufferNoAck batchProvider;
+  private RecordBatchLoader recordBatchLoader;
+
+  
+
 
   public SparkRecordReader(SparkSubScanSpec subScanSpec, FragmentContext fragmentContext) {
     this.subScanSpec = subScanSpec;
     this.fragmentContext = fragmentContext;
+    this.batchProvider = DataPushConnectionManager.getInstance().
+    		getRawBatchBuffer(fragmentContext.getHandle()); 
+    this.batchProvider.setFragmentCount(subScanSpec.getAssignedPartitions().length);
   }
 
   @Override
   public void setup(OutputMutator output) throws ExecutionSetupException {
-    // TODO:
+
   }
 
   @Override
   public void setOperatorContext(OperatorContext operatorContext) {
-    // TODO:
+    this.operatorContext = operatorContext;
+    this.recordBatchLoader = new RecordBatchLoader(this.operatorContext.getAllocator());
   }
 
   @Override
   public int next() {
-    // TODO:
-    return 0;
+	RawFragmentBatch rawFragmentBatch = batchProvider.getNext();
+	if ( rawFragmentBatch == null ) {
+	  return 0;
+	}
+	
+	try {
+	  recordBatchLoader.load(rawFragmentBatch.getHeader().getDef(), rawFragmentBatch.getBody());
+	} catch (SchemaChangeException e) {
+	  logger.error("SchemaChangeException", e);
+	  throw new DrillRuntimeException(e);
+	}
+	  
+    return recordBatchLoader.getRecordCount();
   }
 
   @Override
   public void cleanup() {
-    // TODO:
+    this.batchProvider.cleanup();
+    DataPushConnectionManager.getInstance().cleanRawBatchBuffer(fragmentContext.getHandle());
+    if ( this.recordBatchLoader != null ) {
+    	this.recordBatchLoader.clear();
+    }
   }
+  
 }

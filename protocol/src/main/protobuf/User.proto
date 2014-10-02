@@ -6,6 +6,7 @@ option optimize_for = SPEED;
 
 import "SchemaDef.proto";
 import "UserBitShared.proto";
+import "BitData.proto";
 import "ExecutionProtos.proto";
 
 ////// UserToBit RPC ///////
@@ -84,6 +85,11 @@ message QueryFragmentQuery {
   optional exec.bit.FragmentHandle fragmentHandle = 2; 
 }
 
+message PushDataRequestHeader {
+  optional exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;
+  optional QueryFragmentQuery queryFragmentPlan = 2;
+}
+ 
 enum QueryResultsMode {
   STREAM_FULL = 1; // Server will inform the client regularly on the status of the query. Once the query is completed, service will inform the client as each query chunk is made available.
   // STREAM_FIRST = 2; // Server will inform the client regularly on the status of the query.  Once the query is completed, server will inform the client of the first query chunk.

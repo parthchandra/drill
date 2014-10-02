@@ -1021,6 +1021,128 @@ public final class SchemaUserProtos
         }
     }
 
+    public static final class PushDataRequestHeader
+    {
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.MessageSchema WRITE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.MessageSchema();
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.BuilderSchema MERGE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.BuilderSchema();
+        
+        public static class MessageSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader>
+        {
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader message) throws java.io.IOException
+            {
+                if(message.hasFragmentRecordBatch())
+                    output.writeObject(1, message.getFragmentRecordBatch(), org.apache.drill.exec.proto.SchemaBitData.FragmentRecordBatch.WRITE, false);
+
+                if(message.hasQueryFragmentPlan())
+                    output.writeObject(2, message.getQueryFragmentPlan(), org.apache.drill.exec.proto.SchemaUserProtos.QueryFragmentQuery.WRITE, false);
+
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader message)
+            {
+                return message.isInitialized();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class.getName();
+            }
+            //unused
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader message) throws java.io.IOException {}
+            public org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader newMessage() { return null; }
+        }
+        public static class BuilderSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder>
+        {
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder builder) throws java.io.IOException
+            {
+                for(int number = input.readFieldNumber(this);; number = input.readFieldNumber(this))
+                {
+                    switch(number)
+                    {
+                        case 0:
+                            return;
+                        case 1:
+                            builder.setFragmentRecordBatch(input.mergeObject(org.apache.drill.exec.proto.BitData.FragmentRecordBatch.newBuilder(), org.apache.drill.exec.proto.SchemaBitData.FragmentRecordBatch.MERGE));
+
+                            break;
+                        case 2:
+                            builder.setQueryFragmentPlan(input.mergeObject(org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.newBuilder(), org.apache.drill.exec.proto.SchemaUserProtos.QueryFragmentQuery.MERGE));
+
+                            break;
+                        default:
+                            input.handleUnknownField(number, this);
+                    }
+                }
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder builder)
+            {
+                return builder.isInitialized();
+            }
+            public org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder newMessage()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.newBuilder();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.PushDataRequestHeader.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class.getName();
+            }
+            //unused
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder builder) throws java.io.IOException {}
+        }
+        public static java.lang.String getFieldName(int number)
+        {
+            switch(number)
+            {
+                case 1: return "fragmentRecordBatch";
+                case 2: return "queryFragmentPlan";
+                default: return null;
+            }
+        }
+        public static int getFieldNumber(java.lang.String name)
+        {
+            java.lang.Integer number = fieldMap.get(name);
+            return number == null ? 0 : number.intValue();
+        }
+        private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+        static
+        {
+            fieldMap.put("fragmentRecordBatch", 1);
+            fieldMap.put("queryFragmentPlan", 2);
+        }
+    }
+
     public static final class BitToUserHandshake
     {
         public static final org.apache.drill.exec.proto.SchemaUserProtos.BitToUserHandshake.MessageSchema WRITE =

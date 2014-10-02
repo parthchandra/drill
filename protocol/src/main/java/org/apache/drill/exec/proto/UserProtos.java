@@ -6467,6 +6467,705 @@ public final class UserProtos {
     // @@protoc_insertion_point(class_scope:exec.user.QueryFragmentQuery)
   }
 
+  public interface PushDataRequestHeaderOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;
+    /**
+     * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+     */
+    boolean hasFragmentRecordBatch();
+    /**
+     * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+     */
+    org.apache.drill.exec.proto.BitData.FragmentRecordBatch getFragmentRecordBatch();
+    /**
+     * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+     */
+    org.apache.drill.exec.proto.BitData.FragmentRecordBatchOrBuilder getFragmentRecordBatchOrBuilder();
+
+    // optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;
+    /**
+     * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+     */
+    boolean hasQueryFragmentPlan();
+    /**
+     * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery getQueryFragmentPlan();
+    /**
+     * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.QueryFragmentQueryOrBuilder getQueryFragmentPlanOrBuilder();
+  }
+  /**
+   * Protobuf type {@code exec.user.PushDataRequestHeader}
+   */
+  public static final class PushDataRequestHeader extends
+      com.google.protobuf.GeneratedMessage
+      implements PushDataRequestHeaderOrBuilder {
+    // Use PushDataRequestHeader.newBuilder() to construct.
+    private PushDataRequestHeader(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private PushDataRequestHeader(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final PushDataRequestHeader defaultInstance;
+    public static PushDataRequestHeader getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public PushDataRequestHeader getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private PushDataRequestHeader(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              org.apache.drill.exec.proto.BitData.FragmentRecordBatch.Builder subBuilder = null;
+              if (((bitField0_ & 0x00000001) == 0x00000001)) {
+                subBuilder = fragmentRecordBatch_.toBuilder();
+              }
+              fragmentRecordBatch_ = input.readMessage(org.apache.drill.exec.proto.BitData.FragmentRecordBatch.PARSER, extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(fragmentRecordBatch_);
+                fragmentRecordBatch_ = subBuilder.buildPartial();
+              }
+              bitField0_ |= 0x00000001;
+              break;
+            }
+            case 18: {
+              org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.Builder subBuilder = null;
+              if (((bitField0_ & 0x00000002) == 0x00000002)) {
+                subBuilder = queryFragmentPlan_.toBuilder();
+              }
+              queryFragmentPlan_ = input.readMessage(org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.PARSER, extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(queryFragmentPlan_);
+                queryFragmentPlan_ = subBuilder.buildPartial();
+              }
+              bitField0_ |= 0x00000002;
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_PushDataRequestHeader_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_PushDataRequestHeader_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class, org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<PushDataRequestHeader> PARSER =
+        new com.google.protobuf.AbstractParser<PushDataRequestHeader>() {
+      public PushDataRequestHeader parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new PushDataRequestHeader(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<PushDataRequestHeader> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
+    // optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;
+    public static final int FRAGMENTRECORDBATCH_FIELD_NUMBER = 1;
+    private org.apache.drill.exec.proto.BitData.FragmentRecordBatch fragmentRecordBatch_;
+    /**
+     * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+     */
+    public boolean hasFragmentRecordBatch() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+     */
+    public org.apache.drill.exec.proto.BitData.FragmentRecordBatch getFragmentRecordBatch() {
+      return fragmentRecordBatch_;
+    }
+    /**
+     * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+     */
+    public org.apache.drill.exec.proto.BitData.FragmentRecordBatchOrBuilder getFragmentRecordBatchOrBuilder() {
+      return fragmentRecordBatch_;
+    }
+
+    // optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;
+    public static final int QUERYFRAGMENTPLAN_FIELD_NUMBER = 2;
+    private org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery queryFragmentPlan_;
+    /**
+     * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+     */
+    public boolean hasQueryFragmentPlan() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery getQueryFragmentPlan() {
+      return queryFragmentPlan_;
+    }
+    /**
+     * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.QueryFragmentQueryOrBuilder getQueryFragmentPlanOrBuilder() {
+      return queryFragmentPlan_;
+    }
+
+    private void initFields() {
+      fragmentRecordBatch_ = org.apache.drill.exec.proto.BitData.FragmentRecordBatch.getDefaultInstance();
+      queryFragmentPlan_ = org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.getDefaultInstance();
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeMessage(1, fragmentRecordBatch_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeMessage(2, queryFragmentPlan_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, fragmentRecordBatch_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(2, queryFragmentPlan_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code exec.user.PushDataRequestHeader}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.drill.exec.proto.UserProtos.PushDataRequestHeaderOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_PushDataRequestHeader_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_PushDataRequestHeader_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.class, org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.Builder.class);
+      }
+
+      // Construct using org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getFragmentRecordBatchFieldBuilder();
+          getQueryFragmentPlanFieldBuilder();
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        if (fragmentRecordBatchBuilder_ == null) {
+          fragmentRecordBatch_ = org.apache.drill.exec.proto.BitData.FragmentRecordBatch.getDefaultInstance();
+        } else {
+          fragmentRecordBatchBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        if (queryFragmentPlanBuilder_ == null) {
+          queryFragmentPlan_ = org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.getDefaultInstance();
+        } else {
+          queryFragmentPlanBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_PushDataRequestHeader_descriptor;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader getDefaultInstanceForType() {
+        return org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.getDefaultInstance();
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader build() {
+        org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader buildPartial() {
+        org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader result = new org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
+        }
+        if (fragmentRecordBatchBuilder_ == null) {
+          result.fragmentRecordBatch_ = fragmentRecordBatch_;
+        } else {
+          result.fragmentRecordBatch_ = fragmentRecordBatchBuilder_.build();
+        }
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        if (queryFragmentPlanBuilder_ == null) {
+          result.queryFragmentPlan_ = queryFragmentPlan_;
+        } else {
+          result.queryFragmentPlan_ = queryFragmentPlanBuilder_.build();
+        }
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader) {
+          return mergeFrom((org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader other) {
+        if (other == org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader.getDefaultInstance()) return this;
+        if (other.hasFragmentRecordBatch()) {
+          mergeFragmentRecordBatch(other.getFragmentRecordBatch());
+        }
+        if (other.hasQueryFragmentPlan()) {
+          mergeQueryFragmentPlan(other.getQueryFragmentPlan());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;
+      private org.apache.drill.exec.proto.BitData.FragmentRecordBatch fragmentRecordBatch_ = org.apache.drill.exec.proto.BitData.FragmentRecordBatch.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.BitData.FragmentRecordBatch, org.apache.drill.exec.proto.BitData.FragmentRecordBatch.Builder, org.apache.drill.exec.proto.BitData.FragmentRecordBatchOrBuilder> fragmentRecordBatchBuilder_;
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public boolean hasFragmentRecordBatch() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public org.apache.drill.exec.proto.BitData.FragmentRecordBatch getFragmentRecordBatch() {
+        if (fragmentRecordBatchBuilder_ == null) {
+          return fragmentRecordBatch_;
+        } else {
+          return fragmentRecordBatchBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public Builder setFragmentRecordBatch(org.apache.drill.exec.proto.BitData.FragmentRecordBatch value) {
+        if (fragmentRecordBatchBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          fragmentRecordBatch_ = value;
+          onChanged();
+        } else {
+          fragmentRecordBatchBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public Builder setFragmentRecordBatch(
+          org.apache.drill.exec.proto.BitData.FragmentRecordBatch.Builder builderForValue) {
+        if (fragmentRecordBatchBuilder_ == null) {
+          fragmentRecordBatch_ = builderForValue.build();
+          onChanged();
+        } else {
+          fragmentRecordBatchBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public Builder mergeFragmentRecordBatch(org.apache.drill.exec.proto.BitData.FragmentRecordBatch value) {
+        if (fragmentRecordBatchBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) == 0x00000001) &&
+              fragmentRecordBatch_ != org.apache.drill.exec.proto.BitData.FragmentRecordBatch.getDefaultInstance()) {
+            fragmentRecordBatch_ =
+              org.apache.drill.exec.proto.BitData.FragmentRecordBatch.newBuilder(fragmentRecordBatch_).mergeFrom(value).buildPartial();
+          } else {
+            fragmentRecordBatch_ = value;
+          }
+          onChanged();
+        } else {
+          fragmentRecordBatchBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public Builder clearFragmentRecordBatch() {
+        if (fragmentRecordBatchBuilder_ == null) {
+          fragmentRecordBatch_ = org.apache.drill.exec.proto.BitData.FragmentRecordBatch.getDefaultInstance();
+          onChanged();
+        } else {
+          fragmentRecordBatchBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public org.apache.drill.exec.proto.BitData.FragmentRecordBatch.Builder getFragmentRecordBatchBuilder() {
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return getFragmentRecordBatchFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      public org.apache.drill.exec.proto.BitData.FragmentRecordBatchOrBuilder getFragmentRecordBatchOrBuilder() {
+        if (fragmentRecordBatchBuilder_ != null) {
+          return fragmentRecordBatchBuilder_.getMessageOrBuilder();
+        } else {
+          return fragmentRecordBatch_;
+        }
+      }
+      /**
+       * <code>optional .exec.bit.data.FragmentRecordBatch fragmentRecordBatch = 1;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.BitData.FragmentRecordBatch, org.apache.drill.exec.proto.BitData.FragmentRecordBatch.Builder, org.apache.drill.exec.proto.BitData.FragmentRecordBatchOrBuilder> 
+          getFragmentRecordBatchFieldBuilder() {
+        if (fragmentRecordBatchBuilder_ == null) {
+          fragmentRecordBatchBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              org.apache.drill.exec.proto.BitData.FragmentRecordBatch, org.apache.drill.exec.proto.BitData.FragmentRecordBatch.Builder, org.apache.drill.exec.proto.BitData.FragmentRecordBatchOrBuilder>(
+                  fragmentRecordBatch_,
+                  getParentForChildren(),
+                  isClean());
+          fragmentRecordBatch_ = null;
+        }
+        return fragmentRecordBatchBuilder_;
+      }
+
+      // optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;
+      private org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery queryFragmentPlan_ = org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery, org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.Builder, org.apache.drill.exec.proto.UserProtos.QueryFragmentQueryOrBuilder> queryFragmentPlanBuilder_;
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public boolean hasQueryFragmentPlan() {
+        return ((bitField0_ & 0x00000002) == 0x00000002);
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery getQueryFragmentPlan() {
+        if (queryFragmentPlanBuilder_ == null) {
+          return queryFragmentPlan_;
+        } else {
+          return queryFragmentPlanBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public Builder setQueryFragmentPlan(org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery value) {
+        if (queryFragmentPlanBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          queryFragmentPlan_ = value;
+          onChanged();
+        } else {
+          queryFragmentPlanBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public Builder setQueryFragmentPlan(
+          org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.Builder builderForValue) {
+        if (queryFragmentPlanBuilder_ == null) {
+          queryFragmentPlan_ = builderForValue.build();
+          onChanged();
+        } else {
+          queryFragmentPlanBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public Builder mergeQueryFragmentPlan(org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery value) {
+        if (queryFragmentPlanBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) == 0x00000002) &&
+              queryFragmentPlan_ != org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.getDefaultInstance()) {
+            queryFragmentPlan_ =
+              org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.newBuilder(queryFragmentPlan_).mergeFrom(value).buildPartial();
+          } else {
+            queryFragmentPlan_ = value;
+          }
+          onChanged();
+        } else {
+          queryFragmentPlanBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public Builder clearQueryFragmentPlan() {
+        if (queryFragmentPlanBuilder_ == null) {
+          queryFragmentPlan_ = org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.getDefaultInstance();
+          onChanged();
+        } else {
+          queryFragmentPlanBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.Builder getQueryFragmentPlanBuilder() {
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return getQueryFragmentPlanFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.QueryFragmentQueryOrBuilder getQueryFragmentPlanOrBuilder() {
+        if (queryFragmentPlanBuilder_ != null) {
+          return queryFragmentPlanBuilder_.getMessageOrBuilder();
+        } else {
+          return queryFragmentPlan_;
+        }
+      }
+      /**
+       * <code>optional .exec.user.QueryFragmentQuery queryFragmentPlan = 2;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery, org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.Builder, org.apache.drill.exec.proto.UserProtos.QueryFragmentQueryOrBuilder> 
+          getQueryFragmentPlanFieldBuilder() {
+        if (queryFragmentPlanBuilder_ == null) {
+          queryFragmentPlanBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery, org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery.Builder, org.apache.drill.exec.proto.UserProtos.QueryFragmentQueryOrBuilder>(
+                  queryFragmentPlan_,
+                  getParentForChildren(),
+                  isClean());
+          queryFragmentPlan_ = null;
+        }
+        return queryFragmentPlanBuilder_;
+      }
+
+      // @@protoc_insertion_point(builder_scope:exec.user.PushDataRequestHeader)
+    }
+
+    static {
+      defaultInstance = new PushDataRequestHeader(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:exec.user.PushDataRequestHeader)
+  }
+
   public interface BitToUserHandshakeOrBuilder
       extends com.google.protobuf.MessageOrBuilder {
 
@@ -6904,6 +7603,11 @@ public final class UserProtos {
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_exec_user_QueryFragmentQuery_fieldAccessorTable;
   private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_exec_user_PushDataRequestHeader_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_exec_user_PushDataRequestHeader_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
     internal_static_exec_user_BitToUserHandshake_descriptor;
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
@@ -6918,41 +7622,45 @@ public final class UserProtos {
   static {
     java.lang.String[] descriptorData = {
       "\n\nUser.proto\022\texec.user\032\017SchemaDef.proto" +
-      "\032\023UserBitShared.proto\032\025ExecutionProtos.p" +
-      "roto\"&\n\010Property\022\013\n\003key\030\001 \002(\t\022\r\n\005value\030\002" +
-      " \002(\t\"9\n\016UserProperties\022\'\n\nproperties\030\001 \003" +
-      "(\0132\023.exec.user.Property\"\374\001\n\022UserToBitHan" +
-      "dshake\022.\n\007channel\030\001 \001(\0162\027.exec.shared.Rp" +
-      "cChannel:\004USER\022\031\n\021support_listening\030\002 \001(" +
-      "\010\022\023\n\013rpc_version\030\003 \001(\005\0221\n\013credentials\030\004 " +
-      "\001(\0132\034.exec.shared.UserCredentials\022-\n\npro" +
-      "perties\030\005 \001(\0132\031.exec.user.UserProperties",
-      "\022$\n\025support_complex_types\030\006 \001(\010:\005false\"S" +
-      "\n\016RequestResults\022&\n\010query_id\030\001 \001(\0132\024.exe" +
-      "c.shared.QueryId\022\031\n\021maximum_responses\030\002 " +
-      "\001(\005\"q\n\010RunQuery\0221\n\014results_mode\030\001 \001(\0162\033." +
-      "exec.user.QueryResultsMode\022$\n\004type\030\002 \001(\016" +
-      "2\026.exec.shared.QueryType\022\014\n\004plan\030\003 \001(\t\"&" +
-      "\n\025GetQueryPlanFragments\022\r\n\005query\030\001 \002(\t\"\306" +
-      "\001\n\022QueryPlanFragments\0223\n\006status\030\001 \002(\0162#." +
-      "exec.shared.QueryResult.QueryState\022&\n\010qu" +
-      "ery_id\030\002 \001(\0132\024.exec.shared.QueryId\022)\n\tfr",
-      "agments\030\003 \003(\0132\026.exec.bit.PlanFragment\022(\n" +
-      "\005error\030\004 \001(\0132\031.exec.shared.DrillPBError\"" +
-      "q\n\022QueryFragmentQuery\022)\n\tfragments\030\001 \003(\013" +
-      "2\026.exec.bit.PlanFragment\0220\n\016fragmentHand" +
-      "le\030\002 \001(\0132\030.exec.bit.FragmentHandle\")\n\022Bi" +
-      "tToUserHandshake\022\023\n\013rpc_version\030\002 \001(\005*\241\002" +
-      "\n\007RpcType\022\r\n\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n\007GOO" +
-      "DBYE\020\002\022\r\n\tRUN_QUERY\020\003\022\020\n\014CANCEL_QUERY\020\004\022" +
-      "\023\n\017REQUEST_RESULTS\020\005\022\020\n\014QUERY_RESULT\020\006\022\020" +
-      "\n\014QUERY_HANDLE\020\007\022\026\n\022REQ_META_FUNCTIONS\020\010",
-      "\022\026\n\022RESP_FUNCTION_LIST\020\t\022\034\n\030GET_QUERY_PL" +
-      "AN_FRAGMENTS\020\n\022\030\n\024QUERY_PLAN_FRAGMENTS\020\013" +
-      "\022\026\n\022READ_FRAGMENT_DATA\020\014\022\027\n\023WRITE_FRAGME" +
-      "NT_DATA\020\r*#\n\020QueryResultsMode\022\017\n\013STREAM_" +
-      "FULL\020\001B+\n\033org.apache.drill.exec.protoB\nU" +
-      "serProtosH\001"
+      "\032\023UserBitShared.proto\032\rBitData.proto\032\025Ex" +
+      "ecutionProtos.proto\"&\n\010Property\022\013\n\003key\030\001" +
+      " \002(\t\022\r\n\005value\030\002 \002(\t\"9\n\016UserProperties\022\'\n" +
+      "\nproperties\030\001 \003(\0132\023.exec.user.Property\"\374" +
+      "\001\n\022UserToBitHandshake\022.\n\007channel\030\001 \001(\0162\027" +
+      ".exec.shared.RpcChannel:\004USER\022\031\n\021support" +
+      "_listening\030\002 \001(\010\022\023\n\013rpc_version\030\003 \001(\005\0221\n" +
+      "\013credentials\030\004 \001(\0132\034.exec.shared.UserCre" +
+      "dentials\022-\n\nproperties\030\005 \001(\0132\031.exec.user",
+      ".UserProperties\022$\n\025support_complex_types" +
+      "\030\006 \001(\010:\005false\"S\n\016RequestResults\022&\n\010query" +
+      "_id\030\001 \001(\0132\024.exec.shared.QueryId\022\031\n\021maxim" +
+      "um_responses\030\002 \001(\005\"q\n\010RunQuery\0221\n\014result" +
+      "s_mode\030\001 \001(\0162\033.exec.user.QueryResultsMod" +
+      "e\022$\n\004type\030\002 \001(\0162\026.exec.shared.QueryType\022" +
+      "\014\n\004plan\030\003 \001(\t\"&\n\025GetQueryPlanFragments\022\r" +
+      "\n\005query\030\001 \002(\t\"\306\001\n\022QueryPlanFragments\0223\n\006" +
+      "status\030\001 \002(\0162#.exec.shared.QueryResult.Q" +
+      "ueryState\022&\n\010query_id\030\002 \001(\0132\024.exec.share",
+      "d.QueryId\022)\n\tfragments\030\003 \003(\0132\026.exec.bit." +
+      "PlanFragment\022(\n\005error\030\004 \001(\0132\031.exec.share" +
+      "d.DrillPBError\"q\n\022QueryFragmentQuery\022)\n\t" +
+      "fragments\030\001 \003(\0132\026.exec.bit.PlanFragment\022" +
+      "0\n\016fragmentHandle\030\002 \001(\0132\030.exec.bit.Fragm" +
+      "entHandle\"\222\001\n\025PushDataRequestHeader\022?\n\023f" +
+      "ragmentRecordBatch\030\001 \001(\0132\".exec.bit.data" +
+      ".FragmentRecordBatch\0228\n\021queryFragmentPla" +
+      "n\030\002 \001(\0132\035.exec.user.QueryFragmentQuery\")" +
+      "\n\022BitToUserHandshake\022\023\n\013rpc_version\030\002 \001(",
+      "\005*\241\002\n\007RpcType\022\r\n\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n" +
+      "\007GOODBYE\020\002\022\r\n\tRUN_QUERY\020\003\022\020\n\014CANCEL_QUER" +
+      "Y\020\004\022\023\n\017REQUEST_RESULTS\020\005\022\020\n\014QUERY_RESULT" +
+      "\020\006\022\020\n\014QUERY_HANDLE\020\007\022\026\n\022REQ_META_FUNCTIO" +
+      "NS\020\010\022\026\n\022RESP_FUNCTION_LIST\020\t\022\034\n\030GET_QUER" +
+      "Y_PLAN_FRAGMENTS\020\n\022\030\n\024QUERY_PLAN_FRAGMEN" +
+      "TS\020\013\022\026\n\022READ_FRAGMENT_DATA\020\014\022\027\n\023WRITE_FR" +
+      "AGMENT_DATA\020\r*#\n\020QueryResultsMode\022\017\n\013STR" +
+      "EAM_FULL\020\001B+\n\033org.apache.drill.exec.prot" +
+      "oB\nUserProtosH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -7007,8 +7715,14 @@ public final class UserProtos {
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exec_user_QueryFragmentQuery_descriptor,
               new java.lang.String[] { "Fragments", "FragmentHandle", });
-          internal_static_exec_user_BitToUserHandshake_descriptor =
+          internal_static_exec_user_PushDataRequestHeader_descriptor =
             getDescriptor().getMessageTypes().get(8);
+          internal_static_exec_user_PushDataRequestHeader_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_exec_user_PushDataRequestHeader_descriptor,
+              new java.lang.String[] { "FragmentRecordBatch", "QueryFragmentPlan", });
+          internal_static_exec_user_BitToUserHandshake_descriptor =
+            getDescriptor().getMessageTypes().get(9);
           internal_static_exec_user_BitToUserHandshake_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exec_user_BitToUserHandshake_descriptor,
@@ -7021,6 +7735,7 @@ public final class UserProtos {
         new com.google.protobuf.Descriptors.FileDescriptor[] {
           org.apache.drill.exec.proto.SchemaDefProtos.getDescriptor(),
           org.apache.drill.exec.proto.UserBitShared.getDescriptor(),
+          org.apache.drill.exec.proto.BitData.getDescriptor(),
           org.apache.drill.exec.proto.ExecProtos.getDescriptor(),
         }, assigner);
   }

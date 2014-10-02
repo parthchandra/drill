@@ -75,6 +75,10 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
     send(queryResultHandler.getWrappedListener(resultsListener), RpcType.READ_FRAGMENT_DATA, readReq, QueryId.class);
   }
 
+  /**
+   * submitting request to UserServer to push the data
+   * @param wBatch
+   */
   public void submitWriteFragmentDataRequest(FragmentWritableBatch wBatch) {
     send(RpcType.WRITE_FRAGMENT_DATA, wBatch.getHeader(), FragmentRecordBatch.class, wBatch.getBuffers());    
   }

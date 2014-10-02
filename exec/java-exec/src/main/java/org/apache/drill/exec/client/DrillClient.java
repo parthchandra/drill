@@ -275,6 +275,10 @@ public class DrillClient implements Closeable, ConnectionThrottle{
     return client.submitPlanQuery(runQuery);
   }
 
+  /**
+   * Used by DrillClients to submit request with data
+   * @param wBatch - data that will be transmitted to UserServer
+   */
   public void submitDataPushRequest(FragmentWritableBatch wBatch) {
     client.submitWriteFragmentDataRequest(wBatch);
   }

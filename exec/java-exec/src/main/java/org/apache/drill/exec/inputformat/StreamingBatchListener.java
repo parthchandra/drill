@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.inputformat;
 
-import java.util.NoSuchElementException;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 

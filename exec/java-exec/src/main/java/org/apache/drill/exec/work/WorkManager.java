@@ -30,10 +30,13 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.exec.cache.DistributedCache;
 import org.apache.drill.exec.coord.ClusterCoordinator;
+import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
+import org.apache.drill.exec.record.RawFragmentBatch;
+import org.apache.drill.exec.record.RawFragmentExtendedBatch;
 import org.apache.drill.exec.rpc.NamedThreadFactory;
 import org.apache.drill.exec.rpc.control.Controller;
 import org.apache.drill.exec.rpc.control.WorkEventBus;
@@ -55,6 +58,7 @@ import com.codahale.metrics.Gauge;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Queues;
+
 import org.apache.drill.exec.work.user.UserWorker;
 
 public class WorkManager implements Closeable {
@@ -67,6 +71,7 @@ public class WorkManager implements Closeable {
 
   private Map<FragmentHandle, FragmentExecutor> runningFragments = Maps.newConcurrentMap();
   private FragmentConnectionManager fragmentConnectionManager = new FragmentConnectionManager();
+  private DataPushConnectionManager dataConnectionManager = DataPushConnectionManager.getInstance();
 
   private ConcurrentMap<QueryId, Foreman> queries = Maps.newConcurrentMap();
 
@@ -209,6 +214,9 @@ public class WorkManager implements Closeable {
       return fragmentConnectionManager.setConnection(handle, connection);
     }
 
+    public void enqueueRecordBatch(FragmentHandle handle, RawFragmentBatch rawBatch) {
+      dataConnectionManager.enqueueData(handle,rawBatch);
+    }
   }
 
   private class EventThread extends Thread {
@@ -228,6 +236,7 @@ public class WorkManager implements Closeable {
             if (r.inner instanceof FragmentExecutor) {
               FragmentExecutor fragmentExecutor = (FragmentExecutor) r.inner;
               fragmentExecutor.getContext().setConnectionManager(fragmentConnectionManager);
+              dataConnectionManager.createIfNotExistRawBatchBuffer(fragmentExecutor.getContext());
               runningFragments.put(fragmentExecutor.getContext().getHandle(), fragmentExecutor);
             }
             executor.execute(r);
