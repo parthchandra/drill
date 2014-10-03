@@ -17,12 +17,12 @@
  */
 package org.apache.drill.exec.rpc.user;
 
-import org.apache.drill.exec.proto.BitData.FragmentRecordBatch;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
@@ -42,7 +42,7 @@ public class UserRpcConfig {
       .add(RpcType.GET_QUERY_PLAN_FRAGMENTS, GetQueryPlanFragments.class,
           RpcType.QUERY_PLAN_FRAGMENTS, QueryPlanFragments.class) // user to bit
       .add(RpcType.READ_FRAGMENT_DATA, QueryFragmentQuery.class, RpcType.QUERY_HANDLE, QueryId.class) // user to bit
-      .add(RpcType.WRITE_FRAGMENT_DATA, FragmentRecordBatch.class, RpcType.ACK, Ack.class)
+      .add(RpcType.WRITE_FRAGMENT_DATA, PushDataRequestHeader.class, RpcType.ACK, Ack.class)
       .build();
 
   public static int RPC_VERSION = 2;

@@ -48,6 +48,7 @@ import org.apache.drill.exec.proto.UserProtos.UserProperties;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
+import org.apache.drill.exec.record.ExtendedFragmentWritableBatch;
 import org.apache.drill.exec.record.FragmentWritableBatch;
 import org.apache.drill.exec.rpc.BasicClientWithConnection.ServerConnection;
 import org.apache.drill.exec.rpc.ChannelClosedException;
@@ -279,7 +280,7 @@ public class DrillClient implements Closeable, ConnectionThrottle{
    * Used by DrillClients to submit request with data
    * @param wBatch - data that will be transmitted to UserServer
    */
-  public void submitDataPushRequest(FragmentWritableBatch wBatch) {
+  public void submitDataPushRequest(ExtendedFragmentWritableBatch wBatch) {
     client.submitWriteFragmentDataRequest(wBatch);
   }
   

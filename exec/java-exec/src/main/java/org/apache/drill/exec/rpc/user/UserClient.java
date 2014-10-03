@@ -29,12 +29,14 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
 import org.apache.drill.exec.proto.UserProtos.GetQueryPlanFragments;
+import org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.UserProperties;
 import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments;
+import org.apache.drill.exec.record.ExtendedFragmentWritableBatch;
 import org.apache.drill.exec.record.FragmentWritableBatch;
 import org.apache.drill.exec.record.WritableBatch;
 import org.apache.drill.exec.rpc.BasicClientWithConnection;
@@ -79,8 +81,8 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
    * submitting request to UserServer to push the data
    * @param wBatch
    */
-  public void submitWriteFragmentDataRequest(FragmentWritableBatch wBatch) {
-    send(RpcType.WRITE_FRAGMENT_DATA, wBatch.getHeader(), FragmentRecordBatch.class, wBatch.getBuffers());    
+  public void submitWriteFragmentDataRequest(ExtendedFragmentWritableBatch wBatch) {
+    send(RpcType.WRITE_FRAGMENT_DATA, wBatch.getHeader(), PushDataRequestHeader.class, wBatch.getBuffers());    
   }
   
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)
