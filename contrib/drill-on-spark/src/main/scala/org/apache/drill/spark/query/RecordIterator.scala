@@ -1,4 +1,4 @@
-package org.apache.drill.rdd.query
+package org.apache.drill.spark.sql.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
 import org.apache.drill.exec.physical.impl.sort.RecordBatchData
@@ -7,7 +7,7 @@ import org.apache.drill.exec.rpc.user.QueryResultBatch
 import org.apache.drill.exec.vector.ValueVector
 import org.apache.drill.exec.vector.complex.MapVector
 import org.apache.drill.exec.vector.complex.impl.CombinedMapVector
-import org.apache.drill.rdd.sql.RecordInfo
+import org.apache.drill.spark.sql.sql.RecordInfo
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag

@@ -1,4 +1,4 @@
-package org.apache.drill.rdd.sql
+package org.apache.drill.spark.sql.sql
 
 import java.io.{InputStream, Reader}
 import java.math.BigDecimal
@@ -9,7 +9,7 @@ import org.apache.drill.exec.expr.TypeHelper
 import org.apache.drill.exec.record.VectorAccessible
 import org.apache.drill.exec.vector.ValueVector
 import org.apache.drill.exec.vector.accessor.SqlAccessor
-import org.apache.drill.rdd.SparkRowType
+import org.apache.drill.spark.SparkRowType
 
 import scala.util.Try
 

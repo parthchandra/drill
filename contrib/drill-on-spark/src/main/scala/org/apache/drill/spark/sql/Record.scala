@@ -1,4 +1,4 @@
-package org.apache.drill.rdd.sql
+package org.apache.drill.spark.sql.sql
 
 import org.slf4j.LoggerFactory
 
@@ -40,6 +40,17 @@ class DrillRecord(info:RecordInfo) extends Record {
       case null => None
       case v:Any => Some(v)
     }
+  }
+
+}
+
+
+class ComplexRecord extends Dynamic {
+
+  var children = Map[String, Any]()
+
+  def updateDynamic(name:String)(value:String): Unit = {
+    children += (name -> value)
   }
 
 }

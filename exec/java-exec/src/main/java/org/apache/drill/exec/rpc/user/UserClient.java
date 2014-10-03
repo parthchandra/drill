@@ -59,9 +59,18 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
 
   private boolean supportComplexTypes = true;
 
+  private final EventLoopGroup eventLoopGroup;
+
   public UserClient(boolean supportComplexTypes, BufferAllocator alloc, EventLoopGroup eventLoopGroup) {
     super(UserRpcConfig.MAPPING, alloc, eventLoopGroup, RpcType.HANDSHAKE, BitToUserHandshake.class, BitToUserHandshake.PARSER);
     this.supportComplexTypes = supportComplexTypes;
+    this.eventLoopGroup = eventLoopGroup;
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    eventLoopGroup.shutdownGracefully();
   }
 
   public void submitQuery(UserResultsListener resultsListener, RunQuery query) {

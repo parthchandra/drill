@@ -1,11 +1,12 @@
-package org.apache.drill.rdd.query
+package org.apache.drill.spark.sql.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery
 import org.apache.drill.exec.record.RecordBatchLoader
 import org.apache.drill.exec.vector.complex.MapVector
-import org.apache.drill.rdd._
-import org.apache.drill.rdd.sql.RecordInfo
+import org.apache.drill.spark.sql._
+import org.apache.drill.spark.sql.sql.RecordInfo
+import org.apache.drill.spark.RecordFactoryType
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
@@ -18,7 +19,7 @@ trait QueryManager[T] {
   def close(): Unit
 }
 
-case class QueryContext[T:ClassTag](loader: RecordBatchLoader, recordFactory:(RecordInfo)=>T)
+case class QueryContext[IN:ClassTag](loader: RecordBatchLoader, recordFactory:RecordFactoryType[IN])
 
 class StreamingQueryManager[T:ClassTag](ctx:QueryContext[T]) extends QueryManager[T] {
 

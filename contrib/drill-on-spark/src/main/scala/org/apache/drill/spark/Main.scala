@@ -1,7 +1,8 @@
-import org.apache.drill.rdd.DrillConversions
-import org.apache.spark.{SparkContext, SparkConf}
+package org.apache.drill.spark
 
+import org.apache.drill.spark.rdd.DrillConversions
 import DrillConversions._
+import org.apache.spark.{SparkConf, SparkContext}
 
 
 object Main extends App {
@@ -32,10 +33,11 @@ object Main extends App {
 //        s"$ui"
         val (tid, date, cid) = (r.trans_id, r.date, r.user_info.cust_id) // r.date, r.user_info.cust_id)
         s"$i $tid $date $cid"
-    }
+    }.cache
     val count = rdd1.count
-    rdd1.foreach(println)
+    println(rdd1.first)
     println(s"total records found: $count")
+    sc.stop()
   }
 
   complexJSON
