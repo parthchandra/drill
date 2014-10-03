@@ -19,6 +19,7 @@ package org.apache.drill.rdd;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import org.apache.drill.exec.store.spark.RDDTableSpec;
 import org.junit.Test;
 
@@ -26,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class TestSqlAnalyzer {
@@ -34,20 +34,21 @@ public class TestSqlAnalyzer {
   @Test
   public void testNoExpansionQuery() throws Exception {
     SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from kv", ImmutableSet.<String>of());
-    assertFalse(sqlAnalyzer.needsSqlExpansion());
+    assertEquals("Invalid number of table names to expand", 0, sqlAnalyzer.analyze().size());
   }
 
   @Test
   public void testSimpleExpansionQuery() throws Exception {
-    SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from RddTable1", ImmutableSet.of("RDDTABLE1"));
-    assertTrue(sqlAnalyzer.needsSqlExpansion());
     Map<String, RDDTableSpec> mapTable2Spec = ImmutableMap.of("RDDTABLE1", new RDDTableSpec("RDDTABLE1", 3));
+    SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from RddTable1", ImmutableSet.of("RDDTABLE1"));
+
+    assertTrue("Invalid list of RDD table names that need expansion",
+        Iterables.elementsEqual(sqlAnalyzer.analyze(), mapTable2Spec.keySet()));
 
     String expectedExpandedQuery = "SELECT *\n" +
         "FROM `{\"name\":\"RDDTABLE1\",\"numPartitions\":3}`";
-    assertEquals("Expanded query is not valid", expectedExpandedQuery, sqlAnalyzer.getExpandedSql(mapTable2Spec));
+    assertEquals("Expanded query is not valid", expectedExpandedQuery, sqlAnalyzer.expand(mapTable2Spec));
   }
-
 
   @Test
   public void testMultipleRDDNamesExpansionQuery() throws Exception {
@@ -57,12 +58,13 @@ public class TestSqlAnalyzer {
         "RDDTABLE2", new RDDTableSpec("RDDTABLE2", 5));
 
     SqlAnalyzer sqlAnalyzer = new SqlAnalyzer("select * from RddTable1 join RddTable2 join drillTable1", rddTableNameSet);
-    assertTrue(sqlAnalyzer.needsSqlExpansion());
+    assertTrue("Invalid list of RDD table names that need expansion",
+        Iterables.elementsEqual(sqlAnalyzer.analyze(), mapTable2Spec.keySet()));
 
     String expectedExpandedQuery = "SELECT *\n" +
         "FROM `{\"name\":\"RDDTABLE1\",\"numPartitions\":3}`\n" +
         "INNER JOIN `{\"name\":\"RDDTABLE2\",\"numPartitions\":5}`\n" +
         "INNER JOIN `drillTable1`";
-    assertEquals("Expanded query is not valid", expectedExpandedQuery, sqlAnalyzer.getExpandedSql(mapTable2Spec));
+    assertEquals("Expanded query is not valid", expectedExpandedQuery, sqlAnalyzer.expand(mapTable2Spec));
   }
 }

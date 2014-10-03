@@ -41,7 +41,7 @@ public class SqlAnalyzer {
   private List<SqlIdentifier> ids;
   private SqlNode sqlTree;
   private boolean analyzed = false;
-  private boolean needsExpansion = false;
+  private List<String> rddTablesNeedExpansion; // list of RDD tables that need expansion
 
   /**
    * Create a SqlAnalyzer instance.
@@ -54,35 +54,34 @@ public class SqlAnalyzer {
   }
 
   /**
-   * Is the SQL query string needs expansion. Expansion is needed when the query contains RDD data sources.
-   * @return
+   * Analyze the SQL query and check if any of the table names need expansion.
+   * Table name expansion is needed when the table name refers to an RDD.
+   * @return If expansion is needed, returns the list of "RDD" tables that need expansion.
    */
-  public boolean needsSqlExpansion() throws SqlParseException {
+  public List<String> analyze() throws SqlParseException {
     if (analyzed) {
-      return needsExpansion;
+      return rddTablesNeedExpansion;
     }
 
     SqlParser parser = SqlParser.create(DrillParserWithCompoundIdConverter.FACTORY, sql,
         Quoting.BACK_TICK, Casing.UNCHANGED, Casing.UNCHANGED);
     this.sqlTree = parser.parseQuery();
 
-
     this.ids = Lists.newArrayList();
-    sqlTree.accept(new ListRDDTableIdentifiers(rddTableNames, this.ids));
+    this.rddTablesNeedExpansion = Lists.newArrayList();
+    sqlTree.accept(new ListRDDTableIdentifiers(rddTableNames, this.ids, this.rddTablesNeedExpansion));
 
     this.analyzed = true;
-    this.needsExpansion = ids.size() > 0;
-
-    return needsExpansion;
+    return rddTablesNeedExpansion;
   }
 
   /**
-   * Expand the RDD table names with augmented table info (such as partitions) and return the updated SQL string.
+   * Expand RDD table names with augmented table info (such as number of partitions) and return the updated SQL query.
    * @param mapRDD2TableSpec Mapping of table names (in <i>upperCase</i>) to <i>RDDTableSpec</i>
    * @return
    */
-  public String getExpandedSql(Map<String, RDDTableSpec> mapRDD2TableSpec) throws Exception {
-    if (!analyzed && !needsSqlExpansion()) {
+  public String expand(Map<String, RDDTableSpec> mapRDD2TableSpec) throws Exception {
+    if (analyze().isEmpty()) {
       return sql;
     }
 
@@ -112,16 +111,21 @@ public class SqlAnalyzer {
 
     private final Set<String> rddTableNames;
     private final List<SqlIdentifier> ids;
+    private final List<String> rddTablesNeedExpansion;
 
-    public ListRDDTableIdentifiers(Set<String> rddTableNames, List<SqlIdentifier> ids) {
+    public ListRDDTableIdentifiers(Set<String> rddTableNames, List<SqlIdentifier> ids,
+        List<String> rddTablesNeedExpansion) {
       this.rddTableNames = rddTableNames;
       this.ids = ids;
+      this.rddTablesNeedExpansion = rddTablesNeedExpansion;
     }
 
     @Override
     public SqlNode visit(SqlIdentifier id) {
-      if (rddTableNames.contains(Util.last(id.names).toUpperCase())) {
+      String tblName = Util.last(id.names).toUpperCase();
+      if (rddTableNames.contains(tblName)) {
         ids.add(id);
+        rddTablesNeedExpansion.add(tblName);
       }
 
       return id;
