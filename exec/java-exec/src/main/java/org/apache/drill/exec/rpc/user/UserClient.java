@@ -82,7 +82,7 @@ public class UserClient extends BasicClientWithConnection<RpcType, UserToBitHand
    * @param wBatch
    */
   public void submitWriteFragmentDataRequest(ExtendedFragmentWritableBatch wBatch) {
-    send(RpcType.WRITE_FRAGMENT_DATA, wBatch.getHeader(), PushDataRequestHeader.class, wBatch.getBuffers());    
+    send(RpcType.WRITE_FRAGMENT_DATA, wBatch.getHeader(), Ack.class, wBatch.getBuffers());    
   }
   
   public void connect(RpcConnectionHandler<ServerConnection> handler, DrillbitEndpoint endpoint, UserProperties props)

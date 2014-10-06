@@ -125,7 +125,7 @@ public class UserWorker{
       PushDataRequestHeader header, ByteBuf dBody) {
     // submit query for execution is needed
     submitReadFragmentWork(connection, header.getQueryFragmentPlan());
-    FragmentHandle fHandle = header.getFragmentRecordBatch().getHandle();
+    FragmentHandle fHandle = header.getQueryFragmentPlan().getFragmentHandle();
     RawFragmentBatch rawBatch = new RawFragmentBatch(connection, header.getFragmentRecordBatch(), 
         (DrillBuf) dBody, new ResponseSender() {
 
