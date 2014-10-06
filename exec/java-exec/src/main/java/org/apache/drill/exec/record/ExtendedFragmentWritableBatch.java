@@ -23,6 +23,10 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserProtos.PushDataRequestHeader;
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery;
 
+/**
+ * Helper class to wrap FragmentWritableBatch
+ *
+ */
 public class ExtendedFragmentWritableBatch {
   
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ExtendedFragmentWritableBatch.class);
@@ -36,12 +40,16 @@ public class ExtendedFragmentWritableBatch {
   public ExtendedFragmentWritableBatch(QueryFragmentQuery queryFragmentHeader,
       boolean isLast, QueryId queryId, int sendMajorFragmentId, int sendMinorFragmentId, 
       int receiveMajorFragmentId, int receiveMinorFragmentId, WritableBatch batch) {
-    this.queryFragmentHeader = queryFragmentHeader;
-    this.fragmentWritableBatch = 
+
+    this(queryFragmentHeader, 
         new FragmentWritableBatch(isLast, queryId, 
-            sendMajorFragmentId, sendMinorFragmentId, receiveMajorFragmentId, 
-            receiveMinorFragmentId, batch);
-    
+        sendMajorFragmentId, sendMinorFragmentId, receiveMajorFragmentId, 
+        receiveMinorFragmentId, batch));
+  }
+  
+  public ExtendedFragmentWritableBatch(QueryFragmentQuery queryFragmentHeader, FragmentWritableBatch fragmentWritableBatch) {
+    this.queryFragmentHeader = queryFragmentHeader;
+    this.fragmentWritableBatch = fragmentWritableBatch;
     this.header = PushDataRequestHeader.newBuilder().
         setFragmentRecordBatch(this.fragmentWritableBatch.getHeader()).
         setQueryFragmentPlan(this.queryFragmentHeader).build();
