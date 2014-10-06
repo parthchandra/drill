@@ -93,6 +93,16 @@ public class DataPushConnectionManager {
     return rawBatchBuffer;
   }
 
+  public void remove(FragmentHandle handle) {
+    synchronized(lock) {
+      requestHeaders.remove(handle);
+      CountDownLatch currentLock = locks.remove(handle);
+      if ( currentLock != null ) {
+        currentLock.countDown();
+      }
+    }
+  }
+  
   public void enqueueData(FragmentHandle handle, RawFragmentBatch rawBatch) {
     UnlimitedRawBatchBufferNoAck rawBatchBuffer = getRawBatchBuffer(handle);
     rawBatchBuffer.enqueue(rawBatch);

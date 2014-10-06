@@ -194,6 +194,7 @@ public class WorkManager implements Closeable {
 
     public void removeFragment(FragmentHandle handle) {
       runningFragments.remove(handle);
+      dataConnectionManager.remove(handle);
     }
 
     public Foreman getForemanForQueryId(QueryId queryId) {
