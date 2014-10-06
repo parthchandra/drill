@@ -24,6 +24,7 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.record.RawFragmentBatch;
 import org.apache.drill.exec.work.batch.UnlimitedRawBatchBufferNoAck;
+import org.apache.drill.exec.work.fragment.FragmentExecutor;
 
 import com.google.common.collect.Maps;
 
@@ -52,7 +53,7 @@ public class DataPushConnectionManager {
     return s_instance;
   }
   
-  public void createIfNotExistRawBatchBuffer(FragmentContext context) {
+  public UnlimitedRawBatchBufferNoAck createIfNotExistRawBatchBuffer(FragmentContext context) {
     CountDownLatch lockObject = null;
     UnlimitedRawBatchBufferNoAck rawBatchBuffer = requestHeaders.get(context.getHandle());
     if ( rawBatchBuffer == null) {
@@ -66,6 +67,7 @@ public class DataPushConnectionManager {
         lockObject.countDown();
       }
     }
+    return rawBatchBuffer;
   }
     
   
