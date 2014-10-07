@@ -14,9 +14,30 @@ import org.apache.spark.{InterruptibleIterator, Partition, SparkContext, TaskCon
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 import scala.reflect.ClassTag
 import scala.util.Try
 
+
+class RDDRegistry[OUT<:DrillOutgoingRowType:ClassTag] extends Iterable[(String, RDD[OUT])] with Serializable {
+  private val name2rdd = mutable.Map[String, RDD[OUT]]()
+
+  def register(name:String, rdd:RDD[OUT]): Unit = {
+    name2rdd += (name.toUpperCase -> rdd)
+  }
+
+  def unregister(name:String): Unit = {
+    name2rdd -= name.toUpperCase
+  }
+
+  def find(name:String): Option[RDD[OUT]] = {
+    name2rdd.get(name.toUpperCase)
+  }
+
+  def iterator = name2rdd.iterator
+  def names = name2rdd.keys
+  def rdds = name2rdd.values
+}
 
 case class DrillContext[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sql:String,
                                                 managerFactory:QueryManagerFactoryType[IN],
