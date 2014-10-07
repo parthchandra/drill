@@ -94,7 +94,7 @@ public class DrillQueryInputFormat extends InputFormat<Void, FieldReader> {
     //}
   }
 
-  public class DrillQueryInputSplit extends InputSplit implements Writable {
+  public static class DrillQueryInputSplit extends InputSplit implements Writable {
     private QueryPlanFragments fragments;
     private PlanFragment assignedFragment;
 

@@ -2,10 +2,9 @@ package org.apache.drill.exec.store.spark;
 
 import static org.junit.Assert.fail;
 
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.expression.SchemaPath;
@@ -13,6 +12,7 @@ import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.client.DrillClient;
 import org.apache.drill.exec.expr.TypeHelper;
+import org.apache.drill.exec.inputformat.DrillRecordReader;
 import org.apache.drill.exec.inputformat.DrillQueryInputFormat.DrillQueryInputSplit;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.memory.TopLevelAllocator;
@@ -34,18 +34,20 @@ import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.IntVector;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.VarCharVector;
+import org.apache.drill.exec.vector.complex.fn.JsonWriter;
+import org.apache.drill.exec.vector.complex.reader.FieldReader;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 
 public class TestSparkStoragePlugin {
 
-  private static String sessionSplits = "alter session set `planner.slice_target`=1";
-  private static ExecutorService executor = Executors.newFixedThreadPool(5);
   private static BufferAllocator ALLOCATOR = new TopLevelAllocator();
 
 
@@ -89,11 +91,20 @@ public class TestSparkStoragePlugin {
       
       final QueryPlanFragments planFragments = queryFragmentsFutures.get();
       
+      List<InputSplit> splits = Lists.newArrayList();
+      for (int i = 0; i < planFragments.getFragmentsCount(); i++) {
+        PlanFragment fragment = planFragments.getFragments(i);
+        if (fragment.getFragmentJson().toLowerCase().contains("-writer")) {
+          splits.add(new DrillQueryInputSplit(planFragments, fragment));
+        }
+      }
+
       
       List<Thread> threads = new ArrayList<Thread>();
       int k = 0;
       for ( int i = 0; i < planFragments.getFragmentsCount(); i++) {
         final PlanFragment fragment = planFragments.getFragments(i);
+        System.out.println(fragment.getFragmentJson());
         if (!fragment.getFragmentJson().toLowerCase().contains("spark-sub-scan")) {
           continue;
         }
@@ -125,6 +136,7 @@ public class TestSparkStoragePlugin {
                 (queryFragment, true, planFragments.getQueryId(), planFragment.getHandle().getMajorFragmentId(), planFragment.getHandle().getMinorFragmentId(), 
                     planFragment.getHandle().getMajorFragmentId(), planFragment.getHandle().getMinorFragmentId(), writableBatch);
             threadClient.submitDataPushRequest(extFRB);
+            threadClient.close();
           }
         };
         threads.add(new Thread(myThread));
@@ -135,6 +147,41 @@ public class TestSparkStoragePlugin {
       for ( int i = 0; i < k; i++ ) {
         threads.get(i).join();
       }      
+      
+      Thread.sleep(10000l);
+      List<DrillRecordReader> readers = Lists.newArrayList();
+
+      for (InputSplit split : splits) {
+        DrillRecordReader reader = new DrillRecordReader();
+        reader.initialize(split, null);
+        readers.add(reader);
+      }
+
+      for(DrillRecordReader reader : readers) {
+        int i = 0;
+        while ( reader.nextKeyValue() ) {
+          FieldReader fr = reader.getCurrentValue();
+          if ( i % 100 == 0 ) {
+            System.out.println();
+            for ( String name : fr ) {
+              System.out.print(name + ", ");
+            }            
+            System.out.println();
+          }
+          System.out.print("Row#: " + ++i + ", ");
+          for ( String name : fr ) {
+            FieldReader frChild = fr.reader(name);
+            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+            JsonWriter jsonWriter = new JsonWriter(stream, true);
+            jsonWriter.write(frChild);
+            System.out.print(new String(stream.toByteArray(), Charsets.UTF_8) + ", ");
+            stream.close();
+           }
+          System.out.println();
+        }
+        reader.close();
+      }
+
     } catch(Throwable t) {
       t.printStackTrace();
       //fail(t.fillInStackTrace().getMessage());
@@ -151,8 +198,8 @@ public class TestSparkStoragePlugin {
     MaterializedField intField = MaterializedField.create(SchemaPath.getSimplePath("value"),
         Types.required(TypeProtos.MinorType.INT));
     IntVector intVector = (IntVector) TypeHelper.getNewVector(intField, ALLOCATOR);
-    AllocationHelper.allocate(stringVector, 4, 4);
-    AllocationHelper.allocate(intVector, 4, 5);
+    AllocationHelper.allocate(stringVector, 4, 5);
+    AllocationHelper.allocate(intVector, 4, 4);
     vectorList.add(stringVector);
     vectorList.add(intVector);
 
