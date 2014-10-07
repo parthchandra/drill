@@ -1,6 +1,5 @@
-package org.apache.drill.spark.rdd
+package org.apache.drill.rdd
 
-import java.io.Serializable
 import java.util.concurrent.TimeUnit
 
 import org.apache.drill.common.config.DrillConfig
@@ -8,10 +7,8 @@ import org.apache.drill.exec.memory.TopLevelAllocator
 import org.apache.drill.exec.record.RecordBatchLoader
 import org.apache.drill.exec.vector.complex.reader.BaseReader
 import org.apache.drill.exec.vector.complex.reader.BaseReader.{ListReader, MapReader}
-import org.apache.drill.spark.sql._
-import org.apache.drill.spark.sql.query.{QueryContext, StreamingQueryManager}
-import org.apache.drill.spark.sql.sql.{DrillRecord, RecordInfo}
-import org.apache.drill.spark._
+import org.apache.drill.rdd.complex._
+import org.apache.drill.rdd.complex.query.{QueryContext, StreamingQueryManager}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
@@ -34,8 +31,8 @@ object DrillConversions {
     new StreamingQueryManager[IN](QueryContext[IN](loader, recordFactory[IN]))
   }
 
-  private def recordFactory[IN:ClassTag] = (info:RecordInfo) => {
-    new DrillRecord(info).asInstanceOf[IN]
+  private def recordFactory[IN:ClassTag] = (info:ReadableRecordInfo) => {
+    new DrillReadableRecord(info).asInstanceOf[IN]
   }
 
   val registry = new RDDRegistry[OUT]

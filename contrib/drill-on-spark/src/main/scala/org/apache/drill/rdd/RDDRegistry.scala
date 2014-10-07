@@ -1,10 +1,10 @@
-package org.apache.drill.spark.sql
+package org.apache.drill.rdd
 
 import org.apache.spark.rdd.RDD
 
 import scala.reflect.ClassTag
 
-class RDDRegistry[OUT:ClassTag] extends Iterable[(String, RDD[OUT])] with Serializable {
+class RDDRegistry[OUT<:DrillOutgoingRowType:ClassTag] extends Iterable[(String, RDD[OUT])] with Serializable {
   var name2rdd = Map[String, RDD[OUT]]()
 
   def register(name:String, rdd:RDD[OUT]): Unit = {

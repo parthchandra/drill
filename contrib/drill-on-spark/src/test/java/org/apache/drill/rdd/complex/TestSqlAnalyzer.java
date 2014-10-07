@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.spark.sql;
+package org.apache.drill.rdd.complex;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;

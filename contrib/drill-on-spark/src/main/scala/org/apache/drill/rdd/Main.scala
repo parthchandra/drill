@@ -1,7 +1,6 @@
-package org.apache.drill.spark
+package org.apache.drill.rdd
 
-import org.apache.drill.spark.rdd.DrillConversions
-import DrillConversions._
+import org.apache.drill.rdd.DrillConversions._
 import org.apache.spark.{SparkConf, SparkContext}
 
 
@@ -26,7 +25,7 @@ object Main extends App {
 
   def complexJSON(): Unit = {
     val sql = "SELECT * FROM dfs.`/Users/hgunes/workspaces/mapr/incubator-drill/data/mobile-small.json`"
-    val rdd0 = sc.drillRDD(sql)
+    val rdd0 = sc.drillRDD(sql).cache()
     val rdd1 = rdd0.zipWithIndex.map {
       case (r, i) =>
 //        val ui = r.user_info

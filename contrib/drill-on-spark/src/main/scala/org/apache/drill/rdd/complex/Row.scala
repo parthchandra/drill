@@ -1,4 +1,4 @@
-package org.apache.drill.spark.sql.sql
+package org.apache.drill.rdd.complex
 
 import java.io.{InputStream, Reader}
 import java.math.BigDecimal
@@ -9,7 +9,7 @@ import org.apache.drill.exec.expr.TypeHelper
 import org.apache.drill.exec.record.VectorAccessible
 import org.apache.drill.exec.vector.ValueVector
 import org.apache.drill.exec.vector.accessor.SqlAccessor
-import org.apache.drill.spark.SparkRowType
+import org.apache.drill.rdd.SparkRowType
 
 import scala.util.Try
 
@@ -32,7 +32,7 @@ class RowIterator(row:DrillRow) extends Iterator[Any] {
 
 class DrillRow(@transient val va:VectorAccessible, val row:Int) extends Row with NumberedRow with NamedRow {
 
-  protected[sql] def accessor(column:Int):SqlAccessor = {
+  protected[complex] def accessor(column:Int):SqlAccessor = {
     val vector = va.getValueAccessorById(null, column).getValueVector.asInstanceOf[ValueVector]
     accessor(vector)
   }

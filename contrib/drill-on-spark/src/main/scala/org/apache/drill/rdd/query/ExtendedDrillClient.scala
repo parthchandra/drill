@@ -1,4 +1,4 @@
-package org.apache.drill.spark.sql.query
+package org.apache.drill.rdd.complex.query
 
 import org.apache.drill.common.config.DrillConfig
 import org.apache.drill.exec.client.DrillClient

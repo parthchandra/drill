@@ -1,23 +1,24 @@
-package org.apache.drill.spark.sql
+package org.apache.drill.rdd
 
+import org.apache.drill.common.types.TypeProtos.{DataMode, MajorType, MinorType}
 import org.apache.drill.exec.proto.ExecProtos.PlanFragment
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments
 import org.apache.drill.exec.store.spark.RDDTableSpec
-import org.apache.drill.spark.{DrillOutgoingRowType, QueryManagerFactoryType}
-import org.apache.drill.spark.rdd.DrillConversions
-import DrillConversions._
-import org.apache.drill.spark.sql.query.{ExtendedDrillClient}
-import scala.collection.JavaConversions._
+import org.apache.drill.rdd.DrillConversions._
+import org.apache.drill.rdd.complex.{ComplexRecordWriter, SqlAnalyzer}
+import org.apache.drill.rdd.complex.query.ExtendedDrillClient
+import org.apache.drill.rdd.resource.{using}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{InterruptibleIterator, Partition, SparkContext, TaskContext}
 import org.slf4j.LoggerFactory
 
+import scala.collection.JavaConversions._
 import scala.reflect.ClassTag
 import scala.util.Try
 
 
-case class DrillContext[IN:ClassTag, OUT:ClassTag](sql:String,
+case class DrillContext[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sql:String,
                                                 managerFactory:QueryManagerFactoryType[IN],
                                                 registry:RDDRegistry[OUT],
                                                 recevingRDD:Boolean)
@@ -28,30 +29,32 @@ case class DrillPartition(val queryPlan:QueryPlanFragments, val index:Int) exten
 }
 
 
-class DrillRDD[IN:ClassTag, OUT:ClassTag](@transient sc:SparkContext, dc:DrillContext[IN, OUT]) extends RDD[IN](sc, Nil) {
+class DrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](@transient sc:SparkContext, dc:DrillContext[IN, OUT])
+  extends RDD[IN](sc, Nil) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
   private val analyzer = new SqlAnalyzer(dc.sql, Set() ++ dc.registry.names)
 
   protected lazy val delegate:RDD[IN] = {
-    var delegateCtx:DrillContext[IN, OUT] = dc
-    if (analyzer.needsSqlExpansion()) {
-      throw new UnsupportedOperationException
-      val spec = null
-//      analyzer.getExpandedSql();
-      val names:Seq[String] = null; //analyzer.getExpandedSql(Map());
-      val registry = names.foldLeft(new RDDRegistry[OUT]()) {
-        case (registry, name) =>
-          sc.getRegistry.find(name) match {
-            case Some(rdd) => registry.register(name, rdd.asInstanceOf[RDD[OUT]])
-            case None => throw new IllegalStateException("Unable to find RDD in registry. Should never reach here.")
+    val delegateCtx = Try {
+      analyzer.analyze match {
+        case names if names!=null && names.length>0 =>
+          val registry = names.toList.foldLeft(new RDDRegistry[OUT]()) {
+            case (registry, name) =>
+              sc.getRegistry.find(name) match {
+                case Some(rdd) => registry.register(name, rdd.asInstanceOf[RDD[OUT]])
+                case None => throw new IllegalStateException("Unable to find RDD in registry. Should never reach here.")
+              }
+              registry
           }
-          registry
+          val specs = registry.map { case (n, rdd) => (n, new RDDTableSpec(n, rdd.partitions.length)) }.toMap
+          val expandedSql = analyzer.expand(specs)
+          DrillContext(expandedSql, dc.managerFactory, registry, false)
+        case _ => dc
       }
-      val expandedSql = dc.sql
-      delegateCtx = DrillContext(expandedSql, dc.managerFactory, registry, false)
-    }
+    }.get
+
     createDelegate(sc, delegateCtx)
   }
 
@@ -66,13 +69,13 @@ class DrillRDD[IN:ClassTag, OUT:ClassTag](@transient sc:SparkContext, dc:DrillCo
 
   protected def createDelegate(sc: SparkContext, dc: DrillContext[IN, OUT]): RDD[IN] = {
     dc.recevingRDD match {
-      case true => new ReceivingRDD[IN, OUT](sc, dc)
-      case false => new SendingRDD[IN, OUT](sc, dc)
+      case true => new ReceivingDrillRDD[IN, OUT](sc, dc)
+      case false => new SendingDrillRDD[IN, OUT](sc, dc)
     }
   }
 }
 
-class ReceivingRDD[IN:ClassTag, OUT:ClassTag](sc:SparkContext, dc:DrillContext[IN, OUT])
+class ReceivingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:SparkContext, dc:DrillContext[IN, OUT])
   extends RDD[IN](sc, Nil) {
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -100,12 +103,26 @@ class ReceivingRDD[IN:ClassTag, OUT:ClassTag](sc:SparkContext, dc:DrillContext[I
   }
 }
 
-class SendingRDD[IN:ClassTag, OUT:ClassTag](sc:SparkContext, dc:DrillContext[IN, OUT])
-  extends RDD[IN](sc, Nil) {
+class SendingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:SparkContext, dc:DrillContext[IN, OUT])
+  extends ReceivingDrillRDD[IN, OUT](sc, dc) {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  @DeveloperApi
-  override def compute(split: Partition, context: TaskContext): Iterator[IN] = ???
+  protected def createPushManager(split:Partition) = {
+    (it:Iterator[OUT]) => {
+      using(new ComplexRecordWriter[OUT]) { w =>
+        while (it.hasNext) {
+          w.write(it.next)
+        }
+      }
+    }
+  }
 
-  override protected def getPartitions: Array[Partition] = ???
+  @DeveloperApi
+  override def compute(split: Partition, context: TaskContext): Iterator[IN] = {
+    val it = super.compute(split, context)
+    dc.registry.map {
+      case (name, rdd) => sc.runJob(rdd, createPushManager(split))
+    }
+    it
+  }
 }

@@ -1,13 +1,8 @@
-package org.apache.drill.spark.sql.query
+package org.apache.drill.rdd.complex.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
-import org.apache.drill.exec.physical.impl.sort.RecordBatchData
-import org.apache.drill.exec.record.RecordBatchLoader
-import org.apache.drill.exec.rpc.user.QueryResultBatch
-import org.apache.drill.exec.vector.ValueVector
-import org.apache.drill.exec.vector.complex.MapVector
 import org.apache.drill.exec.vector.complex.impl.CombinedMapVector
-import org.apache.drill.spark.sql.sql.RecordInfo
+import org.apache.drill.rdd.complex.ReadableRecordInfo
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
@@ -47,7 +42,7 @@ class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: Streami
             logger.info(s"loader got $rowCount records")
             batch += 1
             (0 until rowCount) map {
-              row => ctx.recordFactory(RecordInfo(vector.getAccessor.getReader, row, batch))
+              row => ctx.recordFactory(ReadableRecordInfo(vector.getAccessor.getReader, row, batch))
             } iterator
           }
         } match {

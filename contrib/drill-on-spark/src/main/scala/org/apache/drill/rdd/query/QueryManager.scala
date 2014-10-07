@@ -1,16 +1,13 @@
-package org.apache.drill.spark.sql.query
+package org.apache.drill.rdd.complex.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery
 import org.apache.drill.exec.record.RecordBatchLoader
-import org.apache.drill.exec.vector.complex.MapVector
-import org.apache.drill.spark.sql._
-import org.apache.drill.spark.sql.sql.RecordInfo
-import org.apache.drill.spark.RecordFactoryType
+import org.apache.drill.rdd.{DrillPartition, RecordFactoryType}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
-import scala.util.{Success, Failure, Try}
+import scala.util.{Failure, Success}
 
 trait QueryManager[T] {
 
