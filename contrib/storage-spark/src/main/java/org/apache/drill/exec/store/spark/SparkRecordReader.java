@@ -18,6 +18,8 @@
 package org.apache.drill.exec.store.spark;
 
 
+import java.util.List;
+
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -26,10 +28,14 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.record.RawFragmentBatch;
 import org.apache.drill.exec.record.RecordBatchLoader;
+import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.spark.SparkSubScan.SparkSubScanSpec;
+import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.work.DataPushConnectionManager;
 import org.apache.drill.exec.work.batch.UnlimitedRawBatchBufferNoAck;
+
+import com.google.common.collect.Lists;
 
 /**
  * SparkrecordReader is the class that is responsible for reading
@@ -46,6 +52,8 @@ public class SparkRecordReader extends AbstractRecordReader {
   private UnlimitedRawBatchBufferNoAck batchProvider;
   private RecordBatchLoader recordBatchLoader;
 
+  private OutputMutator outputMutator;
+
   
 
 
@@ -59,7 +67,7 @@ public class SparkRecordReader extends AbstractRecordReader {
 
   @Override
   public void setup(OutputMutator output) throws ExecutionSetupException {
-
+    this.outputMutator = output;
   }
 
   @Override
@@ -81,7 +89,12 @@ public class SparkRecordReader extends AbstractRecordReader {
 	  logger.error("SchemaChangeException", e);
 	  throw new DrillRuntimeException(e);
 	}
-	  
+  List<ValueVector> vvList = Lists.newArrayList();
+	for (VectorWrapper<?> vectorWrapper : recordBatchLoader) {
+	  vvList.add(vectorWrapper.getValueVector());
+  }
+
+    this.outputMutator.addFields(vvList);
     return recordBatchLoader.getRecordCount();
   }
 

@@ -68,8 +68,8 @@ public class TestSparkStoragePlugin {
   }
 
   @Test
-  public void testPushingSparkData() throws Exception {
-    String query = "select key, sum(`value`) from spark.`{ \"name\": \"sparkTbl\", \"numPartitions\" : 3}` group by key";
+  public void testPushingSparkData() throws Exception {    
+    String query = "select key, sum(`value`) from spark.`{ \"name\": \"sparkTbl\", \"numPartitions\" : 1}` group by key";
     
     DrillConfig drillConfig = DrillConfig.create();
     RemoteServiceSet serviceSet = RemoteServiceSet.getLocalServiceSet();
@@ -91,7 +91,7 @@ public class TestSparkStoragePlugin {
       
       final QueryPlanFragments planFragments = queryFragmentsFutures.get();
       
-      List<InputSplit> splits = Lists.newArrayList();
+      final List<InputSplit> splits = Lists.newArrayList();
       for (int i = 0; i < planFragments.getFragmentsCount(); i++) {
         PlanFragment fragment = planFragments.getFragments(i);
         if (fragment.getFragmentJson().toLowerCase().contains("-writer")) {
@@ -99,6 +99,49 @@ public class TestSparkStoragePlugin {
         }
       }
 
+      Runnable receivingThread = new Runnable() {
+
+        @Override
+        public void run() {
+          List<DrillRecordReader> readers = Lists.newArrayList();
+          try {
+          for (InputSplit split : splits) {
+            DrillRecordReader reader = new DrillRecordReader();
+            reader.initialize(split, null);
+            readers.add(reader);
+          }
+
+          for(DrillRecordReader reader : readers) {
+            int i = 0;
+            while ( reader.nextKeyValue() ) {
+              FieldReader fr = reader.getCurrentValue();
+              if ( i % 100 == 0 ) {
+                System.out.println();
+                for ( String name : fr ) {
+                  System.out.print(name + ", ");
+                }            
+                System.out.println();
+              }
+              System.out.print("Row#: " + ++i + ", ");
+              for ( String name : fr ) {
+                FieldReader frChild = fr.reader(name);
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                JsonWriter jsonWriter = new JsonWriter(stream, true);
+                jsonWriter.write(frChild);
+                System.out.print(new String(stream.toByteArray(), Charsets.UTF_8) + ", ");
+                stream.close();
+               }
+              System.out.println();
+            }
+            reader.close();
+          }
+          } catch(Exception t) {
+            t.printStackTrace();
+          }
+        }};
+
+      Thread receivingT = new Thread(receivingThread);
+      receivingT.start();
       
       List<Thread> threads = new ArrayList<Thread>();
       int k = 0;
@@ -123,7 +166,6 @@ public class TestSparkStoragePlugin {
             try {
               threadClient.connect(assignedNode);
             } catch (RpcException e) {
-              // TODO Auto-generated catch block
               e.printStackTrace();
               fail(e.fillInStackTrace().getMessage());
             }
@@ -148,39 +190,7 @@ public class TestSparkStoragePlugin {
         threads.get(i).join();
       }      
       
-      Thread.sleep(10000l);
-      List<DrillRecordReader> readers = Lists.newArrayList();
-
-      for (InputSplit split : splits) {
-        DrillRecordReader reader = new DrillRecordReader();
-        reader.initialize(split, null);
-        readers.add(reader);
-      }
-
-      for(DrillRecordReader reader : readers) {
-        int i = 0;
-        while ( reader.nextKeyValue() ) {
-          FieldReader fr = reader.getCurrentValue();
-          if ( i % 100 == 0 ) {
-            System.out.println();
-            for ( String name : fr ) {
-              System.out.print(name + ", ");
-            }            
-            System.out.println();
-          }
-          System.out.print("Row#: " + ++i + ", ");
-          for ( String name : fr ) {
-            FieldReader frChild = fr.reader(name);
-            ByteArrayOutputStream stream = new ByteArrayOutputStream();
-            JsonWriter jsonWriter = new JsonWriter(stream, true);
-            jsonWriter.write(frChild);
-            System.out.print(new String(stream.toByteArray(), Charsets.UTF_8) + ", ");
-            stream.close();
-           }
-          System.out.println();
-        }
-        reader.close();
-      }
+      Thread.sleep(60000l);
 
     } catch(Throwable t) {
       t.printStackTrace();
