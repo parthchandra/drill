@@ -85,6 +85,7 @@ public class SparkRecordReader extends AbstractRecordReader {
 	
 	try {
 	  recordBatchLoader.load(rawFragmentBatch.getHeader().getDef(), rawFragmentBatch.getBody());
+	  if (rawFragmentBatch.getBody() != null) rawFragmentBatch.getBody().release();
 	} catch (SchemaChangeException e) {
 	  logger.error("SchemaChangeException", e);
 	  throw new DrillRuntimeException(e);
