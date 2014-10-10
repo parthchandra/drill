@@ -1,0 +1,32 @@
+{
+  head:{
+    type:"APACHE_DRILL_PHYSICAL",
+    version:"1",
+    generator:{
+      type:"manual"
+    }
+  },
+  graph:[
+    {
+       @id:1,
+       pop:"mock-scan",
+       url: "http://apache.org",
+       entries:[
+         {records: 66000, types: [
+           {name: "red", type: "INT", mode: "REQUIRED"},
+           {name: "green", type: "BIGINT", mode: "OPTIONAL"},
+           {name: "blue", type: "VARCHAR", mode: "REQUIRED"}
+         ]},
+         {records: 66000, types: [
+           {name: "blue", type: "BIT", mode: "REQUIRED"},
+           {name: "green", type: "DECIMAL18", mode: "REQUIRED"},
+           {name: "red", type: "FLOAT8", mode: "OPTIONAL"}
+         ]}
+       ]
+    }, {
+      @id: 2,
+      child: 1,
+      pop: "screen"
+    }
+  ]
+}

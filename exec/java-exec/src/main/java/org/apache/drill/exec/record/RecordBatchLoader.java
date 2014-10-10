@@ -177,4 +177,8 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
 
     //logger.debug( "RecordBatchLoader : after schema " + schema);
   }
+
+  public VectorContainer getContainer() {
+    return container;
+  }
 }
