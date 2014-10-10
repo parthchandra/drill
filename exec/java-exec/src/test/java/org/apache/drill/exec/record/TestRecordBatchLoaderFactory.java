@@ -17,8 +17,8 @@
  */
 package org.apache.drill.exec.record;
 
-import com.beust.jcommander.internal.Lists;
 import com.google.common.base.Charsets;
+import com.google.common.collect.Lists;
 import com.google.common.io.Files;
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.util.FileUtils;

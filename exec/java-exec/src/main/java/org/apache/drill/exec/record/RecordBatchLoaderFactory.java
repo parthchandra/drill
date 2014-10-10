@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.record;
 
-import com.beust.jcommander.internal.Lists;
 import com.google.common.collect.Maps;
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.exec.exception.SchemaChangeException;
