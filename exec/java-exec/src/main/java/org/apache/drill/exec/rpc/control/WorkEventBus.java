@@ -126,6 +126,8 @@ public class WorkEventBus {
       // we added a handler, inform the bee that we did so. This way, the foreman can track status.
       bee.addFragmentPendingRemote(newManager);
       manager = newManager;
+    } else {
+      newManager.getFragmentContext().close();
     }
 
     return manager;
