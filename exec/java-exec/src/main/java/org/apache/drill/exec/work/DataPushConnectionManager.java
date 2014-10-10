@@ -24,7 +24,6 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.record.RawFragmentBatch;
 import org.apache.drill.exec.work.batch.UnlimitedRawBatchBufferNoAck;
-import org.apache.drill.exec.work.fragment.FragmentExecutor;
 
 import com.google.common.collect.Maps;
 
@@ -110,6 +109,7 @@ public class DataPushConnectionManager {
   
   public void cleanRawBatchBuffer(FragmentHandle handle) {
     requestHeaders.remove(handle);
+    locks.remove(handle);
   }
   
 }

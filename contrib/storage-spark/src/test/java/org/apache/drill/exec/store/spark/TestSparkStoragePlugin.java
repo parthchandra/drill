@@ -46,8 +46,13 @@ import org.junit.Test;
 import com.google.common.base.Charsets;
 import com.google.common.collect.Lists;
 
+/**
+ * End to End test to execute query from Drill and use Spark as StoragePlugin to produce the data 
+ *
+ */
 public class TestSparkStoragePlugin {
 
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestSparkStoragePlugin.class);
   private static BufferAllocator ALLOCATOR = new TopLevelAllocator();
 
 
@@ -69,7 +74,7 @@ public class TestSparkStoragePlugin {
 
   @Test
   public void testPushingSparkData() throws Exception {    
-    String query = "select key, sum(`value`) from spark.`{ \"name\": \"sparkTbl\", \"numPartitions\" : 1}` group by key";
+    String query = "select key, sum(`value`) from spark.`{ \"name\": \"sparkTbl\", \"numPartitions\" : 5}` group by key";
     
     DrillConfig drillConfig = DrillConfig.create();
     RemoteServiceSet serviceSet = RemoteServiceSet.getLocalServiceSet();
@@ -162,6 +167,7 @@ public class TestSparkStoragePlugin {
             WritableBatch writableBatch = getWritableBatch(number);
 
             DrillbitEndpoint assignedNode = planFragment.getAssignment();
+            logger.info("DrillbitEndPoint: " + assignedNode);
             DrillClient threadClient = new DrillClient();
             try {
               threadClient.connect(assignedNode);
@@ -172,7 +178,6 @@ public class TestSparkStoragePlugin {
 
             QueryFragmentQuery queryFragment = QueryFragmentQuery.newBuilder().addAllFragments(planFragments.getFragmentsList()).
                 setFragmentHandle(planFragment.getHandle()).build();
-            
             // create fragmentrecordbatch
             ExtendedFragmentWritableBatch extFRB = new ExtendedFragmentWritableBatch
                 (queryFragment, true, planFragments.getQueryId(), planFragment.getHandle().getMajorFragmentId(), planFragment.getHandle().getMinorFragmentId(), 
@@ -190,13 +195,11 @@ public class TestSparkStoragePlugin {
         threads.get(i).join();
       }      
       
-      Thread.sleep(60000l);
-
-    } catch(Throwable t) {
-      t.printStackTrace();
-      //fail(t.fillInStackTrace().getMessage());
-    }
       Thread.sleep(10000l);
+     } catch(Throwable t) {
+      t.printStackTrace();
+      fail(t.fillInStackTrace().getMessage());
+    }
   }
 
   private WritableBatch getWritableBatch(int number) {
@@ -208,25 +211,29 @@ public class TestSparkStoragePlugin {
     MaterializedField intField = MaterializedField.create(SchemaPath.getSimplePath("value"),
         Types.required(TypeProtos.MinorType.INT));
     IntVector intVector = (IntVector) TypeHelper.getNewVector(intField, ALLOCATOR);
-    AllocationHelper.allocate(stringVector, 4, 5);
-    AllocationHelper.allocate(intVector, 4, 4);
+    AllocationHelper.allocate(stringVector, 6, 5);
+    AllocationHelper.allocate(intVector, 6, 4);
     vectorList.add(stringVector);
     vectorList.add(intVector);
 
     stringVector.getMutator().setSafe(0, "ZERO".getBytes());
     intVector.getMutator().setSafe(0, 1*number + 1);
     stringVector.getMutator().setSafe(1, "ONE".getBytes());
-    intVector.getMutator().setSafe(1, 1);
+    intVector.getMutator().setSafe(1, 1*number +1);
     stringVector.getMutator().setSafe(2, "TWO".getBytes());
     intVector.getMutator().setSafe(2, 2*number +2);
     stringVector.getMutator().setSafe(3, "THREE".getBytes());
     intVector.getMutator().setSafe(3, 3*number +3);
-    stringVector.getMutator().setValueCount(4);
-    intVector.getMutator().setValueCount(4);
+    stringVector.getMutator().setSafe(4, "FOUR".getBytes());
+    intVector.getMutator().setSafe(4, 4*number +4);
+    stringVector.getMutator().setSafe(5, "FIVE".getBytes());
+    intVector.getMutator().setSafe(5, 5*number +5);
+    stringVector.getMutator().setValueCount(6);
+    intVector.getMutator().setValueCount(6);
 
     VectorContainer container = new VectorContainer();
     container.addCollection(vectorList);
-    container.setRecordCount(4);
+    container.setRecordCount(6);
     WritableBatch batch = WritableBatch.getBatchNoHVWrap(container.getRecordCount(), container, false);
     return batch;
   }
