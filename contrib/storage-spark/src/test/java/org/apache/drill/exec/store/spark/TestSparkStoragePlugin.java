@@ -36,6 +36,7 @@ import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.VarCharVector;
 import org.apache.drill.exec.vector.complex.fn.JsonWriter;
 import org.apache.drill.exec.vector.complex.reader.FieldReader;
+import org.apache.drill.exec.work.DataPushConnectionManager;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -75,7 +76,7 @@ public class TestSparkStoragePlugin {
   @Test
   public void testPushingSparkData() throws Exception {    
     String query = "select key, sum(`value`) from spark.`{ \"name\": \"sparkTbl\", \"numPartitions\" : 5}` group by key";
-    
+    logger.info("SparkQuery: " + query);
     DrillConfig drillConfig = DrillConfig.create();
     RemoteServiceSet serviceSet = RemoteServiceSet.getLocalServiceSet();
 
@@ -103,7 +104,8 @@ public class TestSparkStoragePlugin {
           splits.add(new DrillQueryInputSplit(planFragments, fragment));
         }
       }
-
+      logger.info("Splits: " + splits.size());
+     
       Runnable receivingThread = new Runnable() {
 
         @Override
@@ -142,6 +144,7 @@ public class TestSparkStoragePlugin {
           }
           } catch(Exception t) {
             t.printStackTrace();
+            fail(t.fillInStackTrace().getMessage());
           }
         }};
 
@@ -194,8 +197,9 @@ public class TestSparkStoragePlugin {
       for ( int i = 0; i < k; i++ ) {
         threads.get(i).join();
       }      
-      
-      Thread.sleep(10000l);
+      receivingT.join();
+      int entriesCount = DataPushConnectionManager.getInstance().getHeadersCount();
+      logger.info("EntriesCount: " + entriesCount);
      } catch(Throwable t) {
       t.printStackTrace();
       fail(t.fillInStackTrace().getMessage());

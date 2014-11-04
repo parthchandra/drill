@@ -124,7 +124,7 @@ public class UserWorker{
   public Ack submitWriteFragmentWork(UserClientConnection connection,
       PushDataRequestHeader header, ByteBuf dBody) {
     // submit query for execution is needed
-    submitReadFragmentWork(connection, header.getQueryFragmentPlan());
+    //submitReadFragmentWork(connection, header.getQueryFragmentPlan());
     FragmentHandle fHandle = header.getQueryFragmentPlan().getFragmentHandle();
     RawFragmentBatch rawBatch = new RawFragmentBatch(connection, header.getFragmentRecordBatch(), 
         (DrillBuf) dBody, new ResponseSender() {

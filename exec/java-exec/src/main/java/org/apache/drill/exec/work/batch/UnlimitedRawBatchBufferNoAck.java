@@ -45,17 +45,17 @@ public class UnlimitedRawBatchBufferNoAck implements RawBatchBuffer {
   private final AtomicBoolean fragmentCounterUsed = new AtomicBoolean(false);
   private final ResponseSenderQueue readController = new ResponseSenderQueue();
   private AtomicInteger streamCounter = new AtomicInteger(1);
-  private FragmentContext context;
+  //private FragmentContext context;
 
-  public UnlimitedRawBatchBufferNoAck(FragmentContext context, int fragmentCount) {
-    int bufferSizePerSocket = context.getConfig().getInt(ExecConstants.INCOMING_BUFFER_SIZE);
+  public UnlimitedRawBatchBufferNoAck(int fragmentCount) {
+    int bufferSizePerSocket = 1000; // TODO need to redo
 
     this.softlimit = bufferSizePerSocket * fragmentCount;
     this.startlimit = Math.max(softlimit/2, 1);
     this.buffer = Queues.newLinkedBlockingDeque();
     // following value can change later on
     this.streamCounter.set(fragmentCount);
-    this.context = context;
+    //this.context = context;
   }
   
   public void setFragmentCount(int fragmentCount) {
@@ -91,21 +91,21 @@ public class UnlimitedRawBatchBufferNoAck implements RawBatchBuffer {
 
   @Override
   public void cleanup() {
-    if (!finished && !context.isCancelled()) {
+  /*  if (!finished && !context.isCancelled()) {
       IllegalStateException e = new IllegalStateException("Cleanup before finished");
       context.fail(e);
       throw e;
-    }
+    } */
 
     if (!buffer.isEmpty()) {
-      if (!context.isFailed() && !context.isCancelled()) {
+     /* if (!context.isFailed() && !context.isCancelled()) {
         context.fail(new IllegalStateException("Batches still in queue during cleanup"));
         logger.error("{} Batches in queue.", buffer.size());
         RawFragmentBatch batch;
         while ((batch = buffer.poll()) != null) {
           logger.error("Batch left in queue: {}", batch);
         }
-      }
+      } */
       RawFragmentBatch batch;
       while ((batch = buffer.poll()) != null) {
         if (batch.getBody() != null) batch.getBody().release();

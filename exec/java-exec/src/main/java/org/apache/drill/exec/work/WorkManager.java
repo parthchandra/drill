@@ -194,7 +194,6 @@ public class WorkManager implements Closeable {
 
     public void removeFragment(FragmentHandle handle) {
       runningFragments.remove(handle);
-      dataConnectionManager.remove(handle);
     }
 
     public Foreman getForemanForQueryId(QueryId queryId) {
@@ -235,7 +234,6 @@ public class WorkManager implements Closeable {
             if (r.inner instanceof FragmentExecutor) {
               FragmentExecutor fragmentExecutor = (FragmentExecutor) r.inner;
               fragmentExecutor.getContext().setConnectionManager(fragmentConnectionManager);
-              dataConnectionManager.createIfNotExistRawBatchBuffer(fragmentExecutor.getContext());
               runningFragments.put(fragmentExecutor.getContext().getHandle(), fragmentExecutor);
             }
             executor.execute(r);
