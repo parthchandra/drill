@@ -36,9 +36,6 @@ public class SparkStoragePluginConfig extends StoragePluginConfigBase {
   @JsonProperty
   public Map<String, String> config;
 
-//  @JsonIgnore
-//  private SparkConf sparkConf;
-
   @JsonCreator
   public SparkStoragePluginConfig(@JsonProperty("config") Map<String, String> config) {
     this.config = config;
@@ -68,15 +65,4 @@ public class SparkStoragePluginConfig extends StoragePluginConfigBase {
     return this.config != null ? this.config.hashCode() : 0;
   }
 
-//  @JsonIgnore
-//  public SparkConf getSparkConf() {
-//    if (sparkConf == null) {
-//      sparkConf = new SparkConf();
-//      for (Map.Entry<String, String> entry : config.entrySet()) {
-//        sparkConf.set(entry.getKey(), entry.getValue());
-//      }
-//    }
-//
-//    return sparkConf;
-//  }
 }
