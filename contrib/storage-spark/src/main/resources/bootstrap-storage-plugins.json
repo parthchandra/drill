@@ -2,7 +2,7 @@
   "storage":{
     spark : {
       type: "spark",
-      enabled: false,
+      enabled: true,
       config : {
       }
     }

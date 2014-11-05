@@ -54,7 +54,7 @@ public class SparkRecordReader extends AbstractRecordReader {
 
   private OutputMutator outputMutator;
 
-  
+  private boolean first = true;
 
 
   public SparkRecordReader(SparkSubScanSpec subScanSpec, FragmentContext fragmentContext) {
@@ -78,24 +78,29 @@ public class SparkRecordReader extends AbstractRecordReader {
 
   @Override
   public int next() {
-	RawFragmentBatch rawFragmentBatch = batchProvider.getNext();
-	if ( rawFragmentBatch == null ) {
-	  return 0;
-	}
-	
-	try {
-	  recordBatchLoader.load(rawFragmentBatch.getHeader().getDef(), rawFragmentBatch.getBody());
-	  if (rawFragmentBatch.getBody() != null) rawFragmentBatch.getBody().release();
-	} catch (SchemaChangeException e) {
-	  logger.error("SchemaChangeException", e);
-	  throw new DrillRuntimeException(e);
-	}
-  List<ValueVector> vvList = Lists.newArrayList();
-	for (VectorWrapper<?> vectorWrapper : recordBatchLoader) {
-	  vvList.add(vectorWrapper.getValueVector());
-  }
+    RawFragmentBatch rawFragmentBatch = batchProvider.getNext();
+    if ( rawFragmentBatch == null ) {
+      return 0;
+    }
 
-    this.outputMutator.addFields(vvList);
+    try {
+      recordBatchLoader.load(rawFragmentBatch.getHeader().getDef(), rawFragmentBatch.getBody());
+      if (rawFragmentBatch.getBody() != null) rawFragmentBatch.getBody().release();
+    } catch (SchemaChangeException e) {
+      logger.error("SchemaChangeException", e);
+      throw new DrillRuntimeException(e);
+    }
+
+    if (first) {
+      List<ValueVector> vvList = Lists.newArrayList();
+      for (VectorWrapper<?> vectorWrapper : recordBatchLoader) {
+        vvList.add(vectorWrapper.getValueVector());
+      }
+
+      outputMutator.addFields(vvList);
+      first = false;
+    }
+
     return recordBatchLoader.getRecordCount();
   }
 

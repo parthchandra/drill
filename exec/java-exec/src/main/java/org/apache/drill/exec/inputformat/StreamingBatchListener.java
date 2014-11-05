@@ -67,10 +67,10 @@ public class StreamingBatchListener implements UserResultsListener {
 
   @Override
   public void submissionFailed(RpcException ex) {
+    logger.error("Query failed", ex);
     this.ex = ex;
     failure = true;
     close();
-    System.out.println("Query failed: " + ex.getMessage());
   }
 
   @Override

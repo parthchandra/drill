@@ -22,12 +22,10 @@ import java.util.Map;
 import org.apache.drill.common.logical.StoragePluginConfigBase;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import org.apache.spark.SparkConf;
 
 @JsonTypeName(SparkStoragePluginConfig.NAME)
 public class SparkStoragePluginConfig extends StoragePluginConfigBase {
@@ -38,8 +36,8 @@ public class SparkStoragePluginConfig extends StoragePluginConfigBase {
   @JsonProperty
   public Map<String, String> config;
 
-  @JsonIgnore
-  private SparkConf sparkConf;
+//  @JsonIgnore
+//  private SparkConf sparkConf;
 
   @JsonCreator
   public SparkStoragePluginConfig(@JsonProperty("config") Map<String, String> config) {
@@ -70,15 +68,15 @@ public class SparkStoragePluginConfig extends StoragePluginConfigBase {
     return this.config != null ? this.config.hashCode() : 0;
   }
 
-  @JsonIgnore
-  public SparkConf getSparkConf() {
-    if (sparkConf == null) {
-      sparkConf = new SparkConf();
-      for (Map.Entry<String, String> entry : config.entrySet()) {
-        sparkConf.set(entry.getKey(), entry.getValue());
-      }
-    }
-
-    return sparkConf;
-  }
+//  @JsonIgnore
+//  public SparkConf getSparkConf() {
+//    if (sparkConf == null) {
+//      sparkConf = new SparkConf();
+//      for (Map.Entry<String, String> entry : config.entrySet()) {
+//        sparkConf.set(entry.getKey(), entry.getValue());
+//      }
+//    }
+//
+//    return sparkConf;
+//  }
 }
