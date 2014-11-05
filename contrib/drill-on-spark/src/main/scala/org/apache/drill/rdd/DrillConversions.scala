@@ -7,13 +7,14 @@ import org.apache.drill.exec.memory.TopLevelAllocator
 import org.apache.drill.exec.record.RecordBatchLoader
 import org.apache.drill.exec.vector.complex.reader.BaseReader
 import org.apache.drill.exec.vector.complex.reader.BaseReader.{ListReader, MapReader}
-import org.apache.drill.rdd.complex._
 import org.apache.drill.rdd.complex.query.{QueryContext, StreamingQueryManager}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.reflect.ClassTag
+
+import org.apache.drill.rdd.complex._
 
 object DrillConversions {
 
@@ -23,18 +24,6 @@ object DrillConversions {
   type IN = DrillIncomingRowType
   type OUT = DrillOutgoingRowType
 
-
-  private def managerFactory[IN:ClassTag] = () => {
-    val conf = DrillConfig.createClient()
-    val allocator = new TopLevelAllocator(conf)
-    val loader = new RecordBatchLoader(allocator)
-    new StreamingQueryManager[IN](QueryContext[IN](loader, recordFactory[IN]))
-  }
-
-  private def recordFactory[IN:ClassTag] = (info:ReadableRecordInfo) => {
-    new DrillReadableRecord(info).asInstanceOf[IN]
-  }
-
   val registry = new RDDRegistry[OUT]
 
   implicit class RichSparkContext(sc: SparkContext) {
@@ -42,7 +31,7 @@ object DrillConversions {
     def getRegistry() = registry
 
     def drillRDD(sql: String): DrillRDD[IN, OUT] = {
-      new DrillRDD[IN, OUT](sc, DrillContext(sql, managerFactory, registry, true))
+      new DrillRDD[IN, OUT](sc, DrillContext(sql, registry, true))
     }
 
     def registerAsTable(name:String, rdd:RDD[OUT]): Unit = {
@@ -50,23 +39,10 @@ object DrillConversions {
     }
   }
 
-  implicit class DrillReader(reader:BaseReader) {
-    def :>(name:String): MapReader = {
-      reader.asInstanceOf[MapReader].reader(name).asInstanceOf[MapReader]
-    }
-
-    def ::>(name:String): ListReader = {
-      reader.asInstanceOf[MapReader].reader(name).asInstanceOf[ListReader]
-    }
-
-    def /(name: String): BaseReader = {
-      reader.asInstanceOf[MapReader].reader(name)
-    }
-  }
-
-  implicit class RichTime(value:Long) {
-    def seconds(): Duration = new FiniteDuration(value, TimeUnit.SECONDS)
-    def millis(): Duration = new FiniteDuration(value, TimeUnit.MILLISECONDS)
-  }
-
+  implicit def toCString(value:String) = CString(value)
+  implicit def toCNumber(value:Int) = CNumber(value)
+  implicit def toCNumber(value:Long) = CNumber(value)
+  implicit def toCNumber(value:Double) = CNumber(value)
+  implicit def toCBool(value:Boolean) = CBool(value)
+  implicit def toCArray(value:Seq[CValue]) = CArray(value: _*)
 }

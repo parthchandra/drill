@@ -1,28 +1,26 @@
 package org.apache.drill.rdd.complex
 
-import java.nio.CharBuffer
-import java.nio.charset.{Charset, CharsetEncoder}
 
-import io.netty.buffer.{ByteBuf, DrillBuf}
-import org.apache.drill.exec.expr.holders.{BitHolder, VarCharHolder, Float8Holder}
+import org.apache.drill.exec.expr.holders.{BitHolder, Float8Holder}
 import org.apache.drill.exec.memory.BufferAllocator
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.{ListWriter, MapWriter}
-import org.apache.drill.exec.vector.complex.writer.{VarCharWriter, BitWriter, Float8Writer}
+import org.apache.drill.exec.vector.complex.writer.{BitWriter, Float8Writer}
 import org.apache.drill.rdd.{GenericMatcher, DrillOutgoingRowType}
 import org.mockito.Matchers._
 import org.mockito.Mockito._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{Matchers, FlatSpec}
 import org.scalatest.mock.MockitoSugar
 
-import org.apache.drill.rdd.complex.WritableRecordConversions._
+import org.apache.drill.rdd.DrillConversions._
+
 
 class ComplexRecordWriterSpec extends FlatSpec with Matchers with MockitoSugar {
 
   // set-up record writer
   val containerWriter = mock[VectorContainerWriter]
-  val allocator = mock[BufferAllocator]
-  val recordWriter = new ComplexRecordWriter[DrillOutgoingRowType](allocator, containerWriter)
+  val factory = mock[HolderFactory]
+  val recordWriter = new ComplexRecordWriter[DrillOutgoingRowType](containerWriter, factory)
 
   val rootMapWriter = mock[MapWriter]
   when(containerWriter.rootAsMap()).thenReturn(rootMapWriter)
@@ -30,7 +28,7 @@ class ComplexRecordWriterSpec extends FlatSpec with Matchers with MockitoSugar {
   "A complex writer" should "increment record count after a write" in {
     val emptyRecord = CObject()
     recordWriter.write(emptyRecord)
-    recordWriter.count should be (1)
+    recordWriter.vector.getAccessor.getValueCount should be (1)
 
     verify(rootMapWriter).start()
     verify(rootMapWriter).end()

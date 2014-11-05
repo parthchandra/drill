@@ -17,7 +17,7 @@ trait RecordIterator[T] extends Iterator[T]
  * @param listener streaming batch listener
  * @tparam T record type
  */
-class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: StreamingBatchListener)
+class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: StreamingBatchListener, whenConsumed: ()=>Unit)
   extends RecordIterator[T] {
 
   private val logger = LoggerFactory.getLogger(getClass)
@@ -54,7 +54,7 @@ class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: Streami
     }
 
     if (!delegate.hasNext) {
-      listener.close()
+      whenConsumed()
     }
     delegate.hasNext
   }

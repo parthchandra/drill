@@ -5,6 +5,7 @@ import org.apache.drill.exec.client.DrillClient
 import org.apache.drill.exec.memory.BufferAllocator
 import org.apache.drill.exec.proto.CoordinationProtos
 import org.apache.drill.exec.proto.UserProtos.{QueryFragmentQuery, QueryPlanFragments}
+import org.apache.drill.exec.record.ExtendedFragmentWritableBatch
 import org.apache.drill.exec.rpc.user.UserResultsListener
 
 import scala.util.Try
@@ -31,10 +32,12 @@ class ExtendedDrillClient(config:DrillConfig, allocator:BufferAllocator) {
     )
   }
 
-  def close() = Try(client.close())
+  def close():Unit = client.close()
 
   def getPlanFor(sql:String):Try[QueryPlanFragments] = Try(client.planQuery(sql).get)
 
   def getFragment(query:QueryFragmentQuery, listener:UserResultsListener) =
     Try(client.submitReadFragmentRequest(query, listener))
+
+  def upload(batch:ExtendedFragmentWritableBatch) = Try(client.submitDataPushRequest(batch))
 }

@@ -1,14 +1,20 @@
 package org.apache.drill.rdd
 
-object resource {
+import org.slf4j.LoggerFactory
 
-  def using[T<:{def close()}](resource: T)(func: T=>Unit): Unit = {
+
+object resource {
+  private val logger = LoggerFactory.getLogger(getClass)
+
+  def using[T<:{def close()}, U](resource: T)(func: T => U): U = {
     try {
       func(resource)
+    } catch {
+      case t:Throwable =>
+        logger.error(s"error while running resource: $resource", t)
+        throw t
     } finally {
-      if (resource!=null) {
-        resource.close()
-      }
+      resource.close()
     }
   }
 

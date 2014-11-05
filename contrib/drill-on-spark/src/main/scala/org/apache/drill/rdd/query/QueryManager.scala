@@ -1,9 +1,10 @@
 package org.apache.drill.rdd.complex.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
+import org.apache.drill.exec.memory.BufferAllocator
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery
 import org.apache.drill.exec.record.RecordBatchLoader
-import org.apache.drill.rdd.{DrillPartition, RecordFactoryType}
+import org.apache.drill.rdd.{resource, DrillPartition, RecordFactoryType}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
@@ -22,7 +23,6 @@ class StreamingQueryManager[T:ClassTag](ctx:QueryContext[T]) extends QueryManage
 
   private val logger = LoggerFactory.getLogger(getClass)
   private val empty = Array[T]().iterator
-  private val client = new ExtendedDrillClient(ctx.loader.getAllocator)
 
   override def execute(partition: DrillPartition): Iterator[T] = {
     val query = QueryFragmentQuery.newBuilder()
@@ -30,19 +30,29 @@ class StreamingQueryManager[T:ClassTag](ctx:QueryContext[T]) extends QueryManage
       .setFragmentHandle(partition.fragment.getHandle)
       .build()
 
-    logger.info("executing partition[{}] fragment[{}]", partition.index, partition.fragment)
+    logger.debug(s"querying drill partition: $partition")
 
     val listener = new StreamingBatchListener
     val endpoint = partition.fragment.getAssignment
-    client.connect(Some(endpoint))
-      .map(c=>c.getFragment(query, listener)) match {
-        case Failure(t) =>
-          logger.error("unable to get fragment", t)
-          empty
-        case Success(_) =>
-          new StreamingRecordIterator[T](ctx, listener)
+    val client = new ExtendedDrillClient(ctx.loader.getAllocator)
+    client.connect(Some(endpoint)).map(c => c.getFragment(query, listener)) match {
+      case Failure(t) =>
+        logger.error("unable to get fragment", t)
+        empty
+      case Success(_) =>
+        new StreamingRecordIterator[T](ctx, listener, () => {
+          listener.close()
+          client.close()
+        })
     }
   }
 
-  override def close() = client.close()
+  override def close():Unit = {}
+}
+
+object StreamingQueryManager {
+  def apply[IN:ClassTag](allocator: BufferAllocator, factory: RecordFactoryType[IN]) = {
+    val loader = new RecordBatchLoader(allocator)
+    new StreamingQueryManager[IN](QueryContext(loader, factory))
+  }
 }

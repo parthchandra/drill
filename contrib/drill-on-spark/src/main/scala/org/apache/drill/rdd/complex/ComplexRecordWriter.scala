@@ -3,45 +3,44 @@ package org.apache.drill.rdd.complex
 import java.util
 
 import io.netty.buffer.DrillBuf
-import org.apache.drill.common.config.DrillConfig
 import org.apache.drill.exec.expr.TypeHelper
 import org.apache.drill.exec.expr.holders.{Float8Holder, BitHolder, Decimal18Holder, VarCharHolder}
 import org.apache.drill.exec.memory.{BufferAllocator, TopLevelAllocator}
 import org.apache.drill.exec.physical.impl.OutputMutator
-import org.apache.drill.exec.record.MaterializedField
+import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery
+import org.apache.drill.exec.record.{FragmentWritableBatch, ExtendedFragmentWritableBatch, WritableBatch, MaterializedField}
 import org.apache.drill.exec.vector.ValueVector
+import org.apache.drill.exec.vector.complex.MapVector
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.{ListWriter, MapWriter}
-import org.apache.drill.exec.vector.complex.writer.{BaseWriter, FieldWriter}
-import org.apache.drill.rdd.DrillOutgoingRowType
+import org.apache.drill.exec.vector.complex.writer._
+import org.apache.drill.rdd.{SendingDrillPartition, DrillPartition, DrillOutgoingRowType}
+import org.apache.drill.rdd.complex.query.ExtendedDrillClient
+import org.slf4j.LoggerFactory
 
 import scala.collection.mutable
+import scala.util.{Failure, Try}
 
-class ComplexRecordWriter[T<:DrillOutgoingRowType] {
-  val config = DrillConfig.createClient()
-  val allocator = new TopLevelAllocator(config)
-  val mutator = new CachingMutator(allocator)
-  val writer = new VectorContainerWriter(mutator)
-  val varCharFactory = new HolderFactory(allocator)
+class ComplexRecordWriter[T<:DrillOutgoingRowType](containerWriter: VectorContainerWriter, factory: HolderFactory) {
   private var count = 0
 
-  def vector = writer.getMapVector
+  def vector = containerWriter.getMapVector
 
-  protected def serialize(writer:BaseWriter, value:CValue): Unit = {
+  protected def write(writer:BaseWriter, value:CValue): Unit = {
     value match {
       case CNothing =>
       // todo: how do you write nothing?
       case CNull =>
       // todo: how do you write null?
       case CString(value) => {
-        val holder  = varCharFactory.createVarCharHolder(value)
-        writer.asInstanceOf[FieldWriter].write(holder)
+        val holder  = factory.createVarCharHolder(value)
+        writer.asInstanceOf[VarCharWriter].write(holder)
         holder.buffer.release()
       }
       case CNumber(value:BigDecimal) => {
         val holder = new Float8Holder
         holder.value = value.doubleValue
-        writer.asInstanceOf[FieldWriter].write(holder)
+        writer.asInstanceOf[Float8Writer].write(holder)
       }
       case CBool(value) => {
         val holder = new BitHolder
@@ -49,22 +48,22 @@ class ComplexRecordWriter[T<:DrillOutgoingRowType] {
           case true => 1
           case _ => 0
         }
-        writer.asInstanceOf[FieldWriter].write(holder)
+        writer.asInstanceOf[BitWriter].write(holder)
       }
       case CArray(values) => {
         val listWriter = writer.asInstanceOf[ListWriter]
         listWriter.start()
         values.foreach {
           case value:CObject =>
-            serialize(listWriter.map(), value)
+            write(listWriter.map(), value)
           case value:CArray =>
-            serialize(listWriter.list(), value)
+            write(listWriter.list(), value)
           case value:CString =>
-            serialize(listWriter.varChar(), value)
+            write(listWriter.varChar(), value)
           case value:CNumber =>
-            serialize(listWriter.float8(), value)
+            write(listWriter.float8(), value)
           case value:CBool =>
-            serialize(listWriter.bit(), value)
+            write(listWriter.bit(), value)
           case _ =>
           //TODO: how do we represent nothing, null?
         }
@@ -75,15 +74,15 @@ class ComplexRecordWriter[T<:DrillOutgoingRowType] {
         mapWriter.start()
         fields.foreach {
           case (name, value:CObject) =>
-            serialize(mapWriter.map(name), value)
+            write(mapWriter.map(name), value)
           case (name, value:CArray) =>
-            serialize(mapWriter.list(name), value)
+            write(mapWriter.list(name), value)
           case (name, value:CString) =>
-            serialize(mapWriter.varChar(name), value)
+            write(mapWriter.varChar(name), value)
           case (name, value:CNumber) =>
-            serialize(mapWriter.float8(name), value)
+            write(mapWriter.float8(name), value)
           case (name, value:CBool) =>
-            serialize(mapWriter.bit(name), value)
+            write(mapWriter.bit(name), value)
           case _ =>
           //TODO: how do we represent nothing, null?
         }
@@ -93,20 +92,28 @@ class ComplexRecordWriter[T<:DrillOutgoingRowType] {
   }
 
   def write(record:T): Unit = {
-    serialize(writer.rootAsMap, record)
+    write(containerWriter.rootAsMap, record)
     count += 1
-    writer.setValueCount(count)
-    writer.setPosition(count)
+    containerWriter.setValueCount(count)
+    containerWriter.setPosition(count)
   }
 
   def close(): Unit = {
-    writer.clear()
-    allocator.close()
+    containerWriter.clear()
+    vector.clear()
+  }
+}
+
+object ComplexRecordWriter {
+  def apply[T<:DrillOutgoingRowType](allocator: BufferAllocator) = {
+    val mutator = new CachingMutator(allocator)
+    val containerWriter = new VectorContainerWriter(mutator)
+    val factory = new HolderFactory(allocator)
+    new ComplexRecordWriter[T](containerWriter, factory)
   }
 }
 
 class HolderFactory(allocator:BufferAllocator) {
-
   def createVarCharHolder(text:String) = {
     val holder = new VarCharHolder
     holder.buffer = allocator.buffer(text.getBytes.length)
@@ -115,22 +122,46 @@ class HolderFactory(allocator:BufferAllocator) {
     holder.end = text.getBytes.length
     holder
   }
-
 }
 
+
 class CachingMutator(allocator:BufferAllocator) extends OutputMutator {
-  val vectors = mutable.HashMap[MaterializedField, ValueVector]()
+  val vectors = new mutable.HashMap[MaterializedField, ValueVector]
+  val logger = LoggerFactory.getLogger(getClass)
 
   override def addField[T <: ValueVector](field: MaterializedField, clazz: Class[T]): T = {
     vectors.getOrElseUpdate(field, TypeHelper.getNewVector(field, allocator)).asInstanceOf[T]
   }
 
   override def addFields(vvList: util.List[ValueVector]): Unit = ???
-
   override def allocate(recordCount: Int): Unit = ???
-
   override def isNewSchema: Boolean = ???
-
   override def getManagedBuffer: DrillBuf = ???
 }
 
+
+class VectorUploader(partition: SendingDrillPartition, allocator:BufferAllocator) {
+  private val logger = LoggerFactory.getLogger(getClass)
+
+  private lazy val query = QueryFragmentQuery.newBuilder()
+    .addAllFragments(partition.drill.queryPlan.getFragmentsList)
+    .setFragmentHandle(partition.drill.fragment.getHandle)
+    .build()
+
+  protected lazy val client:Try[ExtendedDrillClient] = {
+    val client = new ExtendedDrillClient(allocator)
+    val address = Some(partition.drill.fragment.getAssignment)
+    client.connect(address).flatMap(_ => Try(client))
+  }
+
+  def upload(vector:MapVector, isLast:Boolean=false):Try[Unit] = {
+    val handle = partition.drill.fragment.getHandle
+    val writableBatch = WritableBatch.getBatchNoHV(vector.getAccessor.getValueCount, vector, false)
+    val fWritableBatch = new FragmentWritableBatch(isLast, handle.getQueryId, -1, -1, handle.getMajorFragmentId, handle.getMinorFragmentId, writableBatch)
+    val extendedBatch = new ExtendedFragmentWritableBatch(query, fWritableBatch)
+    client.flatMap(c => c.upload(extendedBatch))
+  }
+
+  def close():Unit = client.foreach(c=>c.close())
+
+}
