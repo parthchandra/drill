@@ -2,7 +2,7 @@ package org.apache.drill.rdd.complex.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
 import org.apache.drill.exec.vector.complex.impl.CombinedMapVector
-import org.apache.drill.rdd.complex.ReadableRecordInfo
+import org.apache.drill.rdd.complex.{Backend, FieldReaderInfo}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
@@ -42,7 +42,7 @@ class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: Streami
             logger.info(s"loader got $rowCount records")
             batch += 1
             (0 until rowCount) map {
-              row => ctx.recordFactory(ReadableRecordInfo(vector.getAccessor.getReader, row, batch))
+              row => ctx.recordFactory(Backend(vector.getAccessor.getReader, row))
             } iterator
           }
         } match {
