@@ -11,12 +11,13 @@ object Main extends App {
 
 
   def queryJSON(): Unit = {
-    val sql = "SELECT * FROM dfs.`local`.`lil500.json`"
-    val employees = sc.drillRDD(sql)
+    val sql = "SELECT * FROM dfs.`tmp`.`a.json`"
+    val recordsRDD = sc.drillRDD(sql)
 
-    employees.foreach(println)
-    val count = employees.count()
-    println(s"total records found: $count")
+    // records.foreach(println)``
+    val collectedRecords = recordsRDD.collect()
+    recordsRDD.foreach(r=>println(r.z.a.y))
+    // println(s"total records found: $count")
   }
 
   def queryRDD(): Unit = {
@@ -39,7 +40,7 @@ object Main extends App {
     sc.stop()
   }
 
-  queryRDD
+  queryJSON
 }
 
 

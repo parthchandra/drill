@@ -114,7 +114,7 @@ class ReceivingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:Spar
   extends RDD[IN](sc, Nil) {
   private val logger = LoggerFactory.getLogger(getClass)
 
-  protected val recordFactory = (info:FieldReaderInfo) => new DrillReadableRecord(info).asInstanceOf[IN]
+  protected val recordFactory = (info:FieldReaderBackend) => new DrillReadableRecord(info).asInstanceOf[IN]
 
   override protected def getPartitions: Array[Partition] = {
     val client = new ExtendedDrillClient
