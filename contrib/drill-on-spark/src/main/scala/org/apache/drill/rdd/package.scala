@@ -7,4 +7,5 @@ package object rdd {
   type DrillOutgoingRowType = org.apache.drill.rdd.complex.CObject
   type QueryManagerFactoryType[T] = () => org.apache.drill.rdd.complex.query.QueryManager[T]
   type RecordFactoryType[T] = (Backend) => T
+
 }

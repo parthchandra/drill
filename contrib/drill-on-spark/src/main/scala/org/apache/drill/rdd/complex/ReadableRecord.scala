@@ -1,7 +1,9 @@
 package org.apache.drill.rdd.complex
 
 import java.io.{ObjectOutput, ObjectInput, Externalizable}
+
 import java.util.{HashMap, Map}
+
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.drill.exec.vector.complex.impl.NullReader
@@ -50,9 +52,8 @@ object NullReaderBackend extends Backend {
   override def readObject(Index : Int) = null
 }
 
-
 class FieldReaderBackend(reader:FieldReader, row:Int) extends Backend {
-  override def child(name:String): Backend = {
+  override def child(name: String): Backend = {
     try {
       // reader.reader(name) can throw exception sometimes.
       var nextReader = reader.reader(name)
@@ -86,6 +87,7 @@ class MapReaderBackend(map: Map[String, Object]) extends Backend {
         else {
           new MapReaderBackend(childMap.asInstanceOf[HashMap[String, Object]])
         }
+
     } else {
         NullReaderBackend
     }
@@ -111,7 +113,6 @@ class GenericBackend(genericData: Any) extends Backend {
   override def readObject(): Any = {
     genericData
   }
-
   // TODO: to provide proper implementation for list.
   override def readObject(index: Int): Any = {
     throw new NotImplementedException

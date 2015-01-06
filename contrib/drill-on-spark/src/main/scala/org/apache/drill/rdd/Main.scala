@@ -17,11 +17,7 @@ object Main extends App {
     // records.foreach(println)``
     val collectedRecords = recordsRDD.collect()
 
-
     recordsRDD.foreach(r=>println(r.z.a.y))
-
-    collectedRecords.foreach(r=>println(r.z.a))
-
 
     collectedRecords.foreach(r=>println(r.z.a))
 
