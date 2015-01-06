@@ -3,7 +3,7 @@ package org.apache.drill.rdd.complex.query
 import org.apache.drill.exec.inputformat.StreamingBatchListener
 import org.apache.drill.exec.memory.BufferAllocator
 import org.apache.drill.exec.proto.UserProtos.QueryFragmentQuery
-import org.apache.drill.exec.record.RecordBatchLoader
+import org.apache.drill.exec.record.RecordBatchLoaderFactory
 import org.apache.drill.rdd.{resource, DrillPartition, RecordFactoryType}
 import org.slf4j.LoggerFactory
 
@@ -17,7 +17,7 @@ trait QueryManager[T] {
   def close(): Unit
 }
 
-case class QueryContext[IN:ClassTag](loader: RecordBatchLoader, recordFactory:RecordFactoryType[IN])
+case class QueryContext[IN:ClassTag](loaderFactory: RecordBatchLoaderFactory, recordFactory:RecordFactoryType[IN])
 
 class StreamingQueryManager[T:ClassTag](ctx:QueryContext[T]) extends QueryManager[T] {
 
@@ -34,7 +34,7 @@ class StreamingQueryManager[T:ClassTag](ctx:QueryContext[T]) extends QueryManage
 
     val listener = new StreamingBatchListener
     val endpoint = partition.fragment.getAssignment
-    val client = new ExtendedDrillClient(ctx.loader.getAllocator)
+    val client = new ExtendedDrillClient(ctx.loaderFactory.getAllocator)
     client.connect(Some(endpoint)).map(c => c.getFragment(query, listener)) match {
       case Failure(t) =>
         logger.error("unable to get fragment", t)
@@ -52,7 +52,7 @@ class StreamingQueryManager[T:ClassTag](ctx:QueryContext[T]) extends QueryManage
 
 object StreamingQueryManager {
   def apply[IN:ClassTag](allocator: BufferAllocator, factory: RecordFactoryType[IN]) = {
-    val loader = new RecordBatchLoader(allocator)
-    new StreamingQueryManager[IN](QueryContext(loader, factory))
+    val loaderFactory = new RecordBatchLoaderFactory(allocator)
+    new StreamingQueryManager[IN](QueryContext(loaderFactory, factory))
   }
 }

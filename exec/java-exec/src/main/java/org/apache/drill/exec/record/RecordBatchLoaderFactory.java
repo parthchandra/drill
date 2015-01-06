@@ -74,6 +74,10 @@ public class RecordBatchLoaderFactory {
     return loader;
   }
 
+  public BufferAllocator getAllocator() {
+    return allocator;
+  }
+
   public void close() throws InterruptedException {
     waitingForCompletion = true;
     // Need to call the GC twice in order to make sure unreferenced ValueVectors are GCed.
