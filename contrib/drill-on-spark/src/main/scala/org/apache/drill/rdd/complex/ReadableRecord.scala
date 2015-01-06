@@ -1,19 +1,24 @@
 package org.apache.drill.rdd.complex
 
 import java.io.{ObjectOutput, ObjectInput, Externalizable}
-import java.util.HashMap
+
+import java.util.{HashMap, Map}
+
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.drill.exec.vector.complex.impl.NullReader
 import org.apache.drill.exec.vector.complex.reader.FieldReader
 import org.slf4j.LoggerFactory
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
+import scala.reflect.runtime.{universe => ru}
 
 import scala.language.dynamics
 
+
 trait ReadableRecord extends Dynamic {
-  def selectDynamic(name: String):ReadableRecord = child(name)
-  def \(name: String):ReadableRecord = child(name)
-  def child(name: String):ReadableRecord
+  def selectDynamic(name:String):ReadableRecord = child(name)
+  def \(name:String):ReadableRecord = child(name)
+  def child(name:String):ReadableRecord
   def value():Option[Any]
   def apply(i: Int):Any
 
@@ -24,9 +29,9 @@ trait ReadableRecord extends Dynamic {
 }
 
 trait Backend {
-  def child(name: String): Backend
+  def child(name:String): Backend
   def readObject():Any
-  def readObject(index: Int):Any
+  def readObject(index:Int):Any
 }
 
 object Backend {
@@ -35,18 +40,32 @@ object Backend {
   }
 }
 
-class FieldReaderBackend(reader: FieldReader, row: Int) extends Backend {
+object ObjectType {
+  def getTypeTag[T: ru.TypeTag](obj: T) = ru.typeTag[T]
+}
+
+object NullReaderBackend extends Backend {
+  override def child(name: String): Backend= NullReaderBackend
+
+  override def readObject(): Any = null
+
+  override def readObject(Index : Int) = null
+}
+
+class FieldReaderBackend(reader:FieldReader, row:Int) extends Backend {
   override def child(name: String): Backend = {
     try {
+      // reader.reader(name) can throw exception sometimes.
       var nextReader = reader.reader(name)
-      if (nextReader != NullReader.INSTANCE)
+      if (nextReader != NullReader.INSTANCE && nextReader != null)
         new FieldReaderBackend(nextReader, row)
       else
-        null
+        NullReaderBackend
     } catch {
-      case e: Exception => null
+      case e: Exception => NullReaderBackend
     }
   }
+
   override def readObject(): Any = {
     reader.setPosition(row)
     reader.readObject()
@@ -58,56 +77,48 @@ class FieldReaderBackend(reader: FieldReader, row: Int) extends Backend {
   }
 }
 
-class MapReaderBackend(private var map: HashMap[String, Object]) extends Backend {
+class MapReaderBackend(map: Map[String, Object]) extends Backend {
   override def child(name: String): Backend = {
-    if (map == null)
-      null
-    else {
-      try {
-        // Try to change map[Key] object to another HashMap.
-        // If failed it would mean map[Key] is not a map and has a scalar/literal value.
-        var childMap = map.get(name).asInstanceOf[HashMap[String, Object]]
-        if (childMap == null) {
-          null
-        } else {
-          new MapReaderBackend(childMap)
+    var childMap = map.get(name)
+    if (map != null && childMap !=null) {
+        var objType = ObjectType.getTypeTag(childMap)
+        if (objType.tpe.toString.indexOf("HashMap") == -1)
+          new GenericBackend(childMap)
+        else {
+          new MapReaderBackend(childMap.asInstanceOf[HashMap[String, Object]])
         }
-      } catch {
-        // TODO: put the right exception type to catch.
-        case e: Exception => new ScalarBackend(map.get(name))
-      }
+
+    } else {
+        NullReaderBackend
     }
   }
 
-  override def readObject(): HashMap[String , Object] = {
+  override def readObject(): Map[String , Object] = {
     // Returns the map.
     map
   }
 
-  // TODO
+  // Not supported by the MapReaderBackend.
   override def readObject(index: Int): Any = {
-    // Pass.
-    // Return the value of the ith key of the map.
+    throw new UnsupportedOperationException("readObject(index: Int) is not" +
+      " supported by MapReaderBackend.")
   }
 }
 
-class ScalarBackend(private var scalar: Any) extends Backend {
-  // TODO
+class GenericBackend(genericData: Any) extends Backend {
   override def child(name: String): Backend = {
-    null.asInstanceOf[ScalarBackend]
+    NullReaderBackend
   }
+
   override def readObject(): Any = {
-    // TODO: Should return a better string representation here?
-    scalar
+    genericData
   }
-  // TODO
-  override def readObject(index: Int) = {
-    // If scalar is a list or tuple, return the ith item.
-    // Pass
+  // TODO: to provide proper implementation for list.
+  override def readObject(index: Int): Any = {
+    throw new NotImplementedException
   }
 }
 
-// TODO: add a error reporting string var to return to the application.
 class DrillReadableRecord() extends Externalizable with ReadableRecord {
   val logger = LoggerFactory.getLogger(getClass)
   private var recordReader = null.asInstanceOf[Backend]
@@ -117,25 +128,15 @@ class DrillReadableRecord() extends Externalizable with ReadableRecord {
     recordReader = backend
     jsonstr =  this.toString
   }
-  // Should return a DrillReadableRecord here instead of readObject.
+
   override def apply(index: Int) = recordReader.readObject(index)
 
-  override def child(name: String) = {
-    if (recordReader != null)
-      new DrillReadableRecord(recordReader.child(name))
-    else
-      // Can throw exception instead.
-      new DrillReadableRecord(null)
-  }
+  override def child(name: String) = new DrillReadableRecord(recordReader.child(name))
 
   override def value():Option[Any] = {
-    if (recordReader == null)
-      None
-    else {
-      recordReader.readObject match {
-        case null => None
-        case v: Any => Some(v)
-      }
+    recordReader.readObject match {
+      case null => None
+      case v: Any => Some(v)
     }
   }
 
@@ -147,8 +148,10 @@ class DrillReadableRecord() extends Externalizable with ReadableRecord {
     jsonstr = in.readObject().asInstanceOf[String]
     var mapper = new ObjectMapper
     var map  = new HashMap[String, Object]()
+
     // Convert the jsonStr to a HashMap using mapper object.
     map = mapper.readValue(jsonstr, classOf[HashMap[String, Object]])
+
     // After de-serializing and converting the jsonstr to a map, set the
     // recordReader to MapReaderBackend object.
     recordReader = new MapReaderBackend(map)
