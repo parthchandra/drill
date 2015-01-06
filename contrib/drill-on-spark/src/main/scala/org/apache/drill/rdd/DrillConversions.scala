@@ -25,6 +25,9 @@ object DrillConversions {
   type OUT = DrillOutgoingRowType
 
   val registry = new RDDRegistry[OUT]
+  // introduce client connection here.
+  // exclude implicit here.
+  //
 
   implicit class RichSparkContext(sc: SparkContext) {
 
