@@ -23,7 +23,6 @@ class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: Streami
 
   private val logger = LoggerFactory.getLogger(getClass)
   private var delegate:Iterator[T] = null
-  private val vector = new CombinedMapVector(ctx.loader)
   private val empty = Array[T]().iterator
   var batch = 0
   var loaded = false
@@ -34,17 +33,18 @@ class StreamingRecordIterator[T:ClassTag](ctx:QueryContext[T], listener: Streami
         .flatMap { qrb =>
           Try {
             if (qrb == null) {
-              ctx.loader.clear()
+              empty
             } else {
-              ctx.loader.load(qrb.getHeader.getDef, qrb.getData)
+              val loader = ctx.loaderFactory.load(qrb.getHeader.getDef, qrb.getData)
+              val vector = new CombinedMapVector(loader)
               vector.load()
+              val rowCount = loader.getRecordCount
+              logger.info(s"loader got $rowCount records")
+              batch += 1
+              (0 until rowCount) map {
+                row => ctx.recordFactory(Backend(vector.getAccessor.getReader, row))
+              } iterator
             }
-            val rowCount = ctx.loader.getRecordCount
-            logger.info(s"loader got $rowCount records")
-            batch += 1
-            (0 until rowCount) map {
-              row => ctx.recordFactory(Backend(vector.getAccessor.getReader, row))
-            } iterator
           }
         } match {
           case Success(it) => it
