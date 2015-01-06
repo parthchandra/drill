@@ -99,7 +99,8 @@ class MapReaderBackend(map: Map[String, Object]) extends Backend {
 
   // Not supported by the MapReaderBackend.
   override def readObject(index: Int): Any = {
-    throw new UnsupportedOperationException("readObject(index: Int) is not supported by MapReaderBackend.")
+    throw new UnsupportedOperationException("readObject(index: Int) is not " +
+      "supported by MapReaderBackend.")
     // Pass.
     // Return the value of the ith key of the map.
   }
