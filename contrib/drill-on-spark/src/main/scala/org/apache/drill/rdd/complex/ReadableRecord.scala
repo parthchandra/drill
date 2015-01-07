@@ -40,10 +40,6 @@ object Backend {
   }
 }
 
-object ObjectType {
-  def getTypeTag[T: ru.TypeTag](obj: T) = ru.typeTag[T]
-}
-
 object NullReaderBackend extends Backend {
   override def child(name: String): Backend= NullReaderBackend
 
@@ -53,16 +49,22 @@ object NullReaderBackend extends Backend {
 }
 
 class FieldReaderBackend(reader:FieldReader, row:Int) extends Backend {
+  val logger = LoggerFactory.getLogger(getClass)
   override def child(name: String): Backend = {
     try {
       // reader.reader(name) can throw exception sometimes.
-      var nextReader = reader.reader(name)
+      val nextReader = reader.reader(name)
       if (nextReader != NullReader.INSTANCE && nextReader != null)
         new FieldReaderBackend(nextReader, row)
-      else
+      else {
+        logger.debug("Returned null reader for name", name)
         NullReaderBackend
+      }
     } catch {
-      case e: Exception => NullReaderBackend
+      case e: Exception => {
+        logger.error("Caught exception while getting reader for name", name)
+        NullReaderBackend
+      }
     }
   }
 
@@ -78,17 +80,22 @@ class FieldReaderBackend(reader:FieldReader, row:Int) extends Backend {
 }
 
 class MapReaderBackend(map: Map[String, Object]) extends Backend {
+  val logger = LoggerFactory.getLogger(getClass)
   override def child(name: String): Backend = {
-    var childMap = map.get(name)
-    if (map != null && childMap !=null) {
-        var objType = ObjectType.getTypeTag(childMap)
-        if (objType.tpe.toString.indexOf("HashMap") == -1)
-          new GenericBackend(childMap)
-        else {
-          new MapReaderBackend(childMap.asInstanceOf[HashMap[String, Object]])
+    val childData = map.get(name)
+    if (map != null && childData !=null) {
+      childData match {
+        case childMap: Map[String, Object] => {
+          logger.debug("Returning child MapReaderBackend", childMap.toString)
+          new MapReaderBackend(childMap)
         }
-
+        case _ => {
+          logger.debug("Returning a child GenericBackend", childData.toString)
+          new GenericBackend(childData)
+        }
+      }
     } else {
+        logger.debug("Returning a child NullReaderBackend")
         NullReaderBackend
     }
   }
@@ -121,8 +128,8 @@ class GenericBackend(genericData: Any) extends Backend {
 
 class DrillReadableRecord() extends Externalizable with ReadableRecord {
   val logger = LoggerFactory.getLogger(getClass)
-  private var recordReader = null.asInstanceOf[Backend]
-  private var jsonstr : String = ""
+  private var recordReader: Backend = null
+  private var jsonstr: String = ""
   def this(backend: Backend) = {
     this()
     recordReader = backend
@@ -141,11 +148,13 @@ class DrillReadableRecord() extends Externalizable with ReadableRecord {
   }
 
   def writeExternal(out: ObjectOutput): Unit = {
+    logger.debug("Serializing the string", jsonstr)
     out.writeObject(jsonstr)
   }
 
   def readExternal(in: ObjectInput): Unit = {
     jsonstr = in.readObject().asInstanceOf[String]
+    logger.debug("After de-serializing got the string", jsonstr)
     var mapper = new ObjectMapper
     var map  = new HashMap[String, Object]()
 
