@@ -2,7 +2,8 @@ package org.apache.drill.rdd.complex.query
 
 import org.apache.drill.exec.inputformat.StreamingBatchListener
 import org.apache.drill.exec.vector.complex.impl.CombinedMapVector
-import org.apache.drill.rdd.complex.{Backend, FieldReaderInfo}
+
+import org.apache.drill.rdd.complex.Backend
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
