@@ -6,10 +6,9 @@ import org.apache.drill.common.config.DrillConfig
 import org.apache.drill.exec.memory.TopLevelAllocator
 import org.apache.drill.exec.proto.UserProtos.QueryPlanFragments
 import org.apache.drill.exec.store.spark.{SparkSubScan, RDDTableSpec}
-import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter
-import org.apache.drill.rdd.DrillConversions._
+import org.apache.drill.rdd.DrillType.OUTTYPE
 import org.apache.drill.rdd.complex._
-import org.apache.drill.rdd.complex.query.{StreamingQueryManager, ExtendedDrillClient}
+import org.apache.drill.rdd.complex.query.{StreamingQueryManager}
 import org.apache.drill.rdd.resource.{using}
 import org.apache.spark.annotation.DeveloperApi
 import org.apache.spark.rdd.RDD
@@ -42,9 +41,6 @@ class RDDRegistry[OUT<:DrillOutgoingRowType:ClassTag] extends Iterable[(String, 
   def rdds = name2rdd.values
 }
 
-case class DrillContext[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sql:String, registry:RDDRegistry[OUT],
-                                                                         inbound:Boolean)
-
 case class DrillPartition(index:Int, queryPlan:QueryPlanFragments) extends Partition with Serializable {
   val fragment = queryPlan.getFragments(index)
   val fragmentHandle = fragment.getHandle
@@ -55,30 +51,33 @@ case class RDDDefinition(name:String, partitions:Seq[Partition])
 
 case class SendingDrillPartition(index:Int, last:Boolean, drill: DrillPartition, parent:RDDDefinition) extends Partition with Serializable
 
-class DrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](@transient sc:SparkContext, dc:DrillContext[IN, OUT])
-  extends RDD[IN](sc, Nil) {
+class DrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](@transient dc:DrillContext, @transient private var sql: String, @transient private var inbound: Boolean)
+  extends RDD[IN](dc.getSparkContext, Nil) {
 
   private val logger = LoggerFactory.getLogger(getClass)
 
-  protected lazy val drillCtx: DrillContext[IN, OUT] = {
-    val analyzer = new SqlAnalyzer(dc.sql, Set() ++ dc.registry.names)
+  @transient
+  protected lazy val drillCtx: DrillContext = {
+    val analyzer = new SqlAnalyzer(sql, Set() ++ dc.getRegistry.names)
     analyzer.analyze match {
       case names if names!=null && names.length>0 =>
-        val registry = new RDDRegistry[OUT]
+        val registry = new RDDRegistry[OUTTYPE]
         for (name <- names) {
-          val rdd = sc.getRegistry.find(name).getOrElse {
+          val rdd = dc.getRegistry.find(name).getOrElse {
             throw new IllegalStateException("Unable to find RDD in registry. Should never reach here.")
           }
-          registry.register(name, rdd.asInstanceOf[RDD[OUT]])
+          registry.register(name, rdd.asInstanceOf[RDD[OUTTYPE]])
         }
         val specs = registry.map { case (n, rdd) => (n, new RDDTableSpec(n, rdd.partitions.length)) }.toMap
         val expandedSql = analyzer.expand(specs)
-        DrillContext(expandedSql, registry, false)
+        inbound = false
+        sql = expandedSql
+        new DrillContext(dc.getSparkContext, dc.getClient, registry)
       case _ => dc
     }
   }
 
-  protected lazy val delegate: RDD[IN] = createDelegate(sc, drillCtx)
+  protected lazy val delegate: RDD[IN] = createDelegate(drillCtx)
 
   override protected def getPartitions: Array[Partition] = delegate.partitions
 
@@ -87,11 +86,11 @@ class DrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](@transient sc:Sp
   @DeveloperApi
   override def compute(split: Partition, task: TaskContext): Iterator[IN] = delegate.compute(split, task)
 
-  protected def createDelegate(sc: SparkContext, dc: DrillContext[IN, OUT]): RDD[IN] = {
-    if (dc.inbound) {
-      new ReceivingDrillRDD[IN, OUT](sc, dc)
+  protected def createDelegate(dc:DrillContext): RDD[IN] = {
+    if (inbound) {
+      new ReceivingDrillRDD[IN, OUT](dc, sql)
     } else {
-      new SendingDrillRDD[IN, OUT](sc, dc)
+      new SendingDrillRDD[IN, OUT](dc, sql)
     }
   }
 }
@@ -110,20 +109,19 @@ class SubScanSpecMapper[T](cls:Class[T]) {
   }
 }
 
-class ReceivingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:SparkContext, dc:DrillContext[IN, OUT])
-  extends RDD[IN](sc, Nil) {
+class ReceivingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](@transient dc:DrillContext, @transient sql: String)
+  extends RDD[IN](dc.getSparkContext, Nil) {
   private val logger = LoggerFactory.getLogger(getClass)
 
   protected val recordFactory = (info:Backend) => new DrillReadableRecord(info).asInstanceOf[IN]
 
 
   override protected def getPartitions: Array[Partition] = {
-    val client = new ExtendedDrillClient
+    val client = dc.getClient
     val partitions = client.connect()
-      .flatMap(c=>c.getPlanFor(dc.sql))
+      .flatMap(c=>c.getPlanFor(sql))
       .map(p=>(0 until p.getFragmentsCount)
       .map(i=>DrillPartition(i, p)))
-    client.close()
     partitions.get.toArray
   }
 
@@ -140,8 +138,8 @@ class ReceivingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:Spar
   }
 }
 
-class SendingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:SparkContext, dc:DrillContext[IN, OUT])
-  extends ReceivingDrillRDD[IN, OUT](sc, dc) {
+class SendingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](@transient dc:DrillContext, @transient sql: String)
+  extends ReceivingDrillRDD[IN, OUT](dc, sql) {
   private val logger = LoggerFactory.getLogger(getClass)
 
   override protected def getPartitions: Array[Partition] = {
@@ -150,7 +148,7 @@ class SendingDrillRDD[IN:ClassTag, OUT<:DrillOutgoingRowType:ClassTag](sc:SparkC
     partitions.map { partition =>
       mapper.read(partition).map { subScan =>
         val name = subScan.getTableSpec.getName
-        val parentPartitions = dc.registry.find(name).map(_.partitions).getOrElse(Array[Partition]())
+        val parentPartitions = dc.getRegistry.find(name).map(_.partitions).getOrElse(Array[Partition]())
         SendingDrillPartition(partition.index, partition.index==partitions.length-1, partition, RDDDefinition(name, parentPartitions))
       }.getOrElse {
         throw new IllegalStateException(s"Unable to read subscan definition from drill partition: $partition")
