@@ -37,13 +37,16 @@ public interface Partitioner {
                           OperatorStats stats,
                           SendingAccountor sendingAccountor,
                           OperatorContext oContext,
-                          StatusHandler statusHandler) throws SchemaChangeException;
+                          StatusHandler statusHandler,
+                          int start, int count) throws SchemaChangeException;
 
   public abstract void partitionBatch(RecordBatch incoming) throws IOException;
   public abstract void flushOutgoingBatches(boolean isLastBatch, boolean schemaChanged) throws IOException;
   public abstract void initialize();
   public abstract void clear();
   public abstract List<? extends PartitionOutgoingBatch> getOutgoingBatches();
+  public abstract PartitionOutgoingBatch getOutgoingBatch(int index);
+  public abstract OperatorStats getStats();
 
   public static TemplateClassDefinition<Partitioner> TEMPLATE_DEFINITION = new TemplateClassDefinition<>(Partitioner.class, PartitionerTemplate.class);
 }

@@ -222,6 +222,14 @@ public class FragmentContext implements Closeable, UdfUtilities {
     return context.getCompiler().getImplementationClass(cg);
   }
 
+  public <T> List<T> getImplementationClass(ClassGenerator<T> cg, int instanceNumber) throws ClassTransformationException, IOException {
+    return getImplementationClass(cg.getCodeGenerator(), instanceNumber);
+  }
+
+  public <T> List<T> getImplementationClass(CodeGenerator<T> cg, int instanceNumber) throws ClassTransformationException, IOException {
+    return context.getCompiler().getImplementationClass(cg, instanceNumber);
+  }
+
   /**
    * Get the user connection associated with this fragment.  This return null unless this is a root fragment.
    * @return The RPC connection to the query submitter.

@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicIntegerArray;
 import org.apache.drill.common.expression.ErrorCollector;
 import org.apache.drill.common.expression.ErrorCollectorImpl;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.exception.ClassTransformationException;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.ClassGenerator;
@@ -34,10 +35,12 @@ import org.apache.drill.exec.memory.OutOfMemoryException;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.ops.OperatorContext;
+import org.apache.drill.exec.ops.OperatorStats;
 import org.apache.drill.exec.physical.MinorFragmentEndpoint;
 import org.apache.drill.exec.physical.config.HashPartitionSender;
 import org.apache.drill.exec.physical.impl.BaseRootExec;
 import org.apache.drill.exec.physical.impl.SendingAccountor;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.FragmentWritableBatch;
@@ -45,8 +48,10 @@ import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.RecordBatch.IterOutcome;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.rpc.data.DataTunnel;
+import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.vector.CopyUtil;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.sun.codemodel.JExpr;
 import com.sun.codemodel.JExpression;
 import com.sun.codemodel.JType;
@@ -56,13 +61,15 @@ public class PartitionSenderRootExec extends BaseRootExec {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PartitionSenderRootExec.class);
   private RecordBatch incoming;
   private HashPartitionSender operator;
-  private Partitioner partitioner;
+  private PartitionerDecorator partitioner;
+
   private FragmentContext context;
   private boolean ok = true;
   private final SendingAccountor sendCount = new SendingAccountor();
   private final int outGoingBatchCount;
   private final HashPartitionSender popConfig;
   private final StatusHandler statusHandler;
+  private final double cost;
 
   private final AtomicIntegerArray remainingReceivers;
   private final AtomicInteger remaingReceiverCount;
@@ -71,6 +78,8 @@ public class PartitionSenderRootExec extends BaseRootExec {
 
   long minReceiverRecordCount = Long.MAX_VALUE;
   long maxReceiverRecordCount = Long.MIN_VALUE;
+  protected final int numberPartitions;
+  protected final int actualPartitions;
 
   public enum Metric implements MetricDef {
     BATCHES_SENT,
@@ -78,7 +87,8 @@ public class PartitionSenderRootExec extends BaseRootExec {
     MIN_RECORDS,
     MAX_RECORDS,
     N_RECEIVERS,
-    BYTES_SENT;
+    BYTES_SENT,
+    SENDING_THREADS_COUNT;
 
     @Override
     public int metricId() {
@@ -98,6 +108,25 @@ public class PartitionSenderRootExec extends BaseRootExec {
     this.statusHandler = new StatusHandler(sendCount, context);
     this.remainingReceivers = new AtomicIntegerArray(outGoingBatchCount);
     this.remaingReceiverCount = new AtomicInteger(outGoingBatchCount);
+    // Algorithm to figure out number of threads to parallelize output
+    // numberOfRows/sliceTarget/numReceivers/threadfactor
+    // threadFactor = 4 by default
+    // one more param to put a limit on number max number of threads: default 32
+    this.cost = operator.getChild().getCost();
+    final OptionManager optMgr = context.getOptions();
+    long sliceTarget = optMgr.getOption(ExecConstants.SLICE_TARGET).num_val;
+    int threadFactor = optMgr.getOption(PlannerSettings.PARTITION_SENDER_THREADS_FACTOR.getOptionName()).num_val.intValue();
+    int tmpParts = 1;
+    if ( sliceTarget != 0 && outGoingBatchCount != 0 ) {
+      tmpParts = (int) Math.round((((cost / (sliceTarget*1.0)) / (outGoingBatchCount*1.0)) / (threadFactor*1.0)));
+      if ( tmpParts < 1) {
+        tmpParts = 1;
+      }
+    }
+    this.numberPartitions = Math.min(tmpParts, optMgr.getOption(PlannerSettings.PARTITION_SENDER_MAX_THREADS.getOptionName()).num_val.intValue());
+    logger.info("Preliminary number of sending threads is: " + numberPartitions);
+    this.actualPartitions = outGoingBatchCount > numberPartitions ? numberPartitions : outGoingBatchCount;
+    this.stats.setLongStat(Metric.SENDING_THREADS_COUNT, actualPartitions);
   }
 
   @Override
@@ -186,8 +215,28 @@ public class PartitionSenderRootExec extends BaseRootExec {
     }
   }
 
-  private void createPartitioner() throws SchemaChangeException {
+  @VisibleForTesting
+  protected void createPartitioner() throws SchemaChangeException {
+    final int divisor = Math.max(1, outGoingBatchCount/actualPartitions);
+    final int longTail = outGoingBatchCount % actualPartitions;
 
+    final List<Partitioner> subPartitioners = createClassInstances(actualPartitions);
+    int startIndex = 0;
+    int endIndex = 0;
+    for (int i = 0; i < actualPartitions; i++) {
+      startIndex = endIndex;
+      endIndex = (i < actualPartitions - 1 ) ? startIndex + divisor : outGoingBatchCount;
+      if ( i < longTail ) {
+        endIndex++;
+      }
+      final OperatorStats partitionStats = new OperatorStats(stats, true);
+      subPartitioners.get(i).setup(context, incoming, popConfig, partitionStats, sendCount, oContext, statusHandler,
+        startIndex, endIndex);
+    }
+    partitioner = new PartitionerDecorator(subPartitioners, stats, context);
+  }
+
+  private List<Partitioner> createClassInstances(int actualPartitions) throws SchemaChangeException {
     // set up partitioning function
     final LogicalExpression expr = operator.getExpr();
     final ErrorCollector collector = new ErrorCollectorImpl();
@@ -215,13 +264,14 @@ public class PartitionSenderRootExec extends BaseRootExec {
 
     try {
       // compile and setup generated code
-      partitioner = context.getImplementationClass(cg);
-      partitioner.setup(context, incoming, popConfig, stats, sendCount, oContext, statusHandler);
+      List<Partitioner> subPartitioners = context.getImplementationClass(cg, actualPartitions);
+      return subPartitioners;
 
     } catch (ClassTransformationException | IOException e) {
       throw new SchemaChangeException("Failure while attempting to load generated class", e);
     }
   }
+
 
   public void updateStats(List<? extends PartitionOutgoingBatch> outgoing) {
     long records = 0;
@@ -240,9 +290,9 @@ public class PartitionSenderRootExec extends BaseRootExec {
 
   @Override
   public void receivingFragmentFinished(FragmentHandle handle) {
-    int id = handle.getMinorFragmentId();
+    final int id = handle.getMinorFragmentId();
     if (remainingReceivers.compareAndSet(id, 0, 1)) {
-      partitioner.getOutgoingBatches().get(handle.getMinorFragmentId()).terminate();
+      partitioner.getOutgoingBatches(id).terminate();
       int remaining = remaingReceiverCount.decrementAndGet();
       if (remaining == 0) {
         done = true;
@@ -289,4 +339,8 @@ public class PartitionSenderRootExec extends BaseRootExec {
     }
   }
 
+  @VisibleForTesting
+  protected PartitionerDecorator getPartitioner() {
+    return partitioner;
+  }
 }
