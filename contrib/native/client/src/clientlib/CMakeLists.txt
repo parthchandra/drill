@@ -18,6 +18,11 @@
 
 # Drill Client library
 
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
+    ${CMAKE_CURRENT_SOURCE_DIR}/version.h
+    )
+
 set (CLIENTLIB_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/decimalUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClient.cpp

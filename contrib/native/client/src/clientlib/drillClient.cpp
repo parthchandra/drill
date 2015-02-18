@@ -23,6 +23,7 @@
 #include "drillClientImpl.hpp"
 #include "errmsgs.hpp"
 #include "logger.hpp"
+#include "version.h"
 
 #include "Types.pb.h"
 
@@ -275,6 +276,9 @@ DrillClientConfig DrillClient::s_config;
 void DrillClient::initLogging(const char* path, logLevel_t l){
     if(path!=NULL) s_config.initLogging(path);
     s_config.setLogLevel(l);
+    DRILL_LOG(LOG_INFO) << "Apache Drill Client Library." << std::endl;
+    DRILL_LOG(LOG_INFO) << "    Build branch: " << GIT_BRANCH << std::endl;
+    DRILL_LOG(LOG_INFO) << "    Build Info:   " << GIT_COMMIT_INFO <<std::endl;
 }
 
 DrillClient::DrillClient(){
