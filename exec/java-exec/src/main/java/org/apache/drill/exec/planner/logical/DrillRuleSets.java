@@ -46,6 +46,7 @@ import org.eigenbase.rel.rules.MergeFilterRule;
 import org.eigenbase.rel.rules.MergeProjectRule;
 import org.eigenbase.rel.rules.PushFilterPastJoinRule;
 import org.eigenbase.rel.rules.PushJoinThroughJoinRule;
+import org.eigenbase.rel.rules.ReduceExpressionsRule;
 import org.eigenbase.rel.rules.RemoveDistinctAggregateRule;
 import org.eigenbase.rel.rules.RemoveDistinctRule;
 import org.eigenbase.rel.rules.RemoveSortRule;
@@ -117,6 +118,16 @@ public class DrillRuleSets {
       DrillSortRule.INSTANCE,
       DrillJoinRule.INSTANCE,
       DrillUnionRule.INSTANCE,
+
+      DrillReduceExpressionsRules.FILTER_INSTANCE_DRILL,
+      DrillReduceExpressionsRules.CALC_INSTANCE_DRILL,
+      // TODO - look at this
+      // this is causing a planning bug for the TestAggregateFunctions.testDrill2092
+      // The rules OnMatch is being called, but not modifying the plan
+      // seems like its presence in the optimizer is making another rule fire
+      // that is creating a bad plan, removing all other work, just adding this rule
+      // on top of master causes the same planning issue( even though it still does nothing to the plan itself)
+      ReduceExpressionsRule.PROJECT_INSTANCE,
       DrillReduceAggregatesRule.INSTANCE
       ));
     }

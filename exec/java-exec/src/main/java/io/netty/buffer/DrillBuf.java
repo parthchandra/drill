@@ -22,6 +22,7 @@ import io.netty.util.internal.PlatformDependent;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.GatheringByteChannel;
@@ -712,6 +713,23 @@ public final class DrillBuf extends AbstractByteBuf {
   public byte getByte(int index) {
     chk(index, 1);
     return PlatformDependent.getByte(addr(index));
+  }
+
+  /**
+   * Convert a substring of this buffer to Java string interpreted as UTF-8.
+   *
+   * For debugging only, never use in production code!
+   *
+   * @param startIndex - beginning index of the buffer slice to convert
+   * @param endIndex - end index of the buffer slice to convert
+   * @return - String of the bytes interpreted as UTF-8
+   * @throws UnsupportedEncodingException - should never be thrown, assume UTF-8 is available
+   */
+  @Deprecated
+  public String getString(int startIndex, int endIndex) throws UnsupportedEncodingException {
+    byte[] buffer = new byte[endIndex - startIndex];
+    readBytes(buffer, startIndex, endIndex);
+    return new String(buffer, "UTF-8");
   }
 
   public static DrillBuf getEmpty(BufferAllocator allocator, Accountor a) {

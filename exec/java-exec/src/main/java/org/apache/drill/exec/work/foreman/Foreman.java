@@ -159,7 +159,14 @@ public class Foreman implements Runnable, Closeable, Comparable<Object> {
     bee.retireForeman(this);
     context.getWorkBus().removeFragmentStatusListener(queryId);
     context.getClusterCoordinator().removeDrillbitStatusListener(queryManager);
-    if(result != null){
+
+    try {
+      context.close();
+    } catch (IOException e) {
+      moveToState(QueryState.FAILED, e);
+    }
+
+    if (result != null) {
       initiatingClient.sendResult(responseListener, new QueryWritableBatch(result), true);
     }
     releaseLease();

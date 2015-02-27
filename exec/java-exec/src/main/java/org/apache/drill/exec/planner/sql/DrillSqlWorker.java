@@ -33,6 +33,7 @@ import net.hydromatic.optiq.tools.ValidationException;
 import org.apache.drill.exec.ops.QueryContext;
 import org.apache.drill.exec.physical.PhysicalPlan;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
+import org.apache.drill.exec.planner.logical.DrillConstExecutor;
 import org.apache.drill.exec.planner.logical.DrillRuleSets;
 import org.apache.drill.exec.planner.physical.DrillDistributionTraitDef;
 import org.apache.drill.exec.planner.sql.handlers.AbstractSqlHandler;
@@ -89,6 +90,7 @@ public class DrillSqlWorker {
         .context(context.getPlannerSettings()) //
         .ruleSets(getRules(context)) //
         .costFactory(costFactory) //
+        .executor(new DrillConstExecutor(context.getFunctionRegistry(), context.getAllocator(), context))
         .build();
     this.planner = Frameworks.getPlanner(config);
     HepProgramBuilder builder = new HepProgramBuilder();
