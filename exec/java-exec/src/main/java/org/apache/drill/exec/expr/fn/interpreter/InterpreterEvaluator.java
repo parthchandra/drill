@@ -18,6 +18,8 @@
 package org.apache.drill.exec.expr.fn.interpreter;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import io.netty.buffer.DrillBuf;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.expression.BooleanOperator;
 import org.apache.drill.common.expression.FunctionHolderExpression;
@@ -34,29 +36,53 @@ import org.apache.drill.exec.expr.fn.DrillSimpleFuncHolder;
 import org.apache.drill.exec.expr.holders.BitHolder;
 import org.apache.drill.exec.expr.holders.NullableBitHolder;
 import org.apache.drill.exec.expr.holders.ValueHolder;
+import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.memory.OutOfMemoryException;
+import org.apache.drill.exec.ops.QueryDateTimeInfo;
+import org.apache.drill.exec.ops.UdfUtilities;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.vector.ValueHolderHelper;
 import org.apache.drill.exec.vector.ValueVector;
+import org.reflections.Reflections;
+
+import javax.inject.Inject;
+import java.lang.reflect.Field;
+import java.util.Arrays;
 
 
 public class InterpreterEvaluator {
 
-  public static void evaluate(RecordBatch incoming, ValueVector outVV, LogicalExpression expr) {
+  public static void evaluateConstantExpr(ValueVector outVV, UdfUtilities udfUtilities, LogicalExpression expr) {
+    evaluate(1, udfUtilities, null, outVV, expr);
+  }
 
-    InterpreterInitVisitor initVisitor = new InterpreterInitVisitor();
-    InterEvalVisitor evalVisitor = new InterEvalVisitor(incoming);
+  public static void evaluate(RecordBatch incoming, ValueVector outVV, LogicalExpression expr) {
+    evaluate(incoming.getRecordCount(), incoming.getContext(), incoming, outVV, expr);
+  }
+
+  public static void evaluate(int recordCount, UdfUtilities udfUtilities, RecordBatch incoming, ValueVector outVV, LogicalExpression expr) {
+
+    InterpreterInitVisitor initVisitor = new InterpreterInitVisitor(udfUtilities);
+    InterEvalVisitor evalVisitor = new InterEvalVisitor(incoming, udfUtilities);
 
     expr.accept(initVisitor, incoming);
 
-    for (int i = 0; i < incoming.getRecordCount(); i++) {
+    for (int i = 0; i < recordCount; i++) {
       ValueHolder out = expr.accept(evalVisitor, i);
       TypeHelper.setValueSafe(outVV, i, out);
     }
 
-    outVV.getMutator().setValueCount(incoming.getRecordCount());
+    outVV.getMutator().setValueCount(recordCount);
   }
 
   public static class InterpreterInitVisitor extends AbstractExprVisitor<LogicalExpression, RecordBatch, RuntimeException> {
+
+    private UdfUtilities udfUtilities;
+
+    protected InterpreterInitVisitor(UdfUtilities udfUtilities) {
+      super();
+      this.udfUtilities = udfUtilities;
+    }
     @Override
     public LogicalExpression visitFunctionHolderExpression(FunctionHolderExpression holderExpr, RecordBatch incoming) {
       if (! (holderExpr.getHolder() instanceof DrillSimpleFuncHolder)) {
@@ -71,6 +97,23 @@ public class InterpreterEvaluator {
 
       try {
         DrillSimpleFuncInterpreter interpreter = holder.createInterpreter();
+        Field[] fields = interpreter.getClass().getDeclaredFields();
+        for (Field f : fields) {
+          // the current interpreter strips off annotations, so we just need to assume
+          // the type available as injectable are only used as injectable
+//          if ( f.getAnnotation(Inject.class) != null ) {
+            f.setAccessible(true);
+            if (f.getType().equals(DrillBuf.class)) {
+              f.set(interpreter, udfUtilities.getManagedBuffer());
+            } else if (f.getType().equals(QueryDateTimeInfo.class)) {
+              f.set(interpreter, udfUtilities.getQueryDateTimeInfo());
+            } else {
+              // do nothing with the field
+            }
+//          } else { // do nothing with non-inject fields here
+//            continue;
+//          }
+        }
 
         ((DrillFuncHolderExpr) holderExpr).setInterpreter(interpreter);
 
@@ -94,11 +137,22 @@ public class InterpreterEvaluator {
 
   public static class InterEvalVisitor extends AbstractExprVisitor<ValueHolder, Integer, RuntimeException> {
     private RecordBatch incoming;
+    private UdfUtilities udfUtilities;
 
-    protected InterEvalVisitor(RecordBatch incoming) {
+    protected InterEvalVisitor(RecordBatch incoming, UdfUtilities udfUtilities) {
       super();
       this.incoming = incoming;
+      this.udfUtilities = udfUtilities;
     }
+
+    public DrillBuf getManagedBufferIfAvailable() {
+      if (incoming != null) {
+        return incoming.getContext().getManagedBuffer();
+      } else {
+        return udfUtilities.getManagedBuffer();
+      }
+    }
+
 
     @Override
     public ValueHolder visitFunctionHolderExpression(FunctionHolderExpression holderExpr, Integer inIndex) {
@@ -134,7 +188,7 @@ public class InterpreterEvaluator {
 
         Preconditions.checkArgument(interpreter != null, "interpreter could not be null when use interpreted model to evaluate function " + holder.getRegisteredNames()[0]);
 
-        interpreter.doSetup(args, incoming);
+        interpreter.doSetup(args);
         ValueHolder out = interpreter.doEval(args);
 
         if (TypeHelper.getValueHolderType(out).getMode() == TypeProtos.DataMode.OPTIONAL &&
@@ -148,7 +202,7 @@ public class InterpreterEvaluator {
         }
 
       } catch (Exception ex) {
-        throw new RuntimeException("Error in evaluating function of " + holderExpr.getName() + ": " + ex);
+        throw new RuntimeException("Error in evaluating function of " + holderExpr.getName(), ex);
       }
 
     }
@@ -206,7 +260,7 @@ public class InterpreterEvaluator {
 
     @Override
     public ValueHolder visitQuotedStringConstant(ValueExpressions.QuotedString e, Integer value) throws RuntimeException {
-      return ValueHolderHelper.getVarCharHolder((incoming).getContext().getManagedBuffer(), e.value);
+      return ValueHolderHelper.getVarCharHolder(getManagedBufferIfAvailable(), e.value);
     }
 
 
@@ -234,7 +288,7 @@ public class InterpreterEvaluator {
             holder = TypeHelper.getValue(vv, inIndex.intValue());
             return holder;
           default:
-            throw new UnsupportedOperationException("Type of " + type + " is not supported yet!");
+            throw new UnsupportedOperationException("Type of " + type + " is not supported yet in interpreted expression evaluation!");
         }
       } catch (Exception ex){
         throw new DrillRuntimeException("Error when evaluate a ValueVectorReadExpression: " + ex);
