@@ -170,7 +170,8 @@ public abstract class JoinTemplate implements JoinWorker {
         }
         status.advanceLeft();
 
-        if (status.isLeftRepeating() && doCompareNextLeftKey(status.getLeftPosition()) != 0) {
+        if (status.isLeftRepeating() && status.isNextLeftPositionInCurrentBatch() &&
+            doCompareNextLeftKey(status.getLeftPosition()) != 0) {
           // left no longer has duplicates.  switch back to incoming batch mode
           status.setDefaultAdvanceMode();
           status.notifyLeftStoppedRepeating();
@@ -197,6 +198,7 @@ public abstract class JoinTemplate implements JoinWorker {
         throw new IllegalStateException();
       }
     }
+
     return false;
   }
 
