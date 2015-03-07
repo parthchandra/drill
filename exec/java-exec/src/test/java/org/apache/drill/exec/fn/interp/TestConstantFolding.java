@@ -17,15 +17,16 @@
  ******************************************************************************/
 package org.apache.drill.exec.fn.interp;
 
+import java.io.File;
+import java.io.PrintWriter;
+
 import org.apache.drill.PlanTestBase;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import java.io.File;
-import java.io.PrintWriter;
-
+@Ignore
 public class TestConstantFolding extends PlanTestBase {
 
   @Rule

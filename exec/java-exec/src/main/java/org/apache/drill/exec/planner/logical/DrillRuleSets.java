@@ -123,8 +123,10 @@ public class DrillRuleSets {
       DrillJoinRule.INSTANCE,
       DrillUnionRule.INSTANCE,
 
-      DrillReduceExpressionsRules.FILTER_INSTANCE_DRILL,
-      DrillReduceExpressionsRules.CALC_INSTANCE_DRILL,
+//      DrillReduceExpressionsRules.FILTER_INSTANCE_DRILL,
+//      DrillReduceExpressionsRules.CALC_INSTANCE_DRILL,
+
+
       // TODO - look at this
       // this is causing a planning bug for the TestAggregateFunctions.testDrill2092
       // The rules OnMatch is being called, but not modifying the plan
