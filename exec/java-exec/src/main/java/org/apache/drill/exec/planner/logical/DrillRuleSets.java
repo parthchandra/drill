@@ -133,7 +133,9 @@ public class DrillRuleSets {
       // seems like its presence in the optimizer is making another rule fire
       // that is creating a bad plan, removing all other work, just adding this rule
       // on top of master causes the same planning issue( even though it still does nothing to the plan itself)
-      ReduceExpressionsRule.PROJECT_INSTANCE,
+//      ReduceExpressionsRule.PROJECT_INSTANCE,
+
+
       DrillReduceAggregatesRule.INSTANCE
       ));
     }
