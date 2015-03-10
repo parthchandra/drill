@@ -24,10 +24,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.FormatPluginConfig;
 import org.apache.drill.common.logical.StoragePluginConfig;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.metrics.DrillMetrics;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.physical.PhysicalOperatorSetupException;
@@ -204,8 +206,9 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     columnValueCounts = new HashMap<SchemaPath, Long>();
 
     ColumnChunkMetaData columnChunkMetaData;
+    final int threadCount = formatPlugin.getContext().getConfig().getInt(ExecConstants.METATADATA_THREADS);
 
-    List<Footer> footers = FooterGatherer.getFooters(formatPlugin.getHadoopConfig(), statuses, 16);
+    List<Footer> footers = FooterGatherer.getFooters(formatPlugin.getHadoopConfig(), statuses, threadCount);
     for (Footer footer : footers) {
       int index = 0;
       ParquetMetadata metadata = footer.getParquetMetadata();
@@ -325,12 +328,14 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
     if (this.endpointAffinities == null) {
       BlockMapBuilder bmb = new BlockMapBuilder(fs, formatPlugin.getContext().getBits());
+      final int threadCount = formatPlugin.getContext().getConfig().getInt(ExecConstants.METATADATA_THREADS);
+
       try {
         List<TimedRunnable<Void>> blockMappers = Lists.newArrayList();
         for (RowGroupInfo rgi : rowGroupInfos) {
           blockMappers.add(new BlockMapper(bmb, rgi));
         }
-        TimedRunnable.run("Load Parquet RowGroup block maps", logger, blockMappers, 16);
+        TimedRunnable.run("Load Parquet RowGroup block maps", logger, blockMappers, threadCount);
       } catch (IOException e) {
         logger.warn("Failure while determining operator affinity.", e);
         return Collections.emptyList();

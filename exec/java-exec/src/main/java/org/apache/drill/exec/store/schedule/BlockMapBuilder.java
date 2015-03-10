@@ -66,13 +66,13 @@ public class BlockMapBuilder {
     return codecFactory.getCodec(fileStatus.getPath()) != null;
   }
 
-  public List<CompleteFileWork> generateFileWork(List<FileStatus> files, boolean blockify) throws IOException {
+  public List<CompleteFileWork> generateFileWork(List<FileStatus> files, boolean blockify, int threadCount) throws IOException {
 
     List<TimedRunnable<List<CompleteFileWork>>> readers = Lists.newArrayList();
     for(FileStatus status : files){
       readers.add(new BlockMapReader(status, blockify));
     }
-    List<List<CompleteFileWork>> work = TimedRunnable.run("Get block maps", logger, readers, 16);
+    List<List<CompleteFileWork>> work = TimedRunnable.run("Get block maps", logger, readers, threadCount);
     List<CompleteFileWork> singleList = Lists.newArrayList();
     for(List<CompleteFileWork> innerWorkList : work){
       singleList.addAll(innerWorkList);
