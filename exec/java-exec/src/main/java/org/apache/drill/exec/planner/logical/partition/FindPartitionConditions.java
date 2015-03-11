@@ -76,6 +76,9 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
     public List<RexNode> getChildren() {
       return children;
     }
+    public void clear() {
+      children.clear();
+    }
   }
 
   private final BitSet dirs;
@@ -137,13 +140,31 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
   }
 
   /**
+   * For an OR node that is marked as NO_PUSH, there could be 3 situations:
+   * 1. left child has a partition condition, right child does not.  In this case, we should not push any child of this OR
+   * 2. left child does not have partition condition, right child has one.  Again, we should not push any child of this OR
+   * 3. left and right child both have partition condition but both sides may have had other non-partition conditions. In
+   *    this case, we can push the partition conditions by building a new OR combining both children.
+   * In this method we clear the children of the OR for cases 1 and 2 and leave it alone for case 3
+   */
+  private void clearOrChildrenIfSingle() {
+    if (!opStack.isEmpty()) {
+      BooleanOpState op = opStack.peek();
+      assert op.getOp().getKind() == SqlKind.OR;
+      if (op.getChildren().size() == 1) {
+        op.clear();
+      }
+    }
+  }
+
+  /**
    * If the top of the parentCallTypeStack is an AND or OR, get the corresponding
    * top item from the BooleanOpState stack and examine its children - these must
    * be the directory filters we are interested in.  Create a new filter condition
    * using the boolean operation and the children. Add this new filter as a child
    * of the parent boolean operator - thus the filter condition gets built bottom-up.
    */
-  private void popAndAddResults() {
+  private void popAndBuildFilter() {
     SqlOperator op1 = null;
     if (!parentCallTypeStack.isEmpty()) {
       op1 = parentCallTypeStack.pop();
@@ -235,22 +256,31 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
       callPushDirFilter = PushDirFilter.NO_PUSH;
     }
 
-    if (callPushDirFilter == PushDirFilter.NO_PUSH && call.getKind() == SqlKind.AND) {
-      // one or more children is not a push-able directory filter. If this is an AND, add
-      // all the ones that are push-able directory filters. Otherwise, this tree cannot be pushed.
-      for (int iOperand = 0; iOperand < operandCount; ++iOperand) {
-        PushDirFilter pushDirFilter = operandStack.get(iOperand);
-        if (pushDirFilter == PushDirFilter.PUSH) {
-          addResult(call.getOperands().get(iOperand));
+
+    if (callPushDirFilter == PushDirFilter.NO_PUSH) {
+      if (call.getKind() == SqlKind.AND) {
+        // one or more children is not a push-able directory filter. If this is an AND, add
+        // all the ones that are push-able directory filters.
+        for (int iOperand = 0; iOperand < operandCount; ++iOperand) {
+          PushDirFilter pushDirFilter = operandStack.get(iOperand);
+          RexNode n = call.getOperands().get(iOperand);
+          if (pushDirFilter == PushDirFilter.PUSH && !(n.getKind() == SqlKind.AND || n.getKind() == SqlKind.OR)) {
+            addResult(n);
+          }
         }
+      } else if (call.getKind() == SqlKind.OR) {
+        clearOrChildrenIfSingle();
       }
+    }
+    else if (callPushDirFilter == PushDirFilter.PUSH && !(call.getKind() == SqlKind.AND || call.getKind() == SqlKind.OR)) {
+      addResult(call);
     }
 
     // pop operands off of the stack
     operandStack.clear();
 
-    // pop this parent call operator off the stack
-    popAndAddResults();
+    // pop this parent call operator off the stack and build the intermediate filters as we go
+    popAndBuildFilter();
 
     // push PushDirFilter result for this call onto stack
     pushStatusStack.add(callPushDirFilter);

@@ -38,7 +38,10 @@ public class TestPrune extends BaseTestQuery {
   @Test
   public void pruneCompound2() throws Exception {
     String query1 = String.format("select * from dfs_test.`%s/parquet` where (dir0=1995 and o_totalprice < 40000) or (dir0=1996 and o_totalprice < 40000)", MULTILEVEL);
-    test(query1);
+    String query2 = String.format("select * from dfs_test.`%s/parquet` where dir0=1995 and o_totalprice < 40000", MULTILEVEL);
+    String query3 = String.format("select * from dfs_test.`%s/parquet` where (dir0=1995 and o_totalprice < 40000) or dir0=1996", MULTILEVEL);
+    String query4 = String.format("select * from dfs_test.`%s/parquet` where dir0=1995 or dir0=1996", MULTILEVEL);
+    test(query3);
   }
 
 }
