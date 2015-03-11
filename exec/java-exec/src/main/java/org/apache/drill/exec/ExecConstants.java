@@ -153,7 +153,7 @@ public interface ExecConstants {
    * DEFAULT: 2048 MB
    */
   public static final String MAX_QUERY_MEMORY_PER_NODE_KEY = "planner.memory.max_query_memory_per_node";
-  public static final OptionValidator MAX_QUERY_MEMORY_PER_NODE = new PowerOfTwoLongValidator(
+  public static final OptionValidator MAX_QUERY_MEMORY_PER_NODE = new PositiveLongValidator(
     MAX_QUERY_MEMORY_PER_NODE_KEY, Runtime.getRuntime().maxMemory(), 2*1024*1024*1024L);
 
   /**
@@ -164,7 +164,7 @@ public interface ExecConstants {
    * MAXIMUM: 2048 MB
    */
   public static final String NON_BLOCKING_OPERATORS_MEMORY_KEY = "planner.memory.non_blocking_operators_memory";
-  public static final OptionValidator NON_BLOCKING_OPERATORS_MEMORY = new PowerOfTwoLongValidator(
+  public static final OptionValidator NON_BLOCKING_OPERATORS_MEMORY = new PositiveLongValidator(
     NON_BLOCKING_OPERATORS_MEMORY_KEY, 1 << 11, 1 << 6);
 
   public static final String HASH_JOIN_TABLE_FACTOR_KEY = "planner.memory.hash_join_table_factor";
