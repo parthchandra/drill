@@ -134,7 +134,7 @@ public class FileSelection {
       return new FileSelection(Collections.singletonList(status), p.toUri().getPath());
     } else {
       Path p = new Path(parent,removeLeadingSlash(path));
-      FileStatus[] status = fs.globStatus(p);
+      FileStatus[] status = fs.globStatus(p, new DrillPathFilter());
       if (status == null || status.length == 0) {
         return null;
       }

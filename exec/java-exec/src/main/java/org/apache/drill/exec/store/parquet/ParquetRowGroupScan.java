@@ -40,6 +40,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
+import org.apache.drill.exec.store.dfs.ReadEntryWithPath;
 
 // Class containing information for reading a single parquet row group form HDFS
 @JsonTypeName("parquet-row-group-scan")
@@ -48,7 +49,7 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
 
   public final ParquetFormatConfig formatConfig;
   private final ParquetFormatPlugin formatPlugin;
-  private final List<RowGroupReadEntry> rowGroupReadEntries;
+  private final List<ReadEntryWithPath> rowGroupReadEntries;
   private final List<SchemaPath> columns;
   private String selectionRoot;
 
@@ -57,7 +58,7 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
       @JacksonInject StoragePluginRegistry registry, //
       @JsonProperty("storage") StoragePluginConfig storageConfig, //
       @JsonProperty("format") FormatPluginConfig formatConfig, //
-      @JsonProperty("entries") LinkedList<RowGroupReadEntry> rowGroupReadEntries, //
+      @JsonProperty("entries") LinkedList<ReadEntryWithPath> rowGroupReadEntries, //
       @JsonProperty("columns") List<SchemaPath> columns, //
       @JsonProperty("selectionRoot") String selectionRoot //
   ) throws ExecutionSetupException {
@@ -68,7 +69,7 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
 
   public ParquetRowGroupScan( //
       ParquetFormatPlugin formatPlugin, //
-      List<RowGroupReadEntry> rowGroupReadEntries, //
+      List<ReadEntryWithPath> rowGroupReadEntries, //
       List<SchemaPath> columns,
       String selectionRoot) {
     this.formatPlugin = Preconditions.checkNotNull(formatPlugin);
@@ -79,7 +80,7 @@ public class ParquetRowGroupScan extends AbstractBase implements SubScan {
   }
 
   @JsonProperty("entries")
-  public List<RowGroupReadEntry> getRowGroupReadEntries() {
+  public List<ReadEntryWithPath> getRowGroupReadEntries() {
     return rowGroupReadEntries;
   }
 

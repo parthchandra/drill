@@ -221,3 +221,25 @@ SqlNode SqlCreateTable() :
         return new SqlCreateTable(pos, tblName, fieldList, query);
     }
 }
+
+/**
+ * Parse refresh table metadata statement.
+ * REFRESH TABLE METADATA tblname
+ */
+SqlNode SqlRefreshMetadata() :
+{
+    SqlParserPos pos;
+    SqlIdentifier tblName;
+    SqlNodeList fieldList;
+    SqlNode query;
+}
+{
+    <REFRESH> { pos = getPos(); }
+    <TABLE>
+    <METADATA>
+    tblName = CompoundIdentifier()
+    {
+        return new SqlRefreshMetadata(pos, tblName);
+    }
+}
+

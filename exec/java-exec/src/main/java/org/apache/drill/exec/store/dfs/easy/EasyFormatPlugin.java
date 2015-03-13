@@ -19,10 +19,12 @@ package org.apache.drill.exec.store.dfs.easy;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.Maps;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -122,7 +124,7 @@ public abstract class EasyFormatPlugin<T extends FormatPluginConfig> implements 
       .getOption(ExecConstants.FILESYSTEM_PARTITION_COLUMN_LABEL).string_val;
     List<SchemaPath> columns = scan.getColumns();
     List<RecordReader> readers = Lists.newArrayList();
-    List<String[]> partitionColumns = Lists.newArrayList();
+    Map<Object,String[]> partitionColumns = Maps.newHashMap();
     List<Integer> selectedPartitionColumns = Lists.newArrayList();
     boolean selectAllColumns = false;
 
@@ -154,19 +156,17 @@ public abstract class EasyFormatPlugin<T extends FormatPluginConfig> implements 
         false /* ScanBatch is not subject to fragment memory limit */);
     DrillFileSystem dfs = new DrillFileSystem(fs, oContext.getStats());
     for(FileWork work : scan.getWorkUnits()){
-      readers.add(getRecordReader(context, dfs, work, scan.getColumns()));
+      RecordReader reader = getRecordReader(context, dfs, work, scan.getColumns());
+      reader.setKey(work.getPath());
+      readers.add(reader);
       if (scan.getSelectionRoot() != null) {
         String[] r = scan.getSelectionRoot().split("/");
         String[] p = work.getPath().split("/");
         if (p.length > r.length) {
           String[] q = ArrayUtils.subarray(p, r.length, p.length - 1);
-          partitionColumns.add(q);
+          partitionColumns.put(work.getPath(),q);
           numParts = Math.max(numParts, q.length);
-        } else {
-          partitionColumns.add(new String[] {});
         }
-      } else {
-        partitionColumns.add(new String[] {});
       }
     }
 

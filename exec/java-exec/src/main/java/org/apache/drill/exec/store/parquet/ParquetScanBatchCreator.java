@@ -19,11 +19,14 @@ package org.apache.drill.exec.store.parquet;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.collect.Maps;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -37,6 +40,7 @@ import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.RecordReader;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
+import org.apache.drill.exec.store.dfs.ReadEntryWithPath;
 import org.apache.drill.exec.store.parquet.columnreaders.ParquetRecordReader;
 import org.apache.drill.exec.store.parquet2.DrillParquetReader;
 import org.apache.hadoop.conf.Configuration;
@@ -44,6 +48,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import parquet.column.ColumnDescriptor;
+import parquet.hadoop.Footer;
 import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.schema.MessageType;
@@ -70,7 +75,7 @@ public class ParquetScanBatchCreator implements BatchCreator<ParquetRowGroupScan
     OperatorContext oContext = new OperatorContext(rowGroupScan, context,
         false /* ScanBatch is not subject to fragment memory limit */);
 
-    List<String[]> partitionColumns = Lists.newArrayList();
+    Map<Object,String[]> partitionColumns = Maps.newHashMap();
     List<Integer> selectedPartitionColumns = Lists.newArrayList();
     boolean selectAllColumns = AbstractRecordReader.isStarQuery(columns);
 
@@ -101,50 +106,16 @@ public class ParquetScanBatchCreator implements BatchCreator<ParquetRowGroupScan
     conf.setBoolean(ENABLE_BYTES_TOTAL_COUNTER, false);
     conf.setBoolean(ENABLE_TIME_READ_COUNTER, false);
 
-    // keep footers in a map to avoid re-reading them
-    Map<String, ParquetMetadata> footers = new HashMap<String, ParquetMetadata>();
     int numParts = 0;
-    for(RowGroupReadEntry e : rowGroupScan.getRowGroupReadEntries()){
-      /*
-      Here we could store a map from file names to footers, to prevent re-reading the footer for each row group in a file
-      TODO - to prevent reading the footer again in the parquet record reader (it is read earlier in the ParquetStorageEngine)
-      we should add more information to the RowGroupInfo that will be populated upon the first read to
-      provide the reader with all of th file meta-data it needs
-      These fields will be added to the constructor below
-      */
-      try {
-        if ( ! footers.containsKey(e.getPath())){
-          footers.put(e.getPath(),
-              ParquetFileReader.readFooter( fs.getConf(), new Path(e.getPath())));
+    for(ReadEntryWithPath e : rowGroupScan.getRowGroupReadEntries()){
+      if (rowGroupScan.getSelectionRoot() != null) {
+        String[] r = rowGroupScan.getSelectionRoot().split("/");
+        String[] p = e.getPath().split("/");
+        if (p.length > r.length) {
+          String[] q = ArrayUtils.subarray(p, r.length, p.length - 1);
+          partitionColumns.put(e.getPath(), q);
+          numParts = Math.max(numParts, q.length);
         }
-        if (!context.getOptions().getOption(ExecConstants.PARQUET_NEW_RECORD_READER).bool_val && !isComplex(footers.get(e.getPath()))) {
-          readers.add(
-              new ParquetRecordReader(
-                  context, e.getPath(), e.getRowGroupIndex(), fs,
-                  rowGroupScan.getStorageEngine().getCodecFactoryExposer(),
-                  footers.get(e.getPath()),
-                  rowGroupScan.getColumns()
-              )
-          );
-        } else {
-          ParquetMetadata footer = footers.get(e.getPath());
-          readers.add(new DrillParquetReader(context, footer, e, newColumns, fs));
-        }
-        if (rowGroupScan.getSelectionRoot() != null) {
-          String[] r = rowGroupScan.getSelectionRoot().split("/");
-          String[] p = e.getPath().split("/");
-          if (p.length > r.length) {
-            String[] q = ArrayUtils.subarray(p, r.length, p.length - 1);
-            partitionColumns.add(q);
-            numParts = Math.max(numParts, q.length);
-          } else {
-            partitionColumns.add(new String[] {});
-          }
-        } else {
-          partitionColumns.add(new String[] {});
-        }
-      } catch (IOException e1) {
-        throw new ExecutionSetupException(e1);
       }
     }
 
@@ -154,8 +125,10 @@ public class ParquetScanBatchCreator implements BatchCreator<ParquetRowGroupScan
       }
     }
 
+    Iterator<RecordReader> readerIterator = new RecordReaderIterator(context, rowGroupScan, fs);
+
     ScanBatch s =
-        new ScanBatch(rowGroupScan, context, oContext, readers.iterator(), partitionColumns, selectedPartitionColumns);
+        new ScanBatch(rowGroupScan, context, oContext, readerIterator, partitionColumns, selectedPartitionColumns);
 
     for(RecordReader r  : readers){
       r.setOperatorContext(s.getOperatorContext());
@@ -178,6 +151,87 @@ public class ParquetScanBatchCreator implements BatchCreator<ParquetRowGroupScan
       }
     }
     return false;
+  }
+
+  static class RecordReaderIterator implements Iterator<RecordReader> {
+
+    private ParquetRowGroupScan scan;
+    private Iterator<ReadEntryWithPath> entries;
+    private DrillFileSystem fs;
+    private ReadEntryWithPath currentEntry;
+    private ParquetMetadata currentFooter;
+    private int currentRowGroupIndex = 0;
+    private RecordReader next;
+    private FragmentContext context;
+    private boolean useNewReader;
+
+    RecordReaderIterator(FragmentContext context, ParquetRowGroupScan scan, DrillFileSystem fs) {
+      this.context = context;
+      this.scan = scan;
+      this.entries = scan.getRowGroupReadEntries().iterator();
+      this.fs = fs;
+      this.useNewReader = context.getOptions().getOption(ExecConstants.PARQUET_NEW_RECORD_READER).bool_val;
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (next != null) {
+        return true;
+      }
+      return getNext();
+    }
+
+    @Override
+    public RecordReader next() {
+      if (next != null) {
+        RecordReader toReturn = next;
+        next = null;
+        return toReturn;
+      } else {
+        if (!getNext()) {
+          throw new NoSuchElementException();
+        }
+        RecordReader toReturn = next;
+        next = null;
+        return toReturn;
+      }
+    }
+
+    @Override
+    public void remove() {
+      throw new UnsupportedOperationException();
+    }
+
+    private boolean getNext() {
+      if (currentEntry == null || currentRowGroupIndex >= currentFooter.getBlocks().size()) {
+        if (!entries.hasNext()) {
+          return false;
+        }
+        currentEntry = entries.next();
+        try {
+          currentFooter = ParquetFileReader.readFooter(fs.getConf(), new Path(currentEntry.getPath()));
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+        currentRowGroupIndex = 0;
+      }
+      try {
+        RecordReader reader;
+        if (useNewReader || isComplex(currentFooter)) {
+          reader = new DrillParquetReader(context, currentFooter, currentEntry, currentRowGroupIndex, scan.getColumns(), fs);
+          reader.setKey(currentEntry.getPath());
+        } else {
+          reader = new ParquetRecordReader(context, currentEntry.getPath(), currentRowGroupIndex, fs,
+            scan.getStorageEngine().getCodecFactoryExposer(), currentFooter, scan.getColumns());
+          reader.setKey(currentEntry.getPath());
+        }
+        next = reader;
+      } catch (ExecutionSetupException e) {
+        throw new RuntimeException(e);
+      }
+      currentRowGroupIndex++;
+      return true;
+    }
   }
 
 }

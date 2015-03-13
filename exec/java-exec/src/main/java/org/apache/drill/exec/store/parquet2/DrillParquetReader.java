@@ -42,6 +42,7 @@ import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.MaterializedField.Key;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
+import org.apache.drill.exec.store.dfs.ReadEntryWithPath;
 import org.apache.drill.exec.store.parquet.RowGroupReadEntry;
 import org.apache.drill.exec.vector.AllocationHelper;
 import org.apache.drill.exec.vector.BaseValueVector;
@@ -85,7 +86,8 @@ public class DrillParquetReader extends AbstractRecordReader {
   private ParquetMetadata footer;
   private MessageType schema;
   private DrillFileSystem fileSystem;
-  private RowGroupReadEntry entry;
+  private ReadEntryWithPath entry;
+  private int rowGroupIndex;
   private VectorContainerWriter writer;
   private ColumnChunkIncReadStore pageReadStore;
   private parquet.io.RecordReader<Void> recordReader;
@@ -113,11 +115,12 @@ public class DrillParquetReader extends AbstractRecordReader {
   boolean noColumnsFound = false; // true if none of the columns in the projection list is found in the schema
 
 
-  public DrillParquetReader(FragmentContext fragmentContext, ParquetMetadata footer, RowGroupReadEntry entry,
+  public DrillParquetReader(FragmentContext fragmentContext, ParquetMetadata footer, ReadEntryWithPath entry, int rowGroupIndex,
       List<SchemaPath> columns, DrillFileSystem fileSystem) {
     this.footer = footer;
     this.fileSystem = fileSystem;
     this.entry = entry;
+    this.rowGroupIndex = rowGroupIndex;
     setColumns(columns);
     this.fragmentContext = fragmentContext;
     fillLevelCheckFrequency = this.fragmentContext.getOptions().getOption(ExecConstants.PARQUET_VECTOR_FILL_CHECK_THRESHOLD).num_val.intValue();
@@ -242,14 +245,14 @@ public class DrillParquetReader extends AbstractRecordReader {
       MessageColumnIO columnIO = factory.getColumnIO(projection, schema);
       Map<ColumnPath, ColumnChunkMetaData> paths = new HashMap();
 
-      for (ColumnChunkMetaData md : footer.getBlocks().get(entry.getRowGroupIndex()).getColumns()) {
+      for (ColumnChunkMetaData md : footer.getBlocks().get(rowGroupIndex).getColumns()) {
         paths.put(md.getPath(), md);
       }
 
       CodecFactoryExposer codecFactoryExposer = new CodecFactoryExposer(fileSystem.getConf());
       Path filePath = new Path(entry.getPath());
 
-      BlockMetaData blockMetaData = footer.getBlocks().get(entry.getRowGroupIndex());
+      BlockMetaData blockMetaData = footer.getBlocks().get(rowGroupIndex);
 
       recordCount = (int) blockMetaData.getRowCount();
 
@@ -299,11 +302,11 @@ public class DrillParquetReader extends AbstractRecordReader {
 
     // No columns found in the file were selected, simply return a full batch of null records for each column requested
     if (noColumnsFound) {
-      if (mockRecordsRead == footer.getBlocks().get(entry.getRowGroupIndex()).getRowCount()) {
+      if (mockRecordsRead == footer.getBlocks().get(rowGroupIndex).getRowCount()) {
         return 0;
       }
       long recordsToRead = 0;
-      recordsToRead = Math.min(DEFAULT_RECORDS_TO_READ, footer.getBlocks().get(entry.getRowGroupIndex()).getRowCount() - mockRecordsRead);
+      recordsToRead = Math.min(DEFAULT_RECORDS_TO_READ, footer.getBlocks().get(rowGroupIndex).getRowCount() - mockRecordsRead);
       for (ValueVector vv : nullFilledVectors ) {
         vv.getMutator().setValueCount( (int) recordsToRead);
       }

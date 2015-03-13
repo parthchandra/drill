@@ -19,6 +19,8 @@ package org.apache.drill.exec.store.schedule;
 
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +32,7 @@ import org.apache.drill.exec.metrics.DrillMetrics;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.store.TimedRunnable;
 import org.apache.drill.exec.store.dfs.easy.FileWork;
+import org.apache.drill.exec.store.parquet.Metadata;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -48,22 +51,22 @@ import com.google.common.collect.Range;
 
 public class BlockMapBuilder {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BlockMapBuilder.class);
-  static final MetricRegistry metrics = DrillMetrics.getInstance();
-  static final String BLOCK_MAP_BUILDER_TIMER = MetricRegistry.name(BlockMapBuilder.class, "blockMapBuilderTimer");
 
-  private final Map<Path,ImmutableRangeMap<Long,BlockLocation>> blockMapMap = Maps.newConcurrentMap();
+  private final Map<String,ImmutableRangeMap<Long,BlockLocation>> blockMapMap = Maps.newConcurrentMap();
   private final FileSystem fs;
   private final ImmutableMap<String,DrillbitEndpoint> endPointMap;
   private final CompressionCodecFactory codecFactory;
+  private Map<String,List<BlockLocation>> cachedBlocks;
 
-  public BlockMapBuilder(FileSystem fs, Collection<DrillbitEndpoint> endpoints) {
+  public BlockMapBuilder(FileSystem fs, Collection<DrillbitEndpoint> endpoints, Map<String,List<BlockLocation>> cachedBlocks) {
     this.fs = fs;
     this.codecFactory = new CompressionCodecFactory(fs.getConf());
     this.endPointMap = buildEndpointMap(endpoints);
+    this.cachedBlocks = cachedBlocks;
   }
 
-  private boolean compressed(FileStatus fileStatus) {
-    return codecFactory.getCodec(fileStatus.getPath()) != null;
+  private boolean compressed(FileStatus status) {
+    return codecFactory.getCodec(status.getPath()) != null;
   }
 
   public List<CompleteFileWork> generateFileWork(List<FileStatus> files, boolean blockify) throws IOException {
@@ -153,18 +156,31 @@ public class BlockMapBuilder {
   }
 
   private ImmutableRangeMap<Long,BlockLocation> buildBlockMap(Path path) throws IOException {
-    FileStatus status = fs.getFileStatus(path);
-    return buildBlockMap(status);
+    BlockLocation[] blocks;
+    String pathString = Path.getPathWithoutSchemeAndAuthority(path).toString();
+    {
+      if (cachedBlocks == null) {
+        FileStatus status = fs.getFileStatus(path);
+        blocks = fs.getFileBlockLocations(status, 0, status.getLen());
+      } else {
+        List<BlockLocation> blockList = cachedBlocks.get(pathString);
+        if (blockList == null) {
+          FileStatus status = fs.getFileStatus(path);
+          blocks = fs.getFileBlockLocations(status, 0, status.getLen());
+        } else {
+          blocks = new BlockLocation[blockList.size()];
+          blockList.toArray(blocks);
+        }
+      }
+    }
+    return buildBlockMap(blocks, pathString);
   }
 
   /**
    * Builds a mapping of block locations to file byte range
    */
-  private ImmutableRangeMap<Long,BlockLocation> buildBlockMap(FileStatus status) throws IOException {
-    final Timer.Context context = metrics.timer(BLOCK_MAP_BUILDER_TIMER).time();
-    BlockLocation[] blocks;
+  private ImmutableRangeMap<Long,BlockLocation> buildBlockMap(BlockLocation[] blocks, String path) throws IOException {
     ImmutableRangeMap<Long,BlockLocation> blockMap;
-    blocks = fs.getFileBlockLocations(status, 0 , status.getLen());
     ImmutableRangeMap.Builder<Long, BlockLocation> blockMapBuilder = new ImmutableRangeMap.Builder<Long,BlockLocation>();
     for (BlockLocation block : blocks) {
       long start = block.getOffset();
@@ -173,8 +189,7 @@ public class BlockMapBuilder {
       blockMapBuilder = blockMapBuilder.put(range, block);
     }
     blockMap = blockMapBuilder.build();
-    blockMapMap.put(status.getPath(), blockMap);
-    context.stop();
+    blockMapMap.put(path, blockMap);
     return blockMap;
   }
 
@@ -189,7 +204,7 @@ public class BlockMapBuilder {
   private ImmutableRangeMap<Long,BlockLocation> getBlockMap(FileStatus status) throws IOException{
     ImmutableRangeMap<Long,BlockLocation> blockMap  = blockMapMap.get(status.getPath());
     if (blockMap == null) {
-      blockMap = buildBlockMap(status);
+      blockMap = buildBlockMap(fs.getFileBlockLocations(status, 0, status.getLen()), status.getPath().toString());
     }
     return blockMap;
   }
@@ -204,7 +219,7 @@ public class BlockMapBuilder {
   public EndpointByteMap getEndpointByteMap(FileWork work) throws IOException {
     Stopwatch watch = new Stopwatch();
     watch.start();
-    Path fileName = new Path(work.getPath());
+    Path fileName = Path.getPathWithoutSchemeAndAuthority(new Path(work.getPath()));
 
 
     ImmutableRangeMap<Long,BlockLocation> blockMap = getBlockMap(fileName);
@@ -234,14 +249,14 @@ public class BlockMapBuilder {
         if (endpoint != null) {
           endpointByteMap.add(endpoint, bytes);
         } else {
-          logger.info("Failure finding Drillbit running on host {}.  Skipping affinity to that host.", host);
+          logger.trace("Failure finding Drillbit running on host {}.  Skipping affinity to that host.", host);
         }
       }
     }
 
-    logger.debug("FileWork group ({},{}) max bytes {}", work.getPath(), work.getStart(), endpointByteMap.getMaxBytes());
+//    logger.debug("FileWork group ({},{}) max bytes {}", work.getPath(), work.getStart(), endpointByteMap.getMaxBytes());
 
-    logger.debug("Took {} ms to set endpoint bytes", watch.stop().elapsed(TimeUnit.MILLISECONDS));
+//    logger.debug("Took {} ms to set endpoint bytes", watch.stop().elapsed(TimeUnit.MILLISECONDS));
     return endpointByteMap;
   }
 

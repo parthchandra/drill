@@ -120,7 +120,7 @@ public class AssignmentCreator<T extends CompleteWork> {
                 .get(currentEndpoint) >= endpointByteMap.getMaxBytes() * requiredPercentage))) {
 
           mappings.put(minorFragmentId, unit);
-          logger.debug("Assigned unit: {} to minorFragmentId: {}", unit, minorFragmentId);
+//          logger.debug("Assigned unit: {} to minorFragmentId: {}", unit, minorFragmentId);
           // logger.debug("Assigned rowGroup {} to minorFragmentId {} endpoint {}", rowGroupInfo.getRowGroupIndex(),
           // minorFragmentId, endpoints.get(minorFragmentId).getAddress());
           // if (bytesPerEndpoint.get(currentEndpoint) != null) {

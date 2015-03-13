@@ -60,4 +60,16 @@ public interface RecordReader {
 
   public abstract void cleanup();
 
+  /**
+   * This key will be used by ScanBatch to map record readers to the corresponding partition column set value set
+   * @param key
+   */
+  public abstract void setKey(Object key);
+
+  /**
+   * get the key for mapping to partition column value set
+   * @return
+   */
+  public abstract Object getKey();
+
 }
