@@ -19,6 +19,7 @@ package org.apache.drill.exec.store.schedule;
 
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +31,7 @@ import org.apache.drill.exec.metrics.DrillMetrics;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.store.TimedRunnable;
 import org.apache.drill.exec.store.dfs.easy.FileWork;
+import org.apache.drill.exec.store.parquet.Metadata;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -55,11 +57,22 @@ public class BlockMapBuilder {
   private final FileSystem fs;
   private final ImmutableMap<String,DrillbitEndpoint> endPointMap;
   private final CompressionCodecFactory codecFactory;
+  private Map<String,List<BlockLocation>> cachedBlocks;
 
-  public BlockMapBuilder(FileSystem fs, Collection<DrillbitEndpoint> endpoints) {
+  public BlockMapBuilder(FileSystem fs, Collection<DrillbitEndpoint> endpoints, String path) {
     this.fs = fs;
     this.codecFactory = new CompressionCodecFactory(fs.getConf());
     this.endPointMap = buildEndpointMap(endpoints);
+    if (path != null) {
+      try {
+        Path p = new Path(path, ".drill.blocks");
+        if (fs.exists(p)) {
+          cachedBlocks = Metadata.readBlockMeta(fs, p.toString());
+        }
+      } catch (IOException e) {
+        logger.warn("failure while attempting to read .drill.blocks");
+      }
+    }
   }
 
   private boolean compressed(FileStatus fileStatus) {
@@ -164,7 +177,17 @@ public class BlockMapBuilder {
     final Timer.Context context = metrics.timer(BLOCK_MAP_BUILDER_TIMER).time();
     BlockLocation[] blocks;
     ImmutableRangeMap<Long,BlockLocation> blockMap;
-    blocks = fs.getFileBlockLocations(status, 0 , status.getLen());
+    if (cachedBlocks == null) {
+      blocks = fs.getFileBlockLocations(status, 0, status.getLen());
+    } else {
+      List<BlockLocation> blockList = cachedBlocks.get(Path.getPathWithoutSchemeAndAuthority(status.getPath()).toString());
+      if (blockList == null) {
+        blocks = fs.getFileBlockLocations(status, 0, status.getLen());
+      } else {
+        blocks = new BlockLocation[blockList.size()];
+        blockList.toArray(blocks);
+      }
+    }
     ImmutableRangeMap.Builder<Long, BlockLocation> blockMapBuilder = new ImmutableRangeMap.Builder<Long,BlockLocation>();
     for (BlockLocation block : blocks) {
       long start = block.getOffset();

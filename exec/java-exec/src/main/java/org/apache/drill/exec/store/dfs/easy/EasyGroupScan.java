@@ -111,7 +111,7 @@ public class EasyGroupScan extends AbstractFileGroupScan{
 
   private void initFromSelection(FileSelection selection, EasyFormatPlugin<?> formatPlugin) throws IOException {
     this.selection = selection;
-    BlockMapBuilder b = new BlockMapBuilder(formatPlugin.getFileSystem(), formatPlugin.getContext().getBits());
+    BlockMapBuilder b = new BlockMapBuilder(formatPlugin.getFileSystem(), formatPlugin.getContext().getBits(), selection.getFirstPath(formatPlugin.getFileSystem()).getPath().toString());
     final int threadCount = formatPlugin.getContext().getConfig().getInt(ExecConstants.METATADATA_THREADS);
 
     this.chunks = b.generateFileWork(selection.getFileStatusList(formatPlugin.getFileSystem()), formatPlugin.isBlockSplittable(), threadCount);

@@ -250,7 +250,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
         String filePath = footer.getFile().toUri().getPath();
         rowGroupInfos.add(new ParquetGroupScan.RowGroupInfo(filePath, start, length, index));
-        logger.debug("rowGroupInfo path: {} start: {} length {}", filePath, start, length);
+//        logger.debug("rowGroupInfo path: {} start: {} length {}", filePath, start, length);
         index++;
 
         rowCount += rowGroup.getRowCount();
@@ -327,7 +327,11 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   public List<EndpointAffinity> getOperatorAffinity() {
 
     if (this.endpointAffinities == null) {
-      BlockMapBuilder bmb = new BlockMapBuilder(fs, formatPlugin.getContext().getBits());
+      String path = null;
+      if (entries.size() == 1) {
+        path = entries.get(0).getPath();
+      }
+      BlockMapBuilder bmb = new BlockMapBuilder(fs, formatPlugin.getContext().getBits(), path);
       final int threadCount = formatPlugin.getContext().getConfig().getInt(ExecConstants.METATADATA_THREADS);
 
       try {
