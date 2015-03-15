@@ -22,6 +22,7 @@ import io.netty.buffer.DrillBuf;
 import io.netty.buffer.PooledByteBufAllocatorL;
 import io.netty.buffer.UnsafeDirectLittleEndian;
 
+import org.apache.drill.exec.BitUtil;
 import java.util.IdentityHashMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -215,6 +216,11 @@ public class TopLevelAllocator implements BufferAllocator {
 
     @Override
     public DrillBuf buffer(int size, int max) {
+
+      BitUtil.logMemoryInfo();
+
+      logger.debug("Attempting to allocate buffer. size: {} max {}. Total allocation: {} limit: {}", size, max, TopLevelAllocator.this.getAllocatedMemory(), TopLevelAllocator.this.maximumAllocation);
+
       if (size == 0) {
         return empty;
       }
