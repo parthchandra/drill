@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.store.EventBasedRecordWriter.FieldConverter;
 import org.apache.drill.exec.store.StringOutputRecordWriter;
 import org.apache.drill.exec.vector.complex.reader.FieldReader;
@@ -50,9 +51,15 @@ public class DrillTextRecordWriter extends StringOutputRecordWriter {
   // Record write status
   private boolean fRecordStarted = false; // true once the startRecord() is called until endRecord() is called
   private StringBuilder currentRecord; // contains the current record separated by field delimiter
+  private OperatorContext oContext;
 
   public DrillTextRecordWriter(BufferAllocator allocator) {
     super(allocator);
+  }
+
+  @Override
+  public void setOperatorContext(OperatorContext oContext) {
+    this.oContext = oContext;
   }
 
   @Override

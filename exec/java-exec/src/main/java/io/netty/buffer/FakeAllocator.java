@@ -54,6 +54,11 @@ class FakeAllocator implements BufferAllocator {
   }
 
   @Override
+  public BufferAllocator getChildAllocator(FragmentContext context, long initialReservation, long maximumReservation, boolean applyFragmentLimit, String name) throws OutOfMemoryException {
+    return null;
+  }
+
+  @Override
   public DrillBuf getEmpty() {
     throw new UnsupportedOperationException();
   }
@@ -100,7 +105,7 @@ class FakeAllocator implements BufferAllocator {
   static class FakeAccountor extends Accountor {
 
     public FakeAccountor() {
-      super(null, false, null, null, 0, 0, true);
+      super(null, false, null, null, 0, 0, true, null);
     }
 
     @Override

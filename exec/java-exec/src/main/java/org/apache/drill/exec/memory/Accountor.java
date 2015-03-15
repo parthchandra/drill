@@ -23,7 +23,9 @@ import io.netty.buffer.DrillBuf;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.drill.common.config.DrillConfig;
@@ -47,6 +49,7 @@ public class Accountor {
   private final FragmentHandle handle;
   private String fragmentStr;
   private Accountor parent;
+  volatile private Set<Accountor> children = new HashSet();
 
   private final boolean errorOnLeak;
   // some operators are no subject to the fragment limit. They set the applyFragmentLimit to false
@@ -64,15 +67,22 @@ public class Accountor {
 
   private long peakMemoryAllocation = 0;
 
+  private String name;
+
   // The top level Allocator has an accountor that keeps track of all the FragmentContexts currently executing.
   // This enables the top level accountor to calculate a new fragment limit whenever necessary.
   private final List<FragmentContext> fragmentContexts;
 
-  public Accountor(DrillConfig config, boolean errorOnLeak, FragmentContext context, Accountor parent, long max, long preAllocated, boolean applyFragLimit) {
+  public Accountor(DrillConfig config, boolean errorOnLeak, FragmentContext context, Accountor parent, long max, long preAllocated, boolean applyFragLimit, String name) {
+    this.name = name;
     // TODO: fix preallocation stuff
     this.errorOnLeak = errorOnLeak;
     AtomicRemainder parentRemainder = parent != null ? parent.remainder : null;
     this.parent = parent;
+
+    if (parent != null) {
+      parent.addChild(this);
+    }
 
     boolean enableFragmentLimit;
     double  fragmentMemOvercommitFactor;
@@ -107,6 +117,28 @@ public class Accountor {
         addFragmentContext(this.fragmentContext);
       }
     }
+  }
+
+  public void logAccounting(StringBuilder builder, int level) {
+    for (int i = 0; i < level; i++) {
+      builder.append("\t");
+    }
+    builder.append(getAllocation());
+    builder.append("\t");
+    builder.append(name == null ? "unknown" : name);
+    builder.append("\n");
+
+    for (Accountor child : children) {
+      child.logAccounting(builder, level + 1);
+    }
+  }
+
+  void addChild(Accountor child) {
+    children.add(child);
+  }
+
+  void removeChild(Accountor child) {
+    children.remove(child);
   }
 
   public boolean transferTo(Accountor target, DrillBuf buf, long size) {
@@ -385,6 +417,10 @@ public class Accountor {
 
     remainder.close();
 
+    if (parent != null) {
+      parent.removeChild(this);
+    }
+
   }
 
   public void setFragmentLimit(long add) {
@@ -454,5 +490,4 @@ public class Accountor {
     }
 
   }
-
 }

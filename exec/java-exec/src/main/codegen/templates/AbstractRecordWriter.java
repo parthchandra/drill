@@ -23,6 +23,7 @@
 package org.apache.drill.exec.store;
 
 import org.apache.drill.exec.expr.holders.*;
+import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.store.EventBasedRecordWriter.FieldConverter;
 import org.apache.drill.exec.vector.complex.reader.FieldReader;
 
@@ -30,6 +31,13 @@ import java.io.IOException;
 import java.lang.UnsupportedOperationException;
 
 public abstract class AbstractRecordWriter implements RecordWriter {
+
+  protected OperatorContext oContext;
+
+  @Override
+  public void setOperatorContext(OperatorContext oContext) {
+    this.oContext = oContext;
+  }
 
   @Override
   public FieldConverter getNewMapConverter(int fieldId, String fieldName, FieldReader reader) {

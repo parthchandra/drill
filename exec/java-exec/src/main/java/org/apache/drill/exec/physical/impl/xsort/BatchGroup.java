@@ -51,17 +51,20 @@ public class BatchGroup implements VectorAccessible {
   private FileSystem fs;
   private BufferAllocator allocator;
   private int spilledBatches = 0;
+  private ExternalSortBatch externalSortBatch;
 
-  public BatchGroup(VectorContainer container, SelectionVector2 sv2) {
+  public BatchGroup(VectorContainer container, SelectionVector2 sv2, ExternalSortBatch externalSortBatch) {
     this.sv2 = sv2;
     this.currentContainer = container;
+    this.externalSortBatch = externalSortBatch;
   }
 
-  public BatchGroup(VectorContainer container, FileSystem fs, String path, BufferAllocator allocator) {
+  public BatchGroup(VectorContainer container, FileSystem fs, String path, BufferAllocator allocator, ExternalSortBatch externalSortBatch) {
     currentContainer = container;
     this.fs = fs;
     this.path = new Path(path);
     this.allocator = allocator;
+    this.externalSortBatch = externalSortBatch;
   }
 
   public SelectionVector2 getSv2() {
@@ -98,6 +101,8 @@ public class BatchGroup implements VectorAccessible {
     VectorContainer c =  vas.get();
 //    logger.debug("Took {} us to read {} records", watch.elapsed(TimeUnit.MICROSECONDS), c.getRecordCount());
     spilledBatches--;
+    externalSortBatch.addMemory(-1 * externalSortBatch.getBufferSize(currentContainer));
+    externalSortBatch.addMemory(1 * externalSortBatch.getBufferSize(c));
     currentContainer.zeroVectors();
     Iterator<VectorWrapper<?>> wrapperIterator = c.iterator();
     for (VectorWrapper w : currentContainer) {
@@ -143,6 +148,9 @@ public class BatchGroup implements VectorAccessible {
   }
 
   public void cleanup() throws IOException {
+    if (sv2 != null) {
+      externalSortBatch.addMemory(-1 * sv2.getCount() * 2);
+    }
     if (sv2 != null) {
       sv2.clear();
     }

@@ -57,6 +57,9 @@ public interface BufferAllocator extends Closeable {
   public abstract BufferAllocator getChildAllocator(FragmentContext context, long initialReservation,
       long maximumReservation, boolean applyFragmentLimit) throws OutOfMemoryException;
 
+  public abstract BufferAllocator getChildAllocator(FragmentContext context, long initialReservation,
+                                                    long maximumReservation, boolean applyFragmentLimit, String name) throws OutOfMemoryException;
+
   /**
    * Take over ownership of fragment accounting.  Always takes over ownership.
    * @param buf

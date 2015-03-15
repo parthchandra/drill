@@ -92,12 +92,10 @@ public class ParquetRecordWriter extends ParquetOutputRecordWriter {
   private String location;
   private String prefix;
   private int index = 0;
-  private OperatorContext oContext;
   private ParquetDirectByteBufferAllocator allocator;
 
   public ParquetRecordWriter(FragmentContext context, ParquetWriter writer) throws OutOfMemoryException{
     super();
-    this.oContext=new OperatorContext(writer, context, true);
   }
 
   @Override

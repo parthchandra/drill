@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.physical.impl.xsort;
 
+import com.codahale.metrics.Gauge;
 import io.netty.buffer.DrillBuf;
 
 import java.io.IOException;
@@ -24,6 +25,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.expression.ErrorCollector;
@@ -43,6 +45,7 @@ import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.expr.fn.FunctionGenerationHelper;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.memory.OutOfMemoryException;
+import org.apache.drill.exec.metrics.DrillMetrics;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.config.ExternalSort;
 import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
@@ -187,6 +190,23 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     }
   }
 
+  private static volatile AtomicLong globalMemory = new AtomicLong();
+
+  static {
+    DrillMetrics.getInstance().register("drill.exec.sort.totalMemory",
+        new Gauge<Long>() {
+          @Override
+          public Long getValue() {
+            return globalMemory.get();
+          }
+        });
+  }
+
+  void addMemory(long mem) {
+    totalSizeInMemory += mem;
+    globalMemory.addAndGet(mem);
+  }
+
   @Override
   public IterOutcome innerNext() {
     if (schema != null) {
@@ -255,7 +275,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
             }
             break;
           }
-          totalSizeInMemory += getBufferSize(incoming);
+          addMemory(getBufferSize(incoming));
           SelectionVector2 sv2;
           if (incoming.getSchema().getSelectionVectorMode() == BatchSchema.SelectionVectorMode.TWO_BYTE) {
             sv2 = incoming.getSelectionVector2();
@@ -269,6 +289,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
               throw new RuntimeException(e);
             }
           }
+          addMemory(sv2.getCount()*2);
           int count = sv2.getCount();
           totalCount += count;
 //          if (count == 0) {
@@ -283,7 +304,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
           if (incoming.getSchema().getSelectionVectorMode() == SelectionVectorMode.NONE) {
             rbd.setSv2(sv2);
           }
-          batchGroups.add(new BatchGroup(rbd.getContainer(), rbd.getSv2()));
+          batchGroups.add(new BatchGroup(rbd.getContainer(), rbd.getSv2(), this));
           batchesSinceLastSpill++;
           if (// We have spilled at least once and the current memory used is more than the 75% of peak memory used.
               (spillCount > 0 && totalSizeInMemory > .75 * highWaterMark) ||
@@ -398,7 +419,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
       BatchGroup batch = batchGroups.pollLast();
       batchGroupList.add(batch);
       long bufferSize = getBufferSize(batch);
-      totalSizeInMemory -= bufferSize;
+      addMemory(-1 * bufferSize);
     }
     if (batchGroupList.size() == 0) {
       return;
@@ -413,6 +434,8 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     }
     int targetRecordCount = Math.max(1, 250 * 1000 / estimatedRecordSize);
     VectorContainer hyperBatch = constructHyperBatch(batchGroupList);
+    long size = batchGroupList.size();
+    addMemory(size);
     createCopier(hyperBatch, batchGroupList, outputContainer);
 
     int count = copier.next(targetRecordCount);
@@ -423,7 +446,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     c1.setRecordCount(count);
 
     String outputFile = getFileName(spillCount++);
-    BatchGroup newGroup = new BatchGroup(c1, fs, outputFile, oContext.getAllocator());
+    BatchGroup newGroup = new BatchGroup(c1, fs, outputFile, oContext.getAllocator(), this);
 
     try {
       while ((count = copier.next(targetRecordCount)) > 0) {
@@ -441,7 +464,9 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
       throw new RuntimeException(e);
     }
     takeOwnership(c1);
-    totalSizeInMemory += getBufferSize(c1);
+    addMemory(getBufferSize(c1));
+    copier.cleanup();
+    addMemory(-size);
   }
 
   private void takeOwnership(VectorAccessible batch) {
@@ -455,7 +480,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     }
   }
 
-  private long getBufferSize(VectorAccessible batch) {
+  long getBufferSize(VectorAccessible batch) {
     long size = 0;
     for (VectorWrapper w : batch) {
       DrillBuf[] bufs = w.getValueVector().getBuffers(false);
@@ -618,8 +643,6 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
         CopyUtil.generateCopies(g, batch, true);
         g.setMappingSet(MAIN_MAPPING);
         copier = context.getImplementationClass(cg);
-      } else {
-        copier.cleanup();
       }
 
       for (VectorWrapper<?> i : batch) {

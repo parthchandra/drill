@@ -22,6 +22,7 @@
 package org.apache.drill.exec.store;
 
 import org.apache.drill.exec.expr.holders.*;
+import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.store.EventBasedRecordWriter.FieldConverter;
 import org.apache.drill.exec.vector.complex.reader.FieldReader;
@@ -32,6 +33,8 @@ import java.util.Map;
 
 /** RecordWriter interface. */
 public interface RecordWriter {
+
+  void setOperatorContext(OperatorContext oContext);
 
   /**
    * Initialize the writer.

@@ -60,6 +60,7 @@ public class WriterRecordBatch extends AbstractRecordBatch<Writer> {
     FragmentHandle handle = context.getHandle();
     fragmentUniqueId = String.format("%d_%d", handle.getMajorFragmentId(), handle.getMinorFragmentId());
     this.recordWriter = recordWriter;
+    recordWriter.setOperatorContext(oContext);
   }
 
   @Override

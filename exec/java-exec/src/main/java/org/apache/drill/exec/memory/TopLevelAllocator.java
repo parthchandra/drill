@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.memory;
 
+import com.codahale.metrics.MetricRegistry;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.DrillBuf;
 import io.netty.buffer.PooledByteBufAllocatorL;
@@ -30,8 +31,10 @@ import java.util.Map.Entry;
 
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.metrics.DrillMetrics;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.proto.ExecProtos.FragmentHandle;
+import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.util.AssertionUtil;
 import org.apache.drill.exec.util.Pointer;
 
@@ -46,6 +49,7 @@ public class TopLevelAllocator implements BufferAllocator {
   private final DrillBuf empty;
   private final DrillConfig config;
   private long maximumAllocation;
+  private Thread loggerThread;
 
   @Deprecated
   public TopLevelAllocator() {
@@ -60,10 +64,12 @@ public class TopLevelAllocator implements BufferAllocator {
   private TopLevelAllocator(DrillConfig config, long maximumAllocation, boolean errorOnLeak){
     this.config=(config!=null) ? config : DrillConfig.create();
     this.errorOnLeak = errorOnLeak;
-    this.acct = new Accountor(config, errorOnLeak, null, null, maximumAllocation, 0, true);
+    this.acct = new Accountor(config, errorOnLeak, null, null, maximumAllocation, 0, true, "Top");
     this.empty = DrillBuf.getEmpty(this, acct);
     this.childrenMap = ENABLE_ACCOUNTING ? new IdentityHashMap<ChildAllocator, StackTraceElement[]>() : null;
     this.maximumAllocation = maximumAllocation;
+    this.loggerThread = new Thread(new AllocationLogger());
+    this.loggerThread.start();
   }
 
   public TopLevelAllocator(DrillConfig config) {
@@ -119,12 +125,23 @@ public class TopLevelAllocator implements BufferAllocator {
 
   @Override
   public BufferAllocator getChildAllocator(FragmentContext context, long initialReservation, long maximumReservation, boolean applyFragmentLimit) throws OutOfMemoryException {
+    String name;
+    try {
+      name = String.format("%s_%s_%s", QueryIdHelper.getQueryId(context.getHandle().getQueryId()), context.getHandle().getMajorFragmentId(), context.getHandle().getMinorFragmentId());
+    } catch (NullPointerException e) {
+      name = null;
+    }
+    return getChildAllocator(context, initialReservation, maximumReservation, applyFragmentLimit, name);
+  }
+
+  @Override
+  public BufferAllocator getChildAllocator(FragmentContext context, long initialReservation, long maximumReservation, boolean applyFragmentLimit, String name) throws OutOfMemoryException {
     if(!acct.reserve(initialReservation)){
       logger.debug(String.format("You attempted to create a new child allocator with initial reservation %d but only %d bytes of memory were available.", initialReservation, acct.getCapacity() - acct.getAllocation()));
       throw new OutOfMemoryException(String.format("You attempted to create a new child allocator with initial reservation %d but only %d bytes of memory were available.", initialReservation, acct.getCapacity() - acct.getAllocation()));
     };
     logger.debug("New child allocator with initial reservation {}", initialReservation);
-    ChildAllocator allocator = new ChildAllocator(context, acct, maximumReservation, initialReservation, childrenMap, applyFragmentLimit);
+    ChildAllocator allocator = new ChildAllocator(context, acct, maximumReservation, initialReservation, childrenMap, applyFragmentLimit, name);
     if(ENABLE_ACCOUNTING){
       childrenMap.put(allocator, Thread.currentThread().getStackTrace());
     }
@@ -149,6 +166,7 @@ public class TopLevelAllocator implements BufferAllocator {
 
   @Override
   public void close() {
+    loggerThread.interrupt();
     if (ENABLE_ACCOUNTING) {
       for (Entry<ChildAllocator, StackTraceElement[]> child : childrenMap.entrySet()) {
         if (!child.getKey().isClosed()) {
@@ -164,6 +182,7 @@ public class TopLevelAllocator implements BufferAllocator {
       }
     }
     acct.close();
+    loggerThread.interrupt();
   }
 
 
@@ -171,6 +190,35 @@ public class TopLevelAllocator implements BufferAllocator {
   @Override
   public DrillBuf getEmpty() {
     return empty;
+  }
+
+  public void logAllocationDetails() {
+    if (logger.isDebugEnabled()) {
+      StringBuilder builder = new StringBuilder();
+      builder.append("Memory accounting:\n");
+      acct.logAccounting(builder, 0);
+      logger.debug(builder.toString());
+    }
+  }
+
+  private class AllocationLogger implements Runnable {
+
+    @Override
+    public void run() {
+      while (true) {
+        logAllocationDetails();
+        BitUtil.logMemoryInfo();
+        if (Thread.interrupted()) {
+          return;
+        }
+        try {
+          Thread.sleep(10000);
+        } catch (InterruptedException e) {
+          logger.debug("Allocation logger thread interrupted. Exiting");
+          return;
+        }
+      }
+    }
   }
 
 
@@ -191,11 +239,12 @@ public class TopLevelAllocator implements BufferAllocator {
                           long pre,
                           Map<ChildAllocator,
                           StackTraceElement[]> map,
-                          boolean applyFragmentLimit) throws OutOfMemoryException{
+                          boolean applyFragmentLimit,
+                          String name) throws OutOfMemoryException{
       assert max >= pre;
       this.applyFragmentLimit=applyFragmentLimit;
       DrillConfig drillConf = context != null ? context.getConfig() : null;
-      childAcct = new Accountor(drillConf, errorOnLeak, context, parentAccountor, max, pre, applyFragmentLimit);
+      childAcct = new Accountor(drillConf, errorOnLeak, context, parentAccountor, max, pre, applyFragmentLimit, name);
       this.fragmentContext=context;
       this.handle = context != null ? context.getHandle() : null;
       thisMap = map;
@@ -216,10 +265,6 @@ public class TopLevelAllocator implements BufferAllocator {
 
     @Override
     public DrillBuf buffer(int size, int max) {
-
-      BitUtil.logMemoryInfo();
-
-      logger.debug("Attempting to allocate buffer. size: {} max {}. Total allocation: {} limit: {}", size, max, TopLevelAllocator.this.getAllocatedMemory(), TopLevelAllocator.this.maximumAllocation);
 
       if (size == 0) {
         return empty;
@@ -252,11 +297,17 @@ public class TopLevelAllocator implements BufferAllocator {
     @Override
     public BufferAllocator getChildAllocator(FragmentContext context, long initialReservation, long maximumReservation, boolean applyFragmentLimit)
         throws OutOfMemoryException {
+      return getChildAllocator(context, initialReservation, maximumReservation, applyFragmentLimit, null);
+    }
+
+    @Override
+    public BufferAllocator getChildAllocator(FragmentContext context, long initialReservation, long maximumReservation, boolean applyFragmentLimit, String name)
+        throws OutOfMemoryException {
       if (!childAcct.reserve(initialReservation)) {
         throw new OutOfMemoryException(String.format("You attempted to create a new child allocator with initial reservation %d but only %d bytes of memory were available.", initialReservation, childAcct.getAvailable()));
       };
       logger.debug("New child allocator with initial reservation {}", initialReservation);
-      ChildAllocator newChildAllocator = new ChildAllocator(context, childAcct, maximumReservation, initialReservation, null, applyFragmentLimit);
+      ChildAllocator newChildAllocator = new ChildAllocator(context, childAcct, maximumReservation, initialReservation, null, applyFragmentLimit, name);
       this.children.put(newChildAllocator, Thread.currentThread().getStackTrace());
       return newChildAllocator;
     }

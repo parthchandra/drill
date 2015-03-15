@@ -19,6 +19,8 @@ package org.apache.drill.exec.server;
 
 import java.io.Closeable;
 
+import com.codahale.metrics.Gauge;
+import com.codahale.metrics.MetricRegistry;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.coord.ClusterCoordinator;
@@ -113,6 +115,7 @@ public class Drillbit implements Closeable{
       this.coord = new ZKClusterCoordinator(config);
       this.storeProvider = new PStoreRegistry(this.coord, config).newPStoreProvider();
     }
+
   }
 
   private void startJetty() throws Exception{
@@ -156,6 +159,18 @@ public class Drillbit implements Closeable{
     manager.getContext().getOptionManager().init();
     handle = coord.register(md);
     startJetty();
+    try {
+      context.getMetrics().register(
+          MetricRegistry.name("drill.exec.memory.allocatedMemory" + manager.getContext().getEndpoint().getUserPort()),
+          new Gauge<Long>() {
+            @Override
+            public Long getValue() {
+              return manager.getContext().getAllocator().getAllocatedMemory();
+            }
+          });
+    } catch (IllegalArgumentException e) {
+      logger.warn("Exception while registering metrics", e);
+    }
   }
 
   public void close() {

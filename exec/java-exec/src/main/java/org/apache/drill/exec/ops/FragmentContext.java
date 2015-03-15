@@ -210,8 +210,9 @@ public class FragmentContext implements Closeable, UdfUtilities {
 
   public BufferAllocator getNewChildAllocator(long initialReservation,
                                               long maximumReservation,
-                                              boolean applyFragmentLimit) throws OutOfMemoryException {
-    return allocator.getChildAllocator(this, initialReservation, maximumReservation, applyFragmentLimit);
+                                              boolean applyFragmentLimit,
+                                              String name) throws OutOfMemoryException {
+    return allocator.getChildAllocator(this, initialReservation, maximumReservation, applyFragmentLimit, name);
   }
 
   public <T> T getImplementationClass(ClassGenerator<T> cg) throws ClassTransformationException, IOException {
