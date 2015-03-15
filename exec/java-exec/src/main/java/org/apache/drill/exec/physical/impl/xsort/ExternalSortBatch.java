@@ -461,9 +461,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     for (VectorWrapper w : batch) {
       DrillBuf[] bufs = w.getValueVector().getBuffers(false);
       for (DrillBuf buf : bufs) {
-        if (buf.isRootBuffer()) {
-          size += buf.capacity();
-        }
+        size += buf.capacity();
       }
     }
     return size;
