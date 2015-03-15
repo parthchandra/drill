@@ -44,6 +44,7 @@ public class TopLevelAllocator implements BufferAllocator {
   private final boolean errorOnLeak;
   private final DrillBuf empty;
   private final DrillConfig config;
+  private long maximumAllocation;
 
   @Deprecated
   public TopLevelAllocator() {
@@ -61,6 +62,7 @@ public class TopLevelAllocator implements BufferAllocator {
     this.acct = new Accountor(config, errorOnLeak, null, null, maximumAllocation, 0, true);
     this.empty = DrillBuf.getEmpty(this, acct);
     this.childrenMap = ENABLE_ACCOUNTING ? new IdentityHashMap<ChildAllocator, StackTraceElement[]>() : null;
+    this.maximumAllocation = maximumAllocation;
   }
 
   public TopLevelAllocator(DrillConfig config) {
@@ -221,10 +223,15 @@ public class TopLevelAllocator implements BufferAllocator {
         return null;
       };
 
-      UnsafeDirectLittleEndian buffer = innerAllocator.directBuffer(size, max);
-      DrillBuf wrapped = new DrillBuf(this, childAcct, buffer);
-      childAcct.reserved(buffer.capacity(), wrapped);
-      return wrapped;
+      try {
+        UnsafeDirectLittleEndian buffer = innerAllocator.directBuffer(size, max);
+        DrillBuf wrapped = new DrillBuf(this, childAcct, buffer);
+        childAcct.reserved(buffer.capacity(), wrapped);
+        return wrapped;
+      } catch (OutOfMemoryError e) {
+        logger.error("Caught OOM error while trying to allocate buffer of size {}. Current total allocation: {}. Limit: {}", size, TopLevelAllocator.this.getAllocatedMemory(), TopLevelAllocator.this.maximumAllocation);
+        throw e;
+      }
     }
 
     public DrillBuf buffer(int size) {
