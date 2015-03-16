@@ -147,19 +147,20 @@ public class DataServer extends BasicServer<RpcType, BitServerConnection> {
 
           BufferAllocator allocator = manager.getFragmentContext().getAllocator();
 
-          boolean withinMemoryEnvelope = allocator.takeOwnership((DrillBuf) body, out);
+//          boolean withinMemoryEnvelope = allocator.takeOwnership((DrillBuf) body, out);
 
-          if(!withinMemoryEnvelope){
+//          if(!withinMemoryEnvelope){
             // if we over reserved, we need to add poison pill before batch.
-            dataHandler.handle(manager, OOM_FRAGMENT, null, null);
-          }
+//            dataHandler.handle(manager, OOM_FRAGMENT, null, null);
+//          }
 
           ack.increment();
-          dataHandler.handle(manager, fragmentBatch, out.value, ack);
+//          dataHandler.handle(manager, fragmentBatch, out.value, ack);
+          dataHandler.handle(manager, fragmentBatch, (DrillBuf) body, ack);
 
           // make sure to release the reference count we have to the new buffer.
           // dataHandler.handle should have taken any ownership it needed.
-          out.value.release();
+//          out.value.release();
         }
         out = null;
       }
