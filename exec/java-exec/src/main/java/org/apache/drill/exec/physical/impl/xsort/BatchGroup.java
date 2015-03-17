@@ -148,6 +148,8 @@ public class BatchGroup implements VectorAccessible {
   }
 
   public void cleanup() throws IOException {
+    externalSortBatch.addMemory(-1 * externalSortBatch.getBufferSize(currentContainer));
+    currentContainer.zeroVectors();
     if (sv2 != null) {
       externalSortBatch.addMemory(-1 * sv2.getCount() * 2);
     }
