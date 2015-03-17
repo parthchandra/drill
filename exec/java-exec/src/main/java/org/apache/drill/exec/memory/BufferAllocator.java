@@ -42,16 +42,6 @@ public interface BufferAllocator extends Closeable {
    */
   public abstract DrillBuf buffer(int size);
 
-  /**
-   * Allocate a new or reused buffer within provided range. Note that the buffer may technically be larger than the
-   * requested size for rounding purposes. However, the buffers capacity will be set to the configured size.
-   *
-   * @param minSize The minimum size in bytes.
-   * @param maxSize The maximum size in bytes.
-   * @return A new ByteBuf.
-   */
-  public abstract DrillBuf buffer(int minSize, int maxSize);
-
   public abstract ByteBufAllocator getUnderlyingAllocator();
 
   public abstract BufferAllocator getChildAllocator(FragmentContext context, long initialReservation,

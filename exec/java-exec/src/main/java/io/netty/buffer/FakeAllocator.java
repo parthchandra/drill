@@ -37,11 +37,6 @@ class FakeAllocator implements BufferAllocator {
   }
 
   @Override
-  public DrillBuf buffer(int minSize, int maxSize) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public ByteBufAllocator getUnderlyingAllocator() {
     throw new UnsupportedOperationException();
   }

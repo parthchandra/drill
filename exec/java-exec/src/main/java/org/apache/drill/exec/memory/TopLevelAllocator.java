@@ -90,22 +90,35 @@ public class TopLevelAllocator implements BufferAllocator {
     return acct.transferIn(b, b.capacity());
   }
 
-  public DrillBuf buffer(int min, int max) {
-    if (min == 0) {
-      return empty;
+  /**
+   * returns the value of num rounded up to nearest power of 2 i.e., 31 -> 32, 64 -> 64
+   * @param num
+   * @return the nearest power of 2
+   */
+  private static int powerOf2(int num) {
+    if (num == 0) {
+      return num;
     }
-    if(!acct.reserve(min)) {
-      return null;
+    if (Integer.bitCount(num) == 1) {
+      return num;
     }
-    UnsafeDirectLittleEndian buffer = innerAllocator.directBuffer(min, max);
-    DrillBuf wrapped = new DrillBuf(this, acct, buffer);
-    acct.reserved(min, wrapped);
-    return wrapped;
+    int highestOne = Integer.highestOneBit(num);
+    return highestOne << 1;
   }
 
   @Override
   public DrillBuf buffer(int size) {
-    return buffer(size, size);
+    if (size == 0) {
+      return empty;
+    }
+    int adjustedSize = powerOf2(size);
+    if(!acct.reserve(adjustedSize)) {
+      return null;
+    }
+    UnsafeDirectLittleEndian buffer = innerAllocator.directBuffer(adjustedSize, adjustedSize);
+    DrillBuf wrapped = new DrillBuf(this, acct, buffer);
+    acct.reserved(adjustedSize, wrapped);
+    return wrapped;
   }
 
   @Override
@@ -264,29 +277,26 @@ public class TopLevelAllocator implements BufferAllocator {
     }
 
     @Override
-    public DrillBuf buffer(int size, int max) {
+    public DrillBuf buffer(int size) {
 
       if (size == 0) {
         return empty;
       }
-      if(!childAcct.reserve(size)) {
+      int adjustedSize = powerOf2(size);
+      if(!childAcct.reserve(adjustedSize)) {
         logger.warn("Unable to allocate buffer of size {} due to memory limit. Current allocation: {}", size, getAllocatedMemory(), new Exception());
         return null;
       };
 
       try {
-        UnsafeDirectLittleEndian buffer = innerAllocator.directBuffer(size, max);
+        UnsafeDirectLittleEndian buffer = innerAllocator.directBuffer(adjustedSize, adjustedSize);
         DrillBuf wrapped = new DrillBuf(this, childAcct, buffer);
-        childAcct.reserved(buffer.capacity(), wrapped);
+        childAcct.reserved(adjustedSize, wrapped);
         return wrapped;
       } catch (OutOfMemoryError e) {
         logger.error("Caught OOM error while trying to allocate buffer of size {}. Current total allocation: {}. Limit: {}", size, TopLevelAllocator.this.getAllocatedMemory(), TopLevelAllocator.this.maximumAllocation);
         throw e;
       }
-    }
-
-    public DrillBuf buffer(int size) {
-      return buffer(size, size);
     }
 
     @Override
@@ -413,7 +423,8 @@ public class TopLevelAllocator implements BufferAllocator {
 
 
     public DrillBuf getAllocation() {
-      DrillBuf b = new DrillBuf(allocator, acct, innerAllocator.directBuffer(bytes, bytes));
+      int adjustedSize = powerOf2(bytes);
+      DrillBuf b = new DrillBuf(allocator, acct, innerAllocator.directBuffer(adjustedSize, adjustedSize));
       acct.reserved(bytes, b);
       return b;
     }
