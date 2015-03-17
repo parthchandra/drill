@@ -221,7 +221,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
   }
   
   public void copyFromSafe(int fromIndex, int thisIndex, ${minor.class}Vector from){
-    if(thisIndex >= getValueCapacity()) {
+    while(thisIndex >= getValueCapacity()) {
         reAlloc();
     }
     copyFrom(fromIndex, thisIndex, from);
@@ -560,7 +560,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, <#if (type.width > 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      data.setBytes(index * ${type.width}, value, 0, ${type.width});
@@ -581,7 +581,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, long timestamp, int tzindex){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, timestamp, tzindex);
@@ -612,7 +612,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, int months, int days, int milliseconds){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, months, days, milliseconds);
@@ -641,7 +641,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, int days, int milliseconds){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, days, milliseconds);
@@ -673,7 +673,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
    
    public void setSafe(int index, int start, DrillBuf buffer){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, start, buffer);
@@ -705,7 +705,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
    
    public void setSafe(int index, int start, DrillBuf buffer){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, holder);
@@ -737,7 +737,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, <#if (type.width >= 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, value);
@@ -748,7 +748,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, ${minor.class}Holder holder){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, holder);
@@ -759,7 +759,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
    }
 
    public void setSafe(int index, Nullable${minor.class}Holder holder){
-     if(index >= getValueCapacity()) {
+     while(index >= getValueCapacity()) {
        reAlloc();
      }
      set(index, holder);
