@@ -18,6 +18,7 @@
 package org.apache.drill.exec.physical.impl.xsort;
 
 import com.codahale.metrics.Gauge;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import io.netty.buffer.PooledByteBufAllocatorL;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.expression.ErrorCollector;
 import org.apache.drill.common.expression.ErrorCollectorImpl;
@@ -435,7 +437,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     int targetRecordCount = Math.max(1, 250 * 1000 / estimatedRecordSize);
     VectorContainer hyperBatch = constructHyperBatch(batchGroupList);
     long size = batchGroupList.size();
-    addMemory(size);
+    addMemory(size * 4); // account for selection vector in hyperBatch
     createCopier(hyperBatch, batchGroupList, outputContainer);
 
     int count = copier.next(targetRecordCount);
@@ -466,7 +468,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     takeOwnership(c1);
     addMemory(getBufferSize(c1));
     copier.cleanup();
-    addMemory(-size);
+    addMemory(-size * 4);
   }
 
   private void takeOwnership(VectorAccessible batch) {
@@ -485,6 +487,9 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     for (VectorWrapper w : batch) {
       DrillBuf[] bufs = w.getValueVector().getBuffers(false);
       for (DrillBuf buf : bufs) {
+        if (!buf.isRootBuffer()) {
+          return PooledByteBufAllocatorL.getMaxLength(buf);
+        }
         size += buf.capacity();
       }
     }

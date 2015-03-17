@@ -31,6 +31,18 @@ public class PooledByteBufAllocatorL extends PooledByteBufAllocator{
 //    emptyBuf = newDirectBuffer(0,0);
   }
 
+  public static int getMaxLength(ByteBuf buf) {
+    ByteBuf b = buf.unwrap();
+    int count = 0;
+    while (!(b instanceof PooledByteBuf)) {
+      b = b.unwrap();
+      if (count++ > 1000) {
+        return buf.maxCapacity();
+      }
+    }
+    return ((PooledByteBuf) b).maxLength;
+  }
+
   @Override
   protected ByteBuf newHeapBuffer(int initialCapacity, int maxCapacity) {
     throw new UnsupportedOperationException("Drill doesn't support using heap buffers.");
