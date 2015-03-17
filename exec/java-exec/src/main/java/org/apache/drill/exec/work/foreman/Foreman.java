@@ -331,7 +331,7 @@ public class Foreman implements Runnable, Closeable, Comparable<Object> {
     }
   }
 
-  private void setupSortMemoryAllocations(PhysicalPlan plan){
+  private void setupSortMemoryAllocations(PhysicalPlan plan) throws ForemanSetupException {
     int sortCount = 0;
     int parquetWriterCount = 0;
     for (PhysicalOperator op : plan.getSortedOperators()) {
@@ -347,6 +347,9 @@ public class Foreman implements Runnable, Closeable, Comparable<Object> {
       long maxAllocPerNode = Math.min(DrillConfig.getMaxDirectMemory(),
           context.getConfig().getLong(ExecConstants.TOP_LEVEL_MAX_ALLOC))
           - 2 * parquetWriterCount * maxWidthPerNode * context.getOptions().getOption(ExecConstants.PARQUET_BLOCK_SIZE).num_val;
+      if (maxAllocPerNode < 64*1024*1024) {
+        throw new ForemanSetupException("Not enough memory for sort. Reduce query width or lower writer block size");
+      }
 //      maxAllocPerNode = Math.min(maxAllocPerNode,
 //          context.getOptions().getOption(ExecConstants.MAX_QUERY_MEMORY_PER_NODE_KEY).num_val);
       long maxSortAlloc = (long) (maxAllocPerNode / (sortCount * maxWidthPerNode) * .75);
