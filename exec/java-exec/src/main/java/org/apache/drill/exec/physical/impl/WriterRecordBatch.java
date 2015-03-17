@@ -181,8 +181,6 @@ public class WriterRecordBatch extends AbstractRecordBatch<Writer> {
 
   @Override
   public void cleanup() {
-    super.cleanup();
-    incoming.cleanup();
     try {
       if (recordWriter != null) {
         recordWriter.cleanup();
@@ -191,6 +189,8 @@ public class WriterRecordBatch extends AbstractRecordBatch<Writer> {
       logger.error("Failure while closing record writer", ex);
       throw new RuntimeException("Failed to close RecordWriter", ex);
     }
+    super.cleanup();
+    incoming.cleanup();
   }
 
 }
