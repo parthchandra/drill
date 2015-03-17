@@ -346,7 +346,7 @@ public class Foreman implements Runnable, Closeable, Comparable<Object> {
       long maxWidthPerNode = context.getOptions().getOption(ExecConstants.MAX_WIDTH_PER_NODE_KEY).num_val;
       long maxAllocPerNode = Math.min(DrillConfig.getMaxDirectMemory(),
           context.getConfig().getLong(ExecConstants.TOP_LEVEL_MAX_ALLOC))
-          - parquetWriterCount * maxWidthPerNode * context.getOptions().getOption(ExecConstants.PARQUET_BLOCK_SIZE).num_val;
+          - 2 * parquetWriterCount * maxWidthPerNode * context.getOptions().getOption(ExecConstants.PARQUET_BLOCK_SIZE).num_val;
 //      maxAllocPerNode = Math.min(maxAllocPerNode,
 //          context.getOptions().getOption(ExecConstants.MAX_QUERY_MEMORY_PER_NODE_KEY).num_val);
       long maxSortAlloc = (long) (maxAllocPerNode / (sortCount * maxWidthPerNode) * .75);
