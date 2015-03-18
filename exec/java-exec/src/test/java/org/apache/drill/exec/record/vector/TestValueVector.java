@@ -19,6 +19,7 @@ package org.apache.drill.exec.record.vector;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import java.nio.charset.Charset;
 
@@ -384,8 +385,8 @@ public class TestValueVector extends ExecTest {
     for(int i=0; i<valueVectors.length; i++) {
       final ValueVector vv = valueVectors[i];
       final int vvCapacity = vv.getValueCapacity();
-      assertEquals(String.format("Incorrect value capacity for %s [%d]", vv.getField(), vvCapacity),
-          initialCapacity, vvCapacity);
+      assertTrue(String.format("Incorrect value capacity for %s [%d]", vv.getField(), vvCapacity),
+          initialCapacity <= vvCapacity);
     }
   }
 }
