@@ -327,7 +327,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
 
             if (spilledBatchGroups.size() > firstSpillBatchCount / 2) {
               logger.info("Merging spills");
-              spilledBatchGroups.addFirst(mergeAndSpill(spilledBatchGroups, true));
+              spilledBatchGroups.addFirst(mergeAndSpill(spilledBatchGroups));
             }
             spilledBatchGroups.add(mergeAndSpill(batchGroups));
             batchesSinceLastSpill = 0;
@@ -416,15 +416,11 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
   }
 
   public BatchGroup mergeAndSpill(LinkedList<BatchGroup> batchGroups) throws SchemaChangeException {
-    return mergeAndSpill(batchGroups, false);
-  }
-
-  public BatchGroup mergeAndSpill(LinkedList<BatchGroup> batchGroups, boolean remerge) throws SchemaChangeException {
     logger.debug("Copier allocator current allocation {}", copierAllocator.getAllocatedMemory());
     VectorContainer outputContainer = new VectorContainer();
     List<BatchGroup> batchGroupList = Lists.newArrayList();
     int batchCount = batchGroups.size();
-    for (int i = 0; i < batchCount / 2 || (remerge && i < 10); i++) {
+    for (int i = 0; i < batchCount / 2; i++) {
       if (batchGroups.size() == 0) {
         break;
       }
@@ -440,7 +436,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
       return null;
     }
     int estimatedRecordSize = 0;
-    for (VectorWrapper w : batchGroups.get(0)) {
+    for (VectorWrapper w : batchGroupList.get(0)) {
       try {
         estimatedRecordSize += TypeHelper.getSize(w.getField().getType());
       } catch (UnsupportedOperationException e) {
@@ -482,7 +478,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     addMemory(getBufferSize(c1));
     copier.cleanup();
     addMemory(-size * 4);
-    logger.info("Completed spilling to ", outputFile);
+    logger.info("Completed spilling to {}", outputFile);
     return newGroup;
   }
 
