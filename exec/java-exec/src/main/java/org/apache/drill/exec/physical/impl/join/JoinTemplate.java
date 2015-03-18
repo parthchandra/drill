@@ -137,8 +137,17 @@ public abstract class JoinTemplate implements JoinWorker {
           status.notifyLeftStoppedRepeating();
         }
 
-        boolean crossedBatchBoundaries = false;
-        int initialRightPosition = status.getRightPosition();
+        boolean crossedBatchBoundaries;
+        int initialRightPosition;
+        if (status.hasIntermediateData()) {
+          crossedBatchBoundaries = status.getCrossedBatchBoundaries();
+          initialRightPosition = status.getInitialRightPosition();
+          status.resetIntermediateData();
+        } else {
+          crossedBatchBoundaries = false;
+          initialRightPosition = status.getRightPosition();
+        }
+
         do {
           if (status.isOutgoingBatchFull()) {
             return false;
@@ -171,7 +180,7 @@ public abstract class JoinTemplate implements JoinWorker {
         status.advanceLeft();
 
         if (status.isLeftRepeating() && status.isNextLeftPositionInCurrentBatch() &&
-            doCompareNextLeftKey(status.getLeftPosition()) != 0) {
+          doCompareNextLeftKey(status.getLeftPosition()) != 0) {
           // left no longer has duplicates.  switch back to incoming batch mode
           status.setDefaultAdvanceMode();
           status.notifyLeftStoppedRepeating();
