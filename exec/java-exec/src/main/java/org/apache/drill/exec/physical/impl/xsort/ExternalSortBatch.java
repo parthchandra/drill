@@ -463,6 +463,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     String outputFile = getFileName(spillCount++);
     BatchGroup newGroup = new BatchGroup(c1, fs, outputFile, oContext.getAllocator(), this);
 
+    logger.info("Merging and spilling to {}", outputFile);
     try {
       while ((count = copier.next(targetRecordCount)) > 0) {
         outputContainer.buildSchema(BatchSchema.SelectionVectorMode.NONE);
@@ -481,6 +482,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     addMemory(getBufferSize(c1));
     copier.cleanup();
     addMemory(-size * 4);
+    logger.info("Completed spilling to ", outputFile);
     return newGroup;
   }
 
