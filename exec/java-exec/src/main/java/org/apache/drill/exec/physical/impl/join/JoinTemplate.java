@@ -150,6 +150,7 @@ public abstract class JoinTemplate implements JoinWorker {
 
         do {
           if (status.isOutgoingBatchFull()) {
+            status.setIntermediateData(initialRightPosition, crossedBatchBoundaries);
             return false;
           }
           // copy all equal right keys to the output record batch
