@@ -70,6 +70,7 @@ public class TestLoad extends ExecTest {
       bytes += byteBufs[i].writerIndex();
     }
     DrillBuf byteBuf = allocator.buffer(bytes);
+    byteBuf = byteBuf.slice(0, bytes); // To imitate what happens in actual query
     int index = 0;
     for (int i = 0; i < byteBufs.length; i++) {
       byteBufs[i].readBytes(byteBuf, index, byteBufs[i].writerIndex());
