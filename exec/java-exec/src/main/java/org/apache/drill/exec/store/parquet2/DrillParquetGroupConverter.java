@@ -43,6 +43,7 @@ import org.apache.drill.exec.expr.holders.VarBinaryHolder;
 import org.apache.drill.exec.expr.holders.VarCharHolder;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.store.ParquetOutputRecordWriter;
+import org.apache.drill.exec.store.parquet.columnreaders.ParquetRecordReader;
 import org.apache.drill.exec.util.DecimalUtility;
 import org.apache.drill.exec.vector.complex.impl.ComplexWriterImpl;
 import org.apache.drill.exec.vector.complex.writer.BaseWriter.MapWriter;
@@ -195,6 +196,13 @@ public class DrillParquetGroupConverter extends GroupConverter {
           }
         }
       }
+      case INT96: {
+        if (type.getOriginalType() == null) {
+          VarBinaryWriter writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).varBinary() : mapWriter.varBinary(name);
+          return new DrillFixedBinaryToVarbinaryConverter(writer, ParquetRecordReader.getTypeLengthInBits(type.getPrimitiveTypeName()) / 8, mutator.getManagedBuffer());
+        }
+
+      }
       case FLOAT: {
         Float4Writer writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).float4() : mapWriter.float4(name);
         return new DrillFloat4Converter(writer);
@@ -244,7 +252,8 @@ public class DrillParquetGroupConverter extends GroupConverter {
             return new DrillBinaryToDecimal38Converter(writer, metadata.getPrecision(), metadata.getScale(), mutator.getManagedBuffer());
           }
         } else {
-          throw new UnsupportedOperationException("Unsupported type " + type.getOriginalType());
+          VarBinaryWriter writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).varBinary() : mapWriter.varBinary(name);
+          return new DrillFixedBinaryToVarbinaryConverter(writer, type.getTypeLength(), mutator.getManagedBuffer());
         }
       default:
         throw new UnsupportedOperationException("Unsupported type: " + type.getPrimitiveTypeName());
@@ -501,6 +510,28 @@ public class DrillParquetGroupConverter extends GroupConverter {
       BigDecimal bigDecimal = DecimalUtility.getBigDecimalFromByteArray(value.getBytes(), 0, value.length(), holder.scale);
       DecimalUtility.getSparseFromBigDecimal(bigDecimal, buf, 0, holder.scale, holder.precision, Decimal38SparseHolder.nDecimalDigits);
       holder.buffer = buf;
+      writer.write(holder);
+    }
+  }
+
+  /**
+   * Parquet currently supports a fixed binary type, which is not implemented in Drill. For now this
+   * data will be read in a s varbinary and the same length will be recorded for each value.
+   */
+  public static class DrillFixedBinaryToVarbinaryConverter extends PrimitiveConverter {
+    private VarBinaryWriter writer;
+    private VarBinaryHolder holder = new VarBinaryHolder();
+
+    public DrillFixedBinaryToVarbinaryConverter(VarBinaryWriter writer, int length, DrillBuf buf) {
+      this.writer = writer;
+      holder.buffer = buf = buf.reallocIfNeeded(length);
+      holder.start = 0;
+      holder.end = length;
+    }
+
+    @Override
+    public void addBinary(Binary value) {
+      holder.buffer.setBytes(0, value.toByteBuffer());
       writer.write(holder);
     }
   }

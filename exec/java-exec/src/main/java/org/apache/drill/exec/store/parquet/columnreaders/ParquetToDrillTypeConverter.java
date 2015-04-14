@@ -91,8 +91,7 @@ public class ParquetToDrillTypeConverter {
           // TODO - Both of these are not supported by the parquet library yet (7/3/13),
           // but they are declared here for when they are implemented
           case INT96:
-            return TypeProtos.MajorType.newBuilder().setMinorType(TypeProtos.MinorType.FIXEDBINARY).setWidth(12)
-                .setMode(mode).build();
+            return TypeProtos.MajorType.newBuilder().setMinorType(MinorType.VARBINARY).setMode(mode).build();
           case FIXED_LEN_BYTE_ARRAY:
             if (convertedType == null) {
               checkArgument(length > 0, "A length greater than zero must be provided for a FixedBinary type.");
@@ -154,7 +153,7 @@ public class ParquetToDrillTypeConverter {
           // Both of these are not supported by the parquet library yet (7/3/13),
           // but they are declared here for when they are implemented
           case INT96:
-            return TypeProtos.MajorType.newBuilder().setMinorType(TypeProtos.MinorType.FIXEDBINARY).setWidth(12)
+            return TypeProtos.MajorType.newBuilder().setMinorType(TypeProtos.MinorType.VARBINARY)
                 .setMode(mode).build();
           case FIXED_LEN_BYTE_ARRAY:
             if (convertedType == null) {

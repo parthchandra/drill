@@ -38,12 +38,14 @@ import org.apache.drill.exec.vector.NullableDecimal9Vector;
 import org.apache.drill.exec.vector.NullableDecimal18Vector;
 import org.apache.drill.exec.vector.NullableTimeVector;
 import org.apache.drill.exec.vector.NullableTimeStampVector;
+import org.apache.drill.exec.vector.NullableVarBinaryVector;
 import org.apache.drill.exec.vector.ValueVector;
 import org.joda.time.DateTimeUtils;
 
 import parquet.column.ColumnDescriptor;
 import parquet.format.SchemaElement;
 import parquet.hadoop.metadata.ColumnChunkMetaData;
+import parquet.io.api.Binary;
 
 public class NullableFixedByteAlignedReaders {
 
@@ -62,6 +64,44 @@ public class NullableFixedByteAlignedReaders {
 
       // fill in data.
       vectorData.writeBytes(bytebuf, (int) readStartInBytes, (int) readLength);
+    }
+  }
+
+  /**
+   * Class for reading the fixed length byte array type in parquet. Currently Drill does not have
+   * a fixed length binary type, so this is read into a varbinary with the same size recorded for
+   * each value.
+   */
+  static class NullableFixedBinaryReader extends NullableFixedByteAlignedReader {
+
+    NullableVarBinaryVector castedVector;
+
+    NullableFixedBinaryReader(ParquetRecordReader parentReader, int allocateSize, ColumnDescriptor descriptor,
+                                   ColumnChunkMetaData columnChunkMetaData, boolean fixedLength, NullableVarBinaryVector v, SchemaElement schemaElement) throws ExecutionSetupException {
+      super(parentReader, allocateSize, descriptor, columnChunkMetaData, fixedLength, v, schemaElement);
+      castedVector = v;
+    }
+
+    @Override
+    protected void readField(long recordsToReadInThisPass) {
+      this.bytebuf = pageReader.pageDataByteArray;
+
+      if (usingDictionary) {
+        for (int i = 0; i < recordsReadInThisIteration; i++){
+          Binary currDictValToWrite = pageReader.dictionaryValueReader.readBytes();
+          castedVector.getMutator().setSafe(i, 1, 0, currDictValToWrite.length(),
+              DrillBuf.wrapByteBuffer(currDictValToWrite.toByteBuffer()));
+        }
+      } else {
+        super.readField(recordsToReadInThisPass);
+      }
+
+      // TODO - replace this with fixed binary type in drill
+      // for now we need to write the lengths of each value
+      int byteLength = dataTypeLengthInBits / 8;
+      for (int i = 0; i < recordsToReadInThisPass; i++) {
+        castedVector.getMutator().setValueLengthSafe(i, byteLength);
+      }
     }
   }
 
