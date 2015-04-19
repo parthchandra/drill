@@ -39,7 +39,7 @@ public class PlannerSettings implements Context{
 
   public static final OptionValidator CONSTANT_FOLDING = new BooleanValidator("planner.enable_constant_folding", true);
   public static final OptionValidator EXCHANGE = new BooleanValidator("planner.disable_exchanges", false);
-  public static final OptionValidator HASHAGG = new BooleanValidator("planner.enable_hashagg", true);
+  public static final OptionValidator HASHAGG = new BooleanValidator("planner.enable_hashagg", false);
   public static final OptionValidator STREAMAGG = new BooleanValidator("planner.enable_streamagg", true);
   public static final OptionValidator HASHJOIN = new BooleanValidator("planner.enable_hashjoin", true);
   public static final OptionValidator MERGEJOIN = new BooleanValidator("planner.enable_mergejoin", true);
