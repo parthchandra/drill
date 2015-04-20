@@ -11,7 +11,7 @@
             @id:1,
             pop:"mock-sub-scan",
             entries:[
-                {records: 20000, types: [
+                {records: 40000, types: [
                   {name: "blue", type: "INT", mode: "REQUIRED"},
                   {name: "red", type: "BIGINT", mode: "REQUIRED"},
                   {name: "green", type: "INT", mode: "REQUIRED"}

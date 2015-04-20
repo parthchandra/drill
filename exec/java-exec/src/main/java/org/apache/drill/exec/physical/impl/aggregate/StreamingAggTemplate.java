@@ -43,12 +43,15 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
   private StreamingAggBatch outgoing;
   private FragmentContext context;
   private boolean done = false;
+  private int inputCount = 0;
+  private int addCount = 0;
 
 
   @Override
   public void setup(FragmentContext context, RecordBatch incoming, StreamingAggBatch outgoing) throws SchemaChangeException {
     this.context = context;
     this.incoming = incoming;
+    this.inputCount = incoming.getRecordCount();
     this.outgoing = outgoing;
     setupInterior(incoming, outgoing);
   }
@@ -74,6 +77,7 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
   public AggOutcome doWork() {
     if (done) {
       outcome = IterOutcome.NONE;
+      assert addCount == inputCount : String.format("Number of added records does not match incoming records: incoming: %d added: %d", inputCount, addCount);
       return AggOutcome.CLEANUP_AND_RETURN;
     }
     try { // outside loop to ensure that first is set to false after the first run.
@@ -92,6 +96,7 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
             switch (out) {
             case OK_NEW_SCHEMA:
             case OK:
+              inputCount += incoming.getRecordCount();
               if (incoming.getRecordCount() == 0) {
                 continue;
               } else {
@@ -210,6 +215,7 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
               cleanup();
               return AggOutcome.UPDATE_AGGREGATOR;
             case OK:
+              inputCount += incoming.getRecordCount();
               resetIndex();
               if (incoming.getRecordCount() == 0) {
                 continue;
@@ -328,6 +334,8 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
   private void addRecordInc(int index) {
     addRecord(index);
     this.addedRecordCount++;
+    this.addCount++;
+    assert addCount <= inputCount : String.format("Number of added records greater than incoming records: incoming: %d added: %d", inputCount, addCount);
   }
 
   @Override

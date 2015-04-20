@@ -76,7 +76,7 @@ public class TestAgg extends ExecTest {
     while(exec.next()){
       BigIntVector cnt = exec.getValueVectorById(SchemaPath.getSimplePath("cnt"), BigIntVector.class);
       IntVector key = exec.getValueVectorById(SchemaPath.getSimplePath("blue"), IntVector.class);
-      long[] cntArr = {10001, 9999};
+      long[] cntArr = {20001, 19999};
       int[] keyArr = {Integer.MIN_VALUE, Integer.MAX_VALUE};
 
       for(int i =0; i < exec.getRecordCount(); i++){
