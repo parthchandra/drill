@@ -104,7 +104,8 @@ public class PlannerSettings implements Context{
   }
 
   public boolean isHashAggEnabled() {
-    return options.getOption(HASHAGG.getOptionName()).bool_val;
+    return false;
+    // return options.getOption(HASHAGG.getOptionName()).bool_val;
   }
 
   public boolean isConstantFoldingEnabled() {
