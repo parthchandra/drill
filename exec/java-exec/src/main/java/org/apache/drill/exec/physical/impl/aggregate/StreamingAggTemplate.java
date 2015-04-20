@@ -160,13 +160,11 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
           previousIndex = currentIndex;
         }
 
-        InternalBatch previous = null;
+        InternalBatch previous = new InternalBatch(incoming);
+
         try {
           while (true) {
-            if (previous != null) {
-              previous.clear();
-            }
-            previous = new InternalBatch(incoming);
+
             IterOutcome out = outgoing.next(0, incoming);
             if (EXTRA_DEBUG) {
               logger.debug("Received IterOutcome of {}", out);
@@ -250,8 +248,7 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
               outcome = out;
               return AggOutcome.CLEANUP_AND_RETURN;
             }
-
-        }
+          }
         } finally {
           // make sure to clear previous
           if (previous != null) {
