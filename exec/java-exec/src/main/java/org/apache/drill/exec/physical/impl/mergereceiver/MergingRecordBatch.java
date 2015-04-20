@@ -111,7 +111,9 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
   private int[] batchOffsets;
   private PriorityQueue <Node> pqueue;
   private RawFragmentBatch emptyBatch = null;
-  private RawFragmentBatch[] tempBatchHolder; //
+  private RawFragmentBatch[] tempBatchHolder;
+  private int[] inputCounts;
+  private int[] outputCounts;
 
   public static enum Metric implements MetricDef{
     BYTES_RECEIVED,
@@ -134,15 +136,18 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
     this.outgoingContainer = new VectorContainer(oContext);
     this.stats.setLongStat(Metric.NUM_SENDERS, config.getNumSenders());
     this.config = config;
+    this.inputCounts = new int[config.getNumSenders()];
+    this.outputCounts = new int[config.getNumSenders()];
   }
 
-  private RawFragmentBatch getNext(final RawFragmentBatchProvider provider) throws IOException{
+  private RawFragmentBatch getNext(final RawFragmentBatchProvider provider, int index) throws IOException{
     stats.startWait();
     try {
       final RawFragmentBatch b = provider.getNext();
       if (b != null) {
         stats.addLongStat(Metric.BYTES_RECEIVED, b.getByteCount());
         stats.batchReceived(0, b.getHeader().getDef().getRecordCount(), false);
+        inputCounts[index] += b.getHeader().getDef().getRecordCount();
       }
       return b;
     } finally {
@@ -185,7 +190,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
             rawBatch = tempBatchHolder[p];
             tempBatchHolder[p] = null;
           } else {
-            rawBatch = getNext(provider);
+            rawBatch = getNext(provider, p);
           }
           p++;
           if (rawBatch == null && !context.shouldContinue()) {
@@ -203,7 +208,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
             emptyBatch = rawBatch;
           }
           try {
-            while ((rawBatch = getNext(provider)) != null && rawBatch.getHeader().getDef().getRecordCount() == 0) {
+            while ((rawBatch = getNext(provider, p - 1)) != null && rawBatch.getHeader().getDef().getRecordCount() == 0) {
               ;
             }
             if (rawBatch == null && !context.shouldContinue()) {
@@ -303,7 +308,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
       for (int b = 0; b < senderCount; ++b) {
         while (batchLoaders[b] != null && batchLoaders[b].getRecordCount() == 0) {
           try {
-            final RawFragmentBatch batch = getNext(fragProviders[b]);
+            final RawFragmentBatch batch = getNext(fragProviders[b], b);
             incomingBatches[b] = batch;
             if (batch != null) {
               batchLoaders[b].load(batch.getHeader().getDef(), batch.getBody());
@@ -334,7 +339,6 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
       if (!copyRecordToOutgoingBatch(node)) {
         logger.debug("Outgoing vectors space is full; breaking");
         prevBatchWasFull = true;
-        break;
       }
       pqueue.poll();
 
@@ -348,11 +352,13 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
         // reached the end of an incoming record batch
         RawFragmentBatch nextBatch = null;
         try {
-          nextBatch = getNext(fragProviders[node.batchId]);
+          nextBatch = getNext(fragProviders[node.batchId], node.batchId);
 
           while (nextBatch != null && nextBatch.getHeader().getDef().getRecordCount() == 0) {
-            nextBatch = getNext(fragProviders[node.batchId]);
+            nextBatch = getNext(fragProviders[node.batchId], node.batchId);
           }
+          assert nextBatch != null || inputCounts[node.batchId] == outputCounts[node.batchId]
+              : String.format("Stream %d input count: %d output count %d", node.batchId, inputCounts[node.batchId], outputCounts[node.batchId]);
           if (nextBatch == null && !context.shouldContinue()) {
             return IterOutcome.STOP;
           }
@@ -446,7 +452,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
           state = BatchState.DONE;
           return;
         }
-        final RawFragmentBatch batch = getNext(fragProviders[i]);
+        final RawFragmentBatch batch = getNext(fragProviders[i], i);
         if (batch.getHeader().getDef().getFieldCount() == 0) {
           i++;
           continue;
@@ -660,6 +666,9 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
    * @param node Reference to the next record to copy from the incoming batches
    */
   private boolean copyRecordToOutgoingBatch(final Node node) {
+    outputCounts[node.batchId]++;
+    assert outputCounts[node.batchId] <= inputCounts[node.batchId]
+        : String.format("Stream %d input count: %d output count %d", node.batchId, inputCounts[node.batchId], outputCounts[node.batchId]);
     final int inIndex = (node.batchId << 16) + node.valueIndex;
     merger.doCopy(inIndex, outgoingPosition);
     outgoingPosition++;
