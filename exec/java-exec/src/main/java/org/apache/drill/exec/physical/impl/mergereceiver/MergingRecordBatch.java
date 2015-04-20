@@ -476,7 +476,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
       informSenders();
     }
 
-    cleanup();
+//    cleanup();
     for (final RawFragmentBatchProvider provider : fragProviders) {
       provider.kill(context);
     }
