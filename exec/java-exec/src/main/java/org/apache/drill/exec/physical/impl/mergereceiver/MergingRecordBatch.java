@@ -474,11 +474,11 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
   public void kill(final boolean sendUpstream) {
     if (sendUpstream) {
       informSenders();
-    } else {
-      cleanup();
-      for (final RawFragmentBatchProvider provider : fragProviders) {
-        provider.kill(context);
-      }
+    }
+
+    cleanup();
+    for (final RawFragmentBatchProvider provider : fragProviders) {
+      provider.kill(context);
     }
   }
 
@@ -504,7 +504,7 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
 
     @Override
     public void failed(final RpcException ex) {
-      logger.warn("Failed to inform upstream that receiver is finished");
+      logger.warn("Failed to inform upstream that receiver is finished", ex);
     }
 
     @Override
