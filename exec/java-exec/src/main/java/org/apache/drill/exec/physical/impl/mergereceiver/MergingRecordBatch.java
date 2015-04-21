@@ -388,7 +388,11 @@ public class MergingRecordBatch extends AbstractRecordBatch<MergingReceiverPOP> 
 
           // this batch is empty; since the pqueue no longer references this batch, it will be
           // ignored in subsequent iterations.
-          continue;
+          if (prevBatchWasFull) {
+            break;
+          } else {
+            continue;
+          }
         }
 
         final UserBitShared.RecordBatchDef rbd = incomingBatches[node.batchId].getHeader().getDef();
