@@ -38,6 +38,7 @@ import org.apache.drill.exec.expr.ValueVectorWriteExpression;
 import org.apache.drill.exec.expr.fn.FunctionGenerationHelper;
 import org.apache.drill.exec.memory.OutOfMemoryException;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.ops.OperatorStats;
 import org.apache.drill.exec.physical.config.StreamingAggregate;
 import org.apache.drill.exec.physical.impl.aggregate.StreamingAggregator.AggOutcome;
 import org.apache.drill.exec.record.AbstractRecordBatch;
@@ -352,6 +353,14 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
   @Override
   protected void killIncoming(boolean sendUpstream) {
     incoming.kill(sendUpstream);
+  }
+
+  public long getTotalIncoming() {
+    long total = 0;
+    for (long count :stats.recordsReceivedByInput) {
+      total += count;
+    }
+    return total;
   }
 
 }
