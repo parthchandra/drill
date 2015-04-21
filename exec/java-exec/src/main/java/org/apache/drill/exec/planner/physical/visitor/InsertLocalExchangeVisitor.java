@@ -46,8 +46,8 @@ public class InsertLocalExchangeVisitor extends BasePrelVisitor<Prel, Void, Runt
   private static final DrillSqlOperator SQL_OP_HASH64_WITH_SEED = new DrillSqlOperator("hash64", 2, MajorType.getDefaultInstance(), true);
   private static final DrillSqlOperator SQL_OP_CAST_INT = new DrillSqlOperator("castINT", 1, MajorType.getDefaultInstance(), true);
 
-  private final boolean isMuxEnabled;
-  private final boolean isDeMuxEnabled;
+  private final boolean isMuxEnabled = false;
+  private final boolean isDeMuxEnabled = false;
 
   public static Prel insertLocalExchanges(Prel prel, OptionManager options) {
     boolean isMuxEnabled = options.getOption(PlannerSettings.MUX_EXCHANGE.getOptionName()).bool_val;
@@ -61,8 +61,8 @@ public class InsertLocalExchangeVisitor extends BasePrelVisitor<Prel, Void, Runt
   }
 
   public InsertLocalExchangeVisitor(boolean isMuxEnabled, boolean isDeMuxEnabled) {
-    this.isMuxEnabled = isMuxEnabled;
-    this.isDeMuxEnabled = isDeMuxEnabled;
+//    this.isMuxEnabled = isMuxEnabled;
+//    this.isDeMuxEnabled = isDeMuxEnabled;
   }
 
   @Override
