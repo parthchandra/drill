@@ -109,7 +109,7 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr){
             host=boost::lexical_cast<std::string>(e.address());
             port=boost::lexical_cast<std::string>(e.user_port());
             zook.close();
-        }else if(!strcmp(protocol.c_str(), "local")){
+        }else if(!strcmp(protocol.c_str(), "drillbit")){
             char tempStr[MAX_CONNECT_STR+1];
             strncpy(tempStr, hostPortStr.c_str(), MAX_CONNECT_STR); tempStr[MAX_CONNECT_STR]=0;
             host=strtok(tempStr, ":");
