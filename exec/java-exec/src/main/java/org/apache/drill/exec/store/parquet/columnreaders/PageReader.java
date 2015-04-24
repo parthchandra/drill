@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.parquet.columnreaders;
 
+import static parquet.format.converter.ParquetMetadataConverter.fromParquetStatistics;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
 
@@ -45,8 +46,6 @@ import parquet.format.Util;
 import parquet.hadoop.metadata.ColumnChunkMetaData;
 import parquet.hadoop.metadata.CompressionCodecName;
 import parquet.schema.PrimitiveType;
-
-import static parquet.format.converter.ParquetMetadataConverter.fromParquetStatistics;
 
 // class to keep track of the read position of variable length columns
 final class PageReader {
@@ -316,8 +315,8 @@ final class PageReader {
       //b = UnpooledByteBufAllocator.DEFAULT.heapBuffer(size);
     }catch(Exception e){
       throw new DrillRuntimeException("Unable to allocate "+size+" bytes of memory in the Parquet Reader."+
-        "[Exception: "+e.getMessage()+"]"
-      );
+          "[Exception: " + e.getMessage() + "]",
+          e);
     }
     return b;
   }
