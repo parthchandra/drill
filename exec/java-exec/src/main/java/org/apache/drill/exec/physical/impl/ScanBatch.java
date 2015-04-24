@@ -183,8 +183,8 @@ public class ScanBatch implements RecordBatch {
           currentReader.cleanup();
           currentReader = readers.next();
           partitionValues = partitionColumns.get(currentReader.getKey());
-          currentReader.setup(mutator);
           currentReader.setOperatorContext(oContext);
+          currentReader.setup(mutator);
           try {
             currentReader.allocate(fieldVectorMap);
           } catch (OutOfMemoryException e) {
