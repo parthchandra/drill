@@ -105,6 +105,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   private final FileSystem fs;
   private List<EndpointAffinity> endpointAffinities;
   private String selectionRoot;
+  private ParquetTableMetadata tableMetadata;
 
   private List<SchemaPath> columns;
 
@@ -117,6 +118,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
    * total number of non-null value for each column in parquet files.
    */
   private Map<SchemaPath, Long> columnValueCounts;
+  private boolean selectionModified = false;
 
   public List<ReadEntryWithPath> getEntries() {
     return entries;
@@ -153,7 +155,6 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     this.formatConfig = formatPlugin.getConfig();
     this.entries = entries;
     this.selectionRoot = selectionRoot;
-//    this.readFooterFromEntries();
 
     init();
   }
@@ -199,8 +200,28 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     this.chunks = that.chunks;
     this.selectionRoot = that.selectionRoot;
     this.columnValueCounts = that.columnValueCounts;
+    this.tableMetadata = that.tableMetadata;
+    this.selectionModified = that.selectionModified;
   }
 
+  private ParquetGroupScan(ParquetGroupScan that, List<ReadEntryWithPath> entries) {
+    this.columns = that.columns;
+    this.endpointAffinities = that.endpointAffinities;
+    this.entries = entries;
+    this.formatConfig = that.formatConfig;
+    this.formatPlugin = that.formatPlugin;
+    this.fs = that.fs;
+    this.mappings = that.mappings;
+    this.rowCount = that.rowCount;
+    this.rowGroupInfos = that.rowGroupInfos;
+    this.chunks = that.chunks;
+    this.selectionRoot = that.selectionRoot;
+    this.columnValueCounts = that.columnValueCounts;
+    this.tableMetadata = that.tableMetadata;
+    this.selectionModified = true;
+  }
+
+  /*
   private void readFooterFromEntries()  throws IOException {
     List<FileStatus> files = Lists.newArrayList();
     for (ReadEntryWithPath e : entries) {
@@ -245,7 +266,8 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
           if (! columnValueCounts.containsKey(path)) {
             // create an entry for this column
-            columnValueCounts.put(path, previousCount /* initialize to 0 */);
+            columnValueCounts.put(path, previousCount /* initialize to 0 */;
+  /*
           } else {
             previousCount = columnValueCounts.get(path);
           }
@@ -276,18 +298,11 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     watch.stop();
     logger.debug("Took {} ms to get row group infos", watch.elapsed(TimeUnit.MILLISECONDS));
   }
+  */
 
   @JsonIgnore
   public FileSystem getFileSystem() {
     return this.fs;
-  }
-
-  @Override
-  public void modifyFileSelection(FileSelection selection) {
-    entries.clear();
-    for (String fileName : selection.getAsFiles()) {
-      entries.add(new ReadEntryWithPath(fileName));
-    }
   }
 
   public static class RowGroupInfo extends ReadEntryFromHDFS implements CompleteWork, FileWork {
@@ -331,12 +346,33 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     }
   }
 
+  private void getOrCreateTableMetadata() throws IOException {
+    Path metaPath = selectionRoot == null? null :Path.getPathWithoutSchemeAndAuthority(new Path(selectionRoot, Metadata.FILENAME));
+    if (selectionRoot != null && fs.exists(metaPath)) {
+      tableMetadata = Metadata.readBlockMeta(formatPlugin.getContext().getConfig(), fs, metaPath.toString());
+    } else {
+      List<FileStatus> fileStatuses = Lists.newArrayList();
+      for (ReadEntryWithPath entry : entries) {
+        getFiles(entry.getPath(), fileStatuses);
+      }
+      tableMetadata = Metadata.getParquetTableMetadata(fs, fileStatuses);
+    }
+  }
+
   private void init() {
     if (this.endpointAffinities == null) {
-      ParquetTableMetadata parquetTableMetadata;
-      DrillConfig config = formatPlugin.getContext().getConfig();
       List<FileStatus> fileStatuses = null;
       try {
+
+        getOrCreateTableMetadata();
+
+        columnValueCounts = Maps.newHashMap();
+        for (ColumnWithValueCount column : tableMetadata.columnValueCounts) {
+          columnValueCounts.put(column.column, column.valueCount);
+        }
+        rowCount = tableMetadata.rowCount;
+        columns = new ArrayList(columnValueCounts.keySet());
+        /*
         if (entries.size() == 1) {
           Path p = Path.getPathWithoutSchemeAndAuthority(new Path(entries.get(0).getPath()));
           Path metaPath = new Path(p, ".drill.parquet_metadata");
@@ -352,37 +388,42 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
           }
           parquetTableMetadata = Metadata.getParquetTableMetadata(fs, fileStatuses);
         }
-
-        Map<String,List<BlockLocation>> cachedBlockLocations = Maps.newHashMap();
-        for (ParquetFileMetadata file : parquetTableMetadata.files) {
-          cachedBlockLocations.put(file.path, file.blockLocations);
-        }
-        if (fileStatuses == null) {
-          fileStatuses = Lists.newArrayList();
-          for (ParquetFileMetadata file : parquetTableMetadata.files) {
-            FileStatus fileStatus = new FileStatus();
-            ByteArrayDataInput in = ByteStreams.newDataInput(file.fileStatus);
-            fileStatus.readFields(in);
-            fileStatuses.add(fileStatus);
-          }
-        }
-
-        BlockMapBuilder bmb = new BlockMapBuilder(fs, formatPlugin.getContext().getBits(), cachedBlockLocations);
-
-        chunks = bmb.generateFileWork(fileStatuses, false);
-
-        this.endpointAffinities = AffinityCreator.getAffinityMap(chunks);
-
-        columnValueCounts = Maps.newHashMap();
-        for (ColumnWithValueCount column : parquetTableMetadata.columnValueCounts) {
-          columnValueCounts.put(column.column, column.valueCount);
-        }
-        rowCount = parquetTableMetadata.rowCount;
-        columns = new ArrayList(columnValueCounts.keySet());
+        */
       } catch (IOException e) {
-        logger.warn("Failure while determining operator affinity.", e);
+        throw new RuntimeException("Exception while getting metadat", e);
       }
 
+    }
+  }
+
+  private void generateChunks() {
+    try {
+      List<FileStatus> fileStatuses = Lists.newArrayList();
+      for (ReadEntryWithPath entry : entries) {
+        getFiles(entry.getPath(), fileStatuses);
+      }
+      Map<String, List<BlockLocation>> cachedBlockLocations = Maps.newHashMap();
+      for (ParquetFileMetadata file : tableMetadata.files) {
+        cachedBlockLocations.put(file.path, file.blockLocations);
+      }
+      if (fileStatuses == null) {
+        fileStatuses = Lists.newArrayList();
+        for (ParquetFileMetadata file : tableMetadata.files) {
+          FileStatus fileStatus = new FileStatus();
+          ByteArrayDataInput in = ByteStreams.newDataInput(file.fileStatus);
+          fileStatus.readFields(in);
+          fileStatuses.add(fileStatus);
+        }
+      }
+
+      BlockMapBuilder bmb = new BlockMapBuilder(fs, formatPlugin.getContext().getBits(), cachedBlockLocations);
+
+      chunks = bmb.generateFileWork(fileStatuses, false);
+
+      this.endpointAffinities = AffinityCreator.getAffinityMap(chunks);
+
+    } catch (IOException e) {
+      throw new RuntimeException("Exception while generating chunks", e);
     }
   }
 
@@ -394,6 +435,9 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
    */
   @Override
   public List<EndpointAffinity> getOperatorAffinity() {
+    if (chunks == null) {
+      generateChunks();
+    }
     return this.endpointAffinities;
   }
 
@@ -464,6 +508,9 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
   @Override
   public int getMaxParallelizationWidth() {
+    if (chunks == null) {
+      generateChunks();
+    }
     return chunks.size();
   }
 
@@ -474,7 +521,8 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   @Override
   public ScanStats getScanStats() {
     int columnCount = columns == null ? 20 : columns.size();
-    return new ScanStats(GroupScanProperty.EXACT_ROW_COUNT, rowCount, 1, rowCount * columnCount);
+    GroupScanProperty scanProperty = selectionModified ? GroupScanProperty.NO_EXACT_ROW_COUNT : GroupScanProperty.EXACT_ROW_COUNT;
+    return new ScanStats(scanProperty, rowCount, 1, rowCount * columnCount);
   }
 
   @Override
@@ -506,9 +554,11 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
   @Override
   public FileGroupScan clone(FileSelection selection) throws IOException {
-    ParquetGroupScan newScan = new ParquetGroupScan(this);
-    newScan.modifyFileSelection(selection);
-    newScan.readFooterFromEntries();
+    List<ReadEntryWithPath> newEntries = Lists.newArrayList();
+    for (String file : selection.getAsFiles()) {
+      newEntries.add(new ReadEntryWithPath(file));
+    }
+    ParquetGroupScan newScan = new ParquetGroupScan(this, newEntries);
     return newScan;
   }
 

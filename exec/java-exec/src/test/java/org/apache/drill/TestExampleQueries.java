@@ -31,13 +31,6 @@ import java.math.BigDecimal;
 public class TestExampleQueries extends BaseTestQuery{
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestExampleQueries.class);
 
-  @Test
-  public void q() throws Exception {
-    test("use dfs.tmp");
-//    test("create table lineitem as select * from dfs.`/drill/SF10/lineitem`");
-    test("refresh table metadata lineitem");
-  }
-
   @Test // see DRILL-2328
   public void testConcatOnNull() throws Exception {
     try {

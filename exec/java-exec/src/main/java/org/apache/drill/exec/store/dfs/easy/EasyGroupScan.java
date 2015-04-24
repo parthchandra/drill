@@ -155,11 +155,6 @@ public class EasyGroupScan extends AbstractFileGroupScan{
   }
 
   @Override
-  public void modifyFileSelection(FileSelection selection) {
-    this.selection = selection;
-  }
-
-  @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) throws ExecutionSetupException {
     assert children == null || children.isEmpty();
     return new EasyGroupScan(this);

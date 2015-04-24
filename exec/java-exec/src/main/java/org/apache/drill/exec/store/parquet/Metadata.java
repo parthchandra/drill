@@ -28,6 +28,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import org.apache.drill.common.config.DrillConfig;
@@ -55,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Metadata {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Metadata.class);
+  public static final String FILENAME = ".drill.parquet_metadata";
 
   public static void createMeta(FileSystem fs, String path) throws IOException {
     FileStatus fileStatus = fs.getFileStatus(new Path(path));
@@ -85,6 +87,14 @@ public class Metadata {
     return metaPairs;
   }
 
+  public static List<String> getFilesFromMetadata(final FileSystem fs, String path) throws IOException {
+    ParquetTableMetadata tableMetadata = getParquetTableMetadata(fs, path);
+    List<String> files = Lists.newArrayList();
+    for (ParquetFileMetadata fileMetadata : tableMetadata.files) {
+      files.add(fileMetadata.path);
+    }
+    return files;
+  }
 
   public static ParquetTableMetadata getParquetTableMetadata(FileSystem fs, String path) throws IOException {
     Path p = new Path(path);

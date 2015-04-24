@@ -26,11 +26,6 @@ public abstract class AbstractFileGroupScan extends AbstractGroupScan implements
 
 
   @Override
-  public void modifyFileSelection(FileSelection selection) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public FileGroupScan clone(FileSelection selection) throws IOException {
     throw new UnsupportedOperationException();
   }

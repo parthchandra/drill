@@ -213,6 +213,11 @@ public class ParquetFormatPlugin implements FormatPlugin{
 
     @Override
     public FormatSelection isReadable(FileSelection selection) throws IOException {
+      Path metaFile = Path.getPathWithoutSchemeAndAuthority(new Path(selection.selectionRoot, ".drill.parquet_metadata"));
+      if (fs.exists(metaFile)) {
+        List<String> files = Metadata.getFilesFromMetadata(fs, selection.selectionRoot);
+        return new FormatSelection(plugin.getConfig(), new FileSelection(files, selection.selectionRoot, true));
+      }
       // TODO: we only check the first file for directory reading.  This is because
       if(selection.containsDirectories(fs)){
         if(isDirReadable(selection.getFirstPath(fs))){

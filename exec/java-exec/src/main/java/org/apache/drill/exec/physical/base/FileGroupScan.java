@@ -23,7 +23,5 @@ import org.apache.drill.exec.store.dfs.FileSelection;
 
 public interface FileGroupScan extends GroupScan {
 
-  public void modifyFileSelection(FileSelection selection);
-
   public FileGroupScan clone(FileSelection selection) throws IOException;
 }
