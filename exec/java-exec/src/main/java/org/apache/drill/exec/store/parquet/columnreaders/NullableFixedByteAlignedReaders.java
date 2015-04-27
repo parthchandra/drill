@@ -89,7 +89,7 @@ public class NullableFixedByteAlignedReaders {
       if (usingDictionary) {
         for (int i = 0; i < recordsReadInThisIteration; i++){
           Binary currDictValToWrite = pageReader.dictionaryValueReader.readBytes();
-          castedVector.getMutator().setSafe(i, 1, 0, currDictValToWrite.length(),
+          castedVector.getMutator().setSafe(valuesReadInCurrentPass + i, 1, 0, currDictValToWrite.length(),
               DrillBuf.wrapByteBuffer(currDictValToWrite.toByteBuffer()));
         }
       } else {
@@ -100,7 +100,7 @@ public class NullableFixedByteAlignedReaders {
       // for now we need to write the lengths of each value
       int byteLength = dataTypeLengthInBits / 8;
       for (int i = 0; i < recordsToReadInThisPass; i++) {
-        castedVector.getMutator().setValueLengthSafe(i, byteLength);
+        castedVector.getMutator().setValueLengthSafe(valuesReadInCurrentPass + i, byteLength);
       }
     }
   }
