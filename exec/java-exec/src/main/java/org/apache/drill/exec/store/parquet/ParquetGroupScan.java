@@ -212,7 +212,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     this.formatPlugin = that.formatPlugin;
     this.fs = that.fs;
     this.mappings = that.mappings;
-    this.rowCount = Math.max(that.rowCount * (entries.size() / that.entries.size()), 1);
+    this.rowCount = Math.max((long) (that.rowCount * ((float) entries.size() / that.entries.size())), 1);
     this.rowGroupInfos = that.rowGroupInfos;
     this.chunks = that.chunks;
     this.selectionRoot = that.selectionRoot;
