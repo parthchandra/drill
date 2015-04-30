@@ -17,24 +17,18 @@
  */
 package org.apache.drill.exec.store.parquet;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteStreams;
-import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.FormatPluginConfig;
 import org.apache.drill.common.logical.StoragePluginConfig;
-import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.metrics.DrillMetrics;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.physical.PhysicalOperatorSetupException;
@@ -66,15 +60,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-import parquet.hadoop.Footer;
-import parquet.hadoop.metadata.BlockMetaData;
-import parquet.hadoop.metadata.ColumnChunkMetaData;
-import parquet.hadoop.metadata.ParquetMetadata;
 import parquet.org.codehaus.jackson.annotate.JsonCreator;
 
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.Timer;
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -349,13 +338,13 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   private void getOrCreateTableMetadata() throws IOException {
     Path metaPath = selectionRoot == null? null :Path.getPathWithoutSchemeAndAuthority(new Path(selectionRoot, Metadata.FILENAME));
     if (selectionRoot != null && fs.exists(metaPath)) {
-      tableMetadata = Metadata.readBlockMeta(formatPlugin.getContext().getConfig(), fs, metaPath.toString());
+      tableMetadata = Metadata.readParquetTableMetadataFromFile(formatPlugin.getContext().getConfig(), fs, metaPath.toString());
     } else {
       List<FileStatus> fileStatuses = Lists.newArrayList();
       for (ReadEntryWithPath entry : entries) {
         getFiles(entry.getPath(), fileStatuses);
       }
-      tableMetadata = Metadata.getParquetTableMetadata(fs, fileStatuses);
+      tableMetadata = Metadata.fetchParquetTableMetadata(fs, fileStatuses);
     }
   }
 
@@ -377,16 +366,16 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
           Path p = Path.getPathWithoutSchemeAndAuthority(new Path(entries.get(0).getPath()));
           Path metaPath = new Path(p, ".drill.parquet_metadata");
           if (fs.exists(metaPath)) {
-            parquetTableMetadata = Metadata.readBlockMeta(config, fs, metaPath.toString());
+            parquetTableMetadata = Metadata.readParquetTableMetadataFromFile(config, fs, metaPath.toString());
           } else {
-            parquetTableMetadata = Metadata.getParquetTableMetadata(fs, p.toString());
+            parquetTableMetadata = Metadata.fetchParquetTableMetadata(fs, p.toString());
           }
         } else {
           fileStatuses = Lists.newArrayList();
           for (ReadEntryWithPath entry : entries) {
             getFiles(entry.getPath(), fileStatuses);
           }
-          parquetTableMetadata = Metadata.getParquetTableMetadata(fs, fileStatuses);
+          parquetTableMetadata = Metadata.fetchParquetTableMetadata(fs, fileStatuses);
         }
         */
       } catch (IOException e) {

@@ -25,10 +25,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import org.apache.drill.common.config.DrillConfig;
@@ -52,7 +50,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class Metadata {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Metadata.class);
@@ -82,13 +79,13 @@ public class Metadata {
     if (childFiles.size() > 0) {
       metaPairs.addAll(getMetaPairs(fs, childFiles));
     }
-    ParquetTableMetadata parquetTableMetadata = getParquetTableMetadata(metaPairs);
-    writeFile(parquetTableMetadata, fs, new Path(p, ".drill.parquet_metadata"));
+    ParquetTableMetadata parquetTableMetadata = fetchParquetTableMetadata(metaPairs);
+    writeFile(parquetTableMetadata, fs, new Path(p, FILENAME));
     return metaPairs;
   }
 
-  public static List<String> getFilesFromMetadata(final FileSystem fs, String path) throws IOException {
-    ParquetTableMetadata tableMetadata = getParquetTableMetadata(fs, path);
+  public static List<String> getFilesFromMetadata(final DrillConfig config, final FileSystem fs, String path) throws IOException {
+    ParquetTableMetadata tableMetadata = readParquetTableMetadataFromFile(config, fs, path);
     List<String> files = Lists.newArrayList();
     for (ParquetFileMetadata fileMetadata : tableMetadata.files) {
       files.add(fileMetadata.path);
@@ -96,18 +93,9 @@ public class Metadata {
     return files;
   }
 
-  public static ParquetTableMetadata getParquetTableMetadata(FileSystem fs, String path) throws IOException {
-    Path p = new Path(path);
-    FileStatus fileStatus = fs.getFileStatus(p);
-    Stopwatch watch = new Stopwatch();
-    watch.start();
-    List<FileStatus> fileStatuses = getFileStatuses(fs, fileStatus);
-    logger.info("Took {} ms to get file statuses", watch.elapsed(TimeUnit.MILLISECONDS));
-    return getParquetTableMetadata(fs, fileStatuses);
-  }
-  public static ParquetTableMetadata getParquetTableMetadata(FileSystem fs, List<FileStatus> fileStatuses) throws IOException {
+  public static ParquetTableMetadata fetchParquetTableMetadata(FileSystem fs, List<FileStatus> fileStatuses) throws IOException {
     List<FileMetaColumnValuePair> metaPairs = getMetaPairs(fs, fileStatuses);
-    return getParquetTableMetadata(metaPairs);
+    return fetchParquetTableMetadata(metaPairs);
   }
 
   private static List<FileMetaColumnValuePair> getMetaPairs(FileSystem fs, List<FileStatus> fileStatuses) throws IOException {
@@ -121,7 +109,7 @@ public class Metadata {
     return metaPairs;
   }
 
-  private static ParquetTableMetadata getParquetTableMetadata(List<FileMetaColumnValuePair> metaPairs) {
+  private static ParquetTableMetadata fetchParquetTableMetadata(List<FileMetaColumnValuePair> metaPairs) {
     Map<SchemaPath,Long> columnValueCounts = Maps.newHashMap();
     List<ParquetFileMetadata> fileMetadataList = Lists.newArrayList();
     long rowCount = 0;
@@ -149,18 +137,6 @@ public class Metadata {
     return parquetTableMetadata;
   }
 
-  private static List<FileStatus> getFileStatuses(FileSystem fs, FileStatus fileStatus) throws IOException {
-    List<FileStatus> statuses = Lists.newArrayList();
-    if (fileStatus.isDirectory()) {
-      for (FileStatus child : fs.listStatus(fileStatus.getPath(), new DrillPathFilter())) {
-        statuses.addAll(getFileStatuses(fs, child));
-      }
-    } else {
-      statuses.add(fileStatus);
-    }
-    return statuses;
-  }
-
   private static class MetadataGatherer extends TimedRunnable<FileMetaColumnValuePair> {
 
     private FileSystem fs;
@@ -173,7 +149,7 @@ public class Metadata {
 
     @Override
     protected FileMetaColumnValuePair runInner() throws Exception {
-      return getParquetFileMetadata(fs, fileStatus);
+      return fetchParquetFileMetadata(fs, fileStatus);
     }
 
     @Override
@@ -182,7 +158,7 @@ public class Metadata {
     }
   }
 
-  private static FileMetaColumnValuePair getParquetFileMetadata(FileSystem fs, FileStatus file) throws IOException {
+  private static FileMetaColumnValuePair fetchParquetFileMetadata(FileSystem fs, FileStatus file) throws IOException {
     ParquetMetadata metadata = ParquetFileReader.readFooter(fs.getConf(), file);
     long rowCount = 0;
     Map<SchemaPath,Long> columnValueCounts = Maps.newHashMap();
@@ -241,7 +217,7 @@ public class Metadata {
     os.close();
   }
 
-  public static ParquetTableMetadata readBlockMeta(DrillConfig config, FileSystem fs, String path) throws IOException {
+  public static ParquetTableMetadata readParquetTableMetadataFromFile(DrillConfig config, FileSystem fs, String path) throws IOException {
     Path p = new Path(path);
     ObjectMapper mapper = new ObjectMapper();
     SimpleModule module = new SimpleModule();
