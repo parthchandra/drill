@@ -218,6 +218,7 @@ public class Metadata {
   }
 
   public static ParquetTableMetadata readParquetTableMetadataFromFile(DrillConfig config, FileSystem fs, String path) throws IOException {
+    logger.debug("Read table metadat from file " + path);
     Path p = new Path(path);
     ObjectMapper mapper = new ObjectMapper();
     SimpleModule module = new SimpleModule();

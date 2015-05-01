@@ -349,6 +349,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   }
 
   private void init() {
+    logger.debug("Initialize");
     if (this.endpointAffinities == null) {
       List<FileStatus> fileStatuses = null;
       try {
@@ -386,6 +387,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   }
 
   private void generateChunks() {
+    logger.debug("Generating chunks");
     try {
       List<FileStatus> fileStatuses = Lists.newArrayList();
       for (ReadEntryWithPath entry : entries) {
@@ -497,6 +499,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
   @Override
   public int getMaxParallelizationWidth() {
+    logger.debug("Getting max parallelization width");
     if (chunks == null) {
       generateChunks();
     }
@@ -509,6 +512,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
   @Override
   public ScanStats getScanStats() {
+    logger.debug("Getting scan stats");
     int columnCount = columns == null ? 20 : columns.size();
     GroupScanProperty scanProperty = selectionModified ? GroupScanProperty.NO_EXACT_ROW_COUNT : GroupScanProperty.EXACT_ROW_COUNT;
     return new ScanStats(scanProperty, rowCount, 1, rowCount * columnCount);
