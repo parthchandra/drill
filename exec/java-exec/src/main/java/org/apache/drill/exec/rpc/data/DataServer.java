@@ -83,7 +83,7 @@ public class DataServer extends BasicServer<RpcType, DataServerConnection> {
         builder.setRpcVersion(DataRpcConfig.RPC_VERSION);
         if (config.getAuthMechanismToUse() != null) {
           builder.addAllAuthenticationMechanisms(config.getAuthProvider().getAllFactoryNames());
-        }
+      }
         return builder.build();
       }
 

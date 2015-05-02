@@ -17,6 +17,8 @@
  */
 package org.apache.drill.exec.rpc.data;
 
+import io.netty.channel.EventLoop;
+
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.drill.common.AutoCloseables;
@@ -41,9 +43,16 @@ public class DataConnectionCreator implements AutoCloseable {
 
   private final DataConnectionConfig config;
 
+  // we share one event loop for all local events to ensure that events never get out of order.
+  private final EventLoop localEventLoop;
+  private DrillbitEndpoint localIdentity;
+
+
   public DataConnectionCreator(BootStrapContext context, BufferAllocator allocator, WorkEventBus workBus,
                                WorkerBee bee) throws DrillbitStartupException {
     config = new DataConnectionConfig(allocator, context, new DataServerRequestHandler(workBus, bee));
+    this.localEventLoop = context.getBitLoopGroup().next();
+
   }
 
   public DrillbitEndpoint start(DrillbitEndpoint partialEndpoint, boolean allowPortHunting) {
@@ -53,16 +62,21 @@ public class DataConnectionCreator implements AutoCloseable {
       port = config.getBootstrapContext().getConfig().getInt(ExecConstants.INITIAL_DATA_PORT);
     }
     port = server.bind(port, allowPortHunting);
-    return partialEndpoint.toBuilder().setDataPort(port).build();
+    localIdentity = partialEndpoint.toBuilder().setDataPort(port).build();
+    return localIdentity;
   }
 
   public DataTunnel getTunnel(DrillbitEndpoint endpoint) {
-    DataConnectionManager newManager = new DataConnectionManager(endpoint, config);
-    DataConnectionManager oldManager = connectionManager.putIfAbsent(endpoint, newManager);
-    if(oldManager != null){
-      newManager = oldManager;
+    if (endpoint.equals(localIdentity)) {
+      return new LocalDataTunnel(server, localEventLoop);
+    } else {
+      DataConnectionManager newManager = new DataConnectionManager(endpoint, context);
+      DataConnectionManager oldManager = connectionManager.putIfAbsent(endpoint, newManager);
+      if (oldManager != null) {
+        newManager = oldManager;
+      }
+      return new RemoteDataTunnel(newManager);
     }
-    return new DataTunnel(newManager);
   }
 
   @Override

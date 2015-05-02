@@ -18,6 +18,7 @@
 package org.apache.drill.exec.record;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.DrillBuf;
 
 import org.apache.drill.exec.proto.BitData.FragmentRecordBatch;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
@@ -28,7 +29,7 @@ public class FragmentWritableBatch{
 
   private static RecordBatchDef EMPTY_DEF = RecordBatchDef.newBuilder().setRecordCount(0).build();
 
-  private final ByteBuf[] buffers;
+  private final DrillBuf[] buffers;
   private final FragmentRecordBatch header;
 
   public FragmentWritableBatch(final boolean isLast, final QueryId queryId, final int sendMajorFragmentId, final int sendMinorFragmentId, final int receiveMajorFragmentId, final int receiveMinorFragmentId, final WritableBatch batch){
@@ -39,7 +40,9 @@ public class FragmentWritableBatch{
     this(isLast, queryId, sendMajorFragmentId, sendMinorFragmentId, receiveMajorFragmentId, receiveMinorFragmentIds, batch.getDef(), batch.getBuffers());
   }
 
-  private FragmentWritableBatch(final boolean isLast, final QueryId queryId, final int sendMajorFragmentId, final int sendMinorFragmentId, final int receiveMajorFragmentId, final int[] receiveMinorFragmentId, final RecordBatchDef def, final ByteBuf... buffers){
+  private FragmentWritableBatch(final boolean isLast, final QueryId queryId, final int sendMajorFragmentId,
+      final int sendMinorFragmentId, final int receiveMajorFragmentId, final int[] receiveMinorFragmentId,
+      final RecordBatchDef def, final DrillBuf... buffers) {
     this.buffers = buffers;
     final FragmentRecordBatch.Builder builder = FragmentRecordBatch.newBuilder()
         .setIsLastBatch(isLast)
@@ -85,7 +88,7 @@ public class FragmentWritableBatch{
         new int[] { receiveMinorFragmentId }, def.build());
   }
 
-  public ByteBuf[] getBuffers(){
+  public DrillBuf[] getBuffers() {
     return buffers;
   }
 

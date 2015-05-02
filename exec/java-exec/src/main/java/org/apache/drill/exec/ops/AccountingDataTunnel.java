@@ -27,8 +27,8 @@ import org.apache.drill.exec.testing.ExecutionControlsInjector;
 import org.slf4j.Logger;
 
 /**
- * Wrapper around a {@link org.apache.drill.exec.rpc.data.DataTunnel} that tracks the status of batches sent to
- * to other Drillbits.
+ * Wrapper around a {@link org.apache.drill.exec.rpc.data.DataTunnel} that tracks the status of batches sent to to other
+ * Drillbits.
  */
 public class AccountingDataTunnel {
   private final DataTunnel tunnel;

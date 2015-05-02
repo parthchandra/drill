@@ -50,6 +50,11 @@ import org.apache.drill.exec.record.WritableBatch;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
 import org.apache.drill.exec.rpc.control.WorkEventBus;
+import org.apache.drill.exec.rpc.data.DataConnectionManager;
+import org.apache.drill.exec.rpc.data.DataServer;
+import org.apache.drill.exec.rpc.data.DataTunnel;
+import org.apache.drill.exec.rpc.data.IncomingDataBatch;
+import org.apache.drill.exec.rpc.data.RemoteDataTunnel;
 import org.apache.drill.exec.server.BootStrapContext;
 import org.apache.drill.exec.vector.Float8Vector;
 import org.apache.drill.exec.vector.ValueVector;
@@ -118,8 +123,8 @@ public class TestBitRpc extends ExecTest {
 
     port = server.bind(port, true);
     DrillbitEndpoint ep = DrillbitEndpoint.newBuilder().setAddress("localhost").setDataPort(port).build();
-    DataConnectionManager manager = new DataConnectionManager(ep, config);
-    DataTunnel tunnel = new DataTunnel(manager);
+    DataConnectionManager manager = new DataConnectionManager(ep, c2);
+    DataTunnel tunnel = new RemoteDataTunnel(manager);
     AtomicLong max = new AtomicLong(0);
     for (int i = 0; i < 40; i++) {
       long t1 = System.currentTimeMillis();
@@ -180,6 +185,6 @@ public class TestBitRpc extends ExecTest {
     public void interrupted(final InterruptedException e) {
       // TODO(We don't have any interrupts in test code)
     }
-  }
+        }
 
-}
+  }
