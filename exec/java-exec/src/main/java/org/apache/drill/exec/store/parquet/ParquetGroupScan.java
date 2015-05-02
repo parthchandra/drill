@@ -21,8 +21,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteStreams;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -152,7 +154,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     return selectionRoot;
   }
 
-  public ParquetGroupScan(List<FileStatus> files, //
+  public ParquetGroupScan(List<String> files, //
       ParquetFormatPlugin formatPlugin, //
       String selectionRoot,
       List<SchemaPath> columns) //
@@ -163,8 +165,8 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     this.fs = formatPlugin.getFileSystem();
 
     this.entries = Lists.newArrayList();
-    for (FileStatus file : files) {
-      entries.add(new ReadEntryWithPath(file.getPath().toString()));
+    for (String file : files) {
+      entries.add(new ReadEntryWithPath(file));
     }
 
     this.selectionRoot = selectionRoot;
@@ -390,21 +392,24 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     logger.debug("Generating chunks");
     try {
       List<FileStatus> fileStatuses = Lists.newArrayList();
+      Set<String> entryPaths = Sets.newHashSet();
       for (ReadEntryWithPath entry : entries) {
-        getFiles(entry.getPath(), fileStatuses);
+        String path = Path.getPathWithoutSchemeAndAuthority(new Path(entry.getPath())).toString();
+        entryPaths.add(path);
       }
       Map<String, List<BlockLocation>> cachedBlockLocations = Maps.newHashMap();
       for (ParquetFileMetadata file : tableMetadata.files) {
         cachedBlockLocations.put(file.path, file.blockLocations);
       }
-      if (fileStatuses == null) {
-        fileStatuses = Lists.newArrayList();
-        for (ParquetFileMetadata file : tableMetadata.files) {
-          FileStatus fileStatus = new FileStatus();
-          ByteArrayDataInput in = ByteStreams.newDataInput(file.fileStatus);
-          fileStatus.readFields(in);
-          fileStatuses.add(fileStatus);
+      fileStatuses = Lists.newArrayList();
+      for (ParquetFileMetadata file : tableMetadata.files) {
+        if (selectionModified && !entryPaths.contains(file.path)) {
+          continue;
         }
+        FileStatus fileStatus = new FileStatus();
+        ByteArrayDataInput in = ByteStreams.newDataInput(file.fileStatus);
+        fileStatus.readFields(in);
+        fileStatuses.add(fileStatus);
       }
 
       BlockMapBuilder bmb = new BlockMapBuilder(fs, formatPlugin.getContext().getBits(), cachedBlockLocations);

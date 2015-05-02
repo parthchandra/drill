@@ -155,12 +155,12 @@ public class ParquetFormatPlugin implements FormatPlugin{
 
   @Override
   public ParquetGroupScan getGroupScan(FileSelection selection) throws IOException {
-    return new ParquetGroupScan(selection.getFileStatusList(fs), this, selection.selectionRoot, null);
+    return new ParquetGroupScan(selection.getAsFiles(), this, selection.selectionRoot, null);
   }
 
   @Override
   public ParquetGroupScan getGroupScan(FileSelection selection, List<SchemaPath> columns) throws IOException {
-    return new ParquetGroupScan(selection.getFileStatusList(fs), this, selection.selectionRoot, columns);
+    return new ParquetGroupScan(selection.getAsFiles(), this, selection.selectionRoot, columns);
   }
 
   @Override
