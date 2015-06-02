@@ -22,8 +22,19 @@ project(drillclient)
 message("Project Dir = ${PROJECT_SOURCE_DIR}")
 message("Source Dir = ${CMAKE_SOURCE_DIR} ")
 
+cmake_policy(SET CMP0043 NEW)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmakeModules/")
 
+
+# Get the latest git commit properties of the working branch
+execute_process(
+    COMMAND git log -1 --format="\\nCommit: %H \\nDescription: %s \\nAuthor: %aN Date: %ai"
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE GIT_COMMIT_PROP
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+#add_definitions("-DGIT_COMMIT_PROP=${GIT_COMMIT_PROP}")
 
 # Find Boost
 if(MSVC)
@@ -60,8 +71,23 @@ endif()
 find_package(Protobuf REQUIRED )
 include_directories(${PROTOBUF_INCLUDE_DIR})
 
+#Find SSL
+find_package(OpenSSL REQUIRED )
+if(OPENSSL_FOUND)
+    add_definitions("-DIS_SSL_ENABLED=1")
+endif()
+
 #Find Zookeeper
 find_package(Zookeeper  REQUIRED )
+
+
+# Generated sources
+configure_file(
+    ${CMAKE_SOURCE_DIR}/src/clientlib/env.h.in
+    ${CMAKE_BINARY_DIR}/generated/env.h
+)
+
+include_directories(${CMAKE_BINARY_DIR}/generated)
 
 #
 #   TARGETS
@@ -88,6 +114,12 @@ set_property(
 
 # Link directory
 link_directories(/usr/local/lib)
+
+#test programs
+add_subdirectory("${CMAKE_SOURCE_DIR}/test")
+message("Open SSL Include = ${OPENSSL_INCLUDE_DIR}")
+message("Open SSL Libraries = ${OPENSSL_LIBRARIES}")
+message("Open SSL = ${OPENSSL_ROOT_DIR}")
 
 add_executable(querySubmitter example/querySubmitter.cpp )
 

@@ -19,6 +19,7 @@
 # Drill Client library
 
 set (CLIENTLIB_SRC_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/connection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/decimalUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClientImpl.cpp
@@ -33,6 +34,7 @@ set (CLIENTLIB_SRC_FILES
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../include )
 include_directories(${PROTOBUF_INCLUDE_DIR})
 include_directories(${Zookeeper_INCLUDE_DIRS})
+include_directories("${OPENSSL_INCLUDE_DIR}")
 
 link_directories(/usr/local/lib)
 
@@ -47,4 +49,4 @@ if(MSVC)
 endif()
 
 add_library(drillClient SHARED ${CLIENTLIB_SRC_FILES} )
-target_link_libraries(drillClient ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} ${Zookeeper_LIBRARIES} protomsgs y2038)
+target_link_libraries(drillClient ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} ${Zookeeper_LIBRARIES} ${OPENSSL_LIBRARIES} protomsgs y2038)
