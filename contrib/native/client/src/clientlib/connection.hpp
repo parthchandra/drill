@@ -22,6 +22,8 @@
 #include "drill/common.hpp"
 #include "streamSocket.hpp"
 
+class DrillClientError;
+
 namespace Drill {
 
     /***
@@ -34,7 +36,8 @@ namespace Drill {
      ***/
     class Connection{
         public:
-            Connection(const char* connStr);
+            Connection(const char* connStr, bool useSSL);
+            ~Connection();
             connectionStatus_t connect();
             template <typename SettableSocketOption> void setOption(SettableSocketOption& option);
 
@@ -44,6 +47,8 @@ namespace Drill {
             bool isDirectConnection();
             bool isZookeeperConnection();
             connectionStatus_t getDrillbitEndpoint();
+            connectionStatus_t connectInternal();
+            connectionStatus_t handleError(connectionStatus_t status, std::string msg);
 
             std::string m_connectString;
             std::string m_pathToDrill;
@@ -54,6 +59,9 @@ namespace Drill {
 
             bool m_bIsConnected;
             bool m_bIsSSL;
+
+            DrillClientError* m_pError;
+
     };
 } // namespace Drill
 

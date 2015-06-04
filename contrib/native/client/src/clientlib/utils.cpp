@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include "utils.hpp"
 #include "drill/common.hpp"
+#include "drill/drillConfig.hpp"
 
 namespace Drill{
 

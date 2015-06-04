@@ -28,9 +28,11 @@
 
 namespace Drill {
 
+typedef boost::asio::ip::tcp::socket::lowest_layer_type streamSocket_t;
+
 class AsioStreamSocket{
     public:
-    virtual boost::asio::ip::tcp::socket::lowest_layer_type& getSocket() = 0;
+        virtual boost::asio::ip::tcp::socket::lowest_layer_type& getSocket() = 0;
 };
 
 class Socket: 
@@ -41,7 +43,7 @@ class Socket:
         Socket(boost::asio::io_service& ioService) :
             boost::asio::buffered_stream<boost::asio::ip::tcp::socket>(ioService) {
             }
-        boost::asio::ip::tcp::socket::lowest_layer_type& getSocket(){ return this->lowest_layer();}
+        streamSocket_t& getSocket(){ return this->lowest_layer();}
 
 };
 
@@ -57,19 +59,7 @@ class SslSocket:
             boost::asio::ssl::stream<boost::asio::ip::tcp::socket>(ioService, sslContext) {
             }
 
-        boost::asio::ip::tcp::socket::lowest_layer_type& getSocket(){ return this->lowest_layer();}
-};
-#else
-    public AsioSocketWrapper, 
-    public boost::asio::ssl::stream<boost::asio::ip::tcp::socket>{
-
-    public:
-        SslSocket(boost::asio::io_service& ioService, boost::asio::ssl::context &sslContext) :
-            boost::asio::buffered_stream<boost::asio::ip::tcp::socket>(ioService) {
-                #error " SSL is not enabled"
-            }
-
-        boost::asio::ip::tcp::socket::lowest_layer_type& getSocket(){ return this->lowest_layer();}
+        streamSocket_t& getSocket(){ return this->lowest_layer();}
 };
 #endif
 

@@ -53,6 +53,8 @@ namespace exec{
 namespace Drill{
 
 //struct UserServerEndPoint;
+class  DrillClientConfig;
+class  DrillClientError;
 class  DrillClientImpl;
 class  DrillClientQueryResult;
 class  FieldMetadata;
@@ -65,81 +67,12 @@ enum QueryType{
     PHYSICAL = 3
 };
 
-class DECLSPEC_DRILL_CLIENT DrillClientError{
-    public:
-        static const uint32_t CONN_ERROR_START = 100;
-        static const uint32_t QRY_ERROR_START =  200;
-
-        DrillClientError(uint32_t s, uint32_t e, char* m){status=s; errnum=e; msg=m;};
-        DrillClientError(uint32_t s, uint32_t e, std::string m){status=s; errnum=e; msg=m;};
-
-        static DrillClientError*  getErrorObject(const exec::shared::DrillPBError& e);
-
-        // To get the error number we add a error range start number to
-        // the status code returned (either status_t or connectionStatus_t)
-        uint32_t status; // could be either status_t or connectionStatus_t
-        uint32_t errnum;
-        std::string msg;
-};
-
 // Only one instance of this class exists. A static member of DrillClientImpl;
 class DECLSPEC_DRILL_CLIENT DrillClientInitializer{
     public:
         DrillClientInitializer();
         ~DrillClientInitializer();
 };
-
-// Only one instance of this class exists. A static member of DrillClientImpl;
-class DECLSPEC_DRILL_CLIENT DrillClientConfig{
-    public:
-        DrillClientConfig();
-        ~DrillClientConfig();
-        static void initLogging(const char* path);
-        static void setLogLevel(logLevel_t l);
-        static void setBufferLimit(uint64_t l);
-        static uint64_t getBufferLimit();
-        static void setSocketTimeout(int32_t l);
-        static void setHandshakeTimeout(int32_t l);
-        static void setQueryTimeout(int32_t l);
-        static void setHeartbeatFrequency(int32_t l);
-        static int32_t getSocketTimeout();
-        static int32_t getHandshakeTimeout();
-        static int32_t getQueryTimeout();
-        static int32_t getHeartbeatFrequency();
-        static logLevel_t getLogLevel();
-    private:
-        // The logging level
-        static logLevel_t s_logLevel;
-        // The total amount of memory to be allocated by an instance of DrillClient.
-        // For future use. Currently, not enforced.
-        static uint64_t s_bufferLimit;
-
-        /**
-         * DrillClient configures timeout (in seconds) in a fine granularity.
-         * Disabled by setting the value to zero.
-         *
-         * s_socketTimout: (default 0)
-         *      set SO_RCVTIMEO and SO_SNDTIMEO socket options and place a
-         *		timeout on socket receives and sends. It is disabled by default.
-         *
-         * s_handshakeTimeout: (default 5)
-         *      place a timeout on validating handshake. When an endpoint (host:port)
-         *		is reachable but drillbit hangs or running another service. It will
-         *		avoid the client hanging.
-         *
-         * s_queryTimeout: (default 180)
-         *      place a timeout on waiting result of querying.
-         *
-         * s_heartbeatFrequency: (default 30)
-         *      Seconds of idle activity after which a heartbeat is sent to the drillbit
-         */
-        static int32_t s_socketTimeout;
-        static int32_t s_handshakeTimeout;
-        static int32_t s_queryTimeout;
-        static int32_t s_heartbeatFrequency;
-        static boost::mutex s_mutex;
-};
-
 
 class DECLSPEC_DRILL_CLIENT DrillUserProperties{
     public:

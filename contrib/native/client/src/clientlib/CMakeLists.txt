@@ -21,7 +21,9 @@
 set (CLIENTLIB_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/connection.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/decimalUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drillConfig.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClient.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/drillError.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClientImpl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/recordBatch.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/rpcEncoder.cpp
@@ -29,6 +31,7 @@ set (CLIENTLIB_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/errmsgs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/logger.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/zkCluster.cpp
     )
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../include )
