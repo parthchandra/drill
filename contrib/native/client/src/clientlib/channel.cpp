@@ -20,7 +20,7 @@
 
 #include "drill/drillConfig.hpp"
 #include "drill/drillError.hpp"
-#include "connection.hpp"
+#include "channel.hpp"
 #include "errmsgs.hpp"
 #include "logger.hpp"
 #include "zkCluster.hpp"
@@ -29,43 +29,18 @@
 
 namespace Drill{
 
-Connection::Connection(const char* connStr, bool useSSL){
+ConnectionEndpoint::ConnectionEndpoint(const char* connStr){
     m_connectString=connStr;
-    m_bIsConnected=false;
-    m_bIsSSL=useSSL;
     m_pError=NULL;
 }
 
-Connection::~Connection(){
+ConnectionEndpoint::~ConnectionEndpoint(){
     if(m_pError!=NULL){
         delete m_pError; m_pError=NULL;
     }
 }
 
-connectionStatus_t Connection::connect(){
-    connectionStatus_t ret=CONN_SUCCESS;
-    if(!this->m_bIsConnected){
-        parseConnectString();
-        if(isZookeeperConnection()){
-            if((ret=getDrillbitEndpoint())!=CONN_SUCCESS){
-                return ret;
-            }
-        }else if(!isDirectConnection()){
-            return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, m_protocol.c_str()));
-        }
-        DRILL_LOG(LOG_TRACE) << "Connecting to drillbit: " << m_host << ":" << m_port << "." << std::endl;
-        ret=this->connectInternal();
-    }
-    m_bIsConnected=(ret==CONN_SUCCESS);
-    return ret;
-}
-
-template <typename SettableSocketOption> void Connection::setOption(SettableSocketOption& option){
-    //TODO: May be useful some day. For the moment, we only need to set some well known options after we connect.
-    assert(0); 
-}
-
-void Connection::parseConnectString(){
+void ConnectionEndpoint::parseConnectString(){
     char u[MAX_CONNECT_STR+1];
     assert(!m_connectString.empty());
     strncpy(u, m_connectString.c_str(), MAX_CONNECT_STR); u[MAX_CONNECT_STR]=0;
@@ -86,17 +61,17 @@ void Connection::parseConnectString(){
     return;
 }
 
-bool Connection::isDirectConnection(){
+bool ConnectionEndpoint::isDirectConnection(){
     assert(!m_protocol.empty());
     return (!strcmp(m_protocol.c_str(), "local") || !strcmp(m_protocol.c_str(), "drillbit"));
 }
 
-bool Connection::isZookeeperConnection(){
+bool ConnectionEndpoint::isZookeeperConnection(){
     assert(!m_protocol.empty());
     return (!strcmp(m_protocol.c_str(), "zk"));
 }
 
-connectionStatus_t Connection::getDrillbitEndpoint(){
+connectionStatus_t ConnectionEndpoint::getDrillbitEndpoint(){
     ZkCluster zook;
     assert(!m_hostPortStr.empty());
     zook.debugPrint();
@@ -110,7 +85,84 @@ connectionStatus_t Connection::getDrillbitEndpoint(){
     return CONN_SUCCESS;
 }
 
-connectionStatus_t Connection::connectInternal(){
+connectionStatus_t ConnectionEndpoint::handleError(connectionStatus_t status, std::string msg){
+    DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
+    if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+    m_pError=pErr;
+    return status;
+}
+
+/*******************
+ *  ChannelFactory
+ * *****************/
+Channel* ChannelFactory::getChannel(channelType_t t, const char* connStr){
+    Channel* pChannel=NULL;
+    switch(t){
+        case CHANNEL_TYPE_SOCKET:
+            pChannel=new SocketChannel(connStr);
+            break;
+        case CHANNEL_TYPE_SSLSTREAM:
+            pChannel=new SSLStreamChannel(connStr);
+            break;
+        default:
+            break;
+    }
+    return pChannel;
+}
+
+
+
+/*******************
+ *  Channel
+ * *****************/
+
+Channel::Channel(const char* connStr){
+    m_pEndpoint=new ConnectionEndpoint(connStr);
+    m_pSocket=NULL;
+    m_bIsConnected=false;
+    m_pError=NULL;
+}
+
+Channel::~Channel(){
+    if(m_pEndpoint!=NULL){
+        delete m_pEndpoint; m_pEndpoint=NULL;
+    }
+    if(m_pError!=NULL){
+        delete m_pError; m_pError=NULL;
+    }
+}
+
+template <typename SettableSocketOption> void Channel::setOption(SettableSocketOption& option){
+    //TODO: May be useful some day. For the moment, we only need to set some well known options after we connect.
+    assert(0); 
+}
+
+connectionStatus_t Channel::connect(){
+    connectionStatus_t ret=CONN_SUCCESS;
+    if(!this->m_bIsConnected){
+        m_pEndpoint->parseConnectString();
+        if(m_pEndpoint->isZookeeperConnection()){
+            if((ret=m_pEndpoint->getDrillbitEndpoint())!=CONN_SUCCESS){
+                return ret;
+            }
+        }else if(!m_pEndpoint->isDirectConnection()){
+            return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, m_pEndpoint->getProtocol().c_str()));
+        }
+        DRILL_LOG(LOG_TRACE) << "Connecting to drillbit: " << m_pEndpoint->getHost() << ":" << m_pEndpoint->getPort() << "." << std::endl;
+        ret=this->connectInternal();
+    }
+    m_bIsConnected=(ret==CONN_SUCCESS);
+    return ret;
+}
+
+connectionStatus_t Channel::handleError(connectionStatus_t status, std::string msg){
+    DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
+    if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+    m_pError=pErr;
+    return status;
+}
+
+connectionStatus_t Channel::connectInternal(){
     using boost::asio::ip::tcp;
     tcp::endpoint endpoint;
     const char* host=this->m_host.c_str();
@@ -120,7 +172,7 @@ connectionStatus_t Connection::connectInternal(){
         tcp::resolver::query query(tcp::v4(), host, port);
         tcp::resolver::iterator iter = resolver.resolve(query);
         tcp::resolver::iterator end;
-        while (iter != end){
+        while(iter != end){
             endpoint = *iter++;
             DRILL_LOG(LOG_TRACE) << endpoint << std::endl;
         }
@@ -151,13 +203,6 @@ connectionStatus_t Connection::connectInternal(){
     setSocketTimeout(m_socket, DrillClientConfig::getSocketTimeout());
 
     return CONN_SUCCESS;
-}
-
-connectionStatus_t Connection::handleError(connectionStatus_t status, std::string msg){
-    DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
-    if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
-    m_pError=pErr;
-    return status;
 }
 
 

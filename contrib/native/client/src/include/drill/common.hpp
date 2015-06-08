@@ -82,6 +82,11 @@ class AllocatedBuffer;
 typedef AllocatedBuffer* AllocatedBufferPtr;
 
 typedef enum{
+    CHANNEL_TYPE_SOCKET=1,
+    CHANNEL_TYPE_SSLSTREAM=2
+} channelType_t;
+
+typedef enum{
     QRY_SUCCESS=0,
     QRY_FAILURE=1,
     QRY_SUCCESS_WITH_INFO=2,

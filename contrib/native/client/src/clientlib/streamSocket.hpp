@@ -32,7 +32,10 @@ typedef boost::asio::ip::tcp::socket::lowest_layer_type streamSocket_t;
 
 class AsioStreamSocket{
     public:
-        virtual boost::asio::ip::tcp::socket::lowest_layer_type& getSocket() = 0;
+        virtual streamSocket_t& getSocket() = 0;
+        //connectionStatus_t connect();
+    private:
+        DrillClientError* m_pError;
 };
 
 class Socket: 
