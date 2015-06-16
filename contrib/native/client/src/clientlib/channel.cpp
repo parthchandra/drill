@@ -40,6 +40,19 @@ ConnectionEndpoint::~ConnectionEndpoint(){
     }
 }
 
+connectionStatus_t ConnectionEndpoint::getDrillbitEndpoint(){
+    connectionStatus_t ret=CONN_SUCCESS;
+    parseConnectString();
+    if(isZookeeperConnection()){
+        if((ret=getDrillbitEndpointFromZk())!=CONN_SUCCESS){
+            return ret;
+        }
+    }else if(!this->isDirectConnection()){
+        return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, this->getProtocol().c_str()));
+    }
+    return ret;
+}
+
 void ConnectionEndpoint::parseConnectString(){
     char u[MAX_CONNECT_STR+1];
     assert(!m_connectString.empty());
@@ -71,7 +84,7 @@ bool ConnectionEndpoint::isZookeeperConnection(){
     return (!strcmp(m_protocol.c_str(), "zk"));
 }
 
-connectionStatus_t ConnectionEndpoint::getDrillbitEndpoint(){
+connectionStatus_t ConnectionEndpoint::getDrillbitEndpointFromZk(){
     ZkCluster zook;
     assert(!m_hostPortStr.empty());
     zook.debugPrint();
@@ -101,10 +114,13 @@ Channel* ChannelFactory::getChannel(channelType_t t, const char* connStr){
         case CHANNEL_TYPE_SOCKET:
             pChannel=new SocketChannel(connStr);
             break;
+#if defined(IS_SSL_ENABLED)
         case CHANNEL_TYPE_SSLSTREAM:
             pChannel=new SSLStreamChannel(connStr);
             break;
+#endif
         default:
+            DRILL_LOG(LOG_ERROR) << "Channel type " << t << " is not supported." << std::endl;
             break;
     }
     return pChannel;
@@ -127,6 +143,9 @@ Channel::~Channel(){
     if(m_pEndpoint!=NULL){
         delete m_pEndpoint; m_pEndpoint=NULL;
     }
+    if(m_pSocket!=NULL){
+        delete m_pSocket; m_pSocket=NULL;
+    }
     if(m_pError!=NULL){
         delete m_pError; m_pError=NULL;
     }
@@ -137,19 +156,22 @@ template <typename SettableSocketOption> void Channel::setOption(SettableSocketO
     assert(0); 
 }
 
+connectionStatus_t Channel::init(ChannelContext_t* pContext){
+    connectionStatus_t ret=CONN_SUCCESS;
+    return ret;
+}
+
 connectionStatus_t Channel::connect(){
     connectionStatus_t ret=CONN_SUCCESS;
     if(!this->m_bIsConnected){
-        m_pEndpoint->parseConnectString();
-        if(m_pEndpoint->isZookeeperConnection()){
-            if((ret=m_pEndpoint->getDrillbitEndpoint())!=CONN_SUCCESS){
-                return ret;
-            }
-        }else if(!m_pEndpoint->isDirectConnection()){
-            return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, m_pEndpoint->getProtocol().c_str()));
+        ret=m_pEndpoint->getDrillbitEndpoint();
+        if(ret==CONN_SUCCESS){
+            DRILL_LOG(LOG_TRACE) << "Connecting to drillbit: " 
+                << m_pEndpoint->getHost() 
+                << ":" << m_pEndpoint->getPort() 
+                << "." << std::endl;
+            ret=this->connectInternal();
         }
-        DRILL_LOG(LOG_TRACE) << "Connecting to drillbit: " << m_pEndpoint->getHost() << ":" << m_pEndpoint->getPort() << "." << std::endl;
-        ret=this->connectInternal();
     }
     m_bIsConnected=(ret==CONN_SUCCESS);
     return ret;
@@ -165,10 +187,10 @@ connectionStatus_t Channel::handleError(connectionStatus_t status, std::string m
 connectionStatus_t Channel::connectInternal(){
     using boost::asio::ip::tcp;
     tcp::endpoint endpoint;
-    const char* host=this->m_host.c_str();
-    const char* port=this->m_port.c_str();
+    const char* host=m_pEndpoint->getHost().c_str();
+    const char* port=m_pEndpoint->getPort().c_str();
     try{
-        tcp::resolver resolver(m_io_service);
+        tcp::resolver resolver(m_ioService);
         tcp::resolver::query query(tcp::v4(), host, port);
         tcp::resolver::iterator iter = resolver.resolve(query);
         tcp::resolver::iterator end;
@@ -177,7 +199,7 @@ connectionStatus_t Channel::connectInternal(){
             DRILL_LOG(LOG_TRACE) << endpoint << std::endl;
         }
         boost::system::error_code ec;
-        m_socket.connect(endpoint, ec);
+        m_pSocket->getSocket().connect(endpoint, ec);
         if(ec){
             return handleError(CONN_FAILURE, getMessage(ERR_CONN_FAILURE, host, port, ec.message().c_str()));
         }
@@ -191,19 +213,41 @@ connectionStatus_t Channel::connectInternal(){
 
     // set socket keep alive
     boost::asio::socket_base::keep_alive keepAlive(true);
-    m_socket.set_option(keepAlive);
+    m_pSocket->getSocket().set_option(keepAlive);
 	// set no_delay
     boost::asio::ip::tcp::no_delay noDelay(true);
-    m_socket.set_option(noDelay);
-
-    //
-    // We put some OS dependent code here for timing out a socket. Mostly, this appears to
-    // do nothing. Should we leave it in there?
-    //
-    setSocketTimeout(m_socket, DrillClientConfig::getSocketTimeout());
+    m_pSocket->getSocket().set_option(noDelay);
+    // set reuse addr
+    boost::asio::socket_base::reuse_address reuseAddr(true);
+    m_pSocket->getSocket().set_option(reuseAddr);
 
     return CONN_SUCCESS;
 }
 
+connectionStatus_t SocketChannel::init(ChannelContext_t* pContext){
+    connectionStatus_t ret=CONN_SUCCESS;
+    m_pSocket=new Socket(m_ioService);
+    if(m_pSocket!=NULL){
+        ret=Channel::init(pContext);
+    }else{
+        DRILL_LOG(LOG_ERROR) << "Channel initialization failure. " << std::endl;
+        ret=CONN_FAILURE;
+    }
+    return ret;
+}
+
+#if defined(IS_SSL_ENABLED)
+connectionStatus_t SSLStreamChannel::init(ChannelContext_t* pContext){
+    connectionStatus_t ret=CONN_SUCCESS;
+    m_pSocket=new SslSocket(m_ioService, *pContext->getSslContext());
+    if(m_pSocket!=NULL){
+        ret=Channel::init(pContext);
+    }else{
+        DRILL_LOG(LOG_ERROR) << "Channel initialization failure. " << std::endl;
+        ret=CONN_FAILURE;
+    }
+    return ret;
+}
+#endif
 
 } // namespace Drill

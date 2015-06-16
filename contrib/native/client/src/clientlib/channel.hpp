@@ -31,6 +31,9 @@ namespace Drill {
             ConnectionEndpoint(const char* connStr);
             ~ConnectionEndpoint();
 
+            //parse the connection string and set up the host and port to connect to
+            connectionStatus_t getDrillbitEndpoint();
+
             std::string& getProtocol(){return m_protocol;}
             std::string& getHost(){return m_host;}
             std::string& getPort(){return getPort();}
@@ -40,7 +43,7 @@ namespace Drill {
             connectionStatus_t validateConnectionString();
             bool isDirectConnection();
             bool isZookeeperConnection();
-            connectionStatus_t getDrillbitEndpoint();
+            connectionStatus_t getDrillbitEndpointFromZk();
             connectionStatus_t handleError(connectionStatus_t status, std::string msg);
 
             std::string m_connectString;
@@ -54,6 +57,20 @@ namespace Drill {
 
     };
 
+    class ChannelContext{
+        public:
+            ChannelContext();
+            ~ChannelContext();
+            void setSslContext(boost::asio::ssl::context* c){
+                this->m_pSslContext=c;
+            }
+            boost::asio::ssl::context* getSslContext(){ return m_pSslContext;}
+        private:
+            boost::asio::ssl::context* m_pSslContext;
+    };
+
+    typedef ChannelContext ChannelContext_t; 
+
     /***
      * The Channel class encapsulates a connection to a drillbit. Based on 
      * the connection string and the options, the connection will be either 
@@ -66,36 +83,40 @@ namespace Drill {
     class Channel{
         public: 
             Channel(const char* connStr);
-            ~Channel();
+            virtual ~Channel();
+            virtual connectionStatus_t init(ChannelContext_t* context)=0;
             connectionStatus_t connect();
             template <typename SettableSocketOption> void setOption(SettableSocketOption& option);
+
+        protected:
+            connectionStatus_t handleError(connectionStatus_t status, std::string msg);
+
+            boost::asio::io_service m_ioService;
+            AsioStreamSocket* m_pSocket;
 
         private:
             
             connectionStatus_t connectInternal();
 
             ConnectionEndpoint* m_pEndpoint;
-            boost::asio::io_service m_ioService;
-            //boost::asio::ip::tcp::socket m_Socket;
-            AsioStreamSocket* m_pSocket;
 
-            //bool m_bIsSSL;
             bool m_bIsConnected;
-
             DrillClientError* m_pError;
 
     };
 
     class SocketChannel: public Channel{
         public:
-        SocketChannel(const char* connStr):Channel(connStr){
-        }
+            SocketChannel(const char* connStr):Channel(connStr){
+            }
+            connectionStatus_t init(ChannelContext_t* context=NULL);
     };
 
     class SSLStreamChannel: public Channel{
         public:
-        SSLStreamChannel(const char* connStr):Channel(connStr){
-        }
+            SSLStreamChannel(const char* connStr):Channel(connStr){
+            }
+            connectionStatus_t init(ChannelContext_t* context);
     };
 
     class ChannelFactory{

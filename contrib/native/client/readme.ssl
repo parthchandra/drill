@@ -36,8 +36,8 @@ Set up the certificate
 
     Remove password requirement (needed for example)
 
-        cp drillCppTestServer.pem drillCppTestServer.pem.safe
-        openssl rsa -in drillCppTestServer.pem.safe -out drillCppTestServer.pem
+        cp drillCppTestServer.pem drillCppTestServer.safe.pem
+        openssl rsa -in drillCppTestServer.safe.pem -out drillCppTestServer.pem
 
     Generate dhparam file
         openssl dhparam -out dh512.pem 512

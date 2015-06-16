@@ -42,6 +42,8 @@
 #endif
 
 #include "drill/drillClient.hpp"
+#include "drill/drillConfig.hpp"
+#include "drill/drillError.hpp"
 #include "rpcEncoder.hpp"
 #include "rpcDecoder.hpp"
 #include "utils.hpp"

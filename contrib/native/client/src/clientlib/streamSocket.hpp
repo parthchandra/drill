@@ -33,9 +33,10 @@ typedef boost::asio::ip::tcp::socket::lowest_layer_type streamSocket_t;
 class AsioStreamSocket{
     public:
         virtual streamSocket_t& getSocket() = 0;
+        virtual ~AsioStreamSocket(){};
         //connectionStatus_t connect();
     private:
-        DrillClientError* m_pError;
+        //DrillClientError* m_pError;
 };
 
 class Socket: 
@@ -47,7 +48,7 @@ class Socket:
             boost::asio::buffered_stream<boost::asio::ip::tcp::socket>(ioService) {
             }
         streamSocket_t& getSocket(){ return this->lowest_layer();}
-
+        ~Socket(){};
 };
 
 
@@ -63,6 +64,7 @@ class SslSocket:
             }
 
         streamSocket_t& getSocket(){ return this->lowest_layer();}
+        ~SslSocket(){};
 };
 #endif
 
