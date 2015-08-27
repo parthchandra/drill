@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.calcite.rel.rules.AggregateExpandDistinctAggregatesRule;
 import org.apache.calcite.rel.rules.AggregateRemoveRule;
+import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
 import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
 import org.apache.calcite.rel.rules.JoinPushThroughJoinRule;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
@@ -135,6 +136,7 @@ public class DrillRuleSets {
        */
       DrillPushFilterPastProjectRule.INSTANCE,
       FilterSetOpTransposeRule.INSTANCE,
+      FilterAggregateTransposeRule.INSTANCE,
 
       FilterMergeRule.INSTANCE,
       AggregateRemoveRule.INSTANCE,

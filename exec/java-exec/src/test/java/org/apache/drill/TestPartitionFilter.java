@@ -283,4 +283,10 @@ public class TestPartitionFilter extends PlanTestBase {
     testIncludeFilter(query, 8, "Filter", 24);
   }
 
+  @Test // DRILL-2748
+  public void testPartitionFilterAfterPushFilterPastAgg() throws Exception {
+    String query = String.format("select dir0, dir1, cnt from (select dir0, dir1, count(*) cnt from dfs_test.`%s/multilevel/parquet` group by dir0, dir1) where dir0 = '1994' and dir1 = 'Q1'", TEST_RES_PATH);
+    testExcludeFilter(query, 1, "Filter", 1);
+  }
+
 }
