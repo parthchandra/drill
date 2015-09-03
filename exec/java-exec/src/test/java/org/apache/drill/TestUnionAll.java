@@ -22,6 +22,7 @@ import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.exec.work.foreman.SqlUnsupportedException;
 import org.apache.drill.exec.work.foreman.UnsupportedRelOperatorException;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestUnionAll extends BaseTestQuery{
@@ -634,6 +635,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test // see DRILL-3130
+  @Ignore // see DRILL-3257
   public void testProjectPushDownOverUnionAllWithProject() throws Exception {
     String query = "select n_nationkey, n_name from \n" +
         "(select n_nationkey, n_name, n_comment from cp.`tpch/nation.parquet` \n" +
@@ -659,6 +661,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test // see DRILL-3130
+  @Ignore // see DRILL-3257
   public void testProjectPushDownOverUnionAllWithoutProject() throws Exception {
     String query = "select n_nationkey from \n" +
         "(select n_nationkey, n_name, n_comment from cp.`tpch/nation.parquet` \n" +
@@ -683,6 +686,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test // see DRILL-3130
+  @Ignore // see DRILL-3257
   public void testProjectWithExpressionPushDownOverUnionAll() throws Exception {
     String query = "select 2 * n_nationkey as col from \n" +
         "(select n_nationkey, n_name, n_comment from cp.`tpch/nation.parquet` \n" +
@@ -709,6 +713,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test // see DRILL-3130
+  @Ignore // see DRILL-3257
   public void testProjectDownOverUnionAllImplicitCasting() throws Exception {
     String root = FileUtils.getResourceAsFile("/store/text/data/nations.csv").toURI().toString();
     String query = String.format("select 2 * n_nationkey as col from \n" +
@@ -737,6 +742,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test // see DRILL-3130
+  @Ignore // see DRILL-3257
   public void testProjectPushDownProjectColumnReorderingAndAlias() throws Exception {
     String query = "select n_comment as col1, n_nationkey as col2, n_name as col3 from \n" +
         "(select n_nationkey, n_name, n_comment from cp.`tpch/nation.parquet` \n" +
@@ -763,6 +769,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test // see DRILL-2746, DRILL-3130
+  @Ignore // see DRILL-3257
   public void testProjectFiltertPushDownOverUnionAll() throws Exception {
     String query = "select n_nationkey from \n" +
         "(select n_nationkey, n_name, n_comment from cp.`tpch/nation.parquet` \n" +
