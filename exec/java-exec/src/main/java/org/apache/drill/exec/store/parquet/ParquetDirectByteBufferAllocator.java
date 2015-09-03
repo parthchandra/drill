@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.memory.OutOfMemoryRuntimeException;
 import org.apache.drill.exec.ops.OperatorContext;
 
 import parquet.bytes.ByteBufferAllocator;
