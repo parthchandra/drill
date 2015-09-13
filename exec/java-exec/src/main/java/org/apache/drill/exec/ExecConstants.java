@@ -81,6 +81,7 @@ public interface ExecConstants {
   public static final String HTTP_ENABLE = "drill.exec.http.enabled";
   public static final String HTTP_PORT = "drill.exec.http.port";
   public static final String HTTP_ENABLE_SSL = "drill.exec.http.ssl_enabled";
+  public static final String HTTP_SESSION_MAX_IDLE_SECS = "drill.exec.http.session_max_idle_secs";
   public static final String HTTP_KEYSTORE_PATH = "javax.net.ssl.keyStore";
   public static final String HTTP_KEYSTORE_PASSWORD = "javax.net.ssl.keyStorePassword";
   public static final String HTTP_TRUSTSTORE_PATH = "javax.net.ssl.trustStore";

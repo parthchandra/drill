@@ -17,28 +17,46 @@
  */
 package org.apache.drill.exec.server.rest;
 
-import javax.annotation.security.RolesAllowed;
-import javax.inject.Inject;
+import javax.annotation.security.PermitAll;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.SecurityContext;
 
-import org.apache.drill.exec.server.rest.auth.DrillUserPrincipal;
 import org.glassfish.jersey.server.mvc.Viewable;
 
-@Path("/threads")
-@RolesAllowed(DrillUserPrincipal.ADMIN_ROLE)
-public class ThreadsResources {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MetricsResources.class);
-
-  @Inject SecurityContext sc;
-
+@Path("/")
+@PermitAll
+public class LogInLogOutResources {
   @GET
+  @Path("/log/in")
   @Produces(MediaType.TEXT_HTML)
-  public Viewable getMetrics() {
-    return ViewableWithPermissions.create("/rest/threads/threads.ftl", sc);
+  public Viewable getLoginPage() {
+    return ViewableWithPermissions.createLoginPage(null);
   }
 
+  // Request type is POST because POST request which contains the login credentials are invalid and the request is
+  // dispatched here directly.
+  @POST
+  @Path("/log/error")
+  @Produces(MediaType.TEXT_HTML)
+  public Viewable getLoginPageAfterValidationError() {
+    return ViewableWithPermissions.createLoginPage("Invalid username/password credentials.");
+  }
+
+  @GET
+  @Path("/log/out")
+  @Produces(MediaType.TEXT_HTML)
+  public Viewable logout(@Context HttpServletRequest req) {
+    final HttpSession session = req.getSession();
+    if (session != null) {
+      session.invalidate();
+    }
+
+    return getLoginPage();
+  }
 }

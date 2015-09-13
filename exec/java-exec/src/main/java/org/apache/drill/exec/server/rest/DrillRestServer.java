@@ -17,22 +17,28 @@
  */
 package org.apache.drill.exec.server.rest;
 
+import org.apache.drill.exec.server.rest.auth.DrillUserPrincipal;
 import org.apache.drill.exec.server.rest.profile.ProfileResources;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.sys.PStoreProvider;
 import org.apache.drill.exec.work.WorkManager;
+import org.glassfish.hk2.api.Factory;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.util.PropertiesHelper;
 import org.glassfish.jersey.media.multipart.MultiPartFeature;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.server.ServerProperties;
+import org.glassfish.jersey.server.filter.RolesAllowedDynamicFeature;
 import org.glassfish.jersey.server.mvc.freemarker.FreemarkerMvcFeature;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.jaxrs.base.JsonMappingExceptionMapper;
 import com.fasterxml.jackson.jaxrs.base.JsonParseExceptionMapper;
 import com.fasterxml.jackson.jaxrs.json.JacksonJaxbJsonProvider;
+
+import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 
 public class DrillRestServer extends ResourceConfig {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillRestServer.class);
@@ -45,10 +51,12 @@ public class DrillRestServer extends ResourceConfig {
     register(QueryResources.class);
     register(MetricsResources.class);
     register(ThreadsResources.class);
+    register(LogInLogOutResources.class);
     register(FreemarkerMvcFeature.class);
     register(MultiPartFeature.class);
     property(ServerProperties.METAINF_SERVICES_LOOKUP_DISABLE, true);
 
+    register(RolesAllowedDynamicFeature.class);
 
     //disable moxy so it doesn't conflict with jackson.
     final String disableMoxy = PropertiesHelper.getPropertyNameForRuntime(CommonProperties.MOXY_JSON_FEATURE_DISABLE, getConfiguration().getRuntimeType());
@@ -69,8 +77,24 @@ public class DrillRestServer extends ResourceConfig {
         bind(workManager.getContext().getConfig().getMapper()).to(ObjectMapper.class);
         bind(workManager.getContext().getPersistentStoreProvider()).to(PStoreProvider.class);
         bind(workManager.getContext().getStorage()).to(StoragePluginRegistry.class);
+        bindFactory(DrillUserPrincipalProvider.class).to(DrillUserPrincipal.class);
       }
     });
   }
 
+  // Provider which injects DrillUserPrincipal directly instead of getting it from SecurityContext and typecasting
+  public static class DrillUserPrincipalProvider implements Factory<DrillUserPrincipal> {
+
+    @Inject HttpServletRequest request;
+
+    @Override
+    public DrillUserPrincipal provide() {
+      return (DrillUserPrincipal) request.getUserPrincipal();
+    }
+
+    @Override
+    public void dispose(DrillUserPrincipal principal) {
+      // No-Op
+    }
+  }
 }
