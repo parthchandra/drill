@@ -75,6 +75,7 @@ public interface ExecConstants {
   String HTTP_ENABLE = "drill.exec.http.enabled";
   String HTTP_PORT = "drill.exec.http.port";
   String HTTP_ENABLE_SSL = "drill.exec.http.ssl_enabled";
+  String HTTP_SESSION_MAX_IDLE_SECS = "drill.exec.http.session_max_idle_secs";
   String HTTP_KEYSTORE_PATH = "javax.net.ssl.keyStore";
   String HTTP_KEYSTORE_PASSWORD = "javax.net.ssl.keyStorePassword";
   String HTTP_TRUSTSTORE_PATH = "javax.net.ssl.trustStore";
@@ -87,6 +88,7 @@ public interface ExecConstants {
   String USER_AUTHENTICATION_ENABLED = "drill.exec.security.user.auth.enabled";
   String USER_AUTHENTICATOR_IMPL = "drill.exec.security.user.auth.impl";
   String PAM_AUTHENTICATOR_PROFILES = "drill.exec.security.user.auth.pam_profiles";
+
   /** Size of JDBC batch queue (in batches) above which throttling begins. */
   String JDBC_BATCH_QUEUE_THROTTLING_THRESHOLD =
       "drill.jdbc.batch_queue_throttling_threshold";
@@ -98,9 +100,6 @@ public interface ExecConstants {
    */
   String RETURN_ERROR_FOR_FAILURE_IN_CANCELLED_FRAGMENTS =
       "drill.exec.debug.return_error_for_failure_in_cancelled_fragments";
-
-
-
 
   String CLIENT_SUPPORT_COMPLEX_TYPES = "drill.client.supports-complex-types";
 
