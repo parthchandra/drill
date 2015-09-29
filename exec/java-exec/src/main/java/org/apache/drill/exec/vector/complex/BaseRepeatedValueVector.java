@@ -123,6 +123,15 @@ public abstract class BaseRepeatedValueVector extends BaseValueVector implements
   }
 
   @Override
+  public int getBufferSizeFor(int valueCount) {
+    if (getAccessor().getValueCount() == 0) {
+      return 0;
+    }
+
+    return offsets.getBufferSizeFor(valueCount) + vector.getBufferSizeFor(valueCount);
+  }
+
+  @Override
   public Iterator<ValueVector> iterator() {
     return Collections.singleton(getDataVector()).iterator();
   }
