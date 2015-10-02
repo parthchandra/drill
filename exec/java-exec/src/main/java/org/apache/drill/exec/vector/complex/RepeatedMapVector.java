@@ -90,8 +90,7 @@ public class RepeatedMapVector extends AbstractMapVector
   @Override
   public void setInitialCapacity(int numRecords) {
     offsets.setInitialCapacity(numRecords + 1);
-    final Iterable<ValueVector> container = this;
-    for(final ValueVector v : container) {
+    for(final ValueVector v : (Iterable<ValueVector>) this) {
       v.setInitialCapacity(numRecords * RepeatedValueVector.DEFAULT_REPEAT_PER_RECORD);
     }
   }
@@ -133,10 +132,24 @@ public class RepeatedMapVector extends AbstractMapVector
     if (getAccessor().getValueCount() == 0) {
       return 0;
     }
-    long buffer = offsets.getBufferSize();
+    long bufferSize = offsets.getBufferSize();
     for (final ValueVector v : (Iterable<ValueVector>) this) {
-      buffer += v.getBufferSize();
+      bufferSize += v.getBufferSize();
     }
+    return (int) bufferSize;
+  }
+
+  @Override
+  public int getBufferSizeFor(final int valueCount) {
+    if (valueCount == 0) {
+      return 0;
+    }
+
+    long buffer = 0;
+    for (final ValueVector v : (Iterable<ValueVector>) this) {
+      buffer += v.getBufferSizeFor(valueCount);
+    }
+
     return (int) buffer;
   }
 
@@ -479,7 +492,7 @@ public class RepeatedMapVector extends AbstractMapVector
   public class RepeatedMapAccessor implements RepeatedAccessor {
     @Override
     public Object getObject(int index) {
-      final List<Object> list = new JsonStringArrayList();
+      final List<Object> list = new JsonStringArrayList<>();
       final int end = offsets.getAccessor().get(index+1);
       String fieldName;
       for (int i =  offsets.getAccessor().get(index); i < end; i++) {
