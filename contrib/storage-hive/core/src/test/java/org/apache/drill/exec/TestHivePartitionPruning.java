@@ -103,6 +103,7 @@ public class TestHivePartitionPruning extends HiveTestBase {
    * is able to deserialize the partition values in string format to appropriate type holder.
    */
   @Test
+  @Ignore("Failing due to a bug Hive 1.2 which has binary partition column regression")
   public void pruneDataTypeSupport() throws Exception {
     final String query = "EXPLAIN PLAN FOR " +
         "SELECT * FROM hive.readtest WHERE boolean_part = true";
@@ -114,6 +115,7 @@ public class TestHivePartitionPruning extends HiveTestBase {
   }
 
   @Test
+  @Ignore("Failing due to a bug Hive 1.2 which has binary partition column regression")
   public void pruneDataTypeSupportNativeReaders() throws Exception {
     try {
       test(String.format("alter session set `%s` = true", ExecConstants.HIVE_OPTIMIZE_SCAN_WITH_NATIVE_READERS));
