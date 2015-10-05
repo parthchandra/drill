@@ -51,7 +51,6 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
 
   @Override
   public void processPages(long recordsToReadInThisPass) throws IOException {
-    //int indexInOutputVector = 0;
     readStartInBytes = 0;
     readLength = 0;
     readLengthInBits = 0;
@@ -66,11 +65,9 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
       long runStart = pageReader.readPosInBytes;
       int  runLength = -1;     // number of non-null records in this pass.
       int  nullRunLength = -1; // number of consecutive null records that we read.
-      int currentDefinitionLevel;
-      //boolean lastValueWasNull;
-      //boolean lastRunBrokenByNull = false;
-      int readCount = 0; // the record number we last read. 
-      int writeCount = 0; // the record number we last wrote to the value vector.
+      int  currentDefinitionLevel = -1;
+      int  readCount = 0; // the record number we last read.
+      int  writeCount = 0; // the record number we last wrote to the value vector.
 
 
 
@@ -84,22 +81,17 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
             }
             definitionLevelsRead = 0;
         }
-        /*
-        lastValueWasNull = true;
-        runLength = 0;
-        if (lastRunBrokenByNull ) {
-          //nullsFound = 1;
-          lastRunBrokenByNull = false;
-        //} else  {
-          //nullsFound = 0;
-        }
-        */
-        
+
+        nullRunLength=0;
+        runLength=0;
+
         //
         // Let's skip the next run of nulls if any ...
         //
-        nullRunLength=0;
-        currentDefinitionLevel = pageReader.definitionLevels.readInteger();
+        // If we are reentering this loop, the currentDefinitionLevel has already been read
+        if ( currentDefinitionLevel < 0 ) {
+          currentDefinitionLevel = pageReader.definitionLevels.readInteger();
+        }
         while ( currentDefinitionLevel < columnDescriptor.getMaxDefinitionLevel() 
                   && readCount < recordsToReadInThisPass
                   && writeCount+nullRunLength < valueVec.getValueCapacity()
@@ -129,7 +121,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
         //
         // Handle the run of non-null values
         //
-        while ( currentDefinitionLevel >= columnDescriptor.getMaxDefinitionLevel() 
+        while ( currentDefinitionLevel >= columnDescriptor.getMaxDefinitionLevel()
                   && readCount < recordsToReadInThisPass
                   && writeCount+runLength < valueVec.getValueCapacity()
                   && definitionLevelsRead <= pageReader.currentPageCount
@@ -167,103 +159,6 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     valuesReadInCurrentPass = writeCount;
     valueVec.getMutator().setValueCount(valuesReadInCurrentPass);
   }
-  /*
-  public void processPages(long recordsToReadInThisPass) throws IOException {
-    int indexInOutputVector = 0;
-    readStartInBytes = 0;
-    readLength = 0;
-    readLengthInBits = 0;
-    recordsReadInThisIteration = 0;
-    vectorData = castedBaseVector.getBuffer();
-
-      // values need to be spaced out where nulls appear in the column
-      // leaving blank space for nulls allows for random access to values
-      // to optimize copying data out of the buffered disk stream, runs of defined values
-      // are located and copied together, rather than copying individual values
-
-      long runStart = pageReader.readPosInBytes;
-      int runLength;
-      int currentDefinitionLevel;
-      boolean lastValueWasNull;
-      boolean lastRunBrokenByNull = false;
-
-      while (indexInOutputVector < recordsToReadInThisPass && indexInOutputVector < valueVec.getValueCapacity()){
-        // read a page if needed
-        if (!pageReader.hasPage()
-            || ((readStartInBytes + readLength >= pageReader.byteLength && bitsUsed == 0) &&
-          definitionLevelsRead >= pageReader.currentPageCount)) {
-          if (!pageReader.next()) {
-            break;
-          }
-          definitionLevelsRead = 0;
-        }
-        lastValueWasNull = true;
-        runLength = 0;
-        if (lastRunBrokenByNull ) {
-          //nullsFound = 1;
-          lastRunBrokenByNull = false;
-        //} else  {
-          //nullsFound = 0;
-        }
-        // loop to find the longest run of defined values available, can be preceded by several nulls
-        while(indexInOutputVector < recordsToReadInThisPass
-            && indexInOutputVector < valueVec.getValueCapacity()
-          && definitionLevelsRead < pageReader.currentPageCount) {
-          currentDefinitionLevel = pageReader.definitionLevels.readInteger();
-          definitionLevelsRead++;
-          indexInOutputVector++;
-          totalDefinitionLevelsRead++;
-          if ( currentDefinitionLevel < columnDescriptor.getMaxDefinitionLevel()){
-            // a run of non-null values was found, break out of this loop to do a read in the outer loop
-            if ( ! lastValueWasNull ){
-              lastRunBrokenByNull = true;
-              break;
-            }
-            nullsFound++;
-            lastValueWasNull = true;
-          }
-          else{
-            if (lastValueWasNull){
-              runLength = 0;
-              lastValueWasNull = false;
-            }
-            runLength++;
-            castedVectorMutator.setIndexDefined(indexInOutputVector - 1);
-          }
-        }
-        // take care of an edge case - if a page has exactly one null at the end of the page, the code breaks out
-        // of the above loop but does not count the last value.
-        //if(indexInOutputVector == recordsToReadInThisPass && (runLength+nullsFound) != recordsToReadInThisPass ){
-        //  nullsFound+=recordsToReadInThisPass-runLength;
-        //}
-        valuesReadInCurrentPass += nullsFound;
-
-        int writerIndex = ((BaseDataValueVector) valueVec).getBuffer().writerIndex();
-        if ( dataTypeLengthInBits > 8  || (dataTypeLengthInBits < 8 && totalValuesRead + runLength % 8 == 0)){
-          castedBaseVector.getBuffer().setIndex(0, writerIndex + (int) Math.ceil( nullsFound * dataTypeLengthInBits / 8.0));
-        }
-        else if (dataTypeLengthInBits < 8){
-          rightBitShift += dataTypeLengthInBits * nullsFound;
-        }
-        this.recordsReadInThisIteration = runLength;
-
-        // set up metadata
-        this.readStartInBytes = pageReader.readPosInBytes;
-        this.readLengthInBits = recordsReadInThisIteration * dataTypeLengthInBits;
-        this.readLength = (int) Math.ceil(readLengthInBits / 8.0);
-        readField( runLength);
-        recordsReadInThisIteration += nullsFound;
-        valuesReadInCurrentPass += runLength;
-        totalValuesRead += recordsReadInThisIteration;
-        pageReader.valuesRead += recordsReadInThisIteration;
-
-        pageReader.readPosInBytes = readStartInBytes + readLength;
-      }
-    valuesReadInCurrentPass = indexInOutputVector;
-    valueVec.getMutator().setValueCount(
-        valuesReadInCurrentPass);
-  }
-  */
 
   @Override
   protected abstract void readField(long recordsToRead);
