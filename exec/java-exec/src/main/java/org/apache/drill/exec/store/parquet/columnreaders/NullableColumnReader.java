@@ -101,7 +101,12 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
         totalDefinitionLevelsRead++;
         nullsFound++;
         nullRunLength++;
-        currentDefinitionLevel = pageReader.definitionLevels.readInteger();
+        if(currentDefinitionLevel < columnDescriptor.getMaxDefinitionLevel()
+              && readCount < recordsToReadInThisPass
+              && writeCount + nullRunLength < valueVec.getValueCapacity()
+              && definitionLevelsRead <= pageReader.currentPageCount) {
+          currentDefinitionLevel = pageReader.definitionLevels.readInteger();
+        }
         //TODO: This could be the last record in the page.
       }
       //
@@ -128,7 +133,11 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
         definitionLevelsRead++;
         totalDefinitionLevelsRead++;
         runLength++;
-        castedVectorMutator.setIndexDefined(writeCount); //set the nullable bit to indicate a non-null value
+        castedVectorMutator.setIndexDefined(writeCount+runLength-1); //set the nullable bit to indicate a non-null value
+        if(currentDefinitionLevel >= columnDescriptor.getMaxDefinitionLevel()
+                && readCount < recordsToReadInThisPass
+                && writeCount + runLength < valueVec.getValueCapacity()
+                && definitionLevelsRead <= pageReader.currentPageCount)
         currentDefinitionLevel = pageReader.definitionLevels.readInteger();
       }
 
@@ -143,7 +152,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
       this.readLength = (int) Math.ceil(readLengthInBits / 8.0);
       readField(runLength);
 
-      // Are we incrementing this at the right time??? Should we do this after reading and writing the nulls?
+      //TODO: Are we incrementing this at the right time??? Should we do this after reading and writing the nulls?
       recordsReadInThisIteration += nullsFound;
 
       valuesReadInCurrentPass += runLength;
