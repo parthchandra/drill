@@ -165,7 +165,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
         //this.readLength = (int) Math.ceil(readLengthInBits / 8.0);
 
         // This _must_ be set so that the call to readField works correctly for all datatypes
-        this.recordsReadInThisIteration += runLength; //TODO: check this. Should this include the nulls read or not??
+        this.recordsReadInThisIteration += runLength;
 
         this.readStartInBytes = pageReader.readPosInBytes;
         this.readLengthInBits = runLength * dataTypeLengthInBits;
