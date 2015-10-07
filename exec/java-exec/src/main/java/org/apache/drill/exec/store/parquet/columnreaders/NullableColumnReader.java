@@ -33,7 +33,6 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
   BaseDataValueVector castedBaseVector;
   NullableVectorDefinitionSetter castedVectorMutator;
 
-  private long definitionLevelsRead;
 
   NullableColumnReader(ParquetRecordReader parentReader, int allocateSize, ColumnDescriptor descriptor, ColumnChunkMetaData columnChunkMetaData,
                boolean fixedLength, V v, SchemaElement schemaElement) throws ExecutionSetupException {
@@ -61,6 +60,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     int readCount = 0; // the record number we last read.
     int writeCount = 0; // the record number we last wrote to the value vector.
     boolean haveMoreData; // true if we have more data and have not filled the vector
+    long definitionLevelsRead = 0;
 
     while (readCount < recordsToReadInThisPass && writeCount < valueVec.getValueCapacity()) {
       // read a page if needed
@@ -79,6 +79,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
       //
       // Let's skip the next run of nulls if any ...
       //
+
       // If we are reentering this loop, the currentDefinitionLevel has already been read
       if (currentDefinitionLevel < 0) {
         currentDefinitionLevel = pageReader.definitionLevels.readInteger();
