@@ -30,24 +30,23 @@ import parquet.hadoop.metadata.ColumnChunkMetaData;
 
 abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<V>{
 
-  private int nullsFound;
   // used to skip nulls found
-  private int rightBitShift;
+  //private int rightBitShift;
   // used when copying less than a byte worth of data at a time, to indicate the number of used bits in the current byte
-  private int bitsUsed;
+  //private int bitsUsed;
   BaseDataValueVector castedBaseVector;
   NullableVectorDefinitionSetter castedVectorMutator;
-  long definitionLevelsRead;
-  long totalDefinitionLevelsRead;
+
+  private long definitionLevelsRead;
+  //private long totalDefinitionLevelsRead;
 
   NullableColumnReader(ParquetRecordReader parentReader, int allocateSize, ColumnDescriptor descriptor, ColumnChunkMetaData columnChunkMetaData,
                boolean fixedLength, V v, SchemaElement schemaElement) throws ExecutionSetupException {
     super(parentReader, allocateSize, descriptor, columnChunkMetaData, fixedLength, v, schemaElement);
     castedBaseVector = (BaseDataValueVector) v;
     castedVectorMutator = (NullableVectorDefinitionSetter) v.getMutator();
-    totalDefinitionLevelsRead = 0;
+    //totalDefinitionLevelsRead = 0;
   }
-
 
   @Override
   public void processPages(long recordsToReadInThisPass) throws IOException {
@@ -62,20 +61,19 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     // to optimize copying data out of the buffered disk stream, runs of defined values
     // are located and copied together, rather than copying individual values
 
+    int nullsFound;
     long runStart = pageReader.readPosInBytes;
     int runLength = -1;     // number of non-null records in this pass.
     int nullRunLength = -1; // number of consecutive null records that we read.
     int currentDefinitionLevel = -1;
     int readCount = 0; // the record number we last read.
     int writeCount = 0; // the record number we last wrote to the value vector.
-
-    boolean haveMoreData;
-
+    boolean haveMoreData; // true if we have more data and have not filled the vector
 
     while (readCount < recordsToReadInThisPass && writeCount < valueVec.getValueCapacity()) {
       // read a page if needed
       if (!pageReader.hasPage()
-              || ((readStartInBytes + readLength >= pageReader.byteLength && bitsUsed == 0) &&
+              || ((readStartInBytes + readLength >= pageReader.byteLength /*&& bitsUsed == 0*/) &&
               definitionLevelsRead >= pageReader.currentPageCount)) {
         if (!pageReader.next()) {
           break;
@@ -100,7 +98,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
               ) {
         readCount++;
         definitionLevelsRead++;
-        totalDefinitionLevelsRead++;
+        //totalDefinitionLevelsRead++;
         nullsFound++;
         nullRunLength++;
         haveMoreData=readCount < recordsToReadInThisPass
@@ -115,11 +113,11 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
       //
       if(nullRunLength>0) {
         int writerIndex = ((BaseDataValueVector) valueVec).getBuffer().writerIndex();
-        if (dataTypeLengthInBits > 8 || (dataTypeLengthInBits < 8 && totalValuesRead + runLength % 8 == 0)) {
+        //if (dataTypeLengthInBits > 8 || (dataTypeLengthInBits < 8 && totalValuesRead + runLength % 8 == 0)) {
           castedBaseVector.getBuffer().setIndex(0, writerIndex + (int) Math.ceil(nullsFound * dataTypeLengthInBits / 8.0));
-        } else if (dataTypeLengthInBits < 8) {
-          rightBitShift += dataTypeLengthInBits * nullsFound;
-        }
+        //} else if (dataTypeLengthInBits < 8) {
+        //  rightBitShift += dataTypeLengthInBits * nullsFound;
+        //}
         writeCount += nullsFound; // TODO: nullsFound seems to be the same as nullRunLength - consolidate
         valuesReadInCurrentPass += nullsFound;
         recordsReadInThisIteration += nullsFound;
@@ -139,7 +137,7 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
               ) {
         readCount++;
         definitionLevelsRead++;
-        totalDefinitionLevelsRead++;
+        //totalDefinitionLevelsRead++;
         runLength++;
         castedVectorMutator.setIndexDefined(writeCount+runLength-1); //set the nullable bit to indicate a non-null value
         haveMoreData=readCount < recordsToReadInThisPass
