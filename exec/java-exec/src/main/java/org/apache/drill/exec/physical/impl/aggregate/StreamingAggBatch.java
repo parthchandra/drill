@@ -19,6 +19,7 @@ package org.apache.drill.exec.physical.impl.aggregate;
 
 import java.io.IOException;
 
+import org.apache.drill.common.DrillAutoCloseables;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.ErrorCollector;
@@ -58,7 +59,7 @@ import com.sun.codemodel.JExpr;
 import com.sun.codemodel.JVar;
 
 public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StreamingAggBatch.class);
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(StreamingAggBatch.class);
 
   private StreamingAggregator aggregator;
   private final RecordBatch incoming;
@@ -120,7 +121,6 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
 
   @Override
   public IterOutcome innerNext() {
-
     // if a special batch has been sent, we have no data in the incoming so exit early
     if (specialBatchSent) {
       return IterOutcome.NONE;
@@ -189,7 +189,7 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
       context.fail(UserException.unsupportedError()
         .message("Streaming aggregate does not support schema changes")
         .build(logger));
-      close();
+      DrillAutoCloseables.closeNoChecked(this);
       killIncoming(false);
       return IterOutcome.STOP;
     default:
@@ -285,7 +285,7 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
       }
 
       final MaterializedField outputField = MaterializedField.create(ne.getRef(), expr.getMajorType());
-      ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
+      final ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
       TypedFieldId id = container.add(vector);
       valueExprs[i] = new ValueVectorWriteExpression(id, expr, true);
     }
@@ -416,11 +416,6 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
     default:
       throw new IllegalStateException();
     }
-  }
-
-  @Override
-  public void close() {
-    super.close();
   }
 
   @Override

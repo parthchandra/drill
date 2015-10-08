@@ -50,7 +50,8 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
   private boolean hasRemainder;
   private int remainderIndex;
 
-  public RemovingRecordBatch(SelectionVectorRemover popConfig, FragmentContext context, RecordBatch incoming) throws OutOfMemoryException {
+  public RemovingRecordBatch(SelectionVectorRemover popConfig, FragmentContext context, RecordBatch incoming)
+      throws OutOfMemoryException {
     super(popConfig, context, incoming);
     logger.debug("Created.");
   }
@@ -65,13 +66,13 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
     container.zeroVectors();
     switch(incoming.getSchema().getSelectionVectorMode()){
     case NONE:
-      this.copier = getStraightCopier();
+      copier = getStraightCopier();
       break;
     case TWO_BYTE:
-      this.copier = getGenerated2Copier();
+      copier = getGenerated2Copier();
       break;
     case FOUR_BYTE:
-      this.copier = getGenerated4Copier();
+      copier = getGenerated4Copier();
       break;
     default:
       throw new UnsupportedOperationException();
@@ -96,21 +97,21 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
 
   @Override
   protected IterOutcome doWork() {
-    int incomingRecordCount = incoming.getRecordCount();
-    int copiedRecords = copier.copyRecords(0, incomingRecordCount);
+    final int incomingRecordCount = incoming.getRecordCount();
+    final int copiedRecords = copier.copyRecords(0, incomingRecordCount);
 
     if (copiedRecords < incomingRecordCount) {
       for(VectorWrapper<?> v : container){
-        ValueVector.Mutator m = v.getValueVector().getMutator();
+        final ValueVector.Mutator m = v.getValueVector().getMutator();
         m.setValueCount(copiedRecords);
       }
       hasRemainder = true;
       remainderIndex = copiedRecords;
-      this.recordCount = remainderIndex;
+      recordCount = remainderIndex;
     } else {
       recordCount = copiedRecords;
       for(VectorWrapper<?> v : container){
-        ValueVector.Mutator m = v.getValueVector().getMutator();
+        final ValueVector.Mutator m = v.getValueVector().getMutator();
         m.setValueCount(recordCount);
       }
       if (incoming.getSchema().getSelectionVectorMode() != SelectionVectorMode.FOUR_BYTE) {
@@ -133,8 +134,8 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
   }
 
   private void handleRemainder() {
-    int recordCount = incoming.getRecordCount();
-    int remainingRecordCount = incoming.getRecordCount() - remainderIndex;
+    final int recordCount = incoming.getRecordCount();
+    final int remainingRecordCount = incoming.getRecordCount() - remainderIndex;
     int copiedRecords;
     while((copiedRecords = copier.copyRecords(remainderIndex, remainingRecordCount)) == 0) {
       logger.debug("Copied zero records. Retrying");
@@ -158,14 +159,14 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
 
     if (copiedRecords < remainingRecordCount) {
       for(VectorWrapper<?> v : container){
-        ValueVector.Mutator m = v.getValueVector().getMutator();
+        final ValueVector.Mutator m = v.getValueVector().getMutator();
         m.setValueCount(copiedRecords);
       }
       remainderIndex += copiedRecords;
       this.recordCount = copiedRecords;
     } else {
       for(VectorWrapper<?> v : container){
-        ValueVector.Mutator m = v.getValueVector().getMutator();
+        final ValueVector.Mutator m = v.getValueVector().getMutator();
         m.setValueCount(remainingRecordCount);
         this.recordCount = remainingRecordCount;
       }
@@ -189,9 +190,8 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
     super.close();
   }
 
-  private class StraightCopier implements Copier{
-
-    private List<TransferPair> pairs = Lists.newArrayList();
+  private class StraightCopier implements Copier {
+    private final List<TransferPair> pairs = Lists.newArrayList();
 
     @Override
     public void setupRemover(FragmentContext context, RecordBatch incoming, RecordBatch outgoing){
@@ -209,16 +209,15 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
       }
       return recordCount;
     }
-
   }
 
-  private Copier getStraightCopier(){
-    StraightCopier copier = new StraightCopier();
+  private Copier getStraightCopier() {
+    final StraightCopier copier = new StraightCopier();
     copier.setupRemover(context, incoming, this);
     return copier;
   }
 
-  private Copier getGenerated2Copier() throws SchemaChangeException{
+  private Copier getGenerated2Copier() throws SchemaChangeException {
     Preconditions.checkArgument(incoming.getSchema().getSelectionVectorMode() == SelectionVectorMode.TWO_BYTE);
 
     for(VectorWrapper<?> vv : incoming){
@@ -228,7 +227,7 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
     try {
       final CodeGenerator<Copier> cg = CodeGenerator.get(Copier.TEMPLATE_DEFINITION2, context.getFunctionRegistry());
       CopyUtil.generateCopies(cg.getRoot(), incoming, false);
-      Copier copier = context.getImplementationClass(cg);
+      final Copier copier = context.getImplementationClass(cg);
       copier.setupRemover(context, incoming, this);
 
       return copier;
@@ -252,7 +251,7 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
     try {
       final CodeGenerator<Copier> cg = CodeGenerator.get(Copier.TEMPLATE_DEFINITION4, context.getFunctionRegistry());
       CopyUtil.generateCopies(cg.getRoot(), batch, true);
-      Copier copier = context.getImplementationClass(cg);
+      final Copier copier = context.getImplementationClass(cg);
       copier.setupRemover(context, batch, outgoing);
 
       return copier;
@@ -265,7 +264,4 @@ public class RemovingRecordBatch extends AbstractSingleRecordBatch<SelectionVect
   public WritableBatch getWritableBatch() {
     return WritableBatch.get(this);
   }
-
-
-
 }

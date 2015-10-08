@@ -22,6 +22,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.drill.common.DrillAutoCloseables;
 import org.apache.drill.common.expression.ErrorCollector;
 import org.apache.drill.common.expression.ErrorCollectorImpl;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -65,7 +66,7 @@ import com.sun.codemodel.JConditional;
 import com.sun.codemodel.JExpr;
 
 public class TopNBatch extends AbstractRecordBatch<TopN> {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TopNBatch.class);
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TopNBatch.class);
 
   private  final int batchPurgeThreshold;
 
@@ -121,20 +122,20 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
   @Override
   public void buildSchema() throws SchemaChangeException {
     VectorContainer c = new VectorContainer(oContext);
-    IterOutcome outcome = next(incoming);
+    final IterOutcome outcome = next(incoming);
     switch (outcome) {
       case OK:
       case OK_NEW_SCHEMA:
-        for (VectorWrapper w : incoming) {
-          ValueVector v = c.addOrGet(w.getField());
+        for (final VectorWrapper<?> w : incoming) {
+          final ValueVector v = c.addOrGet(w.getField());
           if (v instanceof AbstractContainerVector) {
             w.getValueVector().makeTransferPair(v);
             v.clear();
           }
         }
         c = VectorContainer.canonicalize(c);
-        for (VectorWrapper w : c) {
-          ValueVector v = container.addOrGet(w.getField());
+        for (final VectorWrapper<?> w : c) {
+          final ValueVector v = container.addOrGet(w.getField());
           if (v instanceof AbstractContainerVector) {
             w.getValueVector().makeTransferPair(v);
             v.clear();
@@ -208,7 +209,7 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
           // fall through.
         case OK:
           if (incoming.getRecordCount() == 0) {
-            for (VectorWrapper w : incoming) {
+            for (VectorWrapper<?> w : incoming) {
               w.clear();
             }
             break;
@@ -250,7 +251,7 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
 
       this.sv4 = priorityQueue.getFinalSv4();
       container.clear();
-      for (VectorWrapper w : priorityQueue.getHyperBatch()) {
+      for (VectorWrapper<?> w : priorityQueue.getHyperBatch()) {
         container.add(w.getValueVectors());
       }
       container.buildSchema(BatchSchema.SelectionVectorMode.FOUR_BYTE);
@@ -279,7 +280,7 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
     } else {
       for (VectorWrapper<?> i : batch) {
 
-        ValueVector v = TypeHelper.getNewVector(i.getField(), oContext.getAllocator());
+        final ValueVector v = TypeHelper.getNewVector(i.getField(), oContext.getAllocator());
         newContainer.add(v);
       }
       copier.setupRemover(context, batch, newBatch);
@@ -307,7 +308,7 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
       builder.getSv4().clear();
       selectionVector4.clear();
     } finally {
-      builder.close();
+      DrillAutoCloseables.closeNoChecked(builder);
     }
     logger.debug("Took {} us to purge", watch.elapsed(TimeUnit.MICROSECONDS));
   }
@@ -365,17 +366,19 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
     incoming.kill(sendUpstream);
   }
 
-
   public static class SimpleRecordBatch implements RecordBatch {
-
-    private VectorContainer container;
-    private SelectionVector4 sv4;
-    private FragmentContext context;
+    private final VectorContainer container;
+    private final SelectionVector4 sv4;
+    private final FragmentContext context;
 
     public SimpleRecordBatch(VectorContainer container, SelectionVector4 sv4, FragmentContext context) {
       this.container = container;
       this.sv4 = sv4;
       this.context = context;
+    }
+
+    @Override
+    public void close() throws Exception {
     }
 
     @Override
@@ -440,7 +443,5 @@ public class TopNBatch extends AbstractRecordBatch<TopN> {
     public VectorContainer getOutgoingContainer() {
       throw new UnsupportedOperationException(String.format(" You should not call getOutgoingContainer() for class %s", this.getClass().getCanonicalName()));
     }
-
   }
-
 }

@@ -403,12 +403,9 @@ public class Foreman implements Runnable {
 
     logger.debug("Submitting fragments to run.");
 
-    // set up the root fragment first so we'll have incoming buffers available.
+    // Set up the root fragment first so we'll have incoming buffers available.
     setupRootFragment(rootPlanFragment, work.getRootOperator());
-
     setupNonRootFragments(planFragments);
-    drillbitContext.getAllocator().resetFragmentLimits(); // TODO a global effect for this query?!?
-
     moveToState(QueryState.RUNNING, null);
     logger.debug("Fragments running.");
   }
@@ -1013,12 +1010,12 @@ public class Foreman implements Runnable {
     // if any of the intermediate fragment submissions failed, fail the query
     final List<FragmentSubmitFailures.SubmissionException> submissionExceptions = fragmentSubmitFailures.submissionExceptions;
     if (submissionExceptions.size() > 0) {
-      Set<DrillbitEndpoint> endpoints = Sets.newHashSet();
-      StringBuilder sb = new StringBuilder();
+      final Set<DrillbitEndpoint> endpoints = Sets.newHashSet();
+      final StringBuilder sb = new StringBuilder();
       boolean first = true;
 
       for (FragmentSubmitFailures.SubmissionException e : fragmentSubmitFailures.submissionExceptions) {
-        DrillbitEndpoint endpoint = e.drillbitEndpoint;
+        final DrillbitEndpoint endpoint = e.drillbitEndpoint;
         if (endpoints.add(endpoint)) {
           if (first) {
             first = false;

@@ -37,6 +37,7 @@ import org.apache.drill.exec.record.RecordBatchLoader;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.record.WritableBatch;
 import org.apache.drill.exec.vector.AllocationHelper;
+import org.apache.drill.exec.vector.BaseValueVector;
 import org.apache.drill.exec.vector.IntVector;
 import org.apache.drill.exec.vector.NullableVarCharVector;
 import org.apache.drill.exec.vector.ValueVector;
@@ -61,15 +62,17 @@ public class TestLoad extends ExecTest {
     final List<ValueVector> vectors = Lists.newArrayList(fixedV, varlenV, nullableVarlenV);
     for (final ValueVector v : vectors) {
       AllocationHelper.allocate(v, 100, 50);
+      BaseValueVector.checkBufRefs(v);
       v.getMutator().generateTestData(100);
+      BaseValueVector.checkBufRefs(v);
     }
 
     final WritableBatch writableBatch = WritableBatch.getBatchNoHV(100, vectors, false);
     final RecordBatchLoader batchLoader = new RecordBatchLoader(allocator);
     final ByteBuf[] byteBufs = writableBatch.getBuffers();
     int bytes = 0;
-    for (int i = 0; i < byteBufs.length; i++) {
-      bytes += byteBufs[i].writerIndex();
+    for(final ByteBuf writableBuf : byteBufs) {
+      bytes += writableBuf.writerIndex();
     }
     final DrillBuf byteBuf = allocator.buffer(bytes);
     int index = 0;

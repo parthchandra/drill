@@ -20,6 +20,7 @@ package org.apache.drill.exec.physical.impl.sort;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.drill.common.DrillAutoCloseables;
 import org.apache.drill.common.expression.ErrorCollector;
 import org.apache.drill.common.expression.ErrorCollectorImpl;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -82,8 +83,7 @@ public class SortBatch extends AbstractRecordBatch<Sort> {
 
   @Override
   public void close() {
-    builder.clear();
-    builder.close();
+    DrillAutoCloseables.closeNoChecked(builder);
     super.close();
   }
 

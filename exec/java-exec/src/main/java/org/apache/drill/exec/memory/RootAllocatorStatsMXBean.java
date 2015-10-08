@@ -17,27 +17,31 @@
  */
 package org.apache.drill.exec.memory;
 
-import org.apache.drill.common.config.DrillConfig;
-
-public class RootAllocatorFactory {
+/**
+ * JMX bean for getting statistics about allocators.
+ */
+public interface RootAllocatorStatsMXBean {
   /**
-   * Constructor to prevent instantiation of this static utility class.
-   */
-  private RootAllocatorFactory() {}
-
-  /**
-   * Factory method.
+   * Get the amount of memory this allocator owns. This includes its
+   * allocated memory, and may include additional memory that it may hand
+   * out without going to its parent for more.
    *
-   * @param drillConfig the DrillConfig
-   * @return a new root allocator
+   * @return the amount of memory owned by this allocator
    */
-  public static BufferAllocator newRoot(final DrillConfig drillConfig) {
-/* TODO(cwestin)
-    if (BaseAllocator.DEBUG) {
-      return new RootAllocator(drillConfig);
-    }
-*/
-    return new RootAllocator(drillConfig);
-    // TODO(cwestin) return new TopLevelAllocator(drillConfig);
-  }
+  public long getOwnedMemory();
+
+  /**
+   * Get the amount of memory this allocator has allocated. This includes
+   * buffers it has allocated and memory it has given to its children to manage.
+   *
+   * @return the amount of memory allocated by this allocator
+   */
+  public long getAllocatedMemory();
+
+  /**
+   * Get the number of child allocators this allocator owns.
+   *
+   * @return the number of child allocators this allocator owns
+   */
+  public long getChildCount();
 }
