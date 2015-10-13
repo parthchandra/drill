@@ -18,6 +18,9 @@
 package org.apache.drill.exec.ops;
 
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.netty.buffer.DrillBuf;
 
 import org.apache.drill.common.exceptions.DrillRuntimeException;
@@ -29,8 +32,14 @@ import com.carrotsearch.hppc.LongObjectOpenHashMap;
 import org.apache.drill.exec.testing.ExecutionControls;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+import java.util.concurrent.Callable;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 class OperatorContextImpl extends OperatorContext implements AutoCloseable {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(OperatorContextImpl.class);
@@ -43,6 +52,11 @@ class OperatorContextImpl extends OperatorContext implements AutoCloseable {
   private LongObjectOpenHashMap<DrillBuf> managedBuffers = new LongObjectOpenHashMap<>();
   private final boolean applyFragmentLimit;
   private DrillFileSystem fs;
+
+  /**
+   * This lazily initialized service is used to submit {@link Callable tasks} that need a proxy user.
+   */
+  private ListeningExecutorService delegatePool;
 
   public OperatorContextImpl(PhysicalOperator popConfig, FragmentContext context, boolean applyFragmentLimit) throws OutOfMemoryException {
     this.applyFragmentLimit=applyFragmentLimit;
@@ -116,6 +130,10 @@ class OperatorContextImpl extends OperatorContext implements AutoCloseable {
       allocator.close();
     }
 
+    if (delegatePool != null) {
+      delegatePool.shutdown();
+    }
+
     if (fs != null) {
       try {
         fs.close();
@@ -128,6 +146,27 @@ class OperatorContextImpl extends OperatorContext implements AutoCloseable {
 
   public OperatorStats getStats() {
     return stats;
+  }
+
+  public <RESULT> ListenableFuture<RESULT> runCallableAs(final UserGroupInformation proxyUgi,
+                                                         final Callable<RESULT> callable) {
+    synchronized (this) {
+      if (delegatePool == null) {
+        delegatePool = MoreExecutors.listeningDecorator(
+          new ThreadPoolExecutor(0, 16, 60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>()));
+      }
+    }
+    return delegatePool.submit(new Callable<RESULT>() {
+      @Override
+      public RESULT call() throws Exception {
+        return proxyUgi.doAs(new PrivilegedExceptionAction<RESULT>() {
+          @Override
+          public RESULT run() throws Exception {
+            return callable.call();
+          }
+        });
+      }
+    });
   }
 
   @Override
