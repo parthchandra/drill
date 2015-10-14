@@ -27,10 +27,13 @@ import org.apache.drill.exec.vector.ValueVector;
 import parquet.column.ColumnDescriptor;
 import parquet.format.SchemaElement;
 import parquet.hadoop.metadata.ColumnChunkMetaData;
+import sun.jvm.hotspot.utilities.Assert;
 
 abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<V>{
 
-  int nullsFound;
+    private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NullableColumnReader.class);
+
+    int nullsFound;
   // used to skip nulls found
   int rightBitShift;
   // used when copying less than a byte worth of data at a time, to indicate the number of used bits in the current byte
@@ -46,6 +49,9 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     castedBaseVector = (BaseDataValueVector) v;
     castedVectorMutator = (NullableVectorDefinitionSetter) v.getMutator();
     totalDefinitionLevelsRead = 0;
+    logger.debug(""+
+            "pageReader.byteLength,readStartInBytes,readLength,runLength,nullsFound,recordsReadInThisIteration,totalValuesRead,totalDefinitionLevelsRead"
+    );
   }
 
 
@@ -73,6 +79,10 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
       if (!pageReader.hasPage()
             || ((readStartInBytes + readLength >= pageReader.byteLength && bitsUsed == 0) &&
           definitionLevelsRead >= pageReader.currentPageCount)) {
+        if (readStartInBytes + readLength >= pageReader.byteLength) {
+          logger.debug("Reached the end. ReadStartBytes = {} . REadLength = {} . PageReader.byteLength = {} .",
+                  readStartInBytes, readLength, pageReader.byteLength);
+        }
           if (!pageReader.next()) {
             break;
           }
@@ -134,6 +144,10 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
         pageReader.valuesRead += recordsReadInThisIteration;
 
         pageReader.readPosInBytes = readStartInBytes + readLength;
+        logger.debug(""+
+                "{},{},{},{},{},{},{},{}",
+                pageReader.byteLength,readStartInBytes,readLength,runLength,nullsFound,recordsReadInThisIteration,totalValuesRead,totalDefinitionLevelsRead
+        );
       }
     valuesReadInCurrentPass = indexInOutputVector;
     valueVec.getMutator().setValueCount(
