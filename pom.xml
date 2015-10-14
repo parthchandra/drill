@@ -1340,6 +1340,7 @@
         <rat.excludeSubprojects>true</rat.excludeSubprojects>
         <hive.version>1.2.0-mapr-1508</hive.version>
         <hadoop.version>2.5.1-mapr-1503</hadoop.version>
+        <mapr.core.version>4.1.0.34989-mapr</mapr.core.version>
       </properties>
       <dependencyManagement>
         <dependencies>
@@ -1529,12 +1530,12 @@
           <dependency>
             <groupId>com.mapr.fs</groupId>
             <artifactId>libprotodefs</artifactId>
-            <version>4.1.0-mapr</version>
+            <version>${mapr.core.version}</version>
           </dependency>
           <dependency>
             <groupId>com.mapr.fs</groupId>
             <artifactId>mapr-hbase</artifactId>
-            <version>4.1.0-mapr</version>
+            <version>${mapr.core.version}</version>
             <exclusions>
               <exclusion>
                 <artifactId>slf4j-log4j12</artifactId>
@@ -1569,7 +1570,7 @@
           <dependency>
             <groupId>com.mapr.hadoop</groupId>
             <artifactId>maprfs</artifactId>
-            <version>4.1.0-mapr</version>
+            <version>${mapr.core.version}</version>
           </dependency>
           <dependency>
             <groupId>xerces</groupId>
