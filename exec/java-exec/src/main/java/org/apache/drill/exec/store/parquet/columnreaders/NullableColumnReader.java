@@ -27,7 +27,6 @@ import org.apache.drill.exec.vector.ValueVector;
 import parquet.column.ColumnDescriptor;
 import parquet.format.SchemaElement;
 import parquet.hadoop.metadata.ColumnChunkMetaData;
-import sun.jvm.hotspot.utilities.Assert;
 
 abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<V>{
 
@@ -49,9 +48,14 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     castedBaseVector = (BaseDataValueVector) v;
     castedVectorMutator = (NullableVectorDefinitionSetter) v.getMutator();
     totalDefinitionLevelsRead = 0;
-    logger.debug(""+
-            "pageReader.byteLength,readStartInBytes,readLength,runLength,nullsFound,recordsReadInThisIteration,totalValuesRead,totalDefinitionLevelsRead"
+    logger.trace(""
+            + "recordsToReadInThisPass,"
+            + "Run Length,Null Run Length,readCount,writeCount,"
+            + "recordsReadInThisIteration,valuesReadInCurrentPass,"
+            + "totalValuesRead,readStartInBytes,readLength,pageReader.byteLength,"
+            + "definitionLevelsRead,pageReader.currentPageCount"
     );
+
   }
 
 
@@ -144,10 +148,12 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
         pageReader.valuesRead += recordsReadInThisIteration;
 
         pageReader.readPosInBytes = readStartInBytes + readLength;
-        logger.debug(""+
-                "{},{},{},{},{},{},{},{}",
-                pageReader.byteLength,readStartInBytes,readLength,runLength,nullsFound,recordsReadInThisIteration,totalValuesRead,totalDefinitionLevelsRead
-        );
+        logger.trace(
+            "" + "{}," + "{},{},{},{}," + "{},{}," + "{},{},{},{}," + "{},{}",
+            recordsToReadInThisPass, runLength, nullsFound,indexInOutputVector,
+            indexInOutputVector, recordsReadInThisIteration, valuesReadInCurrentPass,
+            totalValuesRead, readStartInBytes, readLength, pageReader.byteLength,
+            definitionLevelsRead, pageReader.currentPageCount);
       }
     valuesReadInCurrentPass = indexInOutputVector;
     valueVec.getMutator().setValueCount(
