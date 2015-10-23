@@ -21,7 +21,9 @@ import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Stopwatch;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.util.BitSets;
 
@@ -133,6 +135,12 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
   }
 
   protected void doOnMatch(RelOptRuleCall call, DrillFilterRel filterRel, DrillProjectRel projectRel, DrillScanRel scanRel) {
+    final String pruningClassName = getClass().getName();
+    logger.info("Beginning partition pruning, pruning class: {}", pruningClassName);
+    Stopwatch totalPruningTime = new Stopwatch();
+    totalPruningTime.start();
+
+
     final PlannerSettings settings = PrelUtil.getPlannerSettings(call.getPlanner());
     PartitionDescriptor descriptor = getPartitionDescriptor(settings, scanRel);
     final BufferAllocator allocator = optimizerContext.getAllocator();
@@ -166,16 +174,28 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
     }
 
     if (partitionColumnBitSet.isEmpty()) {
-      logger.debug("No partition columns are projected from the scan..continue.");
+      logger.info("No partition columns are projected from the scan..continue. " +
+          "Total pruning elapsed time: {} ms", totalPruningTime.elapsed(TimeUnit.MILLISECONDS));
       return;
     }
+
+    // stop watch to track how long we spend in different phases of pruning
+    Stopwatch miscTimer = new Stopwatch();
+
+    // track how long we spend building the filter tree
+    miscTimer.start();
 
     FindPartitionConditions c = new FindPartitionConditions(columnBitset, filterRel.getCluster().getRexBuilder());
     c.analyze(condition);
     RexNode pruneCondition = c.getFinalCondition();
 
+    logger.info("Total elapsed time to build and analyze filter tree: {} ms",
+        miscTimer.elapsed(TimeUnit.MILLISECONDS));
+    miscTimer.stop();
+
     if (pruneCondition == null) {
-      logger.debug("No conditions were found eligible for partition pruning.");
+      logger.info("No conditions were found eligible for partition pruning." +
+          "Total pruning elapsed time: {} ms", totalPruningTime.elapsed(TimeUnit.MILLISECONDS));
       return;
     }
 
@@ -189,7 +209,7 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
     // Outer loop: iterate over a list of batches of PartitionLocations
     for (List<PartitionLocation> partitions : descriptor) {
       numTotal += partitions.size();
-      logger.debug("Evaluating partition pruning for batch {}", batchIndex);
+      logger.info("Evaluating partition pruning for batch {} ms", batchIndex);
       if (batchIndex == 0) { // save the first location in case everything is pruned
         firstLocation = partitions.get(0).getEntirePartitionLocation();
       }
@@ -208,8 +228,15 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
           container.add(v);
         }
 
+        // track how long we spend populating partition column vectors
+        miscTimer.start();
+
         // populate partition vectors.
         descriptor.populatePartitionVectors(vectors, partitions, partitionColumnBitSet, fieldNameMap);
+
+        logger.info("Elapsed time to populate partitioning column vectors: {} ms within batchIndex: {}",
+            miscTimer.elapsed(TimeUnit.MILLISECONDS), batchIndex);
+        miscTimer.stop();
 
         // materialize the expression; only need to do this once
         if (batchIndex == 0) {
@@ -217,12 +244,23 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
           if (materializedExpr == null) {
             // continue without partition pruning; no need to log anything here since
             // materializePruneExpr logs it already
+            logger.info("Total pruning elapsed time: {} ms",
+                totalPruningTime.elapsed(TimeUnit.MILLISECONDS));
             return;
           }
         }
 
         output.allocateNew(partitions.size());
+
+        // start the timer to evaluate how long we spend in the interpreter evaluation
+        miscTimer.start();
+
         InterpreterEvaluator.evaluate(partitions.size(), optimizerContext, container, output, materializedExpr);
+
+        logger.info("Elapsed time in interpreter evaluation: {} ms within batchIndex: {}",
+            miscTimer.elapsed(TimeUnit.MILLISECONDS), batchIndex);
+        miscTimer.stop();
+
         int recordCount = 0;
         int qualifiedCount = 0;
 
@@ -234,10 +272,11 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
           }
           recordCount++;
         }
-        logger.debug("Within batch {}: total records: {}, qualified records: {}", batchIndex, recordCount, qualifiedCount);
+        logger.info("Within batch {}: total records: {}, qualified records: {}", batchIndex, recordCount, qualifiedCount);
         batchIndex++;
       } catch (Exception e) {
         logger.warn("Exception while trying to prune partition.", e);
+        logger.info("Total pruning elapsed time: {} ms", totalPruningTime.elapsed(TimeUnit.MILLISECONDS));
         return; // continue without partition pruning
       } finally {
         container.clear();
@@ -297,6 +336,8 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
 
     } catch (Exception e) {
       logger.warn("Exception while using the pruned partitions.", e);
+    } finally {
+      logger.info("Total pruning elapsed time: {} ms", totalPruningTime.elapsed(TimeUnit.MILLISECONDS));
     }
   }
 

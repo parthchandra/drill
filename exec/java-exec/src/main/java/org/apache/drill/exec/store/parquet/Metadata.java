@@ -198,7 +198,9 @@ public class Metadata {
     watch.start();
     List<FileStatus> fileStatuses = getFileStatuses(fileStatus);
     logger.info("Took {} ms to get file statuses", watch.elapsed(TimeUnit.MILLISECONDS));
-    return getParquetTableMetadata(fileStatuses);
+    ParquetTableMetadata_v1 metadata_v1 = getParquetTableMetadata(fileStatuses);
+    logger.info("Took {} ms to read file metadata", watch.elapsed(TimeUnit.MILLISECONDS));
+    return metadata_v1;
   }
 
   /**
@@ -394,6 +396,8 @@ public class Metadata {
    * @throws IOException
    */
   private ParquetTableMetadata_v1 readBlockMeta(String path) throws IOException {
+    Stopwatch timer = new Stopwatch();
+    timer.start();
     Path p = new Path(path);
     ObjectMapper mapper = new ObjectMapper();
     //SimpleModule module = new SimpleModule();
@@ -420,7 +424,8 @@ public class Metadata {
     ParquetTableMetadata_v1 parquetTableMetadata = mapper.readValue(is, ParquetTableMetadata_v1.class);
     //String s = is.readUTF();
     //ParquetTableMetadata_v1 parquetTableMetadata = org.boon.json.JsonFactory.fromJson(is, ParquetTableMetadata_v1.class);
-
+    logger.info("Took {} ms to read metadata from cache file", timer.elapsed(TimeUnit.MILLISECONDS));
+    timer.stop();
     if (tableModified(parquetTableMetadata, p)) {
       parquetTableMetadata = createMetaFilesRecursively(Path.getPathWithoutSchemeAndAuthority(p.getParent()).toString());
     }
