@@ -39,13 +39,6 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     super(parentReader, allocateSize, descriptor, columnChunkMetaData, fixedLength, v, schemaElement);
     castedBaseVector = (BaseDataValueVector) v;
     castedVectorMutator = (NullableVectorDefinitionSetter) v.getMutator();
-      logger.trace(""
-                      + "recordsToReadInThisPass,"
-                      + "Run Length,Null Run Length,readCount,writeCount,"
-                      + "recordsReadInThisIteration,valuesReadInCurrentPass,"
-                      + "totalValuesRead,readStartInBytes,readLength,pageReader.byteLength,"
-                      + "definitionLevelsRead,pageReader.currentPageCount"
-      );
   }
 
   @Override public void processPages(long recordsToReadInThisPass)
@@ -66,8 +59,8 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
     int currentDefinitionLevel = -1;
     int readCount = 0; // the record number we last read.
     int writeCount = 0; // the record number we last wrote to the value vector.
-    boolean
-        haveMoreData; // true if we have more data and have not filled the vector
+                        // This was previously the indexInOutputVector variable
+    boolean haveMoreData; // true if we have more data and have not filled the vector
 
     while (readCount < recordsToReadInThisPass && writeCount < valueVec.getValueCapacity()) {
       // read a page if needed
@@ -167,26 +160,15 @@ abstract class NullableColumnReader<V extends ValueVector> extends ColumnReader<
 
       totalValuesRead += runLength + nullRunLength;
 
-      logger.trace(
-          "" + "{}," + "{},{},{},{}," + "{},{}," + "{},{},{},{}," + "{},{}",
+      logger.trace("" + "recordsToReadInThisPass: {} \t "
+              + "Run Length: {} \t Null Run Length: {} \t readCount: {} \t writeCount: {} \t "
+              + "recordsReadInThisIteration: {} \t valuesReadInCurrentPass: {} \t "
+              + "totalValuesRead: {} \t readStartInBytes: {} \t readLength: {} \t pageReader.byteLength: {} \t "
+              + "definitionLevelsRead: {} \t pageReader.currentPageCount: {}",
           recordsToReadInThisPass, runLength, nullRunLength, readCount,
           writeCount, recordsReadInThisIteration, valuesReadInCurrentPass,
           totalValuesRead, readStartInBytes, readLength, pageReader.byteLength,
           definitionLevelsRead, pageReader.currentPageCount);
-          /*
-          logger.trace(""
-                          + "recordsToReadInThisPass: {} \t "
-                          + "Run Length: {} \t Null Run Length: {} \t readCount: {} \t writeCount: {} \t "
-                          + "recordsReadInThisIteration: {} \t valuesReadInCurrentPass: {} \t "
-                          + "totalValuesRead: {} \t readStartInBytes: {} \t readLength: {} \t pageReader.byteLength: {} \t "
-                          + "definitionLevelsRead: {} \t pageReader.currentPageCount: {}",
-                  recordsToReadInThisPass,
-                  runLength, nullRunLength, readCount, writeCount,
-                  recordsReadInThisIteration, valuesReadInCurrentPass,
-                  totalValuesRead, readStartInBytes, readLength, pageReader.byteLength,
-                  definitionLevelsRead, pageReader.currentPageCount
-          );
-          */
 
     }
 

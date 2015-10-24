@@ -257,7 +257,8 @@ public class TestParquetWriter extends BaseTestQuery {
         "cast(salary as decimal(24,2)) as decimal24, cast(salary as decimal(38,2)) as decimal38";
     String validateSelection = "decimal8, decimal15, decimal24, decimal38";
     String inputTable = "cp.`employee.json`";
-    runTestAndValidate(selection, validateSelection, inputTable, "parquet_decimal");
+    runTestAndValidate(selection, validateSelection, inputTable,
+        "parquet_decimal");
   }
 
   @Test
@@ -324,12 +325,17 @@ public class TestParquetWriter extends BaseTestQuery {
       testBuilder()
         .ordered()
         .sqlQuery(query)
-        .optionSettingQueriesForTestQuery("alter system set `store.parquet.use_new_reader` = false")
+        .optionSettingQueriesForTestQuery(
+            "alter system set `store.parquet.use_new_reader` = false")
         .sqlBaselineQuery(query)
-        .optionSettingQueriesForBaseline("alter system set `store.parquet.use_new_reader` = true")
+        .optionSettingQueriesForBaseline(
+            "alter system set `store.parquet.use_new_reader` = true")
         .build().run();
     } finally {
-      test("alter system set `%s` = %b", ExecConstants.PARQUET_NEW_RECORD_READER, ExecConstants.PARQUET_RECORD_READER_IMPLEMENTATION_VALIDATOR.getDefault().bool_val);
+      test("alter system set `%s` = %b",
+          ExecConstants.PARQUET_NEW_RECORD_READER,
+          ExecConstants.PARQUET_RECORD_READER_IMPLEMENTATION_VALIDATOR
+              .getDefault().bool_val);
     }
   }
 
@@ -341,12 +347,17 @@ public class TestParquetWriter extends BaseTestQuery {
         .ordered()
         .highPerformanceComparison()
         .sqlQuery(query)
-        .optionSettingQueriesForTestQuery("alter system set `store.parquet.use_new_reader` = false")
+        .optionSettingQueriesForTestQuery(
+            "alter system set `store.parquet.use_new_reader` = false")
         .sqlBaselineQuery(query)
-        .optionSettingQueriesForBaseline("alter system set `store.parquet.use_new_reader` = true")
+        .optionSettingQueriesForBaseline(
+            "alter system set `store.parquet.use_new_reader` = true")
         .build().run();
     } finally {
-      test("alter system set `%s` = %b", ExecConstants.PARQUET_NEW_RECORD_READER, ExecConstants.PARQUET_RECORD_READER_IMPLEMENTATION_VALIDATOR.getDefault().bool_val);
+      test("alter system set `%s` = %b",
+          ExecConstants.PARQUET_NEW_RECORD_READER,
+          ExecConstants.PARQUET_RECORD_READER_IMPLEMENTATION_VALIDATOR
+              .getDefault().bool_val);
     }
   }
 
@@ -365,25 +376,29 @@ public class TestParquetWriter extends BaseTestQuery {
   @Ignore
   @Test
   public void testParquetRead_checkNulls_NullsFirst() throws Exception {
-    compareParquetReadersColumnar("*", "dfs.`/tmp/parquet_with_nulls_should_sum_100000_nulls_first.parquet`");
+    compareParquetReadersColumnar("*",
+        "dfs.`/tmp/parquet_with_nulls_should_sum_100000_nulls_first.parquet`");
   }
 
   @Ignore
   @Test
   public void testParquetRead_checkNulls() throws Exception {
-    compareParquetReadersColumnar("*", "dfs.`/tmp/parquet_with_nulls_should_sum_100000.parquet`");
+    compareParquetReadersColumnar("*",
+        "dfs.`/tmp/parquet_with_nulls_should_sum_100000.parquet`");
   }
 
   @Ignore
   @Test
   public void test958_sql() throws Exception {
-    compareParquetReadersHyperVector("ss_ext_sales_price", "dfs.`/tmp/store_sales`");
+    compareParquetReadersHyperVector("ss_ext_sales_price",
+        "dfs.`/tmp/store_sales`");
   }
 
   @Ignore
   @Test
   public void testReadSf_1_supplier() throws Exception {
-    compareParquetReadersHyperVector("*", "dfs.`/tmp/orders_part-m-00001.parquet`");
+    compareParquetReadersHyperVector("*",
+        "dfs.`/tmp/orders_part-m-00001.parquet`");
   }
 
   @Ignore
@@ -407,7 +422,8 @@ public class TestParquetWriter extends BaseTestQuery {
   @Test
   public void testDrill_1314_all_columns() throws Exception {
     compareParquetReadersHyperVector("*", "dfs.`/tmp/drill_1314.parquet`");
-    compareParquetReadersColumnar("l_orderkey,l_partkey,l_suppkey,l_linenumber, l_quantity, l_extendedprice,l_discount,l_tax",
+    compareParquetReadersColumnar(
+        "l_orderkey,l_partkey,l_suppkey,l_linenumber, l_quantity, l_extendedprice,l_discount,l_tax",
         "dfs.`/tmp/drill_1314.parquet`");
   }
 
@@ -657,4 +673,48 @@ public class TestParquetWriter extends BaseTestQuery {
             .baselineValues((Object)null)
             .go();
   }
+
+  /*
+  The following test boundary conditions for null values occurring on page boundaries. All files have at least one dictionary
+  encoded page for all columns
+  */
+  @Test
+  public void testAllNulls() throws Exception {
+    compareParquetReadersColumnar(
+        "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
+        "cp.`parquet/all_nulls.parquet`");
+  }
+
+  @Test
+  public void testNoNulls() throws Exception {
+    compareParquetReadersColumnar(
+        "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
+        "cp.`parquet/no_nulls.parquet`");
+  }
+
+  @Test
+  public void testFirstPageAllNulls() throws Exception {
+    compareParquetReadersColumnar(
+        "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
+        "cp.`parquet/first_page_all_nulls.parquet`");
+  }
+  @Test
+  public void testLastPageAllNulls() throws Exception {
+    compareParquetReadersColumnar(
+        "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
+        "cp.`parquet/first_page_all_nulls.parquet`");
+  }
+  @Test
+  public void testFirstPageOneNull() throws Exception {
+    compareParquetReadersColumnar(
+        "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
+        "cp.`parquet/first_page_one_null.parquet`");
+  }
+  @Test
+  public void testLastPageOneNull() throws Exception {
+    compareParquetReadersColumnar(
+        "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
+        "cp.`parquet/last_page_one_null.parquet`");
+  }
+
 }
