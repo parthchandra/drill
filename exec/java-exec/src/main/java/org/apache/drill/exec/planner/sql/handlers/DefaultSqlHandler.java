@@ -207,10 +207,12 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     try {
       final DrillRel convertedRelNode;
 
+      final boolean limitZero = context.getPlannerSettings().isLimitZeroOptEnabled() && FindLimit0Visitor.containsLimit0(relNode);
+
       if (! context.getPlannerSettings().isHepJoinOptEnabled()) {
-        convertedRelNode = (DrillRel) logicalPlanningVolcano(relNode);
+        convertedRelNode = (DrillRel) logicalPlanningVolcano(relNode, limitZero);
       } else {
-        convertedRelNode = (DrillRel) logicalPlanningVolcanoAndLopt(relNode);
+        convertedRelNode = (DrillRel) logicalPlanningVolcanoAndLopt(relNode, limitZero);
       }
 
       if (convertedRelNode instanceof DrillStoreRel) {
@@ -529,8 +531,10 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
   }
 
 
-  private RelNode logicalPlanningVolcano(RelNode relNode) throws RelConversionException, SqlUnsupportedException {
-    return planner.transform(DrillSqlWorker.LOGICAL_RULES, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
+  private RelNode logicalPlanningVolcano(RelNode relNode, boolean limitZero) throws RelConversionException, SqlUnsupportedException {
+    final int ruleIndex = limitZero? DrillSqlWorker.LOGICAL_LIMIT0_RULES : DrillSqlWorker.LOGICAL_RULES;
+
+    return planner.transform(ruleIndex, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
   }
 
   /**
@@ -540,9 +544,10 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
    * @throws RelConversionException
    * @throws SqlUnsupportedException
    */
-  private RelNode logicalPlanningVolcanoAndLopt(RelNode relNode) throws RelConversionException, SqlUnsupportedException {
+  private RelNode logicalPlanningVolcanoAndLopt(RelNode relNode, boolean limitZero) throws RelConversionException, SqlUnsupportedException {
+    final int ruleIndex = limitZero ? DrillSqlWorker.LOGICAL_LOPT_LIMIT0_RULES : DrillSqlWorker.LOGICAL_LOPT_RULES;
 
-    final RelNode convertedRelNode = planner.transform(DrillSqlWorker.LOGICAL_CONVERT_RULES, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
+    final RelNode convertedRelNode = planner.transform(ruleIndex, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
     log("VolCalciteRel", convertedRelNode, logger);
 
     final RelNode loptNode = getLoptJoinOrderTree(

@@ -73,7 +73,9 @@ public class DrillSqlWorker {
   private final HepPlanner hepPlanner;
   public final static int LOGICAL_RULES = 0;
   public final static int PHYSICAL_MEM_RULES = 1;
-  public final static int LOGICAL_CONVERT_RULES = 2;
+  public final static int LOGICAL_LOPT_RULES = 2;
+  public final static int LOGICAL_LIMIT0_RULES = 3;
+  public final static int LOGICAL_LOPT_LIMIT0_RULES = 4;
 
   private final QueryContext context;
 
@@ -115,20 +117,28 @@ public class DrillSqlWorker {
 
   private RuleSet[] getRules(QueryContext context) {
     StoragePluginRegistry storagePluginRegistry = context.getStorage();
-    RuleSet drillLogicalRules = DrillRuleSets.mergedRuleSets(
+    RuleSet drillLogical_limit0_Rules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
         DrillRuleSets.getJoinPermRules(context),
         DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
+
+    RuleSet drillLogicalRules = DrillRuleSets.mergedRuleSets(drillLogical_limit0_Rules,
+        DrillRuleSets.getProjectPushDownRules());
+
     RuleSet drillPhysicalMem = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getPhysicalRules(context),
         storagePluginRegistry.getStoragePluginRuleSet(context));
 
     // Following is used in LOPT join OPT.
-    RuleSet logicalConvertRules = DrillRuleSets.mergedRuleSets(
+    RuleSet logicalConvert_limit0_Rules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
         DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
 
-    RuleSet[] allRules = new RuleSet[] {drillLogicalRules, drillPhysicalMem, logicalConvertRules};
+    RuleSet logicalConvertRules = DrillRuleSets.mergedRuleSets(
+        logicalConvert_limit0_Rules,
+        DrillRuleSets.getProjectPushDownRules());
+
+    RuleSet[] allRules = new RuleSet[] {drillLogicalRules, drillPhysicalMem, logicalConvertRules, drillLogical_limit0_Rules, logicalConvert_limit0_Rules};
 
     return allRules;
   }

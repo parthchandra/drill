@@ -75,6 +75,7 @@ public class PlannerSettings implements Context{
   public static final OptionValidator HEP_JOIN_OPT = new BooleanValidator("planner.enable_hep_join_opt", true);
   public static final OptionValidator PLANNER_MEMORY_LIMIT = new RangeLongValidator("planner.memory_limit",
       INITIAL_OFF_HEAP_ALLOCATION_IN_BYTES, MAX_OFF_HEAP_ALLOCATION_IN_BYTES, DEFAULT_MAX_OFF_HEAP_ALLOCATION_IN_BYTES);
+  public static final OptionValidator LIMIT_ZERO_OPT = new BooleanValidator("planner.enable_limit_zero_opt", true);
 
   public static final OptionValidator IDENTIFIER_MAX_LENGTH =
       new RangeLongValidator("planner.identifier_max_length", 128 /* A minimum length is needed because option names are identifiers themselves */,
@@ -173,6 +174,8 @@ public class PlannerSettings implements Context{
   }
 
   public boolean isHepJoinOptEnabled() { return options.getOption(HEP_JOIN_OPT.getOptionName()).bool_val;}
+
+  public boolean isLimitZeroOptEnabled() { return options.getOption(LIMIT_ZERO_OPT.getOptionName()).bool_val;}
 
   public double getHashJoinSwapMarginFactor() {
     return options.getOption(HASH_JOIN_SWAP_MARGIN_FACTOR.getOptionName()).float_val / 100d;
