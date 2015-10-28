@@ -47,8 +47,7 @@ import org.apache.hadoop.fs.FileSystem;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.collect.Maps;
 
-public class
-        JSONFormatPlugin extends EasyFormatPlugin<JSONFormatConfig> {
+public class JSONFormatPlugin extends EasyFormatPlugin<JSONFormatConfig> {
 
   private static final boolean IS_COMPRESSIBLE = true;
   private static final String DEFAULT_NAME = "json";

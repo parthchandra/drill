@@ -48,7 +48,6 @@ public class JsonReader extends BaseJsonProcessor {
   private final WorkingBuffer workingBuffer;
   private final List<SchemaPath> columns;
   private final boolean allTextMode;
-  private boolean atLeastOneWrite = false;
   private final MapVectorOutput mapOutput;
   private final ListVectorOutput listOutput;
   private final boolean extended = true;
@@ -76,7 +75,7 @@ public class JsonReader extends BaseJsonProcessor {
 
   public JsonReader(DrillBuf managedBuf, List<SchemaPath> columns, boolean allTextMode, boolean skipOuterList, boolean readNumbersAsDouble) {
     super(managedBuf);
-    assert Preconditions.checkNotNull(columns).size() > 0 : "json record reader requires at least a column";
+    assert Preconditions.checkNotNull(columns).size() > 0 : "JSON record reader requires at least one column";
     this.selection = FieldSelection.getFieldSelection(columns);
     this.workingBuffer = new WorkingBuffer(managedBuf);
     this.skipOuterList = skipOuterList;
@@ -90,16 +89,16 @@ public class JsonReader extends BaseJsonProcessor {
 
   @Override
   public void ensureAtLeastOneField(ComplexWriter writer) {
-    if (!atLeastOneWrite) {
-      // if we had no columns, create one empty one so we can return some data for count purposes.
-      SchemaPath sp = columns.get(0);
-      PathSegment root = sp.getRootSegment();
-      BaseWriter.MapWriter fieldWriter = writer.rootAsMap();
-      while (root.getChild() != null && !root.getChild().isArray()) {
-        fieldWriter = fieldWriter.map(root.getNameSegment().getPath());
-        root = root.getChild();
-      }
-      fieldWriter.integer(root.getNameSegment().getPath());
+    // if we had no columns, create one empty one so we can return some data for count purposes.
+    SchemaPath sp = columns.get(0);
+    PathSegment fieldPath = sp.getRootSegment();
+    BaseWriter.MapWriter fieldWriter = writer.rootAsMap();
+    while (fieldPath.getChild() != null && ! fieldPath.getChild().isArray()) {
+      fieldWriter = fieldWriter.map(fieldPath.getNameSegment().getPath());
+      fieldPath = fieldPath.getChild();
+    }
+    if (fieldWriter.isEmptyMap()) {
+      fieldWriter.integer(fieldPath.getNameSegment().getPath());
     }
   }
 
@@ -313,12 +312,10 @@ public class JsonReader extends BaseJsonProcessor {
 
       case VALUE_FALSE: {
         map.bit(fieldName).writeBit(0);
-        atLeastOneWrite = true;
         break;
       }
       case VALUE_TRUE: {
         map.bit(fieldName).writeBit(1);
-        atLeastOneWrite = true;
         break;
       }
       case VALUE_NULL:
@@ -326,7 +323,6 @@ public class JsonReader extends BaseJsonProcessor {
         break;
       case VALUE_NUMBER_FLOAT:
         map.float8(fieldName).writeFloat8(parser.getDoubleValue());
-        atLeastOneWrite = true;
         break;
       case VALUE_NUMBER_INT:
         if (this.readNumbersAsDouble) {
@@ -335,11 +331,9 @@ public class JsonReader extends BaseJsonProcessor {
         else {
           map.bigInt(fieldName).writeBigInt(parser.getLongValue());
         }
-        atLeastOneWrite = true;
         break;
       case VALUE_STRING:
         handleString(parser, map, fieldName);
-        atLeastOneWrite = true;
         break;
 
       default:
@@ -403,7 +397,6 @@ public class JsonReader extends BaseJsonProcessor {
       case VALUE_NUMBER_INT:
       case VALUE_STRING:
         handleString(parser, map, fieldName);
-        atLeastOneWrite = true;
         break;
       case VALUE_NULL:
         // do nothing as we don't have a type.
@@ -430,7 +423,6 @@ public class JsonReader extends BaseJsonProcessor {
    */
   private boolean writeMapDataIfTyped(MapWriter writer, String fieldName) throws IOException {
     if (extended) {
-      atLeastOneWrite = true;
       return mapOutput.run(writer, fieldName);
     } else {
       parser.nextToken();
@@ -446,7 +438,6 @@ public class JsonReader extends BaseJsonProcessor {
    */
   private boolean writeListDataIfTyped(ListWriter writer) throws IOException {
     if (extended) {
-      atLeastOneWrite = true;
       return listOutput.run(writer);
     } else {
       parser.nextToken();
@@ -483,12 +474,10 @@ public class JsonReader extends BaseJsonProcessor {
       case VALUE_EMBEDDED_OBJECT:
       case VALUE_FALSE: {
         list.bit().writeBit(0);
-        atLeastOneWrite = true;
         break;
       }
       case VALUE_TRUE: {
         list.bit().writeBit(1);
-        atLeastOneWrite = true;
         break;
       }
       case VALUE_NULL:
@@ -499,7 +488,6 @@ public class JsonReader extends BaseJsonProcessor {
           .build(logger);
       case VALUE_NUMBER_FLOAT:
         list.float8().writeFloat8(parser.getDoubleValue());
-        atLeastOneWrite = true;
         break;
       case VALUE_NUMBER_INT:
         if (this.readNumbersAsDouble) {
@@ -508,11 +496,9 @@ public class JsonReader extends BaseJsonProcessor {
         else {
           list.bigInt().writeBigInt(parser.getLongValue());
         }
-        atLeastOneWrite = true;
         break;
       case VALUE_STRING:
         handleString(parser, list);
-        atLeastOneWrite = true;
         break;
       default:
         throw UserException.dataReadError()
@@ -552,7 +538,6 @@ public class JsonReader extends BaseJsonProcessor {
       case VALUE_NUMBER_INT:
       case VALUE_STRING:
         handleString(parser, list);
-        atLeastOneWrite = true;
         break;
       default:
         throw

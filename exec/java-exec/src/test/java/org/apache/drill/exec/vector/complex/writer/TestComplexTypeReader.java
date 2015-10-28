@@ -19,6 +19,7 @@
 package org.apache.drill.exec.vector.complex.writer;
 
 import org.apache.drill.BaseTestQuery;
+import org.junit.Ignore;
 import org.junit.Test;
 
 public class TestComplexTypeReader extends BaseTestQuery{
@@ -218,6 +219,7 @@ public class TestComplexTypeReader extends BaseTestQuery{
   }
 
   @Test
+  @Ignore( "until flattening code creates correct ListVector (DRILL-4045)" )
   public void testNestedFlatten() throws Exception {
     test("select flatten(rl) from cp.`jsoninput/input2.json`");
   }

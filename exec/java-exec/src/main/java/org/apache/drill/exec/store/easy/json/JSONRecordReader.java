@@ -65,7 +65,7 @@ public class JSONRecordReader extends AbstractRecordReader {
    * @param fragmentContext
    * @param inputPath
    * @param fileSystem
-   * @param columns
+   * @param columns  pathnames of columns/subfields to read
    * @throws OutOfMemoryException
    */
   public JSONRecordReader(final FragmentContext fragmentContext, final String inputPath, final DrillFileSystem fileSystem,
@@ -78,7 +78,7 @@ public class JSONRecordReader extends AbstractRecordReader {
    * @param fragmentContext
    * @param embeddedContent
    * @param fileSystem
-   * @param columns
+   * @param columns  pathnames of columns/subfields to read
    * @throws OutOfMemoryException
    */
   public JSONRecordReader(final FragmentContext fragmentContext, final JsonNode embeddedContent,
@@ -109,6 +109,14 @@ public class JSONRecordReader extends AbstractRecordReader {
     this.enableAllTextMode = embeddedContent == null && fragmentContext.getOptions().getOption(ExecConstants.JSON_READER_ALL_TEXT_MODE_VALIDATOR);
     this.readNumbersAsDouble = fragmentContext.getOptions().getOption(ExecConstants.JSON_READ_NUMBERS_AS_DOUBLE).bool_val;
     setColumns(columns);
+  }
+
+  @Override
+  public String toString() {
+    return super.toString()
+        + "[hadoopPath = " + hadoopPath
+        + ", recordCount = " + recordCount
+        + ", runningRecordCount = " + runningRecordCount + ", ...]";
   }
 
   @Override

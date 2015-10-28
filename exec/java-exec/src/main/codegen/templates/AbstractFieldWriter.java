@@ -62,6 +62,17 @@ abstract class AbstractFieldWriter extends AbstractBaseWriter implements FieldWr
     fail("${name}");
   }
 
+  /**
+   * This implementation returns {@code false}.
+   * <p>  
+   *   Must be overridden by map writers.
+   * </p>  
+   */
+  @Override
+  public boolean isEmptyMap() {
+    return false;
+  }
+
   @Override
   public MapWriter map() {
     fail("Map");
