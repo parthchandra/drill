@@ -250,7 +250,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
       * @return whether column is a potential partition column
       */
   private boolean checkForPartitionColumn(ColumnMetadata columnMetadata, boolean first) {
-    SchemaPath schemaPath = columnMetadata.name;
+    SchemaPath schemaPath = SchemaPath.getCompoundPath( columnMetadata.name);
     if (first) {
       if (hasSingleValue(columnMetadata)) {
         columnTypeMap.put(schemaPath, getType(columnMetadata.primitiveType, columnMetadata.originalType));
@@ -605,7 +605,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
       for (RowGroupMetadata rowGroup : file.rowGroups) {
         long rowCount = rowGroup.rowCount;
         for (ColumnMetadata column : rowGroup.columns) {
-          SchemaPath schemaPath = column.name;
+          SchemaPath schemaPath = SchemaPath.getCompoundPath(column.name);
           Long previousCount = columnValueCounts.get(schemaPath);
           if (previousCount != null) {
             if (previousCount != GroupScan.NO_COLUMN_STATS) {

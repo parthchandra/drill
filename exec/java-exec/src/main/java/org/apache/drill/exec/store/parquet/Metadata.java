@@ -41,6 +41,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
+import org.boon.json.annotations.JsonIgnore;
+import org.boon.json.serializers.JsonSerializerInternal;
+import org.boon.json.serializers.impl.AbstractCustomObjectSerializer;
+import org.boon.primitive.CharBuf;
 import parquet.column.statistics.Statistics;
 import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.BlockMetaData;
@@ -55,6 +59,7 @@ import parquet.schema.Type;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -173,7 +178,8 @@ public class Metadata {
    * @throws IOException
    */
   private ParquetTableMetadata_v1 getParquetTableMetadata(List<FileStatus> fileStatuses) throws IOException {
-    List<ParquetFileMetadata> fileMetadataList = getParquetFileMetadata(fileStatuses);
+    List<ParquetFileMetadata> fileMetadataList = getParquetFileMetadata(
+        fileStatuses);
     return new ParquetTableMetadata_v1(fileMetadataList, new ArrayList<String>());
   }
 
@@ -273,12 +279,13 @@ public class Metadata {
         boolean statsAvailable = (col.getStatistics() != null && !col.getStatistics().isEmpty());
 
         Statistics stats = col.getStatistics();
-        SchemaPath columnName = SchemaPath.getCompoundPath(col.getPath().toArray());
+        String[] columnName = col.getPath().toArray();
+        SchemaPath columnSchemaPath = SchemaPath.getCompoundPath(columnName);
         if (statsAvailable) {
-          columnMetadata = new ColumnMetadata(columnName, col.getType(), originalTypeMap.get(columnName),
+          columnMetadata = new ColumnMetadata(columnName, col.getType(), originalTypeMap.get(columnSchemaPath),
               stats.genericGetMax(), stats.genericGetMin(), stats.getNumNulls());
         } else {
-          columnMetadata = new ColumnMetadata(columnName, col.getType(), originalTypeMap.get(columnName),
+          columnMetadata = new ColumnMetadata(columnName, col.getType(), originalTypeMap.get(columnSchemaPath),
               null, null, null);
         }
         columnMetadataList.add(columnMetadata);
@@ -349,13 +356,29 @@ public class Metadata {
    */
   private ParquetTableMetadata_v1 readBlockMeta(String path) throws IOException {
     Path p = new Path(path);
-    ObjectMapper mapper = new ObjectMapper();
-    SimpleModule module = new SimpleModule();
-    module.addDeserializer(SchemaPath.class, new De());
-    mapper.registerModule(module);
-    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    //ObjectMapper mapper = new ObjectMapper();
+    //SimpleModule module = new SimpleModule();
+    //module.addDeserializer(SchemaPath.class, new De());
+    //mapper.registerModule(module);
+    //mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     FSDataInputStream is = fs.open(p);
+
+    /*org.boon.json.JsonSerializerFactory jsonSerializerFactory =
+        new org.boon.json.JsonSerializerFactory()
+            .addTypeSerializer(SchemaPath.class,
+                new AbstractCustomObjectSerializer(SchemaPath.class) {
+                  @Override
+                  public void serializeObject(JsonSerializerInternal serializer,
+                      Object instance, CharBuf builder) {
+
+                  }
+                });
+                */
+    org.boon.json.ObjectMapper mapper = org.boon.json.JsonFactory.create();
     ParquetTableMetadata_v1 parquetTableMetadata = mapper.readValue(is, ParquetTableMetadata_v1.class);
+    //String s = is.readUTF();
+    //ParquetTableMetadata_v1 parquetTableMetadata = org.boon.json.JsonFactory.fromJson(is, ParquetTableMetadata_v1.class);
+
     if (tableModified(parquetTableMetadata, p)) {
       parquetTableMetadata = createMetaFilesRecursively(Path.getPathWithoutSchemeAndAuthority(p.getParent()).toString());
     }
@@ -400,6 +423,9 @@ public class Metadata {
     @JsonProperty
     List<String> directories;
 
+    @JsonIgnore
+    private int hashCode = 0;
+
     public ParquetTableMetadata_v1() {
       super();
     }
@@ -407,6 +433,21 @@ public class Metadata {
     public ParquetTableMetadata_v1(List<ParquetFileMetadata> files, List<String> directories) {
       this.files = files;
       this.directories = directories;
+    }
+
+    @Override
+    public int hashCode() {
+      if (hashCode == 0) {
+        int result = 23;
+        for (ParquetFileMetadata file : files) {
+          result = 31 * result + file.hashCode();
+        }
+        for (String dir : directories) {
+          result = 31 * result + dir.hashCode();
+        }
+        hashCode = result;
+      }
+      return hashCode;
     }
   }
 
@@ -421,6 +462,9 @@ public class Metadata {
     @JsonProperty
     public List<RowGroupMetadata> rowGroups;
 
+    @JsonIgnore
+    private int hashCode = 0;
+
     public ParquetFileMetadata() {
       super();
     }
@@ -431,6 +475,19 @@ public class Metadata {
       this.rowGroups = rowGroups;
     }
 
+    @Override
+    public int hashCode() {
+      if (hashCode == 0) {
+        int result = 23;
+        result = 31 * result + path.hashCode();
+        result = 31 * result + length.hashCode();
+        for (RowGroupMetadata rowGroup : rowGroups) {
+          result = 31 * result + rowGroup.hashCode();
+        }
+        hashCode = result;
+      }
+      return hashCode;
+    }
     @Override
     public String toString() {
       return String.format("path: %s rowGroups: %s", path, rowGroups);
@@ -452,6 +509,9 @@ public class Metadata {
     @JsonProperty
     public List<ColumnMetadata> columns;
 
+    @JsonIgnore
+    private int hashCode = 0;
+
     public RowGroupMetadata() {
       super();
     }
@@ -464,6 +524,21 @@ public class Metadata {
       this.hostAffinity = hostAffinity;
       this.columns = columns;
     }
+    @Override
+    public int hashCode() {
+      if (hashCode == 0) {
+        int result = 23;
+        result = 31 * result + start.hashCode();
+        result = 31 * result + length.hashCode();
+        result = 31 * result + rowCount.hashCode();
+        result = 31 * result + hostAffinity.hashCode();
+        for (ColumnMetadata column : columns) {
+          result = 31 * result + column.hashCode();
+        }
+        hashCode = result;
+      }
+      return hashCode;
+    }
   }
 
   /**
@@ -471,7 +546,7 @@ public class Metadata {
    */
   public static class ColumnMetadata {
     @JsonProperty
-    public SchemaPath name;
+    public String[] name;
     @JsonProperty
     public PrimitiveTypeName primitiveType;
     @JsonProperty
@@ -483,12 +558,14 @@ public class Metadata {
     public Object max;
     public Object min;
 
+    @JsonIgnore
+    private int hashCode = 0;
 
     public ColumnMetadata() {
       super();
     }
 
-    public ColumnMetadata(SchemaPath name, PrimitiveTypeName primitiveType, OriginalType originalType,
+    public ColumnMetadata(String[] name, PrimitiveTypeName primitiveType, OriginalType originalType,
                           Object max, Object min, Long nulls) {
       this.name = name;
       this.primitiveType = primitiveType;
@@ -497,7 +574,6 @@ public class Metadata {
       this.min = min;
       this.nulls = nulls;
     }
-
     @JsonProperty(value = "min")
     public Object getMin() {
       if (primitiveType == PrimitiveTypeName.BINARY && min != null) {
@@ -532,5 +608,20 @@ public class Metadata {
       this.max = max;
     }
 
+    @Override
+    public int hashCode() {
+      if (hashCode == 0) {
+        int result = 23;
+        result = 31 * result + Arrays.hashCode(name);
+        result = 31 * result + primitiveType.hashCode();
+        result = 31 * result + originalType.hashCode();
+        result = 31 * result + max.hashCode();
+        result = 31 * result + min.hashCode();
+        result = 31 * result + nulls.hashCode();
+        hashCode = result;
+      }
+      return hashCode;
+    }
   }
 }
+

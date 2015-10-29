@@ -119,6 +119,11 @@
       <version>2.4.3</version>
     </dependency>
     <dependency>
+      <groupId>io.fastjson</groupId>
+      <artifactId>boon</artifactId>
+      <version>0.33</version>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-transport-native-epoll</artifactId>
       <classifier>linux-x86_64</classifier>
