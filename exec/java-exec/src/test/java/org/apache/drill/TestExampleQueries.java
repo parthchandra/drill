@@ -299,6 +299,15 @@ public class TestExampleQueries extends BaseTestQuery {
         "  on nations.N_REGIONKEY = regions.R_REGIONKEY where 1 = 0");
   }
 
+  @Test
+  public void countDistinct() throws Exception {
+    test("EXPLAIN PLAN FOR SELECT * FROM " +
+            "(SELECT COUNT(employee_id), " +
+            "SUM(employee_id), " +
+            "COUNT(DISTINCT employee_id) " +
+            "FROM cp.`employee.json`) " +
+        "T LIMIT 0");
+  }
 
   @Test
   public void testWhere() throws Exception {
