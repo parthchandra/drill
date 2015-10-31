@@ -323,9 +323,9 @@ public class Metadata {
         }
         parquetTableMetadata.columnTypeInfo.add(columnTypeMetadata);
         if (statsAvailable) {
-          columnMetadata = new ColumnMetadata(columnTypeMetadata.name, stats.genericGetMax(), stats.genericGetMin(), stats.getNumNulls());
+          columnMetadata = new ColumnMetadata(columnTypeMetadata.name, col.getType(), stats.genericGetMax(), stats.genericGetMin(), stats.getNumNulls());
         } else {
-          columnMetadata = new ColumnMetadata(columnTypeMetadata.name, null, null, null);
+          columnMetadata = new ColumnMetadata(columnTypeMetadata.name, col.getType(), null, null, null);
         }
         columnMetadataList.add(columnMetadata);
         length += col.getTotalSize();
@@ -663,6 +663,7 @@ public class Metadata {
     public Object min;
 
     @JsonIgnore private int hashCode = 0;
+    @JsonIgnore private PrimitiveTypeName primitiveType;
 
     //@JsonIgnore private ColumnTypeMetadata columnTypeMetadata;
 
@@ -670,12 +671,13 @@ public class Metadata {
       super();
     }
 
-    public ColumnMetadata(/*ColumnTypeMetadata columnTypeMetadata,*/ String[] name, Object max, Object min, Long nulls) {
+    public ColumnMetadata(/*ColumnTypeMetadata columnTypeMetadata,*/ String[] name, PrimitiveTypeName primitiveType, Object max, Object min, Long nulls) {
       //this.columnTypeMetadata = columnTypeMetadata;
       this.name = name;
       this.max = max;
       this.min = min;
       this.nulls = nulls;
+      this.primitiveType=primitiveType;
     }
 
     //@JsonIgnore public ColumnTypeMetadata typeInfo() {
