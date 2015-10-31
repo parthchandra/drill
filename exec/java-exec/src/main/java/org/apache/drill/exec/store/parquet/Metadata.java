@@ -24,12 +24,20 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator.Feature;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+
+//import  org.boon.json.JsonFactory;
+//import  org.boon.json.ObjectMapper;
+//import static org.boon.json.JsonFactory.fromJson;
+
+import com.fasterxml.jackson.module.afterburner.AfterburnerModule;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Objects;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
+import com.google.common.collect.Sets;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.SchemaPath.De;
 import org.apache.drill.exec.store.TimedRunnable;
@@ -40,11 +48,14 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-
-import org.boon.json.annotations.JsonIgnore;
-import org.boon.json.serializers.JsonSerializerInternal;
-import org.boon.json.serializers.impl.AbstractCustomObjectSerializer;
-import org.boon.primitive.CharBuf;
+//import org.boon.json.annotations.JsonIgnore;
+//import org.boon.json.serializers.JsonSerializerInternal;
+//import org.boon.json.serializers.impl.AbstractCustomObjectSerializer;
+//import org.boon.primitive.CharBuf;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.map.DeserializationContext;
+import org.codehaus.jackson.map.deser.StdDeserializer;
 import parquet.column.statistics.Statistics;
 import parquet.hadoop.ParquetFileReader;
 import parquet.hadoop.metadata.BlockMetaData;
@@ -60,6 +71,7 @@ import parquet.schema.Type;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -67,7 +79,8 @@ import java.util.concurrent.TimeUnit;
 public class Metadata {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Metadata.class);
 
-  public static final String METADATA_FILENAME = ".drill.parquet_metadata";
+  public static final String[] OLD_METADATA_FILENAMES = {".drill.parquet_metadata"};
+  public static final String METADATA_FILENAME = ".drill.parquet_metadata.v2";
 
   private final FileSystem fs;
 
@@ -131,6 +144,7 @@ public class Metadata {
   private ParquetTableMetadata_v1 createMetaFilesRecursively(final String path) throws IOException {
     List<ParquetFileMetadata> metaDataList = Lists.newArrayList();
     List<String> directoryList = Lists.newArrayList();
+    HashSet<ColumnTypeMetadata> columnTypeInfoSet = Sets.newHashSet();
     Path p = new Path(path);
     FileStatus fileStatus = fs.getFileStatus(p);
     assert fileStatus.isDirectory() : "Expected directory";
@@ -143,14 +157,30 @@ public class Metadata {
         metaDataList.addAll(subTableMetadata.files);
         directoryList.addAll(subTableMetadata.directories);
         directoryList.add(file.getPath().toString());
+        // Merge the schema from the child level into the current level
+        //TODO: We need a merge method that merges two colums with the same name but different types
+        columnTypeInfoSet.addAll(subTableMetadata.columnTypeInfo);
       } else {
         childFiles.add(file);
       }
     }
+    ParquetTableMetadata_v1 parquetTableMetadata = new ParquetTableMetadata_v1();
     if (childFiles.size() > 0) {
-      metaDataList.addAll(getParquetFileMetadata(childFiles));
+      List<ParquetFileMetadata> childFilesMetadata =
+          getParquetFileMetadata(parquetTableMetadata, childFiles);
+      metaDataList.addAll(childFilesMetadata);
+      // Note that we do not need to merge the columnInfo at this point. The columnInfo is already added
+      // to the parquetTableMetadata.
     }
-    ParquetTableMetadata_v1 parquetTableMetadata = new ParquetTableMetadata_v1(metaDataList, directoryList);
+
+    parquetTableMetadata.directories = directoryList;
+    parquetTableMetadata.files = metaDataList;
+    //TODO: We need a merge method that merges two colums with the same name but different types
+    if (parquetTableMetadata.columnTypeInfo == null) {
+      parquetTableMetadata.columnTypeInfo = Sets.newHashSet();
+    }
+    parquetTableMetadata.columnTypeInfo.addAll(columnTypeInfoSet);
+
     writeFile(parquetTableMetadata, new Path(p, METADATA_FILENAME));
     return parquetTableMetadata;
   }
@@ -177,10 +207,13 @@ public class Metadata {
    * @return
    * @throws IOException
    */
-  private ParquetTableMetadata_v1 getParquetTableMetadata(List<FileStatus> fileStatuses) throws IOException {
-    List<ParquetFileMetadata> fileMetadataList = getParquetFileMetadata(
-        fileStatuses);
-    return new ParquetTableMetadata_v1(fileMetadataList, new ArrayList<String>());
+  private ParquetTableMetadata_v1 getParquetTableMetadata(List<FileStatus> fileStatuses)
+      throws IOException {
+    ParquetTableMetadata_v1 tableMetadata = new ParquetTableMetadata_v1();
+    List<ParquetFileMetadata> fileMetadataList = getParquetFileMetadata(tableMetadata, fileStatuses);
+    tableMetadata.files = fileMetadataList;
+    tableMetadata.directories = new ArrayList<String>();
+    return tableMetadata;
   }
 
   /**
@@ -189,10 +222,11 @@ public class Metadata {
    * @return
    * @throws IOException
    */
-  private List<ParquetFileMetadata> getParquetFileMetadata(List<FileStatus> fileStatuses) throws IOException {
+  private List<ParquetFileMetadata> getParquetFileMetadata(ParquetTableMetadata_v1 parquetTableMetadata_v1,
+      List<FileStatus> fileStatuses) throws IOException {
     List<TimedRunnable<ParquetFileMetadata>> gatherers = Lists.newArrayList();
     for (FileStatus file : fileStatuses) {
-      gatherers.add(new MetadataGatherer(file));
+      gatherers.add(new MetadataGatherer(parquetTableMetadata_v1, file));
     }
 
     List<ParquetFileMetadata> metaDataList = Lists.newArrayList();
@@ -224,14 +258,16 @@ public class Metadata {
   private class MetadataGatherer extends TimedRunnable<ParquetFileMetadata> {
 
     private FileStatus fileStatus;
+    private ParquetTableMetadata_v1 parquetTableMetadata;
 
-    public MetadataGatherer(FileStatus fileStatus) {
+    public MetadataGatherer(ParquetTableMetadata_v1 parquetTableMetadata, FileStatus fileStatus) {
       this.fileStatus = fileStatus;
+      this.parquetTableMetadata=parquetTableMetadata;
     }
 
     @Override
     protected ParquetFileMetadata runInner() throws Exception {
-      return getParquetFileMetadata(fileStatus);
+      return getParquetFileMetadata(parquetTableMetadata, fileStatus);
     }
 
     @Override
@@ -258,7 +294,7 @@ public class Metadata {
    * @return
    * @throws IOException
    */
-  private ParquetFileMetadata getParquetFileMetadata(FileStatus file) throws IOException {
+  private ParquetFileMetadata getParquetFileMetadata(ParquetTableMetadata_v1 parquetTableMetadata, FileStatus file) throws IOException {
     ParquetMetadata metadata = ParquetFileReader.readFooter(fs.getConf(), file);
     MessageType schema = metadata.getFileMetaData().getSchema();
 
@@ -279,14 +315,17 @@ public class Metadata {
         boolean statsAvailable = (col.getStatistics() != null && !col.getStatistics().isEmpty());
 
         Statistics stats = col.getStatistics();
-        String[] columnName = col.getPath().toArray();
-        SchemaPath columnSchemaPath = SchemaPath.getCompoundPath(columnName);
+        String[] columnName = col.getPath().toArray() ;
+        SchemaPath columnSchemaName = SchemaPath.getCompoundPath(columnName);
+        ColumnTypeMetadata columnTypeMetadata = new ColumnTypeMetadata(columnName, col.getType(), originalTypeMap.get(columnSchemaName));
+        if(parquetTableMetadata.columnTypeInfo == null){
+         parquetTableMetadata.columnTypeInfo = Sets.newHashSet();
+        }
+        parquetTableMetadata.columnTypeInfo.add(columnTypeMetadata);
         if (statsAvailable) {
-          columnMetadata = new ColumnMetadata(columnName, col.getType(), originalTypeMap.get(columnSchemaPath),
-              stats.genericGetMax(), stats.genericGetMin(), stats.getNumNulls());
+          columnMetadata = new ColumnMetadata(columnTypeMetadata.name, stats.genericGetMax(), stats.genericGetMin(), stats.getNumNulls());
         } else {
-          columnMetadata = new ColumnMetadata(columnName, col.getType(), originalTypeMap.get(columnSchemaPath),
-              null, null, null);
+          columnMetadata = new ColumnMetadata(columnTypeMetadata.name, null, null, null);
         }
         columnMetadataList.add(columnMetadata);
         length += col.getTotalSize();
@@ -356,11 +395,14 @@ public class Metadata {
    */
   private ParquetTableMetadata_v1 readBlockMeta(String path) throws IOException {
     Path p = new Path(path);
-    //ObjectMapper mapper = new ObjectMapper();
+    ObjectMapper mapper = new ObjectMapper();
     //SimpleModule module = new SimpleModule();
+
     //module.addDeserializer(SchemaPath.class, new De());
+    //module.addDeserializer(ColumnTypeMetadata.Key.class, new ColumnTypeMetadata.Key.DeSerializer());
     //mapper.registerModule(module);
-    //mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    mapper.registerModule(new AfterburnerModule());
+    mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     FSDataInputStream is = fs.open(p);
 
     /*org.boon.json.JsonSerializerFactory jsonSerializerFactory =
@@ -373,8 +415,8 @@ public class Metadata {
 
                   }
                 });
-                */
-    org.boon.json.ObjectMapper mapper = org.boon.json.JsonFactory.create();
+    */
+    //org.boon.json.ObjectMapper mapper = org.boon.json.JsonFactory.create();
     ParquetTableMetadata_v1 parquetTableMetadata = mapper.readValue(is, ParquetTableMetadata_v1.class);
     //String s = is.readUTF();
     //ParquetTableMetadata_v1 parquetTableMetadata = org.boon.json.JsonFactory.fromJson(is, ParquetTableMetadata_v1.class);
@@ -416,15 +458,21 @@ public class Metadata {
   /**
    * Struct which contains the metadata for an entire parquet directory structure
    */
-  @JsonTypeName("v1")
+  @JsonTypeName("v2")
   public static class ParquetTableMetadata_v1 extends ParquetTableMetadataBase {
+    /*
+     ColumnTypeInfo is schema information from all the files and row groups, merged into
+     one. To get this info, we pass the ParquetTableMetadata object all the way dow to the
+     RowGroup and the column type is built there as it is read from the footer.
+     */
+    @JsonProperty
+    //public HashMap<SchemaPath, ColumnTypeMetadata> columnTypeInfo;
+    //public HashMap<ColumnTypeMetadata.Key, ColumnTypeMetadata> columnTypeInfo;
+    public HashSet<ColumnTypeMetadata> columnTypeInfo;
     @JsonProperty
     List<ParquetFileMetadata> files;
     @JsonProperty
     List<String> directories;
-
-    @JsonIgnore
-    private int hashCode = 0;
 
     public ParquetTableMetadata_v1() {
       super();
@@ -433,22 +481,18 @@ public class Metadata {
     public ParquetTableMetadata_v1(List<ParquetFileMetadata> files, List<String> directories) {
       this.files = files;
       this.directories = directories;
+      this.columnTypeInfo = Sets.newHashSet();
     }
 
-    @Override
-    public int hashCode() {
-      if (hashCode == 0) {
-        int result = 23;
-        for (ParquetFileMetadata file : files) {
-          result = 31 * result + file.hashCode();
+    public ColumnTypeMetadata getColumnTypeInfo(String[] name){
+      for(ColumnTypeMetadata columnTypeMetadata : columnTypeInfo){
+        if(Arrays.equals(columnTypeMetadata.name, name)){
+          return columnTypeMetadata;
         }
-        for (String dir : directories) {
-          result = 31 * result + dir.hashCode();
-        }
-        hashCode = result;
       }
-      return hashCode;
+      return null;
     }
+
   }
 
   /**
@@ -462,9 +506,6 @@ public class Metadata {
     @JsonProperty
     public List<RowGroupMetadata> rowGroups;
 
-    @JsonIgnore
-    private int hashCode = 0;
-
     public ParquetFileMetadata() {
       super();
     }
@@ -475,19 +516,6 @@ public class Metadata {
       this.rowGroups = rowGroups;
     }
 
-    @Override
-    public int hashCode() {
-      if (hashCode == 0) {
-        int result = 23;
-        result = 31 * result + path.hashCode();
-        result = 31 * result + length.hashCode();
-        for (RowGroupMetadata rowGroup : rowGroups) {
-          result = 31 * result + rowGroup.hashCode();
-        }
-        hashCode = result;
-      }
-      return hashCode;
-    }
     @Override
     public String toString() {
       return String.format("path: %s rowGroups: %s", path, rowGroups);
@@ -509,9 +537,6 @@ public class Metadata {
     @JsonProperty
     public List<ColumnMetadata> columns;
 
-    @JsonIgnore
-    private int hashCode = 0;
-
     public RowGroupMetadata() {
       super();
     }
@@ -524,56 +549,138 @@ public class Metadata {
       this.hostAffinity = hostAffinity;
       this.columns = columns;
     }
-    @Override
-    public int hashCode() {
+  }
+
+
+  public static class ColumnTypeMetadata {
+    @JsonProperty public String[] name;
+    @JsonProperty public PrimitiveTypeName primitiveType;
+    @JsonProperty public OriginalType originalType;
+
+    @JsonIgnore private int hashCode = 0;
+
+    // Key to find by name only
+    @JsonIgnore private Key key;
+
+    public ColumnTypeMetadata() {
+      super();
+    }
+
+    public ColumnTypeMetadata(String[] name, PrimitiveTypeName primitiveType, OriginalType originalType) {
+      this.name = name;
+      this.primitiveType = primitiveType;
+      this.originalType = originalType;
+      this.key=new Key(name);
+    }
+
+    @Override public int hashCode() {
       if (hashCode == 0) {
-        int result = 23;
-        result = 31 * result + start.hashCode();
-        result = 31 * result + length.hashCode();
-        result = 31 * result + rowCount.hashCode();
-        result = 31 * result + hostAffinity.hashCode();
-        for (ColumnMetadata column : columns) {
-          result = 31 * result + column.hashCode();
-        }
-        hashCode = result;
+        hashCode = Objects.hashCode(name, primitiveType, originalType);
+        hashCode = Objects.hashCode(name);
       }
       return hashCode;
     }
+
+    @Override public boolean equals(Object obj) {
+      if (obj == null) {
+        return false;
+      }
+      if (getClass() != obj.getClass()) {
+        return false;
+      }
+      final ColumnTypeMetadata other = (ColumnTypeMetadata) obj;
+      return Objects.equal(this.name, other.name) && Objects.equal(this.primitiveType, other.primitiveType)
+          && Objects.equal(this.primitiveType, other.primitiveType);
+    }
+
+    @JsonIgnore private Key key(){
+      return this.key;
+    }
+
+    private static class Key{
+      private String[] name;
+      private int hashCode=0;
+
+      public Key(String[] name){
+
+        this.name = name;
+      }
+      @Override public int hashCode() {
+        if (hashCode == 0) {
+          hashCode = Objects.hashCode(name);
+        }
+        return hashCode;
+      }
+
+      @Override public boolean equals(Object obj) {
+        if (obj == null) {
+          return false;
+        }
+        if (getClass() != obj.getClass()) {
+          return false;
+        }
+        final Key other = (Key) obj;
+        return Objects.equal(this.name, other.name);
+      }
+
+      @Override public String toString(){
+        String s = null;
+        for(String namePart: name){
+         if(s!=null){
+           s+=".";
+         }
+          s+=namePart;
+        }
+        return s;
+      }
+
+      public static class DeSerializer extends JsonDeserializer<Key> {
+
+        public DeSerializer() {
+          super();
+        }
+
+        @Override
+        public Key deserialize(JsonParser jp, com.fasterxml.jackson.databind.DeserializationContext ctxt)
+            throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
+          String s = jp.getText();
+          return new Key(s.split("."));
+        }
+      }
+    }
   }
+
 
   /**
    * A struct that contains the metadata for a column in a parquet file
    */
   public static class ColumnMetadata {
-    @JsonProperty
-    public String[] name;
-    @JsonProperty
-    public PrimitiveTypeName primitiveType;
-    @JsonProperty
-    public OriginalType originalType;
-    @JsonProperty
-    public Long nulls;
+    @JsonProperty public String[] name;
+    @JsonProperty public Long nulls;
 
     // JsonProperty for these are associated with the getters and setters
     public Object max;
     public Object min;
 
-    @JsonIgnore
-    private int hashCode = 0;
+    @JsonIgnore private int hashCode = 0;
+
+    //@JsonIgnore private ColumnTypeMetadata columnTypeMetadata;
 
     public ColumnMetadata() {
       super();
     }
 
-    public ColumnMetadata(String[] name, PrimitiveTypeName primitiveType, OriginalType originalType,
-                          Object max, Object min, Long nulls) {
+    public ColumnMetadata(/*ColumnTypeMetadata columnTypeMetadata,*/ String[] name, Object max, Object min, Long nulls) {
+      //this.columnTypeMetadata = columnTypeMetadata;
       this.name = name;
-      this.primitiveType = primitiveType;
-      this.originalType = originalType;
       this.max = max;
       this.min = min;
       this.nulls = nulls;
     }
+
+    //@JsonIgnore public ColumnTypeMetadata typeInfo() {
+    //  return this.columnTypeMetadata;
+    //}
     @JsonProperty(value = "min")
     public Object getMin() {
       if (primitiveType == PrimitiveTypeName.BINARY && min != null) {
@@ -608,20 +715,6 @@ public class Metadata {
       this.max = max;
     }
 
-    @Override
-    public int hashCode() {
-      if (hashCode == 0) {
-        int result = 23;
-        result = 31 * result + Arrays.hashCode(name);
-        result = 31 * result + primitiveType.hashCode();
-        result = 31 * result + originalType.hashCode();
-        result = 31 * result + max.hashCode();
-        result = 31 * result + min.hashCode();
-        result = 31 * result + nulls.hashCode();
-        hashCode = result;
-      }
-      return hashCode;
-    }
   }
 }
 

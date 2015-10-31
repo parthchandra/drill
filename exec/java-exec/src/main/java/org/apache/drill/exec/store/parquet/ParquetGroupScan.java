@@ -250,10 +250,13 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
       * @return whether column is a potential partition column
       */
   private boolean checkForPartitionColumn(ColumnMetadata columnMetadata, boolean first) {
-    SchemaPath schemaPath = SchemaPath.getCompoundPath( columnMetadata.name);
+    SchemaPath schemaPath = SchemaPath.getCompoundPath(columnMetadata.name);
+    //Metadata.ColumnTypeMetadata columnTypeMetadata = this.parquetTableMetadata.columnTypeInfo.get(columnMetadata.name);
+    Metadata.ColumnTypeMetadata columnTypeMetadata = this.parquetTableMetadata.getColumnTypeInfo(columnMetadata.name);
     if (first) {
       if (hasSingleValue(columnMetadata)) {
-        columnTypeMap.put(schemaPath, getType(columnMetadata.primitiveType, columnMetadata.originalType));
+        columnTypeMap.put(schemaPath, getType(columnTypeMetadata.primitiveType,
+            columnTypeMetadata.originalType));
         return true;
       } else {
         return false;
@@ -266,7 +269,8 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
           columnTypeMap.remove(schemaPath);
           return false;
         }
-        if (!getType(columnMetadata.primitiveType, columnMetadata.originalType).equals(columnTypeMap.get(schemaPath))) {
+        if (!getType(columnTypeMetadata.primitiveType,
+            columnTypeMetadata.originalType).equals(columnTypeMap.get(schemaPath))) {
           columnTypeMap.remove(schemaPath);
           return false;
         }
