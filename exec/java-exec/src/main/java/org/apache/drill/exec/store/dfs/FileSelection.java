@@ -41,8 +41,7 @@ import com.google.common.collect.Lists;
 public class FileSelection {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(FileSelection.class);
 
-  @JsonIgnore
-  private List<FileStatus> statuses;
+  public List<FileStatus> statuses;
 
   public List<String> files;
   public String selectionRoot;
@@ -72,6 +71,14 @@ public class FileSelection {
     this.files = files;
     this.selectionRoot = selectionRoot;
     this.parquetMeta = meta;
+  }
+
+  public FileSelection(List<String> files, String selectionRoot,
+                       ParquetTableMetadata_v1 meta, List<FileStatus> statuses) {
+    this.files = files;
+    this.selectionRoot = selectionRoot;
+    this.parquetMeta = meta;
+    this.statuses = statuses;
   }
 
   public FileSelection(List<FileStatus> statuses, String selectionRoot) {
