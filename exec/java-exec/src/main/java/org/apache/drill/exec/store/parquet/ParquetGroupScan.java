@@ -329,9 +329,10 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   }
 
   private boolean hasSingleValue(ColumnMetadata columnChunkMetaData) {
-    Object max = columnChunkMetaData.max;
-    Object min = columnChunkMetaData.min;
-    return max != null && max.equals(min);
+    //Object max = columnChunkMetaData.max;
+    //Object min = columnChunkMetaData.min;
+    //return max != null && max.equals(min);
+    return (columnChunkMetaData != null) && (columnChunkMetaData.mxValue != null);
 /*
     if (max != null && min != null) {
       if (max instanceof byte[] && min instanceof byte[]) {
@@ -636,7 +637,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
               partitionValueMap.put(file.path, map);
             }
             Object value = map.get(schemaPath);
-            Object currentValue = column.max;
+            Object currentValue = column.mxValue;
 //            Object currentValue = column.getMax();
             if (value != null) {
               if (value != currentValue) {
