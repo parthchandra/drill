@@ -663,7 +663,8 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
         newFileMetadataList.add(file);
       }
     }
-    return new ParquetTableMetadata_v1(newFileMetadataList, new ArrayList<String>());
+    return new ParquetTableMetadata_v1(parquetTableMetadata.columnTypeInfo, newFileMetadataList,
+        new ArrayList<String>());
   }
 
   /**

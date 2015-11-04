@@ -321,7 +321,7 @@ public class Metadata {
         parquetTableMetadata.columnTypeInfo.put(new ColumnTypeMetadata.Key(columnTypeMetadata.name),
             columnTypeMetadata);
         if (statsAvailable) {
-          Object mxValue = stats.genericGetMax() == stats.genericGetMin()?stats.genericGetMax():null;
+          Object mxValue = stats.genericGetMax().equals(stats.genericGetMin())?stats.genericGetMax():null;
           columnMetadata = new ColumnMetadata(columnTypeMetadata.name, col.getType(), mxValue, stats.getNumNulls());
         } else {
           columnMetadata = new ColumnMetadata(columnTypeMetadata.name, col.getType(), null, null);
@@ -487,10 +487,11 @@ public class Metadata {
       super();
     }
 
-    public ParquetTableMetadata_v1(List<ParquetFileMetadata> files, List<String> directories) {
+    public ParquetTableMetadata_v1(LinkedHashMap<ColumnTypeMetadata.Key, ColumnTypeMetadata> columnTypeInfo,
+        List<ParquetFileMetadata> files, List<String> directories) {
       this.files = files;
       this.directories = directories;
-      this.columnTypeInfo = Maps.newLinkedHashMap();
+      this.columnTypeInfo = columnTypeInfo;
     }
 
     public ColumnTypeMetadata getColumnTypeInfo(String[] name){
