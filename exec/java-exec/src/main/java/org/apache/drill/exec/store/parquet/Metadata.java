@@ -328,7 +328,10 @@ public class Metadata {
         parquetTableMetadata.columnTypeInfo.put(new ColumnTypeMetadata.Key(columnTypeMetadata.name),
             columnTypeMetadata);
         if (statsAvailable) {
-          Object mxValue = stats.genericGetMax().equals(stats.genericGetMin())?stats.genericGetMax():null;
+          Object mxValue = null;
+          if(stats.genericGetMax()!=null && stats.genericGetMin() != null && stats.genericGetMax().equals(stats.genericGetMin())){
+            mxValue=stats.genericGetMax();
+          }
           columnMetadata = new ColumnMetadata(columnTypeMetadata.name, col.getType(), mxValue, stats.getNumNulls());
         } else {
           columnMetadata = new ColumnMetadata(columnTypeMetadata.name, col.getType(), null, null);
