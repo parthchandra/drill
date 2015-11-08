@@ -17,6 +17,8 @@
  */
 package org.apache.drill.jdbc.impl;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -56,17 +58,13 @@ import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.record.RecordBatchLoader;
-import org.apache.drill.exec.rpc.user.ConnectionThrottle;
+import org.apache.drill.exec.rpc.ConnectionThrottle;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 import org.apache.drill.jdbc.AlreadyClosedSqlException;
-import org.apache.drill.jdbc.DrillConnection;
 import org.apache.drill.jdbc.DrillResultSet;
 import org.apache.drill.jdbc.ExecutionCanceledSqlException;
 import org.apache.drill.jdbc.SchemaChangeListener;
-
-import static org.slf4j.LoggerFactory.getLogger;
-
 import org.slf4j.Logger;
 
 import com.google.common.collect.Queues;
@@ -398,15 +396,15 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   @Override
   public void clearWarnings() throws SQLException {
     throwIfClosed();
-    super.clearWarnings();
+      super.clearWarnings();
   }
 
   @Override
   public String getCursorName() throws SQLException {
     throwIfClosed();
     try {
-      return super.getCursorName();
-    }
+    return super.getCursorName();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -491,8 +489,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public boolean isLast() throws SQLException {
     throwIfClosed();
     try {
-      return super.isLast();
-    }
+    return super.isLast();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -502,8 +500,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void beforeFirst() throws SQLException {
     throwIfClosed();
     try {
-      super.beforeFirst();
-    }
+    super.beforeFirst();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -513,8 +511,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void afterLast() throws SQLException {
     throwIfClosed();
     try {
-      super.afterLast();
-    }
+    super.afterLast();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -524,8 +522,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public boolean first() throws SQLException {
     throwIfClosed();
     try {
-      return super.first();
-    }
+    return super.first();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -535,8 +533,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public boolean last() throws SQLException {
     throwIfClosed();
     try {
-      return super.last();
-    }
+    return super.last();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -554,8 +552,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public boolean absolute( int row ) throws SQLException {
     throwIfClosed();
     try {
-      return super.absolute( row );
-    }
+    return super.absolute( row );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -565,8 +563,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public boolean relative( int rows ) throws SQLException {
     throwIfClosed();
     try {
-      return super.relative( rows );
-    }
+    return super.relative( rows );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -576,8 +574,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public boolean previous() throws SQLException {
     throwIfClosed();
     try {
-      return super.previous();
-    }
+    return super.previous();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -648,8 +646,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNull( int columnIndex ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNull( columnIndex );
-    }
+    super.updateNull( columnIndex );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -659,8 +657,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateBoolean( int columnIndex, boolean x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBoolean( columnIndex, x );
-    }
+    super.updateBoolean( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -670,8 +668,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateByte( int columnIndex, byte x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateByte( columnIndex, x );
-    }
+    super.updateByte( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -681,8 +679,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateShort( int columnIndex, short x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateShort( columnIndex, x );
-    }
+    super.updateShort( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -692,8 +690,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateInt( int columnIndex, int x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateInt( columnIndex, x );
-    }
+    super.updateInt( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -703,8 +701,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateLong( int columnIndex, long x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateLong( columnIndex, x );
-    }
+    super.updateLong( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -714,8 +712,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateFloat( int columnIndex, float x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateFloat( columnIndex, x );
-    }
+    super.updateFloat( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -725,8 +723,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateDouble( int columnIndex, double x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateDouble( columnIndex, x );
-    }
+    super.updateDouble( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -737,8 +735,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                 BigDecimal x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBigDecimal( columnIndex, x );
-    }
+    super.updateBigDecimal( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -748,8 +746,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateString( int columnIndex, String x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateString( columnIndex, x );
-    }
+    super.updateString( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -759,8 +757,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateBytes( int columnIndex, byte[] x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBytes( columnIndex, x );
-    }
+    super.updateBytes( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -770,8 +768,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateDate( int columnIndex, Date x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateDate( columnIndex, x );
-    }
+    super.updateDate( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -781,8 +779,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateTime( int columnIndex, Time x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateTime( columnIndex, x );
-    }
+    super.updateTime( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -792,8 +790,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateTimestamp( int columnIndex, Timestamp x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateTimestamp( columnIndex, x );
-    }
+    super.updateTimestamp( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -804,8 +802,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                  int length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateAsciiStream( columnIndex, x, length );
-    }
+    super.updateAsciiStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -816,8 +814,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                   int length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBinaryStream( columnIndex, x, length );
-    }
+    super.updateBinaryStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -828,8 +826,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                      int length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateCharacterStream( columnIndex, x, length );
-    }
+    super.updateCharacterStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -840,8 +838,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                             int scaleOrLength ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateObject( columnIndex, x, scaleOrLength );
-    }
+    super.updateObject( columnIndex, x, scaleOrLength );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -851,8 +849,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateObject( int columnIndex, Object x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateObject( columnIndex, x );
-    }
+    super.updateObject( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -862,8 +860,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNull( String columnLabel ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNull( columnLabel );
-    }
+    super.updateNull( columnLabel );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -873,8 +871,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateBoolean( String columnLabel, boolean x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBoolean( columnLabel, x );
-    }
+    super.updateBoolean( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -884,8 +882,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateByte( String columnLabel, byte x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateByte( columnLabel, x );
-    }
+    super.updateByte( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -895,8 +893,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateShort( String columnLabel, short x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateShort( columnLabel, x );
-    }
+    super.updateShort( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -906,8 +904,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateInt( String columnLabel, int x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateInt( columnLabel, x );
-    }
+    super.updateInt( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -917,8 +915,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateLong( String columnLabel, long x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateLong( columnLabel, x );
-    }
+    super.updateLong( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -928,8 +926,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateFloat( String columnLabel, float x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateFloat( columnLabel, x );
-    }
+    super.updateFloat( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -939,8 +937,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateDouble( String columnLabel, double x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateDouble( columnLabel, x );
-    }
+    super.updateDouble( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -951,8 +949,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                 BigDecimal x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBigDecimal( columnLabel, x );
-    }
+    super.updateBigDecimal( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -962,8 +960,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateString( String columnLabel, String x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateString( columnLabel, x );
-    }
+    super.updateString( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -973,8 +971,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateBytes( String columnLabel, byte[] x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBytes( columnLabel, x );
-    }
+    super.updateBytes( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -984,8 +982,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateDate( String columnLabel, Date x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateDate( columnLabel, x );
-    }
+    super.updateDate( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -995,8 +993,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateTime( String columnLabel, Time x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateTime( columnLabel, x );
-    }
+    super.updateTime( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1006,8 +1004,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateTimestamp( String columnLabel, Timestamp x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateTimestamp( columnLabel, x );
-    }
+    super.updateTimestamp( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1018,8 +1016,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                  int length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateAsciiStream( columnLabel, x, length );
-    }
+    super.updateAsciiStream( columnLabel, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1030,8 +1028,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                   int length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBinaryStream( columnLabel, x, length );
-    }
+    super.updateBinaryStream( columnLabel, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1042,8 +1040,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                      int length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateCharacterStream( columnLabel, reader, length );
-    }
+    super.updateCharacterStream( columnLabel, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1054,8 +1052,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                             int scaleOrLength ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateObject( columnLabel, x, scaleOrLength );
-    }
+    super.updateObject( columnLabel, x, scaleOrLength );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1065,8 +1063,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateObject( String columnLabel, Object x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateObject( columnLabel, x );
-    }
+    super.updateObject( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1076,8 +1074,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void insertRow() throws SQLException {
     throwIfClosed();
     try {
-      super.insertRow();
-    }
+    super.insertRow();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1087,8 +1085,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateRow() throws SQLException {
     throwIfClosed();
     try {
-      super.updateRow();
-    }
+    super.updateRow();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1098,8 +1096,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void deleteRow() throws SQLException {
     throwIfClosed();
     try {
-      super.deleteRow();
-    }
+    super.deleteRow();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1109,8 +1107,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void refreshRow() throws SQLException {
     throwIfClosed();
     try {
-      super.refreshRow();
-    }
+    super.refreshRow();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1120,8 +1118,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void cancelRowUpdates() throws SQLException {
     throwIfClosed();
     try {
-      super.cancelRowUpdates();
-    }
+    super.cancelRowUpdates();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1131,8 +1129,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void moveToInsertRow() throws SQLException {
     throwIfClosed();
     try {
-      super.moveToInsertRow();
-    }
+    super.moveToInsertRow();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1142,8 +1140,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void moveToCurrentRow() throws SQLException {
     throwIfClosed();
     try {
-      super.moveToCurrentRow();
-    }
+    super.moveToCurrentRow();
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1280,8 +1278,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateRef( int columnIndex, Ref x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateRef( columnIndex, x );
-    }
+    super.updateRef( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1291,8 +1289,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateRef( String columnLabel, Ref x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateRef( columnLabel, x );
-    }
+    super.updateRef( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1302,8 +1300,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateBlob( int columnIndex, Blob x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBlob( columnIndex, x );
-    }
+    super.updateBlob( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1313,8 +1311,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateBlob( String columnLabel, Blob x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBlob( columnLabel, x );
-    }
+    super.updateBlob( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1324,8 +1322,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateClob( int columnIndex, Clob x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateClob( columnIndex, x );
-    }
+    super.updateClob( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1335,8 +1333,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateClob( String columnLabel, Clob x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateClob( columnLabel, x );
-    }
+    super.updateClob( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1346,8 +1344,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateArray( int columnIndex, Array x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateArray( columnIndex, x );
-    }
+    super.updateArray( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1357,8 +1355,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateArray( String columnLabel, Array x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateArray( columnLabel, x );
-    }
+    super.updateArray( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1369,8 +1367,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public RowId getRowId( int columnIndex ) throws SQLException {
     throwIfClosed();
     try {
-      return super.getRowId( columnIndex );
-    }
+    return super.getRowId( columnIndex );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1380,8 +1378,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public RowId getRowId( String columnLabel ) throws SQLException {
     throwIfClosed();
     try {
-      return super.getRowId( columnLabel );
-    }
+    return super.getRowId( columnLabel );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1391,8 +1389,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateRowId( int columnIndex, RowId x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateRowId( columnIndex, x );
-    }
+    super.updateRowId( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1402,8 +1400,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateRowId( String columnLabel, RowId x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateRowId( columnLabel, x );
-    }
+    super.updateRowId( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1425,8 +1423,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNString( int columnIndex, String nString ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNString( columnIndex, nString );
-    }
+    super.updateNString( columnIndex, nString );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1437,8 +1435,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                              String nString ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNString( columnLabel, nString );
-    }
+    super.updateNString( columnLabel, nString );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1448,8 +1446,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNClob( int columnIndex, NClob nClob ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNClob( columnIndex, nClob );
-    }
+    super.updateNClob( columnIndex, nClob );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1459,8 +1457,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNClob( String columnLabel, NClob nClob ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNClob( columnLabel, nClob );
-    }
+    super.updateNClob( columnLabel, nClob );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1495,8 +1493,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                             SQLXML xmlObject ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateSQLXML( columnIndex, xmlObject );
-    }
+    super.updateSQLXML( columnIndex, xmlObject );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1507,8 +1505,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                             SQLXML xmlObject ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateSQLXML( columnLabel, xmlObject );
-    }
+    super.updateSQLXML( columnLabel, xmlObject );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1543,8 +1541,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                       long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNCharacterStream( columnIndex, x, length );
-    }
+    super.updateNCharacterStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1555,8 +1553,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                       long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNCharacterStream( columnLabel, reader, length );
-    }
+    super.updateNCharacterStream( columnLabel, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1567,8 +1565,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                  long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateAsciiStream( columnIndex, x, length );
-    }
+    super.updateAsciiStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1579,8 +1577,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                   long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBinaryStream( columnIndex, x, length );
-    }
+    super.updateBinaryStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1591,8 +1589,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                      long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateCharacterStream( columnIndex, x, length );
-    }
+    super.updateCharacterStream( columnIndex, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1603,8 +1601,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                  long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateAsciiStream( columnLabel, x, length );
-    }
+    super.updateAsciiStream( columnLabel, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1615,8 +1613,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                   long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBinaryStream( columnLabel, x, length );
-    }
+    super.updateBinaryStream( columnLabel, x, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1627,8 +1625,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                      long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateCharacterStream( columnLabel, reader, length );
-    }
+    super.updateCharacterStream( columnLabel, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1639,8 +1637,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                           long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBlob( columnIndex, inputStream, length );
-    }
+    super.updateBlob( columnIndex, inputStream, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1651,8 +1649,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                           long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBlob( columnLabel, inputStream, length );
-    }
+    super.updateBlob( columnLabel, inputStream, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1663,8 +1661,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                           long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateClob( columnIndex, reader, length );
-    }
+    super.updateClob( columnIndex, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1675,8 +1673,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                           long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateClob( columnLabel, reader, length );
-    }
+    super.updateClob( columnLabel, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1687,8 +1685,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                            long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNClob( columnIndex, reader, length );
-    }
+    super.updateNClob( columnIndex, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1699,8 +1697,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                            long length ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNClob( columnLabel, reader, length );
-    }
+    super.updateNClob( columnLabel, reader, length );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1712,8 +1710,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                       Reader x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNCharacterStream( columnIndex, x );
-    }
+    super.updateNCharacterStream( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1724,8 +1722,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                       Reader reader ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNCharacterStream( columnLabel, reader );
-    }
+    super.updateNCharacterStream( columnLabel, reader );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1736,8 +1734,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                  InputStream x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateAsciiStream( columnIndex, x );
-    }
+    super.updateAsciiStream( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1748,8 +1746,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                   InputStream x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBinaryStream( columnIndex, x );
-    }
+    super.updateBinaryStream( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1760,8 +1758,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                      Reader x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateCharacterStream( columnIndex, x );
-    }
+    super.updateCharacterStream( columnIndex, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1772,8 +1770,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                  InputStream x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateAsciiStream( columnLabel, x );
-    }
+    super.updateAsciiStream( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1784,8 +1782,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                   InputStream x ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBinaryStream( columnLabel, x );
-    }
+    super.updateBinaryStream( columnLabel, x );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1796,8 +1794,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                                      Reader reader ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateCharacterStream( columnLabel, reader );
-    }
+    super.updateCharacterStream( columnLabel, reader );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1808,8 +1806,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                           InputStream inputStream ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBlob( columnIndex, inputStream );
-    }
+    super.updateBlob( columnIndex, inputStream );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1820,8 +1818,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
                           InputStream inputStream ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateBlob( columnLabel, inputStream );
-    }
+    super.updateBlob( columnLabel, inputStream );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1831,8 +1829,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateClob( int columnIndex,  Reader reader ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateClob( columnIndex, reader );
-    }
+    super.updateClob( columnIndex, reader );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1842,8 +1840,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateClob( String columnLabel,  Reader reader ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateClob( columnLabel, reader );
-    }
+    super.updateClob( columnLabel, reader );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1853,8 +1851,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNClob( int columnIndex,  Reader reader ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNClob( columnIndex, reader );
-    }
+    super.updateNClob( columnIndex, reader );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
@@ -1864,8 +1862,8 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
   public void updateNClob( String columnLabel,  Reader reader ) throws SQLException {
     throwIfClosed();
     try {
-      super.updateNClob( columnLabel, reader );
-    }
+    super.updateNClob( columnLabel, reader );
+  }
     catch (UnsupportedOperationException e) {
       throw new SQLFeatureNotSupportedException(e.getMessage(), e);
     }
