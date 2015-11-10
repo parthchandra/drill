@@ -162,6 +162,8 @@ public class FragmentExecutor implements Runnable {
         }
       }
     } else {
+      // if we don't countDown this latch here, it will never be done.
+      acceptExternalEvents.countDown();
       updateState(FragmentState.CANCELLATION_REQUESTED);
       cleanup(FragmentState.FINISHED);
     }
