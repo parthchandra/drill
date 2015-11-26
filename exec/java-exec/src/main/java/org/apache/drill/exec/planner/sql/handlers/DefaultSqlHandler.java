@@ -204,15 +204,6 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
    * @throws RelConversionException
    */
   protected DrillRel convertToDrel(RelNode relNode) throws SqlUnsupportedException, RelConversionException {
-    // If the query contains a limit 0 clause, disable distributed mode since it is overkill for determining schema
-    // And if the schema is known, return the schema directly
-    if (FindLimit0Visitor.containsLimit0(relNode)) {
-      context.getPlannerSettings().forceSingleMode();
-      final DrillRel valuesRel = FindLimit0Visitor.getValuesRelIfFullySchemaed(relNode);
-      if (valuesRel != null) {
-        return valuesRel;
-      }
-    }
     try {
       final DrillRel convertedRelNode;
 
@@ -227,6 +218,13 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
       if (convertedRelNode instanceof DrillStoreRel) {
         throw new UnsupportedOperationException();
       } else {
+
+        // If the query contains a limit 0 clause, disable distributed mode since it is overkill for determining schema.
+        if (FindLimit0Visitor.containsLimit0(convertedRelNode)) {
+          context.getPlannerSettings().forceSingleMode();
+          return FindLimit0Visitor.addLimitOnTopOfLeafNodes(convertedRelNode);
+        }
+
         return convertedRelNode;
       }
     } catch (RelOptPlanner.CannotPlanException ex) {

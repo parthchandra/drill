@@ -58,7 +58,6 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.util.NlsString;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.planner.sql.handlers.FindLimit0Visitor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -71,9 +70,6 @@ public class DrillConstExecutor implements RelOptPlanner.Executor {
 
   private final PlannerSettings plannerSettings;
 
-  /**
-   * NOTE: Ensure changes are reflected in {@link FindLimit0Visitor#TYPES}.
-   */
   public static ImmutableMap<TypeProtos.MinorType, SqlTypeName> DRILL_TO_CALCITE_TYPE_MAPPING =
       ImmutableMap.<TypeProtos.MinorType, SqlTypeName> builder()
       .put(TypeProtos.MinorType.INT, SqlTypeName.INTEGER)
