@@ -204,10 +204,22 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
    * @throws RelConversionException
    */
   protected DrillRel convertToDrel(RelNode relNode) throws SqlUnsupportedException, RelConversionException {
+    // If the query contains a limit 0 clause, disable distributed mode since it is overkill for determining schema
+    // And if the schema is known, return the schema directly
+    boolean containsLimit0 = false;
+    if (FindLimit0Visitor.containsLimit0(relNode)) {
+      containsLimit0 = true;
+      context.getPlannerSettings().forceSingleMode();
+      final DrillRel shortPath = FindLimit0Visitor.getDirectScanRelIfFullySchemaed(relNode);
+      if (shortPath != null) {
+        return shortPath;
+      }
+    }
+
     try {
       final DrillRel convertedRelNode;
 
-      final boolean limitZero = context.getPlannerSettings().isLimitZeroOptEnabled() && FindLimit0Visitor.containsLimit0(relNode);
+      final boolean limitZero = context.getPlannerSettings().isLimitZeroOptEnabled() && containsLimit0;
 
       if (! context.getPlannerSettings().isHepJoinOptEnabled()) {
         convertedRelNode = (DrillRel) logicalPlanningVolcano(relNode, limitZero);
@@ -218,10 +230,8 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
       if (convertedRelNode instanceof DrillStoreRel) {
         throw new UnsupportedOperationException();
       } else {
-
-        // If the query contains a limit 0 clause, disable distributed mode since it is overkill for determining schema.
-        if (FindLimit0Visitor.containsLimit0(convertedRelNode)) {
-          context.getPlannerSettings().forceSingleMode();
+        // If the query contains a limit 0 clause, add limit(0) on top of leaf nodes
+        if (containsLimit0) {
           return FindLimit0Visitor.addLimitOnTopOfLeafNodes(convertedRelNode);
         }
 

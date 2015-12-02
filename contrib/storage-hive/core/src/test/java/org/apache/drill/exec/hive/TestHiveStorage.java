@@ -18,6 +18,12 @@
 package org.apache.drill.exec.hive;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import org.apache.drill.PlanTestBase;
+import org.apache.drill.TestBuilder;
+import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.types.TypeProtos;
+import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.hadoop.fs.FileSystem;
@@ -29,6 +35,7 @@ import org.junit.Test;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
+import java.util.Map;
 
 import static org.junit.Assert.assertFalse;
 
@@ -56,6 +63,31 @@ public class TestHiveStorage extends HiveTestBase {
   @Test
   public void hiveReadWithDb() throws Exception {
     test("select * from hive.kv");
+  }
+
+  @Test
+  public void hiveReadLimitZero() throws Exception {
+    final Map<SchemaPath, TypeProtos.MajorType> types = Maps.newHashMap();
+    types.put(TestBuilder.parsePath("key"), Types.optional(TypeProtos.MinorType.INT));
+    types.put(TestBuilder.parsePath("value"), Types.optional(TypeProtos.MinorType.VARCHAR));
+    testBuilder()
+        .sqlQuery("SELECT * FROM hive.kv LIMIT 0")
+        .expectsEmptyResultSet()
+        .baselineColumns("key", "value")
+        .baselineTypes(types)
+        .go();
+  }
+
+  @Test
+  public void hiveReadLimitZeroPlan() throws Exception {
+    PlanTestBase.testPlanMatchingPatterns("SELECT * from hive.kv LIMIT 0",
+        new String[]{
+            ".*Project.*\n" +
+                ".*Scan.*RelDataTypeReader.*"
+        },
+        new String[] {
+            ".*Limit.fetch.*"
+        });
   }
 
   @Test
@@ -351,6 +383,61 @@ public class TestHiveStorage extends HiveTestBase {
     } finally {
         test(String.format("alter session set `%s` = false", ExecConstants.HIVE_OPTIMIZE_SCAN_WITH_NATIVE_READERS));
     }
+  }
+
+  @Test
+  public void limitZeroVariousTypes() throws Exception {
+    // SCHEMA: BatchSchema [fields=[`binary_field`(VARBINARY:OPTIONAL), `boolean_field`(BIT:OPTIONAL),
+    // `tinyint_field`(INT:OPTIONAL), `decimal0_field`(DECIMAL18:OPTIONAL), `decimal9_field`(DECIMAL9:OPTIONAL),
+    // `decimal18_field`(DECIMAL18:OPTIONAL), `decimal28_field`(DECIMAL28SPARSE:OPTIONAL),
+    // `decimal38_field`(DECIMAL38SPARSE:OPTIONAL), `double_field`(FLOAT8:OPTIONAL),
+    // `float_field`(FLOAT4:OPTIONAL), `int_field`(INT:OPTIONAL), `bigint_field`(BIGINT:OPTIONAL),
+    // `smallint_field`(INT:OPTIONAL), `string_field`(VARCHAR:OPTIONAL), `varchar_field`(VARCHAR:OPTIONAL),
+    // `timestamp_field`(TIMESTAMP:OPTIONAL), `date_field`(DATE:OPTIONAL), `boolean_part`(BIT:OPTIONAL),
+    // `tinyint_part`(INT:OPTIONAL), `decimal0_part`(DECIMAL18:OPTIONAL), `decimal9_part`(DECIMAL9:OPTIONAL),
+    // `decimal18_part`(DECIMAL18:OPTIONAL), `decimal28_part`(DECIMAL28SPARSE:OPTIONAL),
+    // `decimal38_part`(DECIMAL38SPARSE:OPTIONAL), `double_part`(FLOAT8:OPTIONAL),
+    // `float_part`(FLOAT4:OPTIONAL), `int_part`(INT:OPTIONAL), `bigint_part`(BIGINT:OPTIONAL),
+    // `smallint_part`(INT:OPTIONAL), `string_part`(VARCHAR:OPTIONAL), `varchar_part`(VARCHAR:OPTIONAL),
+    // `timestamp_part`(TIMESTAMP:OPTIONAL), `date_part`(DATE:OPTIONAL)], selectionVector=NONE]
+    testBuilder().sqlQuery("SELECT * FROM (SELECT boolean_field, double_field, float_field, int_field, " +
+        "bigint_field, string_field, varchar_field, timestamp_field, date_field, " +
+        "boolean_part, double_part, float_part, int_part, bigint_part, string_part, varchar_part, timestamp_part, " +
+        "date_part FROM hive.readtest) T LIMIT 0")
+        .baselineColumns(
+            "boolean_field",
+            "double_field",
+            "float_field",
+            "int_field",
+            "bigint_field",
+            "string_field",
+            "varchar_field",
+            "timestamp_field",
+            "date_field",
+            "boolean_part",
+            "double_part",
+            "float_part",
+            "int_part",
+            "bigint_part",
+            "string_part",
+            "varchar_part",
+            "timestamp_part",
+            "date_part")
+        .expectsEmptyResultSet()
+        .go();
+  }
+
+  @Test
+  public void limitZeroVariousTypesPlan() throws Exception {
+    PlanTestBase.testPlanMatchingPatterns("SELECT * FROM (SELECT boolean_field, double_field, float_field, int_field, " +
+            "bigint_field, string_field, varchar_field, timestamp_field, date_field, " +
+            "boolean_part, double_part, float_part, int_part, bigint_part, string_part, varchar_part, timestamp_part, " +
+            "date_part FROM hive.readtest) T LIMIT 0",
+        new String[] {
+            ".*Project.*\n" +
+                ".*Scan.*RelDataTypeReader.*"
+        },
+        new String[] {});
   }
 
   @Test

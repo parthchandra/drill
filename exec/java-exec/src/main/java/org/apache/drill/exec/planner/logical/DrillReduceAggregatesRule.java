@@ -43,12 +43,9 @@ import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.sql.fun.SqlAvgAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.fun.SqlSumAggFunction;
-import org.apache.calcite.sql.fun.SqlSumEmptyIsZeroAggFunction;
-import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.util.CompositeList;
 import org.apache.calcite.util.ImmutableIntList;
 import org.apache.calcite.util.Util;
@@ -283,29 +280,26 @@ public class DrillReduceAggregatesRule extends RelOptRule {
         getFieldType(
             oldAggRel.getInput(),
             iAvgInput);
-    RelDataType sumType =
-        typeFactory.createTypeWithNullability(
-            avgInputType,
-            avgInputType.isNullable() || nGroups == 0);
-    // SqlAggFunction sumAgg = new SqlSumAggFunction(sumType);
-    SqlAggFunction sumAgg = new SqlSumEmptyIsZeroAggFunction();
     AggregateCall sumCall =
-        new AggregateCall(
-            sumAgg,
+        AggregateCall.create(
+            SqlStdOperatorTable.SUM0,
             oldCall.isDistinct(),
             oldCall.getArgList(),
-            sumType,
+            oldCall.filterArg,
+            oldAggRel.getGroupCount(),
+            oldAggRel.getInput(),
+            null,
             null);
-    final SqlCountAggFunction countAgg = (SqlCountAggFunction) SqlStdOperatorTable.COUNT;
-    final RelDataType countType = countAgg.getReturnType(typeFactory);
     AggregateCall countCall =
-        new AggregateCall(
-            countAgg,
-            oldCall.isDistinct(),
-            oldCall.getArgList(),
-            countType,
-            null);
-
+    AggregateCall.create(
+        SqlStdOperatorTable.COUNT,
+        oldCall.isDistinct(),
+        oldCall.getArgList(),
+        oldCall.filterArg,
+        oldAggRel.getGroupCount(),
+        oldAggRel.getInput(),
+        null,
+        null);
     RexNode tmpsumRef =
         rexBuilder.addAggCall(
             sumCall,
@@ -368,33 +362,25 @@ public class DrillReduceAggregatesRule extends RelOptRule {
       List<AggregateCall> newCalls,
       Map<AggregateCall, RexNode> aggCallMapping) {
     final int nGroups = oldAggRel.getGroupCount();
-    RelDataTypeFactory typeFactory =
-        oldAggRel.getCluster().getTypeFactory();
     RexBuilder rexBuilder = oldAggRel.getCluster().getRexBuilder();
     int arg = oldCall.getArgList().get(0);
     RelDataType argType =
         getFieldType(
             oldAggRel.getInput(),
             arg);
-    RelDataType sumType =
-        typeFactory.createTypeWithNullability(
-            argType, argType.isNullable());
-    SqlAggFunction sumZeroAgg = new SqlSumEmptyIsZeroAggFunction();
     AggregateCall sumZeroCall =
-        new AggregateCall(
-            sumZeroAgg,
-            oldCall.isDistinct(),
-            oldCall.getArgList(),
-            sumType,
-            null);
-    final SqlCountAggFunction countAgg = (SqlCountAggFunction) SqlStdOperatorTable.COUNT;
-    final RelDataType countType = countAgg.getReturnType(typeFactory);
+        AggregateCall.create(SqlStdOperatorTable.SUM0, oldCall.isDistinct(),
+            oldCall.getArgList(), oldCall.filterArg, oldAggRel.getGroupCount(),
+            oldAggRel.getInput(), null, oldCall.name);
     AggregateCall countCall =
-        new AggregateCall(
-            countAgg,
+        AggregateCall.create(
+            SqlStdOperatorTable.COUNT,
             oldCall.isDistinct(),
             oldCall.getArgList(),
-            countType,
+            oldCall.filterArg,
+            oldAggRel.getGroupCount(),
+            oldAggRel.getInput(),
+            null,
             null);
 
     // NOTE:  these references are with respect to the output
@@ -468,15 +454,14 @@ public class DrillReduceAggregatesRule extends RelOptRule {
             SqlStdOperatorTable.MULTIPLY, argRef, argRef);
     final int argSquaredOrdinal = lookupOrAdd(inputExprs, argSquared);
 
-    final RelDataType sumType =
-        typeFactory.createTypeWithNullability(
-            argType,
-            true);
+    final RelDataType sumType = typeFactory.getTypeSystem().deriveSumType(typeFactory, argType);
+
     final AggregateCall sumArgSquaredAggCall =
-        new AggregateCall(
-            new SqlSumAggFunction(sumType),
+        AggregateCall.create(
+            SqlStdOperatorTable.SUM,
             oldCall.isDistinct(),
             ImmutableIntList.of(argSquaredOrdinal),
+            oldCall.filterArg,
             sumType,
             null);
     final RexNode sumArgSquared =
@@ -489,11 +474,14 @@ public class DrillReduceAggregatesRule extends RelOptRule {
             ImmutableList.of(argType));
 
     final AggregateCall sumArgAggCall =
-        new AggregateCall(
-            new SqlSumAggFunction(sumType),
+        AggregateCall.create(
+            SqlStdOperatorTable.SUM,
             oldCall.isDistinct(),
             ImmutableIntList.of(argOrdinal),
-            sumType,
+            oldCall.filterArg,
+            oldAggRel.getGroupCount(),
+            oldAggRel.getInput(),
+            null,
             null);
     final RexNode sumArg =
           rexBuilder.addAggCall(
