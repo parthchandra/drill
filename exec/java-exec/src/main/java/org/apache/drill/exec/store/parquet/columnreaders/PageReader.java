@@ -223,10 +223,8 @@ final class PageReader {
       timer.start();
       pageHeader = dataReader.readPageHeader();
       long timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
-      this.updateStats(pageHeader, "Page Header Read", start, timeToRead, 0,0);
-      logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}","Page Header Read","",
-          this.parentColumnReader.parentReader.hadoopPath,
-          this.parentColumnReader.columnDescriptor.toString(), start, 0, 0, timeToRead);
+      long bytesRead=inputStream.getPos()-start;
+      this.updateStats(pageHeader, "Page Header Read", start, timeToRead, bytesRead, bytesRead);
       timer.reset();
       if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
         readDictionaryPage(pageHeader, parentColumnReader);
