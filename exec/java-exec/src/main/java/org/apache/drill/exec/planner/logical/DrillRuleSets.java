@@ -20,7 +20,9 @@ package org.apache.drill.exec.planner.logical;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
+import com.google.common.collect.Sets;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.volcano.AbstractConverter.ExpandConversionRule;
 import org.apache.calcite.rel.core.RelFactories;
@@ -137,16 +139,6 @@ public class DrillRuleSets {
       DrillReduceAggregatesRule.INSTANCE,
 
       /*
-       Projection push-down related rules
-       */
-      DrillPushProjectPastFilterRule.INSTANCE,
-      DrillPushProjectPastJoinRule.INSTANCE,
-      DrillPushProjIntoScan.INSTANCE,
-      // Due to infinite loop in planning (DRILL-3257), temporarily disable this rule
-      //DrillProjectSetOpTransposeRule.INSTANCE,
-      ProjectWindowTransposeRule.INSTANCE,
-
-      /*
        Convert from Calcite Logical to Drill Logical Rules.
        */
       ExpandConversionRule.INSTANCE,
@@ -222,6 +214,17 @@ public class DrillRuleSets {
         ).build());
   }
 
+  public static RuleSet getProjectPushDownRules() {
+    return new DrillRuleSet(ImmutableSet.<RelOptRule> builder().add(
+        DrillPushProjectPastFilterRule.INSTANCE,
+        DrillPushProjectPastJoinRule.INSTANCE,
+        DrillPushProjIntoScan.INSTANCE,
+        //  Due to infinite loop in planning (DRILL-3257), temporarily disable this rule
+        //  DrillProjectSetOpTransposeRule.INSTANCE,
+        ProjectWindowTransposeRule.INSTANCE
+    ).build());
+  }
+
   public static final RuleSet DRILL_PHYSICAL_DISK = new DrillRuleSet(ImmutableSet.of(
       ProjectPrule.INSTANCE
     ));
@@ -293,6 +296,18 @@ public class DrillRuleSets {
       }
     }
     return new DrillRuleSet(relOptRuleSetBuilder.build());
+  }
+
+  /**
+   * For rules in srcRuleSet, exclude the rule if it is in fromRuleSet as well.
+   * @param srcRuleSet
+   * @param fromRuleSet
+   * @return
+   */
+  public static RuleSet excludeRuleSetfrom(RuleSet srcRuleSet, RuleSet fromRuleSet){
+    final Set<RelOptRule> src = Sets.newHashSet(srcRuleSet);
+    final Set<RelOptRule> from = Sets.newHashSet(fromRuleSet);
+    return new DrillRuleSet(Sets.difference(src, from).immutableCopy());
   }
 
   private static class DrillRuleSet implements RuleSet{

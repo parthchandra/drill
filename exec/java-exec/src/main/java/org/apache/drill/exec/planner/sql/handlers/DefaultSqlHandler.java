@@ -215,7 +215,10 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     try {
       final DrillRel convertedRelNode;
 
-      convertedRelNode = (DrillRel) doLogicalPlanning(relNode);
+      // Check if this is a "limit 0 " query.
+      final boolean limitZero = FindLimit0Visitor.containsLimit0(relNode);
+
+      convertedRelNode = (DrillRel) doLogicalPlanning(relNode, limitZero);
 
       if (convertedRelNode instanceof DrillStoreRel) {
         throw new UnsupportedOperationException();
@@ -533,14 +536,23 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     }
   }
 
+  /**
+   * conduct logical planning, using different planner or rulesets.
+   * @param relNode
+   * @param limitZero : whether this is a "limit 0" query. Planner will use differnt rule set for "limit 0"; disable project pushdown.
+   * @return
+   * @throws RelConversionException
+   * @throws SqlUnsupportedException
+   */
+  private RelNode doLogicalPlanning(RelNode relNode, boolean limitZero) throws RelConversionException, SqlUnsupportedException {
+    final int rulesetIndexDelta = limitZero ? 3 : 0;
 
-  private RelNode doLogicalPlanning(RelNode relNode) throws RelConversionException, SqlUnsupportedException {
     if (! context.getPlannerSettings().isHepOptEnabled()) {
-      return planner.transform(DrillSqlWorker.LOGICAL_RULES, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
+      return planner.transform(DrillSqlWorker.LOGICAL_RULES + rulesetIndexDelta, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
     } else {
       RelNode convertedRelNode = null;
       if (context.getPlannerSettings().isHepPartitionPruningEnabled()) {
-        convertedRelNode = planner.transform(DrillSqlWorker.LOGICAL_HEP_JOIN__PP_RULES, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
+        convertedRelNode = planner.transform(DrillSqlWorker.LOGICAL_HEP_JOIN__PP_RULES + rulesetIndexDelta, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
         log("VolcanoRel", convertedRelNode, logger);
 
         // Partition pruning .
@@ -550,7 +562,7 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
 
         convertedRelNode = doHepPlan(convertedRelNode, pruneScanRules, HepMatchOrder.BOTTOM_UP);
       } else {
-        convertedRelNode = planner.transform(DrillSqlWorker.LOGICAL_HEP_JOIN_RULES, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
+        convertedRelNode = planner.transform(DrillSqlWorker.LOGICAL_HEP_JOIN_RULES + rulesetIndexDelta, relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL), relNode);
         log("VolcanoRel", convertedRelNode, logger);
       }
 

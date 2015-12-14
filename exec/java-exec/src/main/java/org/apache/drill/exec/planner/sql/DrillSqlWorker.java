@@ -28,6 +28,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.Planner;
 import org.apache.calcite.tools.RelConversionException;
 import org.apache.calcite.tools.RuleSet;
+import org.apache.calcite.tools.RuleSets;
 import org.apache.calcite.tools.ValidationException;
 
 import org.apache.drill.common.exceptions.UserException;
@@ -118,22 +119,27 @@ public class DrillSqlWorker {
   private RuleSet[] getRules(QueryContext context) {
     StoragePluginRegistry storagePluginRegistry = context.getStorage();
 
+    final RuleSet projectPushRules = DrillRuleSets.getProjectPushDownRules();
+
     // Ruleset for the case where VolcanoPlanner is used for everything : join, filter/project pushdown, partition pruning.
     RuleSet drillLogicalVolOnlyRules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
         DrillRuleSets.getPruneScanRules(context),
         DrillRuleSets.getJoinPermRules(context),
+        projectPushRules,
         DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
 
     // Ruleset for the case where join planning is done in Hep-LOPT, filter/project pushdown and parttion pruning are done in VolcanoPlanner
     RuleSet drillLogicalHepJoinRules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
         DrillRuleSets.getPruneScanRules(context),
+        projectPushRules,
         DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
 
     // Ruleset for the case where join planning and partition pruning is done in Hep, filter/project pushdown are done in VolcanoPlanner
     RuleSet drillLogicalHepJoinPPRules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
+        projectPushRules,
         DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
 
     // Ruleset for physical planning rules
@@ -141,8 +147,20 @@ public class DrillSqlWorker {
         DrillRuleSets.getPhysicalRules(context),
         storagePluginRegistry.getStoragePluginRuleSet(context));
 
+    // The following three rulesets are same as the above three logical rulesets, except that project pushdown is disabled.
+    RuleSet drillLogicalVolOnlyNoPPDRules = DrillRuleSets.excludeRuleSetfrom(drillLogicalVolOnlyRules, projectPushRules);
+    RuleSet drillLogicalHepJoinNoPPDRules = DrillRuleSets.excludeRuleSetfrom(drillLogicalHepJoinRules, projectPushRules);
+    RuleSet drillLogicalHepJoinPPNoPPDRules = DrillRuleSets.excludeRuleSetfrom(drillLogicalHepJoinPPRules, projectPushRules);
 
-    RuleSet[] allRules = new RuleSet[] {drillLogicalVolOnlyRules, drillPhysicalMem, drillLogicalHepJoinRules, drillLogicalHepJoinPPRules};
+    RuleSet[] allRules = new RuleSet[] {
+        drillLogicalVolOnlyRules,
+        drillPhysicalMem,
+        drillLogicalHepJoinRules,
+        drillLogicalHepJoinPPRules,
+        drillLogicalVolOnlyNoPPDRules,
+        drillLogicalHepJoinNoPPDRules,
+        drillLogicalHepJoinPPNoPPDRules
+    };
 
     return allRules;
   }
