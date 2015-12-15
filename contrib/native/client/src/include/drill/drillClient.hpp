@@ -65,6 +65,7 @@ enum QueryType{
     PHYSICAL = 3
 };
 
+/*
 class DECLSPEC_DRILL_CLIENT DrillClientError{
     public:
         static const uint32_t CONN_ERROR_START = 100;
@@ -81,6 +82,7 @@ class DECLSPEC_DRILL_CLIENT DrillClientError{
         uint32_t errnum;
         std::string msg;
 };
+*/
 
 // Only one instance of this class exists. A static member of DrillClientImpl;
 class DECLSPEC_DRILL_CLIENT DrillClientInitializer{
@@ -90,6 +92,7 @@ class DECLSPEC_DRILL_CLIENT DrillClientInitializer{
 };
 
 // Only one instance of this class exists. A static member of DrillClientImpl;
+/* 
 class DECLSPEC_DRILL_CLIENT DrillClientConfig{
     public:
         DrillClientConfig();
@@ -114,7 +117,7 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
         // For future use. Currently, not enforced.
         static uint64_t s_bufferLimit;
 
-        /**
+        **
          * DrillClient configures timeout (in seconds) in a fine granularity.
          * Disabled by setting the value to zero.
          *
@@ -132,14 +135,14 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
          *
          * s_heartbeatFrequency: (default 30)
          *      Seconds of idle activity after which a heartbeat is sent to the drillbit
-         */
+         *
         static int32_t s_socketTimeout;
         static int32_t s_handshakeTimeout;
         static int32_t s_queryTimeout;
         static int32_t s_heartbeatFrequency;
         static boost::mutex s_mutex;
 };
-
+*/
 
 class DECLSPEC_DRILL_CLIENT DrillUserProperties{
     public:

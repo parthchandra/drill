@@ -22,6 +22,7 @@
 #include "drill/drillClient.hpp"
 #include "drill/recordBatch.hpp"
 #include "drillClientImpl.hpp"
+#include "env.h"
 #include "errmsgs.hpp"
 #include "logger.hpp"
 
@@ -64,6 +65,9 @@ DrillClientConfig::~DrillClientConfig(){
 
 void DrillClientConfig::initLogging(const char* path){
     Logger::init(path);
+    setLogLevel(LOG_INFO);
+    DRILL_LOG(LOG_INFO) << "Drill Client library." << std::endl;
+    DRILL_LOG(LOG_INFO) <<  GIT_COMMIT_PROP << std::endl;
 }
 
 void DrillClientConfig::setLogLevel(logLevel_t l){
