@@ -117,7 +117,7 @@ public class DrillSqlWorker {
   }
 
   private RuleSet[] getRules(QueryContext context) {
-    StoragePluginRegistry storagePluginRegistry = context.getStorage();
+    final RuleSet[] storagePluginRules = context.getStorage().getStoragePluginRuleSet(context);
 
     final RuleSet projectPushRules = DrillRuleSets.getProjectPushDownRules();
 
@@ -127,25 +127,28 @@ public class DrillSqlWorker {
         DrillRuleSets.getPruneScanRules(context),
         DrillRuleSets.getJoinPermRules(context),
         projectPushRules,
-        DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
+        DrillRuleSets.getDrillUserConfigurableLogicalRules(context),
+        storagePluginRules[0]);
 
     // Ruleset for the case where join planning is done in Hep-LOPT, filter/project pushdown and parttion pruning are done in VolcanoPlanner
     RuleSet drillLogicalHepJoinRules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
         DrillRuleSets.getPruneScanRules(context),
         projectPushRules,
-        DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
+        DrillRuleSets.getDrillUserConfigurableLogicalRules(context),
+        storagePluginRules[0]);
 
     // Ruleset for the case where join planning and partition pruning is done in Hep, filter/project pushdown are done in VolcanoPlanner
     RuleSet drillLogicalHepJoinPPRules = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getDrillBasicRules(context),
         projectPushRules,
-        DrillRuleSets.getDrillUserConfigurableLogicalRules(context));
+        DrillRuleSets.getDrillUserConfigurableLogicalRules(context),
+        storagePluginRules[0]);
 
     // Ruleset for physical planning rules
     RuleSet drillPhysicalMem = DrillRuleSets.mergedRuleSets(
         DrillRuleSets.getPhysicalRules(context),
-        storagePluginRegistry.getStoragePluginRuleSet(context));
+        storagePluginRules[1]);
 
     // The following three rulesets are same as the above three logical rulesets, except that project pushdown is disabled.
     RuleSet drillLogicalVolOnlyNoPPDRules = DrillRuleSets.excludeRuleSetfrom(drillLogicalVolOnlyRules, projectPushRules);
