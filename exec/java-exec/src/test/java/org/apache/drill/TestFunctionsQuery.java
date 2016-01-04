@@ -582,22 +582,6 @@ public class TestFunctionsQuery extends BaseTestQuery {
   }
 
   @Test
-  public void testHashFunctions() throws Exception {
-    String query = "select " +
-        "hash(cast(hire_date as date)) hash_date, " +
-        "hash(cast(employee_id as decimal(9, 2))) as hash_dec9, " +
-        "hash(cast(employee_id as decimal(38, 11))) as hash_dec38 " +
-        "from cp.`employee.json` where employee_id = 1 limit 1";
-
-    testBuilder()
-        .sqlQuery(query)
-        .unOrdered()
-        .baselineColumns("hash_date", "hash_dec9", "hash_dec38")
-        .baselineValues(312993367, 292570647, 337328302)
-        .go();
-  }
-
-  @Test
   public void testDecimalAddConstant() throws Exception {
     String query = "select (cast('-1' as decimal(37, 3)) + cast (employee_id as decimal(37, 3))) as CNT " +
         "from cp.`employee.json` where employee_id <= 4";
@@ -823,29 +807,6 @@ public class TestFunctionsQuery extends BaseTestQuery {
    * We may apply implicit casts in Hash Join while dealing with different numeric data types
    * For this to work we need to distribute the data based on a common key, below method
    * makes sure the hash value for different numeric types is the same for the same key
-   */
-  @Test
-  public void testHash64() throws Exception {
-    String query = "select " +
-        "hash64AsDouble(cast(employee_id as int)) = hash64AsDouble(cast(employee_id as bigint)) col1, " +
-        "hash64AsDouble(cast(employee_id as bigint)) = hash64AsDouble(cast(employee_id as float)) col2, " +
-        "hash64AsDouble(cast(employee_id as float)) = hash64AsDouble(cast(employee_id as double)) col3, " +
-        "hash64AsDouble(cast(employee_id as double)) = hash64AsDouble(cast(employee_id as decimal(9, 0))) col4, " +
-        "hash64AsDouble(cast(employee_id as decimal(9, 0))) = hash64AsDouble(cast(employee_id as decimal(18, 0))) col5, " +
-        "hash64AsDouble(cast(employee_id as decimal(18, 0))) = hash64AsDouble(cast(employee_id as decimal(28, 0))) col6, " +
-        "hash64AsDouble(cast(employee_id as decimal(28, 0))) = hash64AsDouble(cast(employee_id as decimal(38, 0))) col7 " +
-        "from cp.`employee.json` where employee_id = 1";
-
-    testBuilder()
-        .sqlQuery(query)
-        .unOrdered()
-        .baselineColumns("col1", "col2", "col3", "col4", "col5", "col6", "col7")
-        .baselineValues(true, true, true, true, true, true, true)
-        .go();
-  }
-
-  /*
-   * hash32 version of the above test
    */
   @Test
   public void testHash32() throws Exception {
