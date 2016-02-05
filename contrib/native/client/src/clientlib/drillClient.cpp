@@ -46,6 +46,7 @@ DrillClientInitializer::~DrillClientInitializer(){
 }
 
 // Initialize static member of DrillClientConfig
+bool DrillClientConfig::s_logInitialized=false;
 logLevel_t DrillClientConfig::s_logLevel=LOG_ERROR;
 uint64_t DrillClientConfig::s_bufferLimit=MAX_MEM_ALLOC_SIZE;
 int32_t DrillClientConfig::s_socketTimeout=0;
@@ -64,7 +65,9 @@ DrillClientConfig::~DrillClientConfig(){
 }
 
 void DrillClientConfig::initLogging(const char* path){
-    Logger::init(path);
+    if(!DrillClientConfig::s_logInitialized){
+        Logger::init(path);
+    }
 }
 
 void DrillClientConfig::setLogLevel(logLevel_t l){
@@ -361,7 +364,7 @@ void DrillClient::close() {
 status_t DrillClient::submitQuery(Drill::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx, QueryHandle_t* qHandle){
 
     ::exec::shared::QueryType castedType = static_cast< ::exec::shared::QueryType> (t);
-    DrillClientQueryResult* pResult=this->m_pImpl->SubmitQuery(castedType, plan, listener, listenerCtx);
+    DrillClientQueryResult* pResult=this->m_pImpl->submitQuery(castedType, plan, listener, listenerCtx);
     *qHandle=(QueryHandle_t)pResult;
     return QRY_SUCCESS;
 }
@@ -369,7 +372,7 @@ status_t DrillClient::submitQuery(Drill::QueryType t, const std::string& plan, p
 RecordIterator* DrillClient::submitQuery(Drill::QueryType t, const std::string& plan, DrillClientError* err){
     RecordIterator* pIter=NULL;
     ::exec::shared::QueryType castedType = static_cast< ::exec::shared::QueryType> (t);
-    DrillClientQueryResult* pResult=this->m_pImpl->SubmitQuery(castedType, plan, NULL, NULL);
+    DrillClientQueryResult* pResult=this->m_pImpl->submitQuery(castedType, plan, NULL, NULL);
     if(pResult){
         pIter=new RecordIterator(pResult);
     }
@@ -400,6 +403,7 @@ void DrillClient::registerSchemaChangeListener(QueryHandle_t* handle, pfnSchemaL
 }
 
 void DrillClient::freeQueryResources(QueryHandle_t* handle){
+    //TODO: DRILL-4313: Tell PooledDrillClientImpl to free queryResources for this query.
     delete (DrillClientQueryResult*)(*handle);
     *handle=NULL;
 }

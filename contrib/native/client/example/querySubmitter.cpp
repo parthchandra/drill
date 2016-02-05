@@ -346,6 +346,16 @@ int main(int argc, char* argv[]) {
 
         props.setProperty("someRandomProperty", "someRandomValue");
 
+#if 0
+        for(int i=0; i<20; i++){
+            int r = client.connect(connectStr.c_str(), &props);
+            if(r == Drill::CONN_SUCCESS){
+                std::cout << "CONNECTED " << i << std::endl;
+            }else{
+                std::cout << "FAILED TO CONNECT " << i << std::endl;
+            }
+        }
+#endif
         if(client.connect(connectStr.c_str(), &props)!=Drill::CONN_SUCCESS){
             std::cerr<< "Failed to connect with error: "<< client.getError() << " (Using:"<<connectStr<<")"<<std::endl;
             return -1;

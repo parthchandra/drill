@@ -52,6 +52,21 @@ void Utils::freeBuffer(ByteBuf_t b, size_t len){
     }
 }
 
+void Utils::parseConnectStr(const char* connectStr,
+        std::string& pathToDrill,
+        std::string& protocol,
+        std::string& hostPortStr){
+    char u[MAX_CONNECT_STR+1];
+    strncpy(u,connectStr, MAX_CONNECT_STR); u[MAX_CONNECT_STR]=0;
+    char* z=strtok(u, "=");
+    char* c=strtok(NULL, "/");
+    char* p=strtok(NULL, "");
+
+    if(p!=NULL) pathToDrill=std::string("/")+p;
+    protocol=z; hostPortStr=c;
+    return;
+}
+
 
 AllocatedBuffer::AllocatedBuffer(size_t l){
     m_pBuffer=NULL;

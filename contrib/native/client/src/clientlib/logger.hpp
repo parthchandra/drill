@@ -39,12 +39,12 @@ class Logger{
         static std::ostream& log(logLevel_t level);
         static std::string levelAsString(logLevel_t level) {
             static const char* const levelNames[] = {
-                "TRACE",
-                "DEBUG",
-                "INFO",
+                "TRACE  ",
+                "DEBUG  ",
+                "INFO   ",
                 "WARNING",
-                "ERROR",
-                "FATAL"
+                "ERROR  ",
+                "FATAL  "
             };
             return levelNames[level];
         }

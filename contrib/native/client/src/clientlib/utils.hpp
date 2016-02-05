@@ -53,6 +53,10 @@ class Utils{
         //allocate memory for Record Batches
         static ByteBuf_t allocateBuffer(size_t len);
         static void freeBuffer(ByteBuf_t b, size_t len);
+        static void parseConnectStr(const char* connectStr,
+           std::string& pathToDrill,
+           std::string& protocol,
+           std::string& hostPortStr);
 }; // Utils
 
 } // namespace Drill

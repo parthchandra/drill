@@ -59,6 +59,11 @@ static std::map<exec::shared::QueryResult_QueryState, status_t> QUERYSTATE_TO_ST
 RpcEncoder DrillClientImpl::s_encoder;
 RpcDecoder DrillClientImpl::s_decoder;
 
+boost::random::random_device DrillClientImpl::s_RNG;
+boost::random::mt19937 DrillClientImpl::s_URNG(s_RNG());
+boost::uniform_int<> DrillClientImpl::s_uniformDist;
+boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > DrillClientImpl::s_randomNumber(s_URNG, s_uniformDist); 
+
 std::string debugPrintQid(const exec::shared::QueryId& qid){
     return std::string("[")+boost::lexical_cast<std::string>(qid.part1()) +std::string(":") + boost::lexical_cast<std::string>(qid.part2())+std::string("] ");
 }
@@ -79,6 +84,7 @@ void setSocketTimeout(boost::asio::ip::tcp::socket& socket, int32_t timeout){
 }
 
 
+/*  
 void DrillClientImpl::parseConnectStr(const char* connectStr,
         std::string& pathToDrill,
         std::string& protocol,
@@ -93,22 +99,27 @@ void DrillClientImpl::parseConnectStr(const char* connectStr,
     protocol=z; hostPortStr=c;
     return;
 }
+*/
 
 connectionStatus_t DrillClientImpl::connect(const char* connStr){
     std::string pathToDrill, protocol, hostPortStr;
     std::string host;
     std::string port;
     if(!this->m_bIsConnected){
-        parseConnectStr(connStr, pathToDrill, protocol, hostPortStr);
+        Utils::parseConnectStr(connStr, pathToDrill, protocol, hostPortStr);
         if(!strcmp(protocol.c_str(), "zk")){
             ZookeeperImpl zook;
-            if(zook.connectToZookeeper(hostPortStr.c_str(), pathToDrill.c_str())!=0){
+            if(zook.getAllDrillbits(hostPortStr.c_str(), pathToDrill.c_str())!=0){
                 return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
             }
-            zook.debugPrint();
-            exec::DrillbitEndpoint e=zook.getEndPoint();
-            host=boost::lexical_cast<std::string>(e.address());
-            port=boost::lexical_cast<std::string>(e.user_port());
+            exec::DrillbitEndpoint endpoint;
+            size_t nextIndex=0;
+            if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
+                nextIndex = (ZookeeperImpl::s_counter++)%zook.getDrillbitCount();
+            }
+            zook.getEndPoint(nextIndex, endpoint);
+            host=boost::lexical_cast<std::string>(endpoint.address());
+            port=boost::lexical_cast<std::string>(endpoint.user_port());
             zook.close();
         }else if(!strcmp(protocol.c_str(), "local")){
             char tempStr[MAX_CONNECT_STR+1];
@@ -118,7 +129,15 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr){
         }else{
             return handleConnError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, protocol.c_str()));
         }
-        return this->connect(host.c_str(), port.c_str());
+        DRILL_LOG(LOG_TRACE) << "Connecting to endpoint: " << host << ":" << port << std::endl;
+        connectionStatus_t ret = this->connect(host.c_str(), port.c_str());
+        if(ret==CONN_SUCCESS){
+            std::ostringstream connectedHost;
+            connectedHost << "id: " << m_socket.native_handle() << " address: " << host << ":" << port;
+            m_connectedHost = connectedHost.str();
+            DRILL_LOG(LOG_INFO) << "Connected to endpoint: " << m_connectedHost << std::endl;
+        }
+        return ret;
     }
     return CONN_SUCCESS;
 }
@@ -133,14 +152,13 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port){
         tcp::resolver::iterator end;
         while (iter != end){
             endpoint = *iter++;
-            DRILL_LOG(LOG_TRACE) << endpoint << std::endl;
+            DRILL_LOG(LOG_TRACE) << "Host resolved to " << endpoint << std::endl;
         }
         boost::system::error_code ec;
         m_socket.connect(endpoint, ec);
         if(ec){
             return handleConnError(CONN_FAILURE, getMessage(ERR_CONN_FAILURE, host, port, ec.message().c_str()));
         }
-
     }catch(std::exception e){
         // Handle case when the hostname cannot be resolved. "resolve" is hard-coded in boost asio resolver.resolve
         if (!strcmp(e.what(), "resolve")) {
@@ -149,13 +167,13 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port){
         return handleConnError(CONN_FAILURE, getMessage(ERR_CONN_EXCEPT, e.what()));
     }
 
+    m_bIsConnected=true;
     // set socket keep alive
     boost::asio::socket_base::keep_alive keepAlive(true);
     m_socket.set_option(keepAlive);
 	// set no_delay
     boost::asio::ip::tcp::no_delay noDelay(true);
     m_socket.set_option(noDelay);
-
     //
     // We put some OS dependent code here for timing out a socket. Mostly, this appears to
     // do nothing. Should we leave it in there?
@@ -272,7 +290,12 @@ connectionStatus_t DrillClientImpl::recvHandshake(){
                 boost::asio::placeholders::bytes_transferred)
             );
     DRILL_LOG(LOG_DEBUG) << "DrillClientImpl::recvHandshake: async read waiting for server handshake response.\n";
-    m_io_service.run();
+    m_io_service.run(); // this returns when the handshake request returns (or fails)
+    //boost::unique_lock<boost::mutex> lock(m_handshakeMutex);
+    //while(!m_handshakeCompleted){
+    //    m_handshakeCV.wait(lock);
+    //}
+
     if(m_rbuf!=NULL){
         Utils::freeBuffer(m_rbuf, MAX_SOCK_RD_BUFSIZE); m_rbuf=NULL;
     }
@@ -332,8 +355,12 @@ void DrillClientImpl::handleHandshake(ByteBuf_t _buf,
         }else{
             handleConnError(CONN_FAILURE, getMessage(ERR_CONN_RDFAIL, error.message().c_str()));
         }
-        return;
     }
+    //{
+    //    boost::lock_guard<boost::mutex> lock(m_handshakeMutex);
+    //    m_handshakeCompleted=true;
+    //}
+    //m_handshakeCV.notify_one();
     return;
 }
 
@@ -349,6 +376,11 @@ void DrillClientImpl::handleHShakeReadTimeout(const boost::system::error_code & 
             m_io_service.stop();
             boost::system::error_code ignorederr;
             m_socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignorederr);
+            //{
+            //    boost::lock_guard<boost::mutex> lock(m_handshakeMutex);
+            //    m_handshakeCompleted=true;
+            //}
+            //m_handshakeCV.notify_one();
         }
     }
     return;
@@ -462,7 +494,7 @@ void DrillClientImpl::startMessageListener() {
     }
 }
 
-DrillClientQueryResult* DrillClientImpl::SubmitQuery(::exec::shared::QueryType t,
+DrillClientQueryResult* DrillClientImpl::submitQuery(::exec::shared::QueryType t,
         const std::string& plan,
         pfnQueryResultsListener l,
         void* lCtx){
@@ -480,12 +512,13 @@ DrillClientQueryResult* DrillClientImpl::SubmitQuery(::exec::shared::QueryType t
         OutBoundRpcMessage out_msg(exec::rpc::REQUEST, exec::user::RUN_QUERY, coordId, &query);
         sendSync(out_msg);
 
-        pQuery = new DrillClientQueryResult(this, coordId);
+        pQuery = new DrillClientQueryResult(this, coordId, plan);
         pQuery->registerListener(l, lCtx);
         bool sendRequest=false;
         this->m_queryIds[coordId]=pQuery;
 
-        DRILL_LOG(LOG_DEBUG)  << "Sent query request. Coordination id = " << coordId << std::endl;
+        DRILL_LOG(LOG_DEBUG)  << "Sent query request. " << "[" << m_connectedHost << "]"  << "Coordination id = " << coordId << std::endl;
+        DRILL_LOG(LOG_DEBUG)  << "Sent query " <<  "Coordination id = " << coordId << " query: " << plan << std::endl;
 
         if(m_pendingRequests++==0){
             sendRequest=true;
@@ -510,7 +543,6 @@ void DrillClientImpl::getNextResult(){
 
     // This call is always made from within a function where the mutex has already been acquired
     //boost::lock_guard<boost::mutex> lock(this->m_dcMutex);
-
     {
         boost::unique_lock<boost::mutex> memLock(AllocatedBuffer::s_memCVMutex);
         DRILL_LOG(LOG_TRACE) << "Read blocked waiting for memory." << std::endl;
@@ -804,6 +836,7 @@ status_t DrillClientImpl::processQueryId(AllocatedBufferPtr allocatedBuffer, InB
         m_queryResults[qid]=pDrillClientQueryResult;
         //save queryId allocated here so we can free it later
         pDrillClientQueryResult->setQueryId(qid);
+        DRILL_LOG(LOG_DEBUG) << "Query Id - " << debugPrintQid(*qid) << " Query - " << pDrillClientQueryResult->getQuery() << std::endl;
     }else{
         delete allocatedBuffer;
         return handleQryError(QRY_INTERNAL_ERROR, getMessage(ERR_QRY_INVQUERYID), NULL);
@@ -1060,12 +1093,14 @@ status_t DrillClientImpl::validateResultMessage(InBoundRpcMessage& msg, exec::sh
 connectionStatus_t DrillClientImpl::handleConnError(connectionStatus_t status, std::string msg){
     DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
     m_pendingRequests=0;
+    DRILL_LOG(LOG_DEBUG) << "Connection Error: " << pErr->msg << std::endl;
     if(!m_queryIds.empty()){
         // set query error only if queries are running
         broadcastError(pErr);
     }else{
         if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
         m_pError=pErr;
+        shutdownSocket();
     }
     return status;
 }
@@ -1392,17 +1427,126 @@ void DrillClientQueryResult::clearAndDestroy(){
     }
 }
 
+
+connectionStatus_t PooledDrillClientImpl::connect(const char* connStr){
+    connectionStatus_t stat = CONN_SUCCESS;
+    std::string pathToDrill, protocol, hostPortStr;
+    std::string host;
+    std::string port;
+    m_connectStr=connStr;
+    if(m_clientConnections.size() == 0){
+        DrillClientImpl* pDrillClientImpl = new DrillClientImpl();
+        Utils::parseConnectStr(connStr, pathToDrill, protocol, hostPortStr);
+        if(!strcmp(protocol.c_str(), "zk")){
+            ZookeeperImpl zook;
+            // Get a list of drillbits
+            int err = zook.getAllDrillbits(hostPortStr.c_str(), pathToDrill.c_str());
+            if(!err){
+                exec::DrillbitEndpoint e;
+                size_t nextIndex=0;
+                if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
+                    nextIndex = (m_lastConnection++)%(zook.getDrillbitCount());
+                }
+                err=zook.getEndPoint(nextIndex, e);
+                if(!err){
+                    host=boost::lexical_cast<std::string>(e.address());
+                    port=boost::lexical_cast<std::string>(e.user_port());
+                }
+            }
+            if(err){
+                return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
+            }
+            zook.close();
+            m_bIsDirectConnection=false;
+        }else if(!strcmp(protocol.c_str(), "local")){
+            char tempStr[MAX_CONNECT_STR+1];
+            strncpy(tempStr, hostPortStr.c_str(), MAX_CONNECT_STR); tempStr[MAX_CONNECT_STR]=0;
+            host=strtok(tempStr, ":");
+            port=strtok(NULL, "");
+            m_bIsDirectConnection=true;
+        }else{
+            return handleConnError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, protocol.c_str()));
+        }
+        DRILL_LOG(LOG_TRACE) << "Connecting to endpoint: (Pooled)" << host << ":" << port << std::endl;
+        stat =  pDrillClientImpl->connect(host.c_str(), port.c_str());
+        if(stat == CONN_SUCCESS){
+            m_clientConnections.push_back(pDrillClientImpl);
+            DRILL_LOG(LOG_INFO) << "Connected to endpoint: (Pooled) id: " << pDrillClientImpl->m_socket.native_handle()
+                << " address: " << host << ":" << port << std::endl;
+        }
+    }
+    return stat;
+}
+
+DrillClientQueryResult* PooledDrillClientImpl::submitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx){
+    DrillClientQueryResult* pDrillClientQueryResult = NULL;
+    DrillClientImpl* pDrillClientImpl = NULL;
+    pDrillClientImpl = getOneConnection();
+    if(pDrillClientImpl != NULL){
+
+        pDrillClientQueryResult=pDrillClientImpl->submitQuery(t,plan,listener,listenerCtx);
+        if(pDrillClientQueryResult!=NULL){
+            m_queryConnectionMap[pDrillClientQueryResult]=pDrillClientImpl;
+        }    
+    }
+    return pDrillClientQueryResult;
+}
+
+connectionStatus_t PooledDrillClientImpl::handleConnError(connectionStatus_t status, std::string msg){
+    DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
+    DRILL_LOG(LOG_DEBUG) << "Connection Error: (Pooled) " << pErr->msg << std::endl;
+    if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+    m_pError=pErr;
+
+    return status;
+}
+
+DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
+
+    DrillClientImpl* pDrillClientImpl = NULL;
+    while(pDrillClientImpl==NULL){
+        if(m_queriesExecuted == 0){
+            pDrillClientImpl=m_clientConnections[0];// There should be one connection in the list when the first query is executed
+
+        }else if(m_clientConnections.size() == m_maxConcurrentConnections){
+            int32_t randomChoice = DrillClientImpl::s_randomNumber()%m_clientConnections.size();
+            pDrillClientImpl = m_clientConnections[randomChoice];
+            if(!pDrillClientImpl->Active()){
+                m_clientConnections.erase( std::remove(m_clientConnections.begin(), m_clientConnections.end(), pDrillClientImpl), m_clientConnections.end() );
+                pDrillClientImpl=NULL;
+            }
+        }else{
+            // TODO: Get a new connection to a new Drillbit. 
+            int tries=0;
+            while(pDrillClientImpl==NULL && tries++ < 3){
+                pDrillClientImpl=new DrillClientImpl;
+                if(pDrillClientImpl->connect(m_connectStr.c_str())==CONN_SUCCESS){
+                    break;
+                }else{
+                    delete pDrillClientImpl; pDrillClientImpl=NULL;
+                }
+            } // try a few times
+        } // need a new connection 
+    }// while
+
+    //TODO: If still not found, then iterate over all the remaining connections in the pool
+    // If still not found, return failure.
+
+    return pDrillClientImpl;
+}
+
 char ZookeeperImpl::s_drillRoot[]="/drill/";
 char ZookeeperImpl::s_defaultCluster[]="drillbits1";
+int  ZookeeperImpl::s_counter=0;
 
 ZookeeperImpl::ZookeeperImpl(){
-    m_pDrillbits=new String_vector;
+    //m_pDrillbits=new String_vector;
     m_bConnecting=true;
     memset(&m_id, 0, sizeof(m_id));
 }
 
 ZookeeperImpl::~ZookeeperImpl(){
-    delete m_pDrillbits;
+    //delete m_pDrillbits;
 }
 
 ZooLogLevel ZookeeperImpl::getZkLogLevel(){
@@ -1427,14 +1571,16 @@ ZooLogLevel ZookeeperImpl::getZkLogLevel(){
     return ZOO_LOG_LEVEL_ERROR;
 }
 
-int ZookeeperImpl::connectToZookeeper(const char* connectStr, const char* pathToDrill){
+int ZookeeperImpl::getAllDrillbits(const char* connectStr, const char* pathToDrill){
+    bool shuffle=false;
     uint32_t waitTime=30000; // 10 seconds
     zoo_set_debug_level(getZkLogLevel());
     zoo_deterministic_conn_order(1); // enable deterministic order
+    struct String_vector* pDrillbits=NULL;
     m_zh = zookeeper_init(connectStr, watcher, waitTime, 0, this, 0);
     if(!m_zh) {
         m_err = getMessage(ERR_CONN_ZKFAIL);
-        return CONN_FAILURE;
+        return -1;
     }else{
         m_err="";
         //Wait for the completion handler to signal successful connection
@@ -1443,42 +1589,72 @@ int ZookeeperImpl::connectToZookeeper(const char* connectStr, const char* pathTo
         while(this->m_bConnecting) {
             if(!this->m_cv.timed_wait(bufferLock, timeout)){
                 m_err = getMessage(ERR_CONN_ZKTIMOUT);
-                return CONN_FAILURE;
+                return -1;
             }
         }
     }
     if(m_state!=ZOO_CONNECTED_STATE){
-        return CONN_FAILURE;
+        return -1;
     }
     int rc = ZOK;
-    char rootDir[MAX_CONNECT_STR+1];
+    //char rootDir[MAX_CONNECT_STR+1];
     if(pathToDrill==NULL || strlen(pathToDrill)==0){
-        strcpy(rootDir, (char*)s_drillRoot);
-        strcat(rootDir, s_defaultCluster);
+        //strcpy(rootDir, (char*)s_drillRoot);
+        //strcat(rootDir, s_defaultCluster);
+        m_rootDir=s_drillRoot;
+        m_rootDir += s_defaultCluster;
     }else{
-        strncpy(rootDir, pathToDrill, MAX_CONNECT_STR); rootDir[MAX_CONNECT_STR]=0;
+        //strncpy(rootDir, pathToDrill, MAX_CONNECT_STR); rootDir[MAX_CONNECT_STR]=0;
+        m_rootDir=pathToDrill;
     }
-    rc=zoo_get_children(m_zh, (char*)rootDir, 0, m_pDrillbits);
+
+    pDrillbits = new String_vector;
+    rc=zoo_get_children(m_zh, m_rootDir.c_str(), 0, pDrillbits);
     if(rc!=ZOK){
+        delete pDrillbits;
         m_err=getMessage(ERR_CONN_ZKERR, rc);
         zookeeper_close(m_zh);
         return -1;
     }
-
-    //Let's pick a random drillbit.
-    if(m_pDrillbits && m_pDrillbits->count >0){
-
-        std::vector<std::string> randomDrillbits;
-        for(int i=0; i<m_pDrillbits->count; i++){
-            randomDrillbits.push_back(m_pDrillbits->data[i]);
+    // Randomize the list of drillbits
+    if(pDrillbits && pDrillbits->count > 0){
+        DRILL_LOG(LOG_TRACE) << "Found " << pDrillbits->count << " drillbits in cluster (" 
+            << connectStr << "/" << pathToDrill
+            << ")." <<std::endl;
+        for(int i=0; i<pDrillbits->count; i++){
+            m_drillbits.push_back(pDrillbits->data[i]);
         }
-        //Use the same random shuffle as the Java client instead of picking a drillbit at random.
-        //Gives much better randomization when the size of the cluster is small.
-        std::random_shuffle(randomDrillbits.begin(), randomDrillbits.end());
-        const char * bit=randomDrillbits[0].c_str();
-        std::string s;
+        for(int i=0; i<m_drillbits.size(); i++){
+            DRILL_LOG(LOG_TRACE) << "\t Unshuffled Drillbit id: " << m_drillbits[i] << std::endl;
+        }
+        shuffle = pDrillbits->count > RANDOMIZE_CONN_POOL_THRESHOLD;
+        if(shuffle){
+            //Use the same random shuffle as the Java client instead of picking a drillbit at random.
+            //Gives much better randomization when the size of the cluster is small.
+            //boost::random::random_device rng;   //Truly random (expensive and device dependent)
+            //boost::random::mt19937 urng(rng()); //Pseudo random with a period of ( 2^19937 - 1 )
+            //boost::uniform_int<> uni_dist;
+            //boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > randomNumber(urng, uni_dist); // a random number generator usable by shuffle
+            //TODO: replace std::random_shuffle with the std::shuffle method, when we move to a C++ version
+            //      that supports the boost random methods used above.
+            std::random_shuffle(m_drillbits.begin(), m_drillbits.end(), DrillClientImpl::s_randomNumber);
+            for(int i=0; i<m_drillbits.size(); i++){
+                DRILL_LOG(LOG_TRACE) << "\tDrillbit id: " << m_drillbits[i] << std::endl;
+            }
+        }
+    }
+    delete pDrillbits;
+    return 0;
+}
 
-        s=rootDir +  std::string("/") + bit;
+int ZookeeperImpl::getEndPoint(size_t index, exec::DrillbitEndpoint& endpoint){
+    int rc = ZOK;
+    exec::DrillServiceInstance drillServiceInstance;
+    if( m_drillbits.size() >0){
+        // pick the drillbit at 'index'
+        const char * bit=m_drillbits[index].c_str();
+        std::string s;
+        s=m_rootDir +  std::string("/") + bit;
         int buffer_len=MAX_CONNECT_STR;
         char buffer[MAX_CONNECT_STR+1];
         struct Stat stat;
@@ -1489,8 +1665,40 @@ int ZookeeperImpl::connectToZookeeper(const char* connectStr, const char* pathTo
             zookeeper_close(m_zh);
             return -1;
         }
-        m_drillServiceInstance.ParseFromArray(buffer, buffer_len);
+        exec::DrillServiceInstance drillServiceInstance;
+        drillServiceInstance.ParseFromArray(buffer, buffer_len);
+        endpoint=drillServiceInstance.endpoint();
+        DRILL_LOG(LOG_TRACE) << "Choosing drillbit. Selected " << drillServiceInstance.DebugString() << std::endl;
     }else{
+
+        m_err=getMessage(ERR_CONN_ZKNODBIT);
+        zookeeper_close(m_zh);
+        return -1;
+    }
+    return 0;
+}
+
+int ZookeeperImpl::connectToZookeeper(const char* connectStr, const char* pathToDrill){
+    int rc = ZOK;
+    rc = getAllDrillbits(connectStr, pathToDrill);
+    //Let's pick a random drillbit.
+    //if(r==0 && m_drillbits.size() >0){
+    //    const char * bit=m_drillbits[0].c_str();
+    //    std::string s;
+    //    s=rootDir +  std::string("/") + bit;
+    //    int buffer_len=MAX_CONNECT_STR;
+    //    char buffer[MAX_CONNECT_STR+1];
+    //    struct Stat stat;
+    //    buffer[MAX_CONNECT_STR]=0;
+    //    rc= zoo_get(m_zh, s.c_str(), 0, buffer,  &buffer_len, &stat);
+    //    if(rc!=ZOK){
+    //        m_err=getMessage(ERR_CONN_ZKDBITERR, rc);
+    //        zookeeper_close(m_zh);
+    //        return -1;
+    //    }
+    //    m_drillServiceInstance.ParseFromArray(buffer, buffer_len);
+    //}else{
+    if(rc!=0){
         m_err=getMessage(ERR_CONN_ZKNODBIT);
         zookeeper_close(m_zh);
         return -1;
@@ -1533,10 +1741,10 @@ void ZookeeperImpl::watcher(zhandle_t *zzh, int type, int state, const char *pat
     self->m_cv.notify_one();
 }
 
-void ZookeeperImpl:: debugPrint(){
-    if(m_zh!=NULL && m_state==ZOO_CONNECTED_STATE){
-        DRILL_LOG(LOG_TRACE) << m_drillServiceInstance.DebugString() << std::endl;
-    }
-}
+//void ZookeeperImpl:: debugPrint(){
+//    if(m_zh!=NULL && m_state==ZOO_CONNECTED_STATE){
+//        DRILL_LOG(LOG_TRACE) << m_drillServiceInstance.DebugString() << std::endl;
+//    }
+//}
 
 } // namespace Drill

@@ -35,6 +35,10 @@
 #include <vector>
 #include <boost/asio.hpp>
 #include <boost/asio/deadline_timer.hpp>
+#include <boost/random/mersenne_twister.hpp> // for mt19937
+#include <boost/random/random_device.hpp>
+#include <boost/random/uniform_int.hpp>
+#include <boost/random/variate_generator.hpp>
 #include <boost/thread.hpp>
 #ifdef _WIN32
 #include <zookeeper.h>
@@ -61,9 +65,10 @@ class RpcDecoder;
 class DrillClientQueryResult{
     friend class DrillClientImpl;
     public:
-    DrillClientQueryResult(DrillClientImpl * pClient, uint64_t coordId):
+    DrillClientQueryResult(DrillClientImpl * pClient, uint64_t coordId, const std::string& query):
         m_pClient(pClient),
         m_coordinationId(coordId),
+        m_query(query),
         m_numBatches(0),
         m_columnDefs(new std::vector<Drill::FieldMetadata*>),
         m_bIsQueryPending(true),
@@ -116,6 +121,7 @@ class DrillClientQueryResult{
     bool isCancelled(){return this->m_bCancel;};
     bool hasSchemaChanged(){return this->m_bHasSchemaChanged;};
     int32_t getCoordinationId(){ return this->m_coordinationId;}
+    const std::string&  getQuery(){ return this->m_query;}
 
     void setQueryId(exec::shared::QueryId* q){this->m_pQueryId=q;}
     void* getListenerContext() {return this->m_pListenerCtx;}
@@ -147,6 +153,8 @@ class DrillClientQueryResult{
     DrillClientImpl* m_pClient;
 
     int32_t m_coordinationId;
+    const std::string& m_query;
+
     size_t m_numBatches; // number of record batches received so far
 
     // Vector of Buffers holding data returned by the server
@@ -190,7 +198,14 @@ class DrillClientQueryResult{
 };
 
 class DrillClientImpl{
+    friend class PooledDrillClientImpl;
     public:
+
+       static boost::random::random_device s_RNG;   //Truly random (expensive and device dependent)
+       static boost::random::mt19937 s_URNG; //Pseudo random with a period of ( 2^19937 - 1 )
+       static boost::uniform_int<> s_uniformDist;      // Produces a uniform distribution
+       static boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > s_randomNumber; // a random number generator also usable by shuffle
+
         DrillClientImpl():
             m_coordinationId(1),
             m_handshakeVersion(0),
@@ -247,13 +262,14 @@ class DrillClientImpl{
             }
         };
 
+       
         //Connect via Zookeeper or directly
         connectionStatus_t connect(const char* connStr);
         // test whether the client is active
         bool Active();
         void Close() ;
         DrillClientError* getError(){ return m_pError;}
-        DrillClientQueryResult* SubmitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx);
+        DrillClientQueryResult* submitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx);
         void waitForResults();
         connectionStatus_t validateHandshake(DrillUserProperties* props);
 
@@ -275,7 +291,7 @@ class DrillClientImpl{
         void handleHeartbeatTimeout(const boost::system::error_code & err); // send a heartbeat. If send fails, broadcast error, close connection and bail out.
 
         int32_t getNextCoordinationId(){ return ++m_coordinationId; };
-        void parseConnectStr(const char* connectStr, std::string& pathToDrill, std::string& protocol, std::string& hostPortStr);
+        //void parseConnectStr(const char* connectStr, std::string& pathToDrill, std::string& protocol, std::string& hostPortStr);
         // send synchronous messages
         //connectionStatus_t recvSync(InBoundRpcMessage& msg);
         connectionStatus_t sendSync(OutBoundRpcMessage& msg);
@@ -356,6 +372,8 @@ class DrillClientImpl{
         boost::asio::deadline_timer m_deadlineTimer; // to timeout async queries that never return
         boost::asio::deadline_timer m_heartbeatTimer; // to send heartbeat messages
 
+        std::string m_connectedHost; // The hostname and port the socket is connected to.
+
         //for synchronous messages, like validate handshake
         ByteBuf_t m_rbuf; // buffer for receiving synchronous messages
         DataBuf m_wbuf; // buffer for sending synchronous message
@@ -371,6 +389,13 @@ class DrillClientImpl{
 
         // Condition variable to signal completion of all queries. 
         boost::condition_variable m_cv;
+        
+        // check if handshake validation message received
+        //bool m_handshakeCompleted;
+        // Mutex to protect handshake
+        //boost::mutex m_handshakeMutex;
+        // Condition variable to signal completion of handshake
+        //boost::condition_variable m_handshakeCV;
 
 };
 
@@ -378,19 +403,104 @@ inline bool DrillClientImpl::Active() {
     return this->m_bIsConnected;;
 }
 
+
+/* *
+ *  Provides the same public interface as a DrillClientImpl but holds a pool of DrillClientImpls.
+ *  Every submitQuery uses a different DrillClientImpl to distribute the load.
+ *  DrillClient can use this class instead of DrillClientImpl to get better load balancing.
+ * */
+
+class PooledDrillClientImpl{
+    public:
+        PooledDrillClientImpl(){
+            m_bIsDirectConnection=false;
+            m_maxConcurrentConnections = DEFAULT_MAX_CONCURRENT_CONNECTIONS;
+            m_lastConnection=-1;
+            m_pError=NULL;
+            m_queriesExecuted=0;
+        }
+
+        ~PooledDrillClientImpl(){
+            for(std::vector<DrillClientImpl*>::iterator it = m_clientConnections.begin(); it != m_clientConnections.end(); ++it){
+                delete *it;
+            }
+            m_clientConnections.clear();
+            if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+        }
+
+        //Connect via Zookeeper or directly.
+        //Makes an initial connection to a drillbit. successful connect adds the first drillbit to the pool.
+        connectionStatus_t connect(const char* connStr);
+
+        // Test whether the client is active. Returns true if any one of the underlying connections is active
+        bool active();
+
+        // Closes all open connections. 
+        void close() ;
+
+        // Returns the last error encountered by any of the underlying executing queries or connections
+        DrillClientError* getError();
+
+        // Submits a query to a drillbit. If more than one query is to be sent, we may choose a
+        // a different drillbit in the pool. No more than m_maxConcurrentConnections will be allowed.
+        // Connections once added to the pool will be removed only when the DrillClient is closed.
+        DrillClientQueryResult* submitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx);
+
+        //Waits as long as any one drillbit connection has results pending
+        void waitForResults();
+
+        //Validates handshake only against the first drillbit connected to.
+        connectionStatus_t validateHandshake(DrillUserProperties* props);
+
+    private:
+        
+        std::string m_connectStr; 
+        std::string m_lastQuery;
+        
+        // Connects a queryResult to the DrillClientImpl Object that is executing the query.
+        std::map<DrillClientQueryResult*, DrillClientImpl*> m_queryConnectionMap; 
+        
+        // A list of all the current client connections. We choose a new one for every query. 
+        // When picking a drillClientImpl to use, we see how many queries each drillClientImpl
+        // is currently executing. If none,  
+        std::vector<DrillClientImpl*> m_clientConnections; 
+        
+        //ZookeeperImpl zook;
+        
+        // Use this to decide which drillbit to select next from the list of drillbits.
+        size_t m_lastConnection;
+
+        // Number of queries executed so far. Can be used to select a new Drillbit from the pool.
+        size_t m_queriesExecuted;
+
+        size_t m_maxConcurrentConnections;
+
+        bool m_bIsDirectConnection;
+
+        DrillClientError* m_pError;
+
+        connectionStatus_t handleConnError(connectionStatus_t status, std::string msg);
+        // get a connection from the pool or create a new one. Return NULL if none is found
+        DrillClientImpl* getOneConnection();
+};
+
+
 class ZookeeperImpl{
     public:
         ZookeeperImpl();
         ~ZookeeperImpl();
+        static int  s_counter; // a monotically increasing counter to choose a connection from the
+                               // drill cluster in a somewhat round robin fashion.
         static ZooLogLevel getZkLogLevel();
         // comma separated host:port pairs, each corresponding to a zk
         // server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
         int connectToZookeeper(const char* connectStr, const char* pathToDrill);
         void close();
         static void watcher(zhandle_t *zzh, int type, int state, const char *path, void* context);
-        void debugPrint();
         std::string& getError(){return m_err;}
-        const exec::DrillbitEndpoint& getEndPoint(){ return m_drillServiceInstance.endpoint();}
+        int getAllDrillbits(const char* connectStr, const char* pathToDrill);
+        int getEndPoint(size_t index, exec::DrillbitEndpoint& endpoint);
+        int getDrillbitCount(){ return m_drillbits.size();};
 
     private:
         static char s_drillRoot[];
@@ -400,13 +510,14 @@ class ZookeeperImpl{
         int m_state;
         std::string m_err;
 
-        struct String_vector* m_pDrillbits;
+        std::vector<std::string> m_drillbits;
 
         boost::mutex m_cvMutex;
         // Condition variable to signal connection callback has been processed
         boost::condition_variable m_cv;
         bool m_bConnecting;
-        exec::DrillServiceInstance m_drillServiceInstance;
+        std::string m_rootDir;
+
 };
 
 } // namespace Drill
