@@ -18,10 +18,17 @@
 
 #include <stdlib.h>
 #include "utils.hpp"
+#include "logger.hpp"
 #include "drill/common.hpp"
 
 namespace Drill{
 
+
+
+boost::random::random_device Utils::s_RNG;
+boost::random::mt19937 Utils::s_URNG(s_RNG());
+boost::uniform_int<> Utils::s_uniformDist;
+boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > Utils::s_randomNumber(s_URNG, s_uniformDist); 
 
 boost::mutex AllocatedBuffer::s_memCVMutex;
 boost::condition_variable AllocatedBuffer::s_memCV;
@@ -52,6 +59,38 @@ void Utils::freeBuffer(ByteBuf_t b, size_t len){
     }
 }
 
+void Utils::parseConnectStr(const char* connectStr,
+        std::string& pathToDrill,
+        std::string& protocol,
+        std::string& hostPortStr){
+    char u[MAX_CONNECT_STR+1];
+    strncpy(u,connectStr, MAX_CONNECT_STR); u[MAX_CONNECT_STR]=0;
+    char* z=strtok(u, "=");
+    char* c=strtok(NULL, "/");
+    char* p=strtok(NULL, "");
+
+    if(p!=NULL) pathToDrill=std::string("/")+p;
+    protocol=z; hostPortStr=c;
+    return;
+}
+
+void Utils::shuffle(std::vector<std::string>& vector){
+    std::random_shuffle(vector.begin(), vector.end(), Utils::s_randomNumber);
+    for(int i=0; i<vector.size(); i++){
+        DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "\tShuffled id: " << vector[i] << std::endl;)
+    }
+    return;
+}
+
+void Utils::add(std::vector<std::string>& vector1, std::vector<std::string>& vector2){
+    std::vector<std::string>::iterator it;
+    for(it=vector2.begin(); it!=vector2.end(); it++) {
+        std::vector<std::string>::iterator it2 = std::find(vector1.begin(), vector1.end(), *it);
+        if(it2==vector1.end()){
+            vector1.push_back(*it);
+        }
+    }
+}
 
 AllocatedBuffer::AllocatedBuffer(size_t l){
     m_pBuffer=NULL;

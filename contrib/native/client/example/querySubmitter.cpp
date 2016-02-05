@@ -20,6 +20,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <boost/thread.hpp>
 #include "drill/drillc.hpp"
 
 int nOptions=13;
@@ -65,11 +66,13 @@ Drill::status_t SchemaListener(void* ctx, Drill::FieldDefPtr fields, Drill::Dril
     }
 }
 
+boost::mutex listenerMutex;
 Drill::status_t QueryResultsListener(void* ctx, Drill::RecordBatch* b, Drill::DrillClientError* err){
     // Invariant:
     // (received an record batch and err is NULL)
     // or
     // (received query state message passed by `err` and b is NULL)
+    boost::lock_guard<boost::mutex> listenerLock(listenerMutex);
     if(!err){
         if(b!=NULL){
             b->print(std::cout, 0); // print all rows
@@ -316,11 +319,17 @@ int main(int argc, char* argv[]) {
         std::vector<Drill::QueryHandle_t*> queryHandles;
         std::vector<Drill::QueryHandle_t*>::iterator queryHandleIter;
 
+#if defined _WIN32 || defined _WIN64
+        const char* logpathPrefix="C:\\Users\\Administrator\\Documents\\temp\\drillclient";
+#else
+        const char* logpathPrefix="/var/log/drill/drillclient";
+#endif
+
         Drill::DrillClient client;
         // To log to file
-        //DrillClient::initLogging("/var/log/drill/", l);
+        Drill::DrillClient::initLogging(logpathPrefix, l);
         // To log to stderr
-        Drill::DrillClient::initLogging(NULL, l);
+        //Drill::DrillClient::initLogging(NULL, l);
         //Drill::DrillClientConfig::setBufferLimit(2*1024*1024); // 2MB. Allows us to hold at least two record batches.
         int nQueries=queryInputs.size();
         Drill::DrillClientConfig::setBufferLimit(nQueries*2*1024*1024); // 2MB per query. Allows us to hold at least two record batches.
@@ -346,6 +355,16 @@ int main(int argc, char* argv[]) {
 
         props.setProperty("someRandomProperty", "someRandomValue");
 
+#if 0
+        for(int i=0; i<20; i++){
+            int r = client.connect(connectStr.c_str(), &props);
+            if(r == Drill::CONN_SUCCESS){
+                std::cout << "CONNECTED " << i << std::endl;
+            }else{
+                std::cout << "FAILED TO CONNECT " << i << std::endl;
+            }
+        }
+#endif
         if(client.connect(connectStr.c_str(), &props)!=Drill::CONN_SUCCESS){
             std::cerr<< "Failed to connect with error: "<< client.getError() << " (Using:"<<connectStr<<")"<<std::endl;
             return -1;
@@ -411,17 +430,41 @@ int main(int argc, char* argv[]) {
                 }
 
             }else{
+                std::vector<Drill::DrillClient*> clients;
+                std::vector<Drill::DrillClient*>::iterator clientsIter;
+
+                for(size_t i=0; i<6; i++){
+                    Drill::DrillClient * pClient = new Drill::DrillClient();
+                    clients.push_back(pClient);
+                    if(pClient->connect(connectStr.c_str(), &props)!=Drill::CONN_SUCCESS){
+                        std::cerr<< "Failed to connect with error: "<< client.getError() << " (Using:"<<connectStr<<")"<<std::endl;
+                        return -1;
+                    }
+                    std::cout<< "Connected!\n" << std::endl;
+                    char logpath[1024+1];
+                    sprintf(logpath, "%s%lu.log", logpathPrefix, i);
+                    pClient->initLogging(logpath, l);
                 for(queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++) {
                     Drill::QueryHandle_t* qryHandle = new Drill::QueryHandle_t;
-                    client.submitQuery(type, *queryInpIter, QueryResultsListener, NULL, qryHandle);
-                    client.registerSchemaChangeListener(qryHandle, SchemaListener);
+                    pClient->submitQuery(type, *queryInpIter, QueryResultsListener, NULL, qryHandle);
+                    pClient->registerSchemaChangeListener(qryHandle, SchemaListener);
                     queryHandles.push_back(qryHandle);
                 }
-                client.waitForResults();
+                }
+                //pClient->waitForResults();
+                for(clientsIter = clients.begin(); clientsIter != clients.end(); clientsIter++) {
+                    (*clientsIter)->waitForResults();
+                }
                 for(queryHandleIter = queryHandles.begin(); queryHandleIter != queryHandles.end(); queryHandleIter++) {
                     client.freeQueryResources(*queryHandleIter);
                     delete *queryHandleIter;
                 }
+                    for(clientsIter = clients.begin(); clientsIter != clients.end(); clientsIter++) {
+                        
+                        delete *clientsIter;
+                    }
+                    clients.erase(clients.begin());
+                
             }
         }
         client.close();

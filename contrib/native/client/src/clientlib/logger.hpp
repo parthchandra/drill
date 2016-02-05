@@ -25,47 +25,74 @@
 #include <string>
 #include <stdio.h>
 
+#include <boost/thread/mutex.hpp>
 #include "drill/common.hpp"
 
 namespace Drill{
 
 class Logger{
     public:
-        Logger(){}
+        Logger(){
+            s_level=LOG_ERROR;
+            s_pOutStream=NULL;
+            s_pOutStream=&std::cout;
+        }
         ~Logger(){ }
 
-        static void init(const char* path);
-        static void close();
-        static std::ostream& log(logLevel_t level);
-        static std::string levelAsString(logLevel_t level) {
+        /*  static */ void init(const char* path);
+        /*  static */ void close();
+        /*  static */ std::ostream& log(logLevel_t level);
+        std::string levelAsString(logLevel_t level) {
             static const char* const levelNames[] = {
-                "TRACE",
-                "DEBUG",
-                "INFO",
+                "TRACE  ",
+                "DEBUG  ",
+                "INFO   ",
                 "WARNING",
-                "ERROR",
-                "FATAL"
+                "ERROR  ",
+                "FATAL  "
             };
             return levelNames[level];
         }
 
         // The logging level
-        static logLevel_t s_level;
-        static std::ostream* s_pOutStream;
+        /*  static */ logLevel_t s_level;
+        /*  static */ std::ostream* s_pOutStream;
+        /*  static */ boost::mutex s_logMutex;
 
     private:
         //static std::ostream* s_pOutStream;
-        static std::ofstream* s_pOutFileStream;
-        static char* s_filepath;
+        /*  static */ std::ofstream* s_pOutFileStream;
+        /*  static */ std::string s_filepath;
 
 }; // Logger
 
+Logger& getLogger();
 std::string getTime();
 std::string getTid();
+
+#define DRILL_MT_LOG(LOG) \
+{ \
+    boost::lock_guard<boost::mutex> logLock(getLogger().s_logMutex); \
+    LOG \
+}
+
+#define DRILL_LOG(level) \
+    if (getLogger().s_pOutStream==NULL || level < getLogger().s_level); \
+    else getLogger().log(level)       \
+
+
+#if 0
+#define DRILL_MT_LOG(LOG) \
+{ \
+    boost::lock_guard<boost::mutex> logLock(Drill::Logger::s_logMutex); \
+    LOG \
+}
 
 #define DRILL_LOG(level) \
     if (Logger::s_pOutStream==NULL || level < Drill::Logger::s_level); \
     else Drill::Logger::log(level)       \
+
+#endif
 
 } // namespace Drill
 

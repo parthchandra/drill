@@ -23,6 +23,11 @@
 #include <ostream>
 #include <fstream>
 #include <string>
+#include <vector>
+#include <boost/random/mersenne_twister.hpp> // for mt19937
+#include <boost/random/random_device.hpp>
+#include <boost/random/uniform_int.hpp>
+#include <boost/random/variate_generator.hpp>
 #include <boost/thread.hpp>
 
 #include "drill/common.hpp"
@@ -50,9 +55,32 @@ class AllocatedBuffer{
 
 class Utils{
     public:
+       static boost::random::random_device s_RNG;   //Truly random (expensive and device dependent)
+       static boost::random::mt19937 s_URNG; //Pseudo random with a period of ( 2^19937 - 1 )
+       static boost::uniform_int<> s_uniformDist;      // Produces a uniform distribution
+       static boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > s_randomNumber; // a random number generator also usable by shuffle
+
         //allocate memory for Record Batches
         static ByteBuf_t allocateBuffer(size_t len);
         static void freeBuffer(ByteBuf_t b, size_t len);
+        static void parseConnectStr(const char* connectStr,
+           std::string& pathToDrill,
+           std::string& protocol,
+           std::string& hostPortStr);
+        
+        // useful vector methods/idioms
+
+        // performs a random shuffle on a string vector
+        static void shuffle(std::vector<std::string>& vector);
+
+        // adds the contents of vector2 to vector1
+        static void add(std::vector<std::string>& vector1, std::vector<std::string>& vector2);
+        
+        // removes the element from the vector
+        template <typename T> static void eraseRemove( std::vector<T>& vector, T elem){
+            vector.erase( std::remove(vector.begin(), vector.end(), elem), vector.end() );
+        }
+
 }; // Utils
 
 } // namespace Drill

@@ -53,6 +53,7 @@ namespace exec{
 namespace Drill{
 
 //struct UserServerEndPoint;
+class  PooledDrillClientImpl;
 class  DrillClientImpl;
 class  DrillClientQueryResult;
 class  FieldMetadata;

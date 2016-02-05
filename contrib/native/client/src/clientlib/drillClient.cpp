@@ -56,21 +56,25 @@ int32_t DrillClientConfig::s_heartbeatFrequency=15; // 15 seconds
 boost::mutex DrillClientConfig::s_mutex;
 
 DrillClientConfig::DrillClientConfig(){
-    initLogging(NULL);
+    //initLogging(NULL);
 }
 
 DrillClientConfig::~DrillClientConfig(){
-    Logger::close();
+    //Logger::close();
+    //TODO: close the logger
+    //getLogger().close();
 }
 
 void DrillClientConfig::initLogging(const char* path){
-    Logger::init(path);
+    //Logger::init(path);
+    getLogger().init(path);
 }
 
 void DrillClientConfig::setLogLevel(logLevel_t l){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     s_logLevel=l;
-    Logger::s_level=l;
+    //Logger::s_level=l;
+    getLogger().s_level=l;
     //boost::log::core::get()->set_filter(boost::log::trivial::severity >= s_logLevel);
 }
 
@@ -162,7 +166,7 @@ RecordIterator::~RecordIterator(){
     delete this->m_pQueryResult;
     this->m_pQueryResult=NULL;
     if(this->m_pCurrentRecordBatch!=NULL){
-        DRILL_LOG(LOG_TRACE) << "Deleted last Record batch " << (void*) m_pCurrentRecordBatch << std::endl;
+        DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Deleted last Record batch " << (void*) m_pCurrentRecordBatch << std::endl;)
         delete this->m_pCurrentRecordBatch; this->m_pCurrentRecordBatch=NULL;
     }
 }
@@ -223,7 +227,7 @@ status_t RecordIterator::next(){
         if(this->m_pCurrentRecordBatch==NULL || this->m_currentRecord==this->m_pCurrentRecordBatch->getNumRecords()){
             boost::lock_guard<boost::mutex> bufferLock(this->m_recordBatchMutex);
             if(this->m_pCurrentRecordBatch !=NULL){
-                DRILL_LOG(LOG_TRACE) << "Deleted old Record batch " << (void*) m_pCurrentRecordBatch << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Deleted old Record batch " << (void*) m_pCurrentRecordBatch << std::endl;)
                 delete this->m_pCurrentRecordBatch; //free the previous record batch
                 this->m_pCurrentRecordBatch=NULL;
             }
@@ -234,12 +238,12 @@ status_t RecordIterator::next(){
             }
             this->m_pCurrentRecordBatch=this->m_pQueryResult->getNext();
             if(this->m_pCurrentRecordBatch != NULL){
-                DRILL_LOG(LOG_TRACE) << "Fetched new Record batch " << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Fetched new Record batch " << std::endl;)
             }else{
-                DRILL_LOG(LOG_TRACE) << "No new Record batch found " << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "No new Record batch found " << std::endl;)
             }
             if(this->m_pCurrentRecordBatch==NULL || this->m_pCurrentRecordBatch->getNumRecords()==0){
-                DRILL_LOG(LOG_TRACE) << "No more data." << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "No more data." << std::endl;)
                 ret = QRY_NO_MORE_DATA;
             }else if(this->m_pCurrentRecordBatch->hasSchemaChanged()){
                 ret=QRY_SUCCESS_WITH_INFO;
@@ -351,17 +355,17 @@ connectionStatus_t DrillClient::connect(const char* connectStr, DrillUserPropert
 }
 
 bool DrillClient::isActive(){
-    return this->m_pImpl->Active();
+    return this->m_pImpl->active();
 }
 
 void DrillClient::close() {
-    this->m_pImpl->Close();
+    this->m_pImpl->close();
 }
 
 status_t DrillClient::submitQuery(Drill::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx, QueryHandle_t* qHandle){
 
     ::exec::shared::QueryType castedType = static_cast< ::exec::shared::QueryType> (t);
-    DrillClientQueryResult* pResult=this->m_pImpl->SubmitQuery(castedType, plan, listener, listenerCtx);
+    DrillClientQueryResult* pResult=this->m_pImpl->submitQuery(castedType, plan, listener, listenerCtx);
     *qHandle=(QueryHandle_t)pResult;
     return QRY_SUCCESS;
 }
@@ -369,7 +373,7 @@ status_t DrillClient::submitQuery(Drill::QueryType t, const std::string& plan, p
 RecordIterator* DrillClient::submitQuery(Drill::QueryType t, const std::string& plan, DrillClientError* err){
     RecordIterator* pIter=NULL;
     ::exec::shared::QueryType castedType = static_cast< ::exec::shared::QueryType> (t);
-    DrillClientQueryResult* pResult=this->m_pImpl->SubmitQuery(castedType, plan, NULL, NULL);
+    DrillClientQueryResult* pResult=this->m_pImpl->submitQuery(castedType, plan, NULL, NULL);
     if(pResult){
         pIter=new RecordIterator(pResult);
     }
@@ -400,6 +404,8 @@ void DrillClient::registerSchemaChangeListener(QueryHandle_t* handle, pfnSchemaL
 }
 
 void DrillClient::freeQueryResources(QueryHandle_t* handle){
+    //TODO: DRILL-4313: Tell PooledDrillClientImpl to free queryResources for this query.
+    //m_pImpl->freeQueryResources((DrillClientQueryResult*)(*handle));
     delete (DrillClientQueryResult*)(*handle);
     *handle=NULL;
 }

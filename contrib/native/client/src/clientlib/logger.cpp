@@ -18,10 +18,20 @@
 
 #include "boost/date_time/posix_time/posix_time.hpp"
 #include "boost/thread.hpp"
-
+#include "utils.hpp"
 #include "logger.hpp"
 
 namespace Drill{
+
+/* 
+ * Creates a single instance of the logger the first time this is called 
+ */
+/*  static */ boost::mutex g_logMutex;
+Logger& getLogger() {
+    boost::lock_guard<boost::mutex> logLock(g_logMutex); 
+    static Logger* logger = new Logger();
+    return *logger;
+}
 
 std::string getTime(){
     return to_simple_string(boost::posix_time::second_clock::local_time());
@@ -31,23 +41,60 @@ std::string getTid(){
     return boost::lexical_cast<std::string>(boost::this_thread::get_id());
 }
 
-logLevel_t Logger::s_level=LOG_ERROR;
-std::ostream* Logger::s_pOutStream=NULL;
-std::ofstream* Logger::s_pOutFileStream=NULL;
-char* Logger::s_filepath=NULL;
+//logLevel_t Logger::s_level=LOG_ERROR;
+//std::ostream* Logger::s_pOutStream=NULL;
+//std::ofstream* Logger::s_pOutFileStream=NULL;
+//std::string Logger::s_filepath;
+//boost::mutex Logger::s_logMutex;
 
 void Logger::init(const char* path){
-    if(path!=NULL) {
+
+    static bool initialized=false;
+    boost::lock_guard<boost::mutex> logLock(s_logMutex); 
+    if(!initialized && path!=NULL && s_filepath.empty()) {
+        std::string fullname = path;
+        size_t lastindex = fullname.find_last_of(".");
+        std::string filename;
+        if(lastindex != std::string::npos){
+        filename = fullname.substr(0, lastindex)
+            +std::to_string(Utils::s_randomNumber())
+            +fullname.substr(lastindex, fullname.length());
+        }else{
+            filename = fullname.substr(0, fullname.length())
+            +std::to_string(Utils::s_randomNumber())
+            +".log";
+        }
+        //s_filepath=path;
+        s_filepath=filename.c_str();
         s_pOutFileStream = new std::ofstream;
-        s_pOutFileStream->open(path, std::ofstream::out);
+        s_pOutFileStream->open(s_filepath, std::ofstream::out|std::ofstream::app);
         if(!s_pOutFileStream->is_open()){
             std::cerr << "Logfile could not be opened. Logging to stdout" << std::endl;
+            s_filepath.erase();
+            delete s_pOutFileStream;
         }
-    }
+        initialized=true;
+
     s_pOutStream=(s_pOutFileStream!=NULL && s_pOutFileStream->is_open())?s_pOutFileStream:&std::cout;
+#if defined _WIN32 || defined _WIN64
+
+	TCHAR szFile[MAX_PATH];
+	GetModuleFileName(NULL, szFile, MAX_PATH);
+#endif
+	*s_pOutStream
+		<< " DRILL CLIENT LIBRARY " << std::endl
+#if defined _WIN32 || defined _WIN64
+		<< " Loaded by process : " << szFile << std::endl
+		<< " Current Process Id is: " << ::GetCurrentProcessId() << std::endl
+#endif
+		<< " Initialized Logging to file (" << path << "). "
+		<< std::endl;
+	}
 }
 
 void Logger::close(){
+    //boost::lock_guard<boost::mutex> logLock(Drill::Logger::s_logMutex); 
+    boost::lock_guard<boost::mutex> logLock(s_logMutex); 
     if(s_pOutFileStream !=NULL){
         if(s_pOutFileStream->is_open()){
             s_pOutFileStream->close();
@@ -56,6 +103,8 @@ void Logger::close(){
     }
 }
 
+// The log call itself cannot be thread safe. Use the DRILL_MT_LOG macro to make 
+// this thread safe
 std::ostream& Logger::log(logLevel_t level){
     *s_pOutStream << getTime();
     *s_pOutStream << " : "<<levelAsString(level);
