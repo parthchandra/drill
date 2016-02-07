@@ -225,7 +225,6 @@ class DrillClientImpl{
     };
 
         ~DrillClientImpl(){
-            //TODO: Cleanup.
             //Free any record batches or buffers remaining
             //Cancel any pending requests
             //Clear and destroy DrillClientQueryResults vector?
@@ -266,8 +265,8 @@ class DrillClientImpl{
         //Connect via Zookeeper or directly
         connectionStatus_t connect(const char* connStr);
         // test whether the client is active
-        bool Active();
-        void Close() ;
+        bool active();
+        void close() ;
         DrillClientError* getError(){ return m_pError;}
         DrillClientQueryResult* submitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx);
         void waitForResults();
@@ -399,7 +398,7 @@ class DrillClientImpl{
 
 };
 
-inline bool DrillClientImpl::Active() {
+inline bool DrillClientImpl::active() {
     return this->m_bIsConnected;;
 }
 
@@ -409,7 +408,6 @@ inline bool DrillClientImpl::Active() {
  *  Every submitQuery uses a different DrillClientImpl to distribute the load.
  *  DrillClient can use this class instead of DrillClientImpl to get better load balancing.
  * */
-
 class PooledDrillClientImpl{
     public:
         PooledDrillClientImpl(){
@@ -452,13 +450,15 @@ class PooledDrillClientImpl{
         //Validates handshake only against the first drillbit connected to.
         connectionStatus_t validateHandshake(DrillUserProperties* props);
 
+        void freeQueryResources(DrillClientQueryResult* pQryResult);
+
     private:
         
         std::string m_connectStr; 
         std::string m_lastQuery;
         
         // Connects a queryResult to the DrillClientImpl Object that is executing the query.
-        std::map<DrillClientQueryResult*, DrillClientImpl*> m_queryConnectionMap; 
+        std::map<DrillClientQueryResult*, const DrillClientImpl*> m_queryConnectionMap; 
         
         // A list of all the current client connections. We choose a new one for every query. 
         // When picking a drillClientImpl to use, we see how many queries each drillClientImpl
@@ -489,9 +489,9 @@ class ZookeeperImpl{
     public:
         ZookeeperImpl();
         ~ZookeeperImpl();
-        static int  s_counter; // a monotically increasing counter to choose a connection from the
-                               // drill cluster in a somewhat round robin fashion.
         static ZooLogLevel getZkLogLevel();
+        static uint32_t  s_counter; // a counter to choose a connection from the
+                               // drill cluster in a round robin fashion.
         // comma separated host:port pairs, each corresponding to a zk
         // server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
         int connectToZookeeper(const char* connectStr, const char* pathToDrill);

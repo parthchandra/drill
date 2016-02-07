@@ -50,8 +50,7 @@
 // If the number of drillbits in a cluster is greater than RANDOMIZE_CONN_POOL_THRESHOLD
 // then we randomize the list of drillbits to achieve load balancing.
 // If not, then we use a round robin scheme
-//#define RANDOMIZE_CONN_POOL_THRESHOLD  32
-#define RANDOMIZE_CONN_POOL_THRESHOLD  2
+#define RANDOMIZE_CONN_POOL_THRESHOLD  32
 
 #ifdef _DEBUG
 #define EXTRA_DEBUGGING
@@ -118,7 +117,8 @@ typedef enum{
     CONN_HOSTNAME_RESOLUTION_ERROR=6,
     CONN_AUTH_FAILED=7,
     CONN_BAD_RPC_VER=8,
-    CONN_DEAD=9
+    CONN_DEAD=9,
+    CONN_NOTCONNECTED=10
 } connectionStatus_t;
 
 typedef enum{
