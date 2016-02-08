@@ -907,4 +907,42 @@ public class TestFunctionsQuery extends BaseTestQuery {
         .baselineValues("foo")
         .go();
   }
+
+  @Test
+  public void testTimestampAdd() throws Exception {
+    String query = "select " +
+        "timestampadd(SQL_TSI_FRAC_SECOND, 2, timestamp '2015-03-30 20:49:59.000') as col1, " +
+        "timestampadd(SQL_TSI_SECOND, 2, timestamp '2015-03-30 20:49:59.000') as col2 " +
+        "from (values(1))";
+
+    DateTime dateTime1 = DateUtility.formatTimeStamp.parseDateTime("2015-03-30 20:49:59.002");
+    DateTime dateTime2 = DateUtility.formatTimeStamp.parseDateTime("2015-03-30 20:50:01.000");
+
+    testBuilder()
+        .sqlQuery(query)
+        .unOrdered()
+        .baselineColumns("col1", "col2")
+        .baselineValues(dateTime1, dateTime2)
+        .go();
+
+
+      //test("SELECT DATE_ADD(date '2015-05-15', interval '3' year) FROM (VALUES(1))");
+      //test("SELECT INTERVAL '13' month FROM (VALUES(1))");
+  }
+
+  @Test
+  public void testTimestampDiff() throws Exception {
+    String query = "select " +
+        "timestampdiff(SQL_TSI_MINUTE, timestamp '2015-03-30 20:55:59.000', timestamp '2015-03-30 20:49:59.000') as col1, " +
+        "timestampdiff(SQL_TSI_MONTH, timestamp '2016-03-30 20:49:59.000', timestamp '2015-03-30 20:49:59.000') as col2 " +
+        "from (values(1))";
+
+    testBuilder()
+        .sqlQuery(query)
+        .unOrdered()
+        .baselineColumns("col1", "col2")
+        .baselineValues(6L, 12L)
+        .go();
+  }
+
 }

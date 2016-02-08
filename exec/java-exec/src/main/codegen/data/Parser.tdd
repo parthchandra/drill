@@ -36,7 +36,16 @@
     "USE",
     "FILES",
     "REFRESH",
-    "METADATA"
+    "METADATA",
+    "SQL_TSI_FRAC_SECOND",
+    "SQL_TSI_SECOND",
+    "SQL_TSI_MINUTE",
+    "SQL_TSI_HOUR",
+    "SQL_TSI_DAY",
+    "SQL_TSI_WEEK",
+    "SQL_TSI_MONTH",
+    "SQL_TSI_QUARTER",
+    "SQL_TSI_YEAR"
   ]
 
   # List of methods for parsing custom SQL statements.
@@ -56,6 +65,7 @@
   # List of methods for parsing custom literals.
   # Example: ParseJsonLiteral().
   literalParserMethods: [
+    "SqlTsiLiteral()"
   ]
 
   # List of methods for parsing custom data types.
