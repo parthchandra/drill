@@ -46,7 +46,6 @@ DrillClientInitializer::~DrillClientInitializer(){
 }
 
 // Initialize static member of DrillClientConfig
-bool DrillClientConfig::s_logInitialized=false;
 logLevel_t DrillClientConfig::s_logLevel=LOG_ERROR;
 uint64_t DrillClientConfig::s_bufferLimit=MAX_MEM_ALLOC_SIZE;
 int32_t DrillClientConfig::s_socketTimeout=0;
@@ -65,9 +64,7 @@ DrillClientConfig::~DrillClientConfig(){
 }
 
 void DrillClientConfig::initLogging(const char* path){
-    if(!DrillClientConfig::s_logInitialized){
         Logger::init(path);
-    }
 }
 
 void DrillClientConfig::setLogLevel(logLevel_t l){

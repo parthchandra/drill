@@ -56,7 +56,7 @@ class Logger{
     private:
         //static std::ostream* s_pOutStream;
         static std::ofstream* s_pOutFileStream;
-        static char* s_filepath;
+        static std::string s_filepath;
 
 }; // Logger
 

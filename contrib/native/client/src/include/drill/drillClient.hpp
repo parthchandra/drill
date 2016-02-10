@@ -108,7 +108,6 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
         static int32_t getHeartbeatFrequency();
         static logLevel_t getLogLevel();
     private:
-        static bool s_logInitialized;
         // The logging level
         static logLevel_t s_logLevel;
         // The total amount of memory to be allocated by an instance of DrillClient.

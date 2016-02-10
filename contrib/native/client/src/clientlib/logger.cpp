@@ -34,10 +34,11 @@ std::string getTid(){
 logLevel_t Logger::s_level=LOG_ERROR;
 std::ostream* Logger::s_pOutStream=NULL;
 std::ofstream* Logger::s_pOutFileStream=NULL;
-char* Logger::s_filepath=NULL;
+std::string Logger::s_filepath;
 
 void Logger::init(const char* path){
-    if(path!=NULL) {
+    if(path!=NULL && s_filepath.empty()) {
+        s_filepath=path;
         s_pOutFileStream = new std::ofstream;
         s_pOutFileStream->open(path, std::ofstream::out);
         if(!s_pOutFileStream->is_open()){
