@@ -115,6 +115,10 @@ Windows platforms should be more or less similar.
         iii) If you do not have the 64 bit assembler installed, boost-context does not
         build. It is safe to ignore it as boost-context is not needed for Drill
 
+Notes on building withVisual Studio 2013 
+  You can download the prebuilt binary from http://sourceforge.net/projects/boost/files/boost-binaries/1.55.0/ 
+  Installs in C:\local\boost_1_55_0
+
 2.2 Protobuf (2.5.0)
     Get protobuf from here: https://protobuf.googlecode.com/files/protobuf-2.5.0.zip
 
@@ -126,6 +130,13 @@ Windows platforms should be more or less similar.
         platform toolset is set to Windows7.1SDK)
     d) Build the protobuf project first (not the solution)
     e) Build the solution!
+
+Notes on building with Visual Studio 2013 - 
+   i) Importing the solution generates 32 bit projects. You need to add the 64 bit configuration manually.
+   ii) Fix zero_copy_stream_impl_lite.cc 
+      #include <minmax.h>
+   iii) Add the /FS flag (https://msdn.microsoft.com/en-us/library/dn502518.aspx) if you see the " fatal error C1041: cannot open program database" error.
+   iv) Ignore test and lite_test build failure
 
 2.3 Zookeeper (3.4.6) 
     a) Set the ZOOKEEPER_HOME environment variable
@@ -140,6 +151,16 @@ Windows platforms should be more or less similar.
             Properties->Configuration Properties->General->Configuration Type = Static Library
       iii) In the cli project add the preprocessor define USE_STATIC_LIB
       iv) Build. Build zookeeper lib first, then build cli 
+Notes on building with Visual Studio 2013 - 
+    Apply the x64 patch.
+    Also, need to edit the file recordio.h and not define htonll if _WINSOCK2API_ is defined
+
+    For x64 build you need to edit the link directories for the path for additional libraries -
+      Properties->Configuration Properties->Linker->General -> Additional Library Directories
+      Change to 
+          $(ZOOKEEPER_HOME)\src\c\x64\Debug 
+          $(ZOOKEEPER_HOME)\src\c\x64\Release 
+     For the Debug x64 build change the link library to zookeeper.lib (from zookeeper_d.lib)
 
 3 Building Drill Clientlib
 3.1 SET the following environment variables
@@ -186,3 +207,4 @@ Windows platforms should be more or less similar.
 	
 5 Testing with querySubmitter
 querySubmitter query="select * from INFORMAITON_SCHEMA.SCHEMATA" type=sql connectStr=local=192.168.39.43:31010 api=sync logLevel=trace user=yourUserName password=yourPassWord
+

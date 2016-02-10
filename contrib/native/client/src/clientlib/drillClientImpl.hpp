@@ -34,18 +34,22 @@
 #include <queue>
 #include <vector>
 #include <boost/asio.hpp>
+
+#if defined _WIN32  || defined _WIN64
+#include <zookeeper.h>
+//Windows header files redefine 'random'
+#ifdef random
+#undef random
+#endif
+#else
+#include <zookeeper/zookeeper.h>
+#endif
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/random/mersenne_twister.hpp> // for mt19937
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/random/variate_generator.hpp>
 #include <boost/thread.hpp>
-#ifdef _WIN32
-#include <zookeeper.h>
-#else
-#include <zookeeper/zookeeper.h>
-#endif
-
 #include "drill/drillClient.hpp"
 #include "rpcEncoder.hpp"
 #include "rpcDecoder.hpp"
