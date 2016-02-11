@@ -45,7 +45,7 @@
 #define MEM_CHUNK_SIZE 64*1024 // 64K
 #define MAX_MEM_ALLOC_SIZE 256*1024*1024 // 256 MB
 
-#define DEFAULT_MAX_CONCURRENT_CONNECTIONS 16
+#define DEFAULT_MAX_CONCURRENT_CONNECTIONS 2
 
 // If the number of drillbits in a cluster is greater than RANDOMIZE_CONN_POOL_THRESHOLD
 // then we randomize the list of drillbits to achieve load balancing.

@@ -23,6 +23,14 @@
 
 namespace Drill{
 
+/* 
+ * Creates a single instance of the logger the first time this is called 
+ */
+Logger& getLogger() {
+    static Logger* logger = new Logger();
+    return *logger;
+}
+
 std::string getTime(){
     return to_simple_string(boost::posix_time::second_clock::local_time());
 }
@@ -31,12 +39,15 @@ std::string getTid(){
     return boost::lexical_cast<std::string>(boost::this_thread::get_id());
 }
 
-logLevel_t Logger::s_level=LOG_ERROR;
-std::ostream* Logger::s_pOutStream=NULL;
-std::ofstream* Logger::s_pOutFileStream=NULL;
-std::string Logger::s_filepath;
+//logLevel_t Logger::s_level=LOG_ERROR;
+//std::ostream* Logger::s_pOutStream=NULL;
+//std::ofstream* Logger::s_pOutFileStream=NULL;
+//std::string Logger::s_filepath;
+//boost::mutex Logger::s_logMutex;
 
 void Logger::init(const char* path){
+    //boost::lock_guard<boost::mutex> logLock(Drill::Logger::s_logMutex); 
+    boost::lock_guard<boost::mutex> logLock(s_logMutex); 
     if(path!=NULL && s_filepath.empty()) {
         s_filepath=path;
         s_pOutFileStream = new std::ofstream;
@@ -63,6 +74,8 @@ void Logger::init(const char* path){
 }
 
 void Logger::close(){
+    //boost::lock_guard<boost::mutex> logLock(Drill::Logger::s_logMutex); 
+    boost::lock_guard<boost::mutex> logLock(s_logMutex); 
     if(s_pOutFileStream !=NULL){
         if(s_pOutFileStream->is_open()){
             s_pOutFileStream->close();
@@ -71,6 +84,8 @@ void Logger::close(){
     }
 }
 
+// The log call itself cannot be thread safe. Use the DRILL_MT_LOG macro to make 
+// this thread safe
 std::ostream& Logger::log(logLevel_t level){
     *s_pOutStream << getTime();
     *s_pOutStream << " : "<<levelAsString(level);
