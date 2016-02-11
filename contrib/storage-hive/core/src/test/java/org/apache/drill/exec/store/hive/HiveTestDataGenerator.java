@@ -25,6 +25,7 @@ import java.sql.Timestamp;
 import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.store.StoragePluginRegistry;
@@ -464,6 +465,19 @@ public class HiveTestDataGenerator {
     FileUtils.deleteQuietly(new File(whDir, "kv_sh"));
     //executeQuery(hiveDriver, "INSERT OVERWRITE TABLE kv_sh SELECT * FROM kv");
 
+    // Create tables with skip header and footer table property
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("default.kv_small_skip_header_footer_lines", "1", "1"));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("default.kv_small_skip_header_footer_lines", 5, 1, 1));
+
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("default.kv_more_than_4000_skip_header_footer_lines", "2", "2"));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("default.kv_more_than_4000_skip_header_footer_lines", 5000, 2, 2));
+
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("default.kv_incorrect_skip_header", "A", "1"));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("default.kv_incorrect_skip_header", 5, 1, 1));
+
+    executeQuery(hiveDriver, createTableWithHeaderFooterProperties("default.kv_incorrect_skip_footer", "1", "A"));
+    executeQuery(hiveDriver, generateTestDataWithHeadersAndFooters("default.kv_incorrect_skip_footer", 5, 1, 1));
+
     ss.close();
   }
 
@@ -519,5 +533,24 @@ public class HiveTestDataGenerator {
     printWriter.close();
 
     return file.getPath();
+  }
+
+  private String createTableWithHeaderFooterProperties(String tableName, String headerValue, String footerValue) {
+    return "create table " + tableName +
+          " (key int, value string) row format delimited fields terminated by ',' stored as textfile " +
+          "tblproperties(" + "'skip.header.line.count'='" + headerValue + "',"
+          + "'skip.footer.line.count'='" + footerValue + "'" + ")";
+  }
+
+  private String generateTestDataWithHeadersAndFooters(String tableName, int rowCount, int headerLines, int footerLines) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("insert into table ").append(tableName).append(" (key, value) values ");
+    sb.append(StringUtils.repeat("('key_header', 'value_header')", ",", headerLines));
+    for (int i  = 1; i <= rowCount; i++) {
+        sb.append(",(").append(i).append(",").append("'key_").append(i).append("')");
+    }
+    sb.append(StringUtils.repeat(",('key_footer', 'value_footer')", footerLines));
+
+    return sb.toString();
   }
 }
