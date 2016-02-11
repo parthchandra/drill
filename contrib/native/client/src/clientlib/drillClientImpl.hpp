@@ -473,6 +473,7 @@ class PooledDrillClientImpl{
         
         // Use this to decide which drillbit to select next from the list of drillbits.
         size_t m_lastConnection;
+		boost::mutex m_cMutex;
 
         // Number of queries executed so far. Can be used to select a new Drillbit from the pool.
         size_t m_queriesExecuted;
@@ -496,6 +497,8 @@ class ZookeeperImpl{
         static ZooLogLevel getZkLogLevel();
         static uint32_t  s_counter; // a counter to choose a connection from the
                                // drill cluster in a round robin fashion.
+		static boost::mutex s_cMutex;
+
         // comma separated host:port pairs, each corresponding to a zk
         // server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
         int connectToZookeeper(const char* connectStr, const char* pathToDrill);

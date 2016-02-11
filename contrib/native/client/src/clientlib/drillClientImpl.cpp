@@ -114,10 +114,13 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr){
             }
             exec::DrillbitEndpoint endpoint;
             size_t nextIndex=0;
-            if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
+            //if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
+			{
+				boost::lock_guard<boost::mutex> cLock(ZookeeperImpl::s_cMutex);
                 int nDrillbits=zook.getDrillbitCount();
                 nextIndex = (ZookeeperImpl::s_counter)%nDrillbits;
                 ZookeeperImpl::s_counter++;
+				DRILL_LOG(LOG_TRACE) << "Current Zookeeper counter is: " << ZookeeperImpl::s_counter++ << std::endl;
             }
             zook.getEndPoint(nextIndex, endpoint);
             host=boost::lexical_cast<std::string>(endpoint.address());
@@ -1443,7 +1446,13 @@ connectionStatus_t PooledDrillClientImpl::connect(const char* connStr){
                 exec::DrillbitEndpoint e;
                 size_t nextIndex=0;
                 if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
-                    nextIndex = (++m_lastConnection)%(zook.getDrillbitCount());
+					boost::lock_guard<boost::mutex> cLock(m_cMutex);
+					m_lastConnection++;
+                    nextIndex = (m_lastConnection)%(zook.getDrillbitCount());
+					DRILL_LOG(LOG_TRACE) << "Pooled Connection"
+						<< "(" << (void*)this << ")"
+						<< ": Current counter is: " 
+						<< m_lastConnection << std::endl;
                 }
                 err=zook.getEndPoint(nextIndex, e);
                 if(!err){
@@ -1623,6 +1632,7 @@ DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
 char ZookeeperImpl::s_drillRoot[]="/drill/";
 char ZookeeperImpl::s_defaultCluster[]="drillbits1";
 uint32_t  ZookeeperImpl::s_counter=0;
+boost::mutex  ZookeeperImpl::s_cMutex;
 
 ZookeeperImpl::ZookeeperImpl(){
     //m_pDrillbits=new String_vector;

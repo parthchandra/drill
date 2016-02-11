@@ -267,6 +267,7 @@ int main(int argc, char* argv[]) {
         parseArgs(argc, argv);
 
         std::vector<std::string*> queries;
+		std::vector<Drill::DrillClient*> clients;
 
         std::string connectStr=qsOptionValues["connectStr"];
         std::string schema=qsOptionValues["schema"];
@@ -317,10 +318,15 @@ int main(int argc, char* argv[]) {
         std::vector<Drill::QueryHandle_t*>::iterator queryHandleIter;
 
         Drill::DrillClient client;
+		//Drill::DrillClient client2;
+
         // To log to file
-        //DrillClient::initLogging("/var/log/drill/", l);
+        Drill::DrillClient::initLogging("C:\\Users\\Administrator\\Documents\\temp\\drillclient1.log", l);
+		Sleep(5000);
+		Drill::DrillClient::initLogging("C:\\Users\\Administrator\\Documents\\temp\\drillclient2.log", l);
+
         // To log to stderr
-        Drill::DrillClient::initLogging(NULL, l);
+        //Drill::DrillClient::initLogging(NULL, l);
         //Drill::DrillClientConfig::setBufferLimit(2*1024*1024); // 2MB. Allows us to hold at least two record batches.
         int nQueries=queryInputs.size();
         Drill::DrillClientConfig::setBufferLimit(nQueries*2*1024*1024); // 2MB per query. Allows us to hold at least two record batches.
@@ -408,15 +414,22 @@ int main(int argc, char* argv[]) {
             }
             client.waitForResults();
         }else{
-            if(bSyncSend){
+			Drill::DrillClient* pClient = new Drill::DrillClient();
+			clients.push_back(pClient);
+			if (pClient->connect(connectStr.c_str(), &props) != Drill::CONN_SUCCESS){
+				std::cerr << "Failed to connect with error: " << pClient->getError() << " (Using:" << connectStr << ")" << std::endl;
+				return -1;
+			}
+
+			if (bSyncSend){
                 for(queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++) {
                     Drill::QueryHandle_t* qryHandle = new Drill::QueryHandle_t;
-                    client.submitQuery(type, *queryInpIter, QueryResultsListener, NULL, qryHandle);
-                    client.registerSchemaChangeListener(qryHandle, SchemaListener);
+                    pClient->submitQuery(type, *queryInpIter, QueryResultsListener, NULL, qryHandle);
+                    pClient->registerSchemaChangeListener(qryHandle, SchemaListener);
                     
-                    client.waitForResults();
+                    pClient->waitForResults();
 
-                    client.freeQueryResources(qryHandle);
+                    pClient->freeQueryResources(qryHandle);
                     delete qryHandle;
                 }
 

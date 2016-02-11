@@ -44,8 +44,22 @@ void Logger::init(const char* path){
         if(!s_pOutFileStream->is_open()){
             std::cerr << "Logfile could not be opened. Logging to stdout" << std::endl;
         }
-    }
+
     s_pOutStream=(s_pOutFileStream!=NULL && s_pOutFileStream->is_open())?s_pOutFileStream:&std::cout;
+#if defined _WIN32 || defined _WIN64
+
+	TCHAR szFile[MAX_PATH];
+	GetModuleFileName(NULL, szFile, MAX_PATH);
+#endif
+	*s_pOutStream
+		<< " DRILL CLIENT LIBRARY " << std::endl
+#if defined _WIN32 || defined _WIN64
+		<< " Loaded by process : " << szFile << std::endl
+		<< " Current Process Id is: " << ::GetCurrentProcessId() << std::endl
+#endif
+		<< " Initialized Logging to file (" << path << "). "
+		<< std::endl;
+	}
 }
 
 void Logger::close(){
