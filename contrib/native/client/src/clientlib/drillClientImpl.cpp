@@ -124,10 +124,11 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr){
                     host=boost::lexical_cast<std::string>(endpoint.address());
                     port=boost::lexical_cast<std::string>(endpoint.user_port());
                 }
-                if(err){
-                    return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
-                }
-                zook.close();
+            }
+            if(err){
+                return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
+            }
+            zook.close();
             }else if(!strcmp(protocol.c_str(), "local")){
             char tempStr[MAX_CONNECT_STR+1];
             strncpy(tempStr, hostPortStr.c_str(), MAX_CONNECT_STR); tempStr[MAX_CONNECT_STR]=0;
