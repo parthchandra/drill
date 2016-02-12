@@ -36,7 +36,7 @@ else()
     set(Boost_USE_STATIC_RUNTIME OFF)
 endif()
 
-find_package(Boost 1.53.0 REQUIRED COMPONENTS regex system date_time chrono thread )
+find_package(Boost 1.53.0 REQUIRED COMPONENTS regex system date_time chrono thread random)
 include_directories(${Boost_INCLUDE_DIRS})
 
 if(CMAKE_COMPILER_IS_GNUCXX)
@@ -90,5 +90,7 @@ set_property(
 link_directories(/usr/local/lib)
 
 add_executable(querySubmitter example/querySubmitter.cpp )
+add_executable(pooledConnections example/pooledConnections.cpp )
 
 target_link_libraries(querySubmitter ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} drillClient protomsgs y2038)
+target_link_libraries(pooledConnections ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} drillClient protomsgs y2038)
