@@ -105,26 +105,30 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr){
         if(!strcmp(protocol.c_str(), "zk")){
             ZookeeperImpl zook;
             std::vector<std::string> drillbits;
-            if(zook.getAllDrillbits(hostPortStr.c_str(), pathToDrill.c_str(), drillbits)!=0){
-                return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
-            }
-            Utils::shuffle(drillbits);
+            int err = zook.getAllDrillbits(hostPortStr.c_str(), pathToDrill.c_str(), drillbits);
+            if(!err){
+                Utils::shuffle(drillbits);
 
-            exec::DrillbitEndpoint endpoint;
-            size_t nextIndex=0;
-            //if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
-			{
-				boost::lock_guard<boost::mutex> cLock(ZookeeperImpl::s_cMutex);
-                int nDrillbits=drillbits.size();
-                nextIndex = (ZookeeperImpl::s_counter)%nDrillbits;
-                ZookeeperImpl::s_counter++;
-				DRILL_LOG(LOG_TRACE) << "Current Zookeeper counter is: " << ZookeeperImpl::s_counter++ << std::endl;
-            }
-            zook.getEndPoint(drillbits, nextIndex, endpoint);
-            host=boost::lexical_cast<std::string>(endpoint.address());
-            port=boost::lexical_cast<std::string>(endpoint.user_port());
-            zook.close();
-        }else if(!strcmp(protocol.c_str(), "local")){
+                exec::DrillbitEndpoint endpoint;
+                //size_t nextIndex=0;
+                //if(zook.getDrillbitCount() <= RANDOMIZE_CONN_POOL_THRESHOLD){
+                //{
+                //	boost::lock_guard<boost::mutex> cLock(ZookeeperImpl::s_cMutex);
+                //    int nDrillbits=drillbits.size();
+                //    nextIndex = (ZookeeperImpl::s_counter)%nDrillbits;
+                //    ZookeeperImpl::s_counter++;
+                //	DRILL_LOG(LOG_TRACE) << "Current Zookeeper counter is: " << ZookeeperImpl::s_counter++ << std::endl;
+                //}
+                err = zook.getEndPoint(drillbits, drillbits.size(), endpoint);// get the last one in the list
+                if(!err){
+                    host=boost::lexical_cast<std::string>(endpoint.address());
+                    port=boost::lexical_cast<std::string>(endpoint.user_port());
+                }
+                if(err){
+                    return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
+                }
+                zook.close();
+            }else if(!strcmp(protocol.c_str(), "local")){
             char tempStr[MAX_CONNECT_STR+1];
             strncpy(tempStr, hostPortStr.c_str(), MAX_CONNECT_STR); tempStr[MAX_CONNECT_STR]=0;
             host=strtok(tempStr, ":");
