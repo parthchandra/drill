@@ -53,6 +53,7 @@ namespace exec{
 namespace Drill{
 
 //struct UserServerEndPoint;
+class  DrillClientImplBase;
 class  DrillClientImpl;
 class  DrillClientQueryResult;
 class  FieldMetadata;
@@ -107,6 +108,10 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
         static int32_t getQueryTimeout();
         static int32_t getHeartbeatFrequency();
         static logLevel_t getLogLevel();
+        static void enableConnectionPooling();
+        static bool isConnectionPoolingEnabled();
+        static void setConnectionPoolMax(int32_t l);
+        static int32_t getConnectionPoolMax();
     private:
         // The logging level
         static logLevel_t s_logLevel;
@@ -138,6 +143,8 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
         static int32_t s_queryTimeout;
         static int32_t s_heartbeatFrequency;
         static boost::mutex s_mutex;
+        static bool s_enableConnectionPool;
+        static int32_t s_connectionPoolMax;
 };
 
 
@@ -340,6 +347,10 @@ class DECLSPEC_DRILL_CLIENT DrillClient{
         std::string& getError();
 
         /*
+         * Returns the error message associated with the query handle
+         */
+        std::string& getError(QueryHandle_t handle);
+        /*
          * Applications using the async query submit method can register a listener for schema changes
          *
          */
@@ -369,7 +380,7 @@ class DECLSPEC_DRILL_CLIENT DrillClient{
         static DrillClientInitializer s_init;
         static DrillClientConfig s_config;
 
-        DrillClientImpl * m_pImpl;
+        DrillClientImplBase * m_pImpl;
 };
 
 } // namespace Drill

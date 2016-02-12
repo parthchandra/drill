@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-
+#include <stdlib.h>
 #include <boost/assign.hpp>
 #include "drill/common.hpp"
 #include "drill/drillClient.hpp"
@@ -52,25 +52,30 @@ int32_t DrillClientConfig::s_socketTimeout=0;
 int32_t DrillClientConfig::s_handshakeTimeout=5;
 int32_t DrillClientConfig::s_queryTimeout=180;
 int32_t DrillClientConfig::s_heartbeatFrequency=15; // 15 seconds
+bool DrillClientConfig::s_enableConnectionPool=false; // 15 seconds
+int32_t DrillClientConfig::s_connectionPoolMax=DEFAULT_MAX_CONCURRENT_CONNECTIONS; // 10
 
 boost::mutex DrillClientConfig::s_mutex;
 
 DrillClientConfig::DrillClientConfig(){
-    initLogging(NULL);
+    // Do not initialize logging. The Logger object is static and may 
+    // not have been initialized yet
+    //initLogging(NULL);
 }
 
 DrillClientConfig::~DrillClientConfig(){
-    Logger::close();
+    //TODO: close the logger
+    //getLogger.close();
 }
 
 void DrillClientConfig::initLogging(const char* path){
-    Logger::init(path);
+    getLogger().init(path);
 }
 
 void DrillClientConfig::setLogLevel(logLevel_t l){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     s_logLevel=l;
-    Logger::s_level=l;
+    getLogger().m_level=l;
     //boost::log::core::get()->set_filter(boost::log::trivial::severity >= s_logLevel);
 }
 
@@ -110,6 +115,18 @@ void DrillClientConfig::setHeartbeatFrequency(int32_t t){
     }
 }
 
+void DrillClientConfig::enableConnectionPooling(){
+    boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+    s_enableConnectionPool=true;
+}
+
+void DrillClientConfig::setConnectionPoolMax(int32_t t){
+    if (t>0 && t!=DEFAULT_MAX_CONCURRENT_CONNECTIONS){
+        boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+        s_connectionPoolMax=t;
+    }
+}
+
 int32_t DrillClientConfig::getSocketTimeout(){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     return s_socketTimeout;
@@ -133,6 +150,20 @@ int32_t DrillClientConfig::getHeartbeatFrequency(){
 logLevel_t DrillClientConfig::getLogLevel(){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     return s_logLevel;
+}
+
+bool DrillClientConfig::isConnectionPoolingEnabled(){
+    boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+    const char* enablePooledClient=std::getenv(ENABLE_CONNECTION_POOL_ENV);
+    bool enabled= s_enableConnectionPool || (enablePooledClient!=NULL && atoi(enablePooledClient)!=0);
+    return enabled;
+}
+
+int32_t DrillClientConfig::getConnectionPoolMax(){
+    boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+    const char* strConnPoolMax=std::getenv(ENABLE_CONNECTION_POOL_ENV);
+    int32_t connPoolMax = strConnPoolMax!=NULL && s_connectionPoolMax!= atoi(strConnPoolMax) ? atoi(strConnPoolMax) : s_connectionPoolMax;
+    return connPoolMax;
 }
 
 //Using boost assign to initialize maps. 
@@ -162,7 +193,7 @@ RecordIterator::~RecordIterator(){
     delete this->m_pQueryResult;
     this->m_pQueryResult=NULL;
     if(this->m_pCurrentRecordBatch!=NULL){
-        DRILL_LOG(LOG_TRACE) << "Deleted last Record batch " << (void*) m_pCurrentRecordBatch << std::endl;
+        DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Deleted last Record batch " << (void*) m_pCurrentRecordBatch << std::endl;)
         delete this->m_pCurrentRecordBatch; this->m_pCurrentRecordBatch=NULL;
     }
 }
@@ -223,7 +254,7 @@ status_t RecordIterator::next(){
         if(this->m_pCurrentRecordBatch==NULL || this->m_currentRecord==this->m_pCurrentRecordBatch->getNumRecords()){
             boost::lock_guard<boost::mutex> bufferLock(this->m_recordBatchMutex);
             if(this->m_pCurrentRecordBatch !=NULL){
-                DRILL_LOG(LOG_TRACE) << "Deleted old Record batch " << (void*) m_pCurrentRecordBatch << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Deleted old Record batch " << (void*) m_pCurrentRecordBatch << std::endl;)
                 delete this->m_pCurrentRecordBatch; //free the previous record batch
                 this->m_pCurrentRecordBatch=NULL;
             }
@@ -234,12 +265,12 @@ status_t RecordIterator::next(){
             }
             this->m_pCurrentRecordBatch=this->m_pQueryResult->getNext();
             if(this->m_pCurrentRecordBatch != NULL){
-                DRILL_LOG(LOG_TRACE) << "Fetched new Record batch " << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Fetched new Record batch " << std::endl;)
             }else{
-                DRILL_LOG(LOG_TRACE) << "No new Record batch found " << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "No new Record batch found " << std::endl;)
             }
             if(this->m_pCurrentRecordBatch==NULL || this->m_pCurrentRecordBatch->getNumRecords()==0){
-                DRILL_LOG(LOG_TRACE) << "No more data." << std::endl;
+                DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "No more data." << std::endl;)
                 ret = QRY_NO_MORE_DATA;
             }else if(this->m_pCurrentRecordBatch->hasSchemaChanged()){
                 ret=QRY_SUCCESS_WITH_INFO;
@@ -314,7 +345,12 @@ void DrillClient::initLogging(const char* path, logLevel_t l){
 }
 
 DrillClient::DrillClient(){
-    this->m_pImpl=new DrillClientImpl;
+    const char* enablePooledClient=std::getenv(ENABLE_CONNECTION_POOL_ENV);
+    if(enablePooledClient!=NULL && atoi(enablePooledClient)!=0){
+        this->m_pImpl=new PooledDrillClientImpl;
+    }else{
+        this->m_pImpl=new DrillClientImpl;
+    }
 }
 
 DrillClient::~DrillClient(){
@@ -388,6 +424,9 @@ std::string& DrillClient::getError(){
     return m_pImpl->getError()->msg;
 }
 
+std::string& DrillClient::getError(QueryHandle_t handle){
+    return ((DrillClientQueryResult*)handle)->getError()->msg;
+}
 
 void DrillClient::waitForResults(){
     this->m_pImpl->waitForResults();
