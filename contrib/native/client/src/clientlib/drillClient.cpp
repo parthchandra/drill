@@ -56,12 +56,13 @@ int32_t DrillClientConfig::s_heartbeatFrequency=15; // 15 seconds
 boost::mutex DrillClientConfig::s_mutex;
 
 DrillClientConfig::DrillClientConfig(){
-    initLogging(NULL);
+    //initLogging(NULL);
 }
 
 DrillClientConfig::~DrillClientConfig(){
     //Logger::close();
-    getLogger().close();
+    //TODO: close the logger
+    //getLogger().close();
 }
 
 void DrillClientConfig::initLogging(const char* path){

@@ -45,10 +45,6 @@
 #include <zookeeper/zookeeper.h>
 #endif
 #include <boost/asio/deadline_timer.hpp>
-#include <boost/random/mersenne_twister.hpp> // for mt19937
-#include <boost/random/random_device.hpp>
-#include <boost/random/uniform_int.hpp>
-#include <boost/random/variate_generator.hpp>
 #include <boost/thread.hpp>
 #include "drill/drillClient.hpp"
 #include "rpcEncoder.hpp"
@@ -204,11 +200,6 @@ class DrillClientQueryResult{
 class DrillClientImpl{
     friend class PooledDrillClientImpl;
     public:
-
-       static boost::random::random_device s_RNG;   //Truly random (expensive and device dependent)
-       static boost::random::mt19937 s_URNG; //Pseudo random with a period of ( 2^19937 - 1 )
-       static boost::uniform_int<> s_uniformDist;      // Produces a uniform distribution
-       static boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > s_randomNumber; // a random number generator also usable by shuffle
 
         DrillClientImpl():
             m_coordinationId(1),
@@ -456,6 +447,8 @@ class PooledDrillClientImpl{
 
         void freeQueryResources(DrillClientQueryResult* pQryResult);
 
+        int getDrillbitCount(){ return m_drillbits.size();};
+
     private:
         
         std::string m_connectStr; 
@@ -487,6 +480,8 @@ class PooledDrillClientImpl{
         connectionStatus_t handleConnError(connectionStatus_t status, std::string msg);
         // get a connection from the pool or create a new one. Return NULL if none is found
         DrillClientImpl* getOneConnection();
+
+        std::vector<std::string> m_drillbits;
 };
 
 
@@ -498,16 +493,16 @@ class ZookeeperImpl{
         static uint32_t  s_counter; // a counter to choose a connection from the
                                // drill cluster in a round robin fashion.
 		static boost::mutex s_cMutex;
-
         // comma separated host:port pairs, each corresponding to a zk
         // server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
         int connectToZookeeper(const char* connectStr, const char* pathToDrill);
         void close();
         static void watcher(zhandle_t *zzh, int type, int state, const char *path, void* context);
         std::string& getError(){return m_err;}
-        int getAllDrillbits(const char* connectStr, const char* pathToDrill);
-        int getEndPoint(size_t index, exec::DrillbitEndpoint& endpoint);
-        int getDrillbitCount(){ return m_drillbits.size();};
+        // return UNSHUFFLED list of drillbits
+        int getAllDrillbits(const char* connectStr, const char* pathToDrill, std::vector<std::string>& drillbits);
+        // picks the index drillbit and returns the corresponding endpoint object
+        int getEndPoint(std::vector<std::string>& drillbits, size_t index, exec::DrillbitEndpoint& endpoint);
 
     private:
         static char s_drillRoot[];
@@ -517,14 +512,11 @@ class ZookeeperImpl{
         int m_state;
         std::string m_err;
 
-        std::vector<std::string> m_drillbits;
-
         boost::mutex m_cvMutex;
         // Condition variable to signal connection callback has been processed
         boost::condition_variable m_cv;
         bool m_bConnecting;
         std::string m_rootDir;
-
 };
 
 } // namespace Drill

@@ -26,7 +26,9 @@ namespace Drill{
 /* 
  * Creates a single instance of the logger the first time this is called 
  */
+/*  static */ boost::mutex g_logMutex;
 Logger& getLogger() {
+    boost::lock_guard<boost::mutex> logLock(g_logMutex); 
     static Logger* logger = new Logger();
     return *logger;
 }

@@ -34,8 +34,8 @@ class Logger{
     public:
         Logger(){
             s_level=LOG_ERROR;
-            Logger::s_pOutStream=NULL;
-            s_pOutFileStream=NULL;
+            s_pOutStream=NULL;
+            s_pOutStream=&std::cout;
         }
         ~Logger(){ }
 
