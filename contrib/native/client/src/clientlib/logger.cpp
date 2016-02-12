@@ -18,7 +18,7 @@
 
 #include "boost/date_time/posix_time/posix_time.hpp"
 #include "boost/thread.hpp"
-
+#include "utils.hpp"
 #include "logger.hpp"
 
 namespace Drill{
@@ -48,15 +48,32 @@ std::string getTid(){
 //boost::mutex Logger::s_logMutex;
 
 void Logger::init(const char* path){
-    //boost::lock_guard<boost::mutex> logLock(Drill::Logger::s_logMutex); 
+
+    static bool initialized=false;
     boost::lock_guard<boost::mutex> logLock(s_logMutex); 
-    if(path!=NULL && s_filepath.empty()) {
-        s_filepath=path;
+    if(!initialized && path!=NULL && s_filepath.empty()) {
+        std::string fullname = path;
+        size_t lastindex = fullname.find_last_of(".");
+        std::string filename;
+        if(lastindex != std::string::npos){
+        filename = fullname.substr(0, lastindex)
+            +std::to_string(Utils::s_randomNumber())
+            +fullname.substr(lastindex, fullname.length());
+        }else{
+            filename = fullname.substr(0, fullname.length())
+            +std::to_string(Utils::s_randomNumber())
+            +".log";
+        }
+        //s_filepath=path;
+        s_filepath=filename.c_str();
         s_pOutFileStream = new std::ofstream;
-        s_pOutFileStream->open(path, std::ofstream::out);
+        s_pOutFileStream->open(s_filepath, std::ofstream::out|std::ofstream::app);
         if(!s_pOutFileStream->is_open()){
             std::cerr << "Logfile could not be opened. Logging to stdout" << std::endl;
+            s_filepath.erase();
+            delete s_pOutFileStream;
         }
+        initialized=true;
 
     s_pOutStream=(s_pOutFileStream!=NULL && s_pOutFileStream->is_open())?s_pOutFileStream:&std::cout;
 #if defined _WIN32 || defined _WIN64

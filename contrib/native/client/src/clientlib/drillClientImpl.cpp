@@ -132,7 +132,7 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr){
         }else{
             return handleConnError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, protocol.c_str()));
         }
-        DRILL_MT_LOG(DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Connecting to endpoint: " << host << ":" << port << std::endl;))
+        DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Connecting to endpoint: " << host << ":" << port << std::endl;)
         connectionStatus_t ret = this->connect(host.c_str(), port.c_str());
         return ret;
     }

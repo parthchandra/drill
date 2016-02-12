@@ -20,6 +20,7 @@
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <boost/thread.hpp>
 #include "drill/drillc.hpp"
 
 int nOptions=13;
@@ -65,11 +66,13 @@ Drill::status_t SchemaListener(void* ctx, Drill::FieldDefPtr fields, Drill::Dril
     }
 }
 
+boost::mutex listenerMutex;
 Drill::status_t QueryResultsListener(void* ctx, Drill::RecordBatch* b, Drill::DrillClientError* err){
     // Invariant:
     // (received an record batch and err is NULL)
     // or
     // (received query state message passed by `err` and b is NULL)
+    boost::lock_guard<boost::mutex> listenerLock(listenerMutex);
     if(!err){
         if(b!=NULL){
             b->print(std::cout, 0); // print all rows
@@ -317,9 +320,9 @@ int main(int argc, char* argv[]) {
         std::vector<Drill::QueryHandle_t*>::iterator queryHandleIter;
 
 #if defined _WIN32 || defined _WIN64
-        char* logpathPrefix="C:\\Users\\Administrator\\Documents\\temp\\drillclient";
+        const char* logpathPrefix="C:\\Users\\Administrator\\Documents\\temp\\drillclient";
 #else
-        char* logpathPrefix="/var/log/drill/drillclient";
+        const char* logpathPrefix="/var/log/drill/drillclient";
 #endif
 
         Drill::DrillClient client;

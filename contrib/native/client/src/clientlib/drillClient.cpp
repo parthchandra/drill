@@ -318,7 +318,7 @@ void DrillClient::initLogging(const char* path, logLevel_t l){
 }
 
 DrillClient::DrillClient(){
-    this->m_pImpl=new PooledDrillClientImpl;
+    this->m_pImpl=new DrillClientImpl;
 }
 
 DrillClient::~DrillClient(){
@@ -405,7 +405,7 @@ void DrillClient::registerSchemaChangeListener(QueryHandle_t* handle, pfnSchemaL
 
 void DrillClient::freeQueryResources(QueryHandle_t* handle){
     //TODO: DRILL-4313: Tell PooledDrillClientImpl to free queryResources for this query.
-    m_pImpl->freeQueryResources((DrillClientQueryResult*)(*handle));
+    //m_pImpl->freeQueryResources((DrillClientQueryResult*)(*handle));
     delete (DrillClientQueryResult*)(*handle);
     *handle=NULL;
 }

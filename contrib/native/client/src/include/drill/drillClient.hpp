@@ -54,6 +54,7 @@ namespace Drill{
 
 //struct UserServerEndPoint;
 class  PooledDrillClientImpl;
+class  DrillClientImpl;
 class  DrillClientQueryResult;
 class  FieldMetadata;
 class  RecordBatch;
@@ -369,7 +370,7 @@ class DECLSPEC_DRILL_CLIENT DrillClient{
         static DrillClientInitializer s_init;
         static DrillClientConfig s_config;
 
-        PooledDrillClientImpl * m_pImpl;
+        DrillClientImpl * m_pImpl;
 };
 
 } // namespace Drill
