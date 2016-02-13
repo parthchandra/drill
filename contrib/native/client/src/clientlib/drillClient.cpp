@@ -73,7 +73,7 @@ void DrillClientConfig::initLogging(const char* path){
 void DrillClientConfig::setLogLevel(logLevel_t l){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     s_logLevel=l;
-    getLogger().s_level=l;
+    getLogger().m_level=l;
     //boost::log::core::get()->set_filter(boost::log::trivial::severity >= s_logLevel);
 }
 
