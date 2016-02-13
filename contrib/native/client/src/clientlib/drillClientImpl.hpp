@@ -268,6 +268,7 @@ class DrillClientImpl{
 
     private:
         friend class DrillClientQueryResult;
+        friend class PooledDrillClientImpl;
 
         struct compareQueryId{
             bool operator()(const exec::shared::QueryId* q1, const exec::shared::QueryId* q2) const {
@@ -391,6 +392,93 @@ class DrillClientImpl{
 inline bool DrillClientImpl::Active() {
     return this->m_bIsConnected;;
 }
+
+
+/* *
+ *  Provides the same public interface as a DrillClientImpl but holds a pool of DrillClientImpls.
+ *  Every submitQuery uses a different DrillClientImpl to distribute the load.
+ *  DrillClient can use this class instead of DrillClientImpl to get better load balancing.
+ * */
+class PooledDrillClientImpl{
+    public:
+        PooledDrillClientImpl(){
+            m_bIsDirectConnection=false;
+            m_maxConcurrentConnections = DEFAULT_MAX_CONCURRENT_CONNECTIONS;
+            m_lastConnection=-1;
+            m_pError=NULL;
+            m_queriesExecuted=0;
+        }
+
+        ~PooledDrillClientImpl(){
+            for(std::vector<DrillClientImpl*>::iterator it = m_clientConnections.begin(); it != m_clientConnections.end(); ++it){
+                delete *it;
+            }
+            m_clientConnections.clear();
+            if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+        }
+
+        //Connect via Zookeeper or directly.
+        //Makes an initial connection to a drillbit. successful connect adds the first drillbit to the pool.
+        connectionStatus_t connect(const char* connStr);
+
+        // Test whether the client is active. Returns true if any one of the underlying connections is active
+        bool Active();
+
+        // Closes all open connections. 
+        void Close() ;
+
+        // Returns the last error encountered by any of the underlying executing queries or connections
+        DrillClientError* getError();
+
+        // Submits a query to a drillbit. If more than one query is to be sent, we may choose a
+        // a different drillbit in the pool. No more than m_maxConcurrentConnections will be allowed.
+        // Connections once added to the pool will be removed only when the DrillClient is closed.
+        DrillClientQueryResult* SubmitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx);
+
+        //Waits as long as any one drillbit connection has results pending
+        void waitForResults();
+
+        //Validates handshake only against the first drillbit connected to.
+        connectionStatus_t validateHandshake(DrillUserProperties* props);
+
+        void freeQueryResources(DrillClientQueryResult* pQryResult);
+
+        int getDrillbitCount(){ return m_drillbits.size();};
+
+    private:
+        
+        std::string m_connectStr; 
+        std::string m_lastQuery;
+        
+        // Connects a queryResult to the DrillClientImpl Object that is executing the query.
+        std::map<DrillClientQueryResult*, const DrillClientImpl*> m_queryConnectionMap; 
+        
+        // A list of all the current client connections. We choose a new one for every query. 
+        // When picking a drillClientImpl to use, we see how many queries each drillClientImpl
+        // is currently executing. If none,  
+        std::vector<DrillClientImpl*> m_clientConnections; 
+        
+        //ZookeeperImpl zook;
+        
+        // Use this to decide which drillbit to select next from the list of drillbits.
+        size_t m_lastConnection;
+		boost::mutex m_cMutex;
+
+        // Number of queries executed so far. Can be used to select a new Drillbit from the pool.
+        size_t m_queriesExecuted;
+
+        size_t m_maxConcurrentConnections;
+
+        bool m_bIsDirectConnection;
+
+        DrillClientError* m_pError;
+
+        connectionStatus_t handleConnError(connectionStatus_t status, std::string msg);
+        // get a connection from the pool or create a new one. Return NULL if none is found
+        DrillClientImpl* getOneConnection();
+
+        std::vector<std::string> m_drillbits;
+};
 
 class ZookeeperImpl{
     public:

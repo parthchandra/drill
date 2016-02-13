@@ -1400,6 +1400,210 @@ void DrillClientQueryResult::clearAndDestroy(){
     }
 }
 
+
+/* **************************************************** */
+
+connectionStatus_t PooledDrillClientImpl::connect(const char* connStr){
+    connectionStatus_t stat = CONN_SUCCESS;
+    std::string pathToDrill, protocol, hostPortStr;
+    std::string host;
+    std::string port;
+    m_connectStr=connStr;
+    Utils::parseConnectStr(connStr, pathToDrill, protocol, hostPortStr);
+    if(!strcmp(protocol.c_str(), "zk")){
+        // Get a list of drillbits
+        ZookeeperImpl zook;
+        std::vector<std::string> drillbits;
+        int err = zook.getAllDrillbits(hostPortStr.c_str(), pathToDrill.c_str(), drillbits);
+        if(!err){
+            Utils::shuffle(drillbits);
+            // The original shuffled order is maintained if we shuffle first and then add any missing elements
+            Utils::add(m_drillbits, drillbits);
+            exec::DrillbitEndpoint e;
+            size_t nextIndex=0;
+            boost::lock_guard<boost::mutex> cLock(m_cMutex);
+            m_lastConnection++;
+            nextIndex = (m_lastConnection)%(getDrillbitCount());
+            DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Pooled Connection"
+                    << "(" << (void*)this << ")"
+                    << ": Current counter is: " 
+                    << m_lastConnection << std::endl;)
+                err=zook.getEndPoint(m_drillbits, nextIndex, e);
+            if(!err){
+                host=boost::lexical_cast<std::string>(e.address());
+                port=boost::lexical_cast<std::string>(e.user_port());
+            }
+        }
+        if(err){
+            return handleConnError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
+        }
+        zook.close();
+        m_bIsDirectConnection=false;
+    }else if(!strcmp(protocol.c_str(), "local")){
+        char tempStr[MAX_CONNECT_STR+1];
+        strncpy(tempStr, hostPortStr.c_str(), MAX_CONNECT_STR); tempStr[MAX_CONNECT_STR]=0;
+        host=strtok(tempStr, ":");
+        port=strtok(NULL, "");
+        m_bIsDirectConnection=true;
+    }else{
+        return handleConnError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, protocol.c_str()));
+    }
+    DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Connecting to endpoint: (Pooled) " << host << ":" << port << std::endl;)
+        DrillClientImpl* pDrillClientImpl = new DrillClientImpl();
+    stat =  pDrillClientImpl->connect(host.c_str(), port.c_str());
+    if(stat == CONN_SUCCESS){
+        m_clientConnections.push_back(pDrillClientImpl);
+    }else{
+        DrillClientError* pErr = pDrillClientImpl->getError();
+        handleConnError((connectionStatus_t)pErr->status, pErr->msg);
+        delete pDrillClientImpl;
+    }
+    return stat;
+}
+
+connectionStatus_t PooledDrillClientImpl::validateHandshake(DrillUserProperties* props){
+    // Assume there is one valid connection to at least one drillbit
+    connectionStatus_t stat=CONN_FAILURE;
+    DrillClientImpl* pDrillClientImpl = getOneConnection();
+    if(pDrillClientImpl != NULL){
+        DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Validating handshake: (Pooled) " << pDrillClientImpl->m_connectedHost << std::endl;)
+        stat=pDrillClientImpl->validateHandshake(props);
+    }
+    else{
+        stat =  handleConnError(CONN_NOTCONNECTED, getMessage(ERR_CONN_NOCONN));
+    }
+    return stat;
+}
+
+DrillClientQueryResult* PooledDrillClientImpl::SubmitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx){
+    DrillClientQueryResult* pDrillClientQueryResult = NULL;
+    DrillClientImpl* pDrillClientImpl = NULL;
+    pDrillClientImpl = getOneConnection();
+    if(pDrillClientImpl != NULL){
+        pDrillClientQueryResult=pDrillClientImpl->SubmitQuery(t,plan,listener,listenerCtx);
+        m_queriesExecuted++;
+        //if(pDrillClientQueryResult!=NULL){
+        //    m_queryConnectionMap[pDrillClientQueryResult]=pDrillClientImpl;
+        //}    
+        //TODO: when freeQueryResources is called by the client, then remove this entry from
+        // this list.
+        // Implement a freqqQueryResources in this class and call it from DrillClient 
+    }
+    return pDrillClientQueryResult;
+}
+
+void PooledDrillClientImpl::freeQueryResources(DrillClientQueryResult* pQryResult){
+   //TODO:  
+}
+
+bool PooledDrillClientImpl::Active(){
+    for(std::vector<DrillClientImpl*>::iterator it = m_clientConnections.begin(); it != m_clientConnections.end(); ++it){
+        if((*it)->Active()){
+            return true;
+        }
+    }
+    return false;
+}
+
+void PooledDrillClientImpl::Close() {
+    for(std::vector<DrillClientImpl*>::iterator it = m_clientConnections.begin(); it != m_clientConnections.end(); ++it){
+        (*it)->Close();
+        delete *it;
+    }
+    m_clientConnections.clear();
+}
+
+DrillClientError* PooledDrillClientImpl::getError(){
+    //TODO: In DrillClientImpl, keep track of the time of each error. Return the newest.
+    //TODO: In DrillClient, getError should take a queryHandle_t to get an error message
+    std::string errMsg;
+    std::string nl="";
+    uint32_t stat;
+    for(std::vector<DrillClientImpl*>::iterator it = m_clientConnections.begin(); it != m_clientConnections.end(); ++it){
+        if((*it)->getError() != NULL){
+            errMsg+=nl+"Query"/*+(*it)->queryId() +*/":"+(*it)->getError()->msg;
+            stat=(*it)->getError()->status;
+        }
+    }
+    if(errMsg.length()>0){
+        if(m_pError!=NULL){ delete m_pError; m_pError=NULL; }
+        m_pError = new DrillClientError(stat, DrillClientError::QRY_ERROR_START+stat, errMsg);
+    }
+    return m_pError;
+}
+
+//Waits as long as any one drillbit connection has results pending
+void PooledDrillClientImpl::waitForResults(){
+    for(std::vector<DrillClientImpl*>::iterator it = m_clientConnections.begin(); it != m_clientConnections.end(); ++it){
+        (*it)->waitForResults();
+    }
+    return;
+}
+
+connectionStatus_t PooledDrillClientImpl::handleConnError(connectionStatus_t status, std::string msg){
+    DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
+    DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << "Connection Error: (Pooled) " << pErr->msg << std::endl;)
+    if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+    m_pError=pErr;
+    return status;
+}
+
+DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
+    DrillClientImpl* pDrillClientImpl = NULL;
+    while(pDrillClientImpl==NULL){
+        if(m_queriesExecuted == 0){
+            pDrillClientImpl=m_clientConnections[0];// There should be one connection in the list when the first query is executed
+        }else if(m_clientConnections.size() == m_maxConcurrentConnections){
+            //int32_t randomChoice = Utils::s_randomNumber()%m_clientConnections.size();
+            //pDrillClientImpl = m_clientConnections[randomChoice];
+            pDrillClientImpl = m_clientConnections[m_queriesExecuted%m_maxConcurrentConnections];
+            if(!pDrillClientImpl->Active()){
+                m_clientConnections.erase( std::remove(m_clientConnections.begin(), m_clientConnections.end(), pDrillClientImpl), m_clientConnections.end() );
+                pDrillClientImpl=NULL;
+            }
+        }else{
+            int tries=0;
+            connectionStatus_t ret=CONN_SUCCESS;
+            
+            while(pDrillClientImpl==NULL && tries++ < 3){
+                if((ret=connect(m_connectStr.c_str()))==CONN_SUCCESS){
+                    pDrillClientImpl=m_clientConnections.back();
+                    ret=pDrillClientImpl->validateHandshake(NULL);
+                    if(ret!=CONN_SUCCESS){
+                        delete pDrillClientImpl; pDrillClientImpl=NULL;
+                        m_clientConnections.erase(m_clientConnections.end());
+                    }
+                }
+            /*  
+                pDrillClientImpl=new DrillClientImpl;
+                if((ret=pDrillClientImpl->connect(m_connectStr.c_str()))==CONN_SUCCESS){
+                    if(ret==CONN_SUCCESS){
+                    //    if(properties!=NULL){
+                    //        ret=pDrillClientImpl->validateHandshake(properties);
+                    //    }else{
+                            ret=pDrillClientImpl->validateHandshake(NULL);
+                    //    }
+                    }
+                    //if(ret==CONN_SUCCESS){
+                        //pDrillClientImpl->startHeartbeatTimer();
+                        m_clientConnections.push_back(pDrillClientImpl);
+                        break;
+                    //}
+                }else{
+                    delete pDrillClientImpl; pDrillClientImpl=NULL;
+                }
+            */
+            } // try a few times
+        } // need a new connection 
+    }// while
+
+    //TODO: DRILL_4313 - If still not found, then iterate over all the remaining connections in the pool
+    // If still not found, return failure.
+
+    return pDrillClientImpl;
+}
+/* **************************************************** */
+
 char ZookeeperImpl::s_drillRoot[]="/drill/";
 char ZookeeperImpl::s_defaultCluster[]="drillbits1";
 
