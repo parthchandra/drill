@@ -41,48 +41,44 @@ namespace Drill{
 		return boost::lexical_cast<std::string>(boost::this_thread::get_id());
 	}
 
-	//logLevel_t Logger::s_level=LOG_ERROR;
-	//std::ostream* Logger::s_pOutStream=NULL;
-	//std::ofstream* Logger::s_pOutFileStream=NULL;
-	//std::string Logger::s_filepath;
-	//boost::mutex Logger::s_logMutex;
-
 	void Logger::init(const char* path){
 
 		static bool initialized = false;
-		boost::lock_guard<boost::mutex> logLock(s_logMutex);
-		if (!initialized && path != NULL && s_filepath.empty()) {
+		boost::lock_guard<boost::mutex> logLock(m_logMutex);
+		if (!initialized && path != NULL && m_filepath.empty()) {
 			std::string fullname = path;
 			size_t lastindex = fullname.find_last_of(".");
 			std::string filename;
 			if (lastindex != std::string::npos){
 				filename = fullname.substr(0, lastindex)
+					+ "-"
 					+ std::to_string(Utils::s_randomNumber())
 					+ fullname.substr(lastindex, fullname.length());
 			}
 			else{
 				filename = fullname.substr(0, fullname.length())
+					+ "-"
 					+ std::to_string(Utils::s_randomNumber())
 					+ ".log";
 			}
-			//s_filepath=path;
-			s_filepath = filename.c_str();
-			s_pOutFileStream = new std::ofstream;
-			s_pOutFileStream->open(s_filepath, std::ofstream::out | std::ofstream::app);
-			if (!s_pOutFileStream->is_open()){
+			//m_filepath=path;
+			m_filepath = filename.c_str();
+			m_pOutFileStream = new std::ofstream;
+			m_pOutFileStream->open(m_filepath, std::ofstream::out | std::ofstream::app);
+			if (!m_pOutFileStream->is_open()){
 				std::cerr << "Logfile could not be opened. Logging to stdout" << std::endl;
-				s_filepath.erase();
-				delete s_pOutFileStream;
+				m_filepath.erase();
+				delete m_pOutFileStream;
 			}
 			initialized = true;
 
-			s_pOutStream = (s_pOutFileStream != NULL && s_pOutFileStream->is_open()) ? s_pOutFileStream : &std::cout;
+			m_pOutStream = (m_pOutFileStream != NULL && m_pOutFileStream->is_open()) ? m_pOutFileStream : &std::cout;
 #if defined _WIN32 || defined _WIN64
 
 			TCHAR szFile[MAX_PATH];
 			GetModuleFileName(NULL, szFile, MAX_PATH);
 #endif
-			*s_pOutStream
+			*m_pOutStream
 				<< " DRILL CLIENT LIBRARY " << std::endl
 #if defined _WIN32 || defined _WIN64
 				<< " Loaded by process : " << szFile << std::endl
@@ -94,24 +90,24 @@ namespace Drill{
 	}
 
 	void Logger::close(){
-		//boost::lock_guard<boost::mutex> logLock(Drill::Logger::s_logMutex); 
-		boost::lock_guard<boost::mutex> logLock(s_logMutex);
-		if (s_pOutFileStream != NULL){
-			if (s_pOutFileStream->is_open()){
-				s_pOutFileStream->close();
+		//boost::lock_guard<boost::mutex> logLock(Drill::Logger::m_logMutex); 
+		boost::lock_guard<boost::mutex> logLock(m_logMutex);
+		if (m_pOutFileStream != NULL){
+			if (m_pOutFileStream->is_open()){
+				m_pOutFileStream->close();
 			}
-			delete s_pOutFileStream; s_pOutFileStream = NULL;
+			delete m_pOutFileStream; m_pOutFileStream = NULL;
 		}
 	}
 
 	// The log call itself cannot be thread safe. Use the DRILL_MT_LOG macro to make 
 	// this thread safe
 	std::ostream& Logger::log(logLevel_t level){
-		*s_pOutStream << getTime();
-		*s_pOutStream << " : " << levelAsString(level);
-		*s_pOutStream << " : " << getTid();
-		*s_pOutStream << " : ";
-		return *s_pOutStream;
+		*m_pOutStream << getTime();
+		*m_pOutStream << " : " << levelAsString(level);
+		*m_pOutStream << " : " << getTid();
+		*m_pOutStream << " : ";
+		return *m_pOutStream;
 	}
 
 
