@@ -43,53 +43,53 @@
 
 namespace Drill{
 
-	// Wrapper Class to keep track of allocated memory
-	class AllocatedBuffer{
-	public:
-		AllocatedBuffer(size_t l);
-		~AllocatedBuffer();
+// Wrapper Class to keep track of allocated memory
+class AllocatedBuffer{
+    public:
+        AllocatedBuffer(size_t l);
+        ~AllocatedBuffer();
 
-		ByteBuf_t m_pBuffer;
-		size_t    m_bufSize;
+        ByteBuf_t m_pBuffer;
+        size_t    m_bufSize;
 
-		// keep track of allocated memory. The client lib blocks
-		// if we have allocated up to a limit (defined in drillClientConfig).
-		static boost::mutex s_memCVMutex;
-		static boost::condition_variable s_memCV;
-		static size_t s_allocatedMem;
-		static bool s_isBufferLimitReached;
+        // keep track of allocated memory. The client lib blocks
+        // if we have allocated up to a limit (defined in drillClientConfig).
+        static boost::mutex s_memCVMutex;
+        static boost::condition_variable s_memCV;
+        static size_t s_allocatedMem;
+        static bool s_isBufferLimitReached;
 
-	};
+};
 
-	class Utils{
-	public:
-		static boost::random::random_device s_RNG;   //Truly random (expensive and device dependent)
-		static boost::random::mt19937 s_URNG; //Pseudo random with a period of ( 2^19937 - 1 )
-		static boost::uniform_int<> s_uniformDist;      // Produces a uniform distribution
-		static boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > s_randomNumber; // a random number generator also usable by shuffle
+class Utils{
+    public:
+        static boost::random::random_device s_RNG;   //Truly random (expensive and device dependent)
+        static boost::random::mt19937 s_URNG; //Pseudo random with a period of ( 2^19937 - 1 )
+        static boost::uniform_int<> s_uniformDist;      // Produces a uniform distribution
+        static boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > s_randomNumber; // a random number generator also usable by shuffle
 
-		//allocate memory for Record Batches
-		static ByteBuf_t allocateBuffer(size_t len);
-		static void freeBuffer(ByteBuf_t b, size_t len);
-		static void parseConnectStr(const char* connectStr,
-			std::string& pathToDrill,
-			std::string& protocol,
-			std::string& hostPortStr);
+        //allocate memory for Record Batches
+        static ByteBuf_t allocateBuffer(size_t len);
+        static void freeBuffer(ByteBuf_t b, size_t len);
+        static void parseConnectStr(const char* connectStr,
+            std::string& pathToDrill,
+            std::string& protocol,
+            std::string& hostPortStr);
 
-		// useful vector methods/idioms
+        // useful vector methods/idioms
 
-		// performs a random shuffle on a string vector
-		static void shuffle(std::vector<std::string>& vector);
+        // performs a random shuffle on a string vector
+        static void shuffle(std::vector<std::string>& vector);
 
-		// adds the contents of vector2 to vector1
-		static void add(std::vector<std::string>& vector1, std::vector<std::string>& vector2);
+        // adds the contents of vector2 to vector1
+        static void add(std::vector<std::string>& vector1, std::vector<std::string>& vector2);
 
-		// removes the element from the vector
-		template <typename T> static void eraseRemove(std::vector<T>& vector, T elem){
-			vector.erase(std::remove(vector.begin(), vector.end(), elem), vector.end());
-		}
+        // removes the element from the vector
+        template <typename T> static void eraseRemove(std::vector<T>& vector, T elem){
+            vector.erase(std::remove(vector.begin(), vector.end(), elem), vector.end());
+        }
 
-	}; // Utils
+}; // Utils
 
 } // namespace Drill
 

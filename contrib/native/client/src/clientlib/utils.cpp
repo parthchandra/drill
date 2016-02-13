@@ -25,80 +25,80 @@ namespace Drill{
 
 
 
-	boost::random::random_device Utils::s_RNG;
-	boost::random::mt19937 Utils::s_URNG(s_RNG());
-	boost::uniform_int<> Utils::s_uniformDist(0, INT32_MAX-1);
-	boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > Utils::s_randomNumber(s_URNG, s_uniformDist);
+boost::random::random_device Utils::s_RNG;
+boost::random::mt19937 Utils::s_URNG(s_RNG());
+boost::uniform_int<> Utils::s_uniformDist(0, INT32_MAX-1);
+boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > Utils::s_randomNumber(s_URNG, s_uniformDist);
 
-	boost::mutex AllocatedBuffer::s_memCVMutex;
-	boost::condition_variable AllocatedBuffer::s_memCV;
-	size_t AllocatedBuffer::s_allocatedMem = 0;
-	bool AllocatedBuffer::s_isBufferLimitReached = false;
+boost::mutex AllocatedBuffer::s_memCVMutex;
+boost::condition_variable AllocatedBuffer::s_memCV;
+size_t AllocatedBuffer::s_allocatedMem = 0;
+bool AllocatedBuffer::s_isBufferLimitReached = false;
 
-	ByteBuf_t Utils::allocateBuffer(size_t len){
-		boost::lock_guard<boost::mutex> memLock(AllocatedBuffer::s_memCVMutex);
-		AllocatedBuffer::s_allocatedMem += len;
-		//http://stackoverflow.com/questions/2688466/why-mallocmemset-is-slower-than-calloc
-		ByteBuf_t b = (ByteBuf_t)calloc(len, sizeof(Byte_t));
-		size_t safeSize = DrillClientConfig::getBufferLimit() - MEM_CHUNK_SIZE;
-		if (b != NULL && AllocatedBuffer::s_allocatedMem >= safeSize){
-			AllocatedBuffer::s_isBufferLimitReached = true;
-		}
-		return b;
-	}
+ByteBuf_t Utils::allocateBuffer(size_t len){
+    boost::lock_guard<boost::mutex> memLock(AllocatedBuffer::s_memCVMutex);
+    AllocatedBuffer::s_allocatedMem += len;
+    //http://stackoverflow.com/questions/2688466/why-mallocmemset-is-slower-than-calloc
+    ByteBuf_t b = (ByteBuf_t)calloc(len, sizeof(Byte_t));
+    size_t safeSize = DrillClientConfig::getBufferLimit() - MEM_CHUNK_SIZE;
+    if (b != NULL && AllocatedBuffer::s_allocatedMem >= safeSize){
+        AllocatedBuffer::s_isBufferLimitReached = true;
+    }
+    return b;
+}
 
-	void Utils::freeBuffer(ByteBuf_t b, size_t len){
-		boost::lock_guard<boost::mutex> memLock(AllocatedBuffer::s_memCVMutex);
-		AllocatedBuffer::s_allocatedMem -= len;
-		free(b);
-		size_t safeSize = DrillClientConfig::getBufferLimit() - MEM_CHUNK_SIZE;
-		if (b != NULL && AllocatedBuffer::s_allocatedMem < safeSize){
-			AllocatedBuffer::s_isBufferLimitReached = false;
-			//signal any waiting threads
-			AllocatedBuffer::s_memCV.notify_one();
-		}
-	}
+void Utils::freeBuffer(ByteBuf_t b, size_t len){
+    boost::lock_guard<boost::mutex> memLock(AllocatedBuffer::s_memCVMutex);
+    AllocatedBuffer::s_allocatedMem -= len;
+    free(b);
+    size_t safeSize = DrillClientConfig::getBufferLimit() - MEM_CHUNK_SIZE;
+    if (b != NULL && AllocatedBuffer::s_allocatedMem < safeSize){
+        AllocatedBuffer::s_isBufferLimitReached = false;
+        //signal any waiting threads
+        AllocatedBuffer::s_memCV.notify_one();
+    }
+}
 
-	void Utils::parseConnectStr(const char* connectStr,
-		std::string& pathToDrill,
-		std::string& protocol,
-		std::string& hostPortStr){
-		char u[MAX_CONNECT_STR + 1];
-		strncpy(u, connectStr, MAX_CONNECT_STR); u[MAX_CONNECT_STR] = 0;
-		char* z = strtok(u, "=");
-		char* c = strtok(NULL, "/");
-		char* p = strtok(NULL, "");
+void Utils::parseConnectStr(const char* connectStr,
+    std::string& pathToDrill,
+    std::string& protocol,
+    std::string& hostPortStr){
+    char u[MAX_CONNECT_STR + 1];
+    strncpy(u, connectStr, MAX_CONNECT_STR); u[MAX_CONNECT_STR] = 0;
+    char* z = strtok(u, "=");
+    char* c = strtok(NULL, "/");
+    char* p = strtok(NULL, "");
 
-		if (p != NULL) pathToDrill = std::string("/") + p;
-		protocol = z; hostPortStr = c;
-		return;
-	}
+    if (p != NULL) pathToDrill = std::string("/") + p;
+    protocol = z; hostPortStr = c;
+    return;
+}
 
-	void Utils::shuffle(std::vector<std::string>& vector){
-		std::random_shuffle(vector.begin(), vector.end(), Utils::s_randomNumber);
-		return;
-	}
+void Utils::shuffle(std::vector<std::string>& vector){
+    std::random_shuffle(vector.begin(), vector.end(), Utils::s_randomNumber);
+    return;
+}
 
-	void Utils::add(std::vector<std::string>& vector1, std::vector<std::string>& vector2){
-		std::vector<std::string>::iterator it;
-		for (it = vector2.begin(); it != vector2.end(); it++) {
-			std::vector<std::string>::iterator it2 = std::find(vector1.begin(), vector1.end(), *it);
-			if (it2 == vector1.end()){
-				vector1.push_back(*it);
-			}
-		}
-	}
+void Utils::add(std::vector<std::string>& vector1, std::vector<std::string>& vector2){
+    std::vector<std::string>::iterator it;
+    for (it = vector2.begin(); it != vector2.end(); it++) {
+        std::vector<std::string>::iterator it2 = std::find(vector1.begin(), vector1.end(), *it);
+        if (it2 == vector1.end()){
+            vector1.push_back(*it);
+        }
+    }
+}
 
-	AllocatedBuffer::AllocatedBuffer(size_t l){
-		m_pBuffer = NULL;
-		m_pBuffer = Utils::allocateBuffer(l);
-		m_bufSize = m_pBuffer != NULL ? l : 0;
-	}
+AllocatedBuffer::AllocatedBuffer(size_t l){
+    m_pBuffer = NULL;
+    m_pBuffer = Utils::allocateBuffer(l);
+    m_bufSize = m_pBuffer != NULL ? l : 0;
+}
 
-	AllocatedBuffer::~AllocatedBuffer(){
-		Utils::freeBuffer(m_pBuffer, m_bufSize);
-		m_pBuffer = NULL;
-		m_bufSize = 0;
-	}
+AllocatedBuffer::~AllocatedBuffer(){
+    Utils::freeBuffer(m_pBuffer, m_bufSize);
+    m_pBuffer = NULL;
+    m_bufSize = 0;
+}
 
 } // namespace 
