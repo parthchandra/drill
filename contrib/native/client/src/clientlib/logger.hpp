@@ -33,15 +33,15 @@ namespace Drill{
 	class Logger{
 	public:
 		Logger(){
-			s_level = LOG_ERROR;
-			s_pOutStream = NULL;
-			s_pOutStream = &std::cout;
+			m_level = LOG_ERROR;
+			m_pOutStream = NULL;
+			m_pOutStream = &std::cout;
 		}
 		~Logger(){ }
 
-		/*  static */ void init(const char* path);
-		/*  static */ void close();
-		/*  static */ std::ostream& log(logLevel_t level);
+		void init(const char* path);
+		void close();
+		std::ostream& log(logLevel_t level);
 		std::string levelAsString(logLevel_t level) {
 			static const char* const levelNames[] = {
 				"TRACE  ",
@@ -55,14 +55,13 @@ namespace Drill{
 		}
 
 		// The logging level
-		/*  static */ logLevel_t s_level;
-		/*  static */ std::ostream* s_pOutStream;
-		/*  static */ boost::mutex s_logMutex;
+		logLevel_t m_level;
+		std::ostream* m_pOutStream;
+		boost::mutex m_logMutex;
 
 	private:
-		//static std::ostream* s_pOutStream;
-		/*  static */ std::ofstream* s_pOutFileStream;
-		/*  static */ std::string s_filepath;
+		std::ofstream* m_pOutFileStream;
+		std::string m_filepath;
 
 	}; // Logger
 
@@ -72,12 +71,12 @@ namespace Drill{
 
 #define DRILL_MT_LOG(LOG) \
 	{ \
-    boost::lock_guard<boost::mutex> logLock(getLogger().s_logMutex); \
+    boost::lock_guard<boost::mutex> logLock(getLogger().m_logMutex); \
     LOG \
 	}
 
 #define DRILL_LOG(level) \
-    if (getLogger().s_pOutStream==NULL || level < getLogger().s_level); \
+    if (getLogger().m_pOutStream==NULL || level < getLogger().m_level); \
 	    else getLogger().log(level)       \
 
 
