@@ -152,7 +152,7 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port){
     // set socket keep alive
     boost::asio::socket_base::keep_alive keepAlive(true);
     m_socket.set_option(keepAlive);
-	// set no_delay
+    // set no_delay
     boost::asio::ip::tcp::no_delay noDelay(true);
     m_socket.set_option(noDelay);
 
@@ -174,16 +174,16 @@ void DrillClientImpl::startHeartbeatTimer(){
                 this,
                 boost::asio::placeholders::error
                 ));
-	    startMessageListener(); // start this thread early so we don't have the timer blocked
+        startMessageListener(); // start this thread early so we don't have the timer blocked
 }
 
 connectionStatus_t DrillClientImpl::sendHeartbeat(){
-	connectionStatus_t status=CONN_SUCCESS;
+    connectionStatus_t status=CONN_SUCCESS;
     exec::rpc::Ack ack;
     ack.set_ok(true);
     OutBoundRpcMessage heartbeatMsg(exec::rpc::PING, exec::user::ACK/*can be anything */, 0, &ack);
-	boost::lock_guard<boost::mutex> prLock(this->m_prMutex);
-	boost::lock_guard<boost::mutex> lock(m_dcMutex);
+    boost::lock_guard<boost::mutex> prLock(this->m_prMutex);
+    boost::lock_guard<boost::mutex> lock(m_dcMutex);
     DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Heartbeat sent." << std::endl;)
     status=sendSync(heartbeatMsg);
     status=status==CONN_SUCCESS?status:CONN_DEAD;
@@ -943,9 +943,9 @@ void DrillClientImpl::handleRead(ByteBuf_t _buf,
                 boost::lock_guard<boost::mutex> lock(this->m_dcMutex);
                 getNextResult();
             }else{
-				boost::unique_lock<boost::mutex> cvLock(this->m_dcMutex);
+                boost::unique_lock<boost::mutex> cvLock(this->m_dcMutex);
                 DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "No more results expected from server. " <<  std::endl;)
-				m_cv.notify_one();
+                m_cv.notify_one();
             }
             return;
         }else if(!error && msg.m_rpc_type==exec::user::QUERY_RESULT){
