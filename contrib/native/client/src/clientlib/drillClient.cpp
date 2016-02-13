@@ -317,7 +317,7 @@ void DrillClient::initLogging(const char* path, logLevel_t l){
 }
 
 DrillClient::DrillClient(){
-    this->m_pImpl=new DrillClientImpl;
+    this->m_pImpl=new PooledDrillClientImpl;
 }
 
 DrillClient::~DrillClient(){
