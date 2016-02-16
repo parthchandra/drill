@@ -16,6 +16,7 @@
 * limitations under the License.
 */
 
+#include <limits.h>
 #include <stdlib.h>
 #include "utils.hpp"
 #include "logger.hpp"
@@ -27,7 +28,7 @@ namespace Drill{
 
 boost::random::random_device Utils::s_RNG;
 boost::random::mt19937 Utils::s_URNG(s_RNG());
-boost::uniform_int<> Utils::s_uniformDist(0, INT32_MAX-1);
+boost::uniform_int<> Utils::s_uniformDist(0,std::numeric_limits<int>::max()-1);
 boost::variate_generator<boost::random::mt19937&, boost::uniform_int<> > Utils::s_randomNumber(s_URNG, s_uniformDist);
 
 boost::mutex AllocatedBuffer::s_memCVMutex;
