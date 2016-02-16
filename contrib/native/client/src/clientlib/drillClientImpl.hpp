@@ -450,9 +450,6 @@ class PooledDrillClientImpl{
         std::string m_connectStr; 
         std::string m_lastQuery;
         
-        // Connects a queryResult to the DrillClientImpl Object that is executing the query.
-        std::map<DrillClientQueryResult*, const DrillClientImpl*> m_queryConnectionMap; 
-        
         // A list of all the current client connections. We choose a new one for every query. 
         // When picking a drillClientImpl to use, we see how many queries each drillClientImpl
         // is currently executing. If none,  
@@ -487,7 +484,7 @@ class ZookeeperImpl{
         static ZooLogLevel getZkLogLevel();
         // comma separated host:port pairs, each corresponding to a zk
         // server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
-        int connectToZookeeper(const char* connectStr, const char* pathToDrill);
+        DEPRECATED int connectToZookeeper(const char* connectStr, const char* pathToDrill);
         void close();
         static void watcher(zhandle_t *zzh, int type, int state, const char *path, void* context);
         void debugPrint();
