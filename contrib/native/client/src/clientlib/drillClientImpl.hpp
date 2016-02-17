@@ -404,6 +404,10 @@ class PooledDrillClientImpl{
         PooledDrillClientImpl(){
             m_bIsDirectConnection=false;
             m_maxConcurrentConnections = DEFAULT_MAX_CONCURRENT_CONNECTIONS;
+            char* maxConn=std::getenv(MAX_CONCURRENT_CONNECTIONS_ENV);
+            if(maxConn!=NULL){
+                m_maxConcurrentConnections=atoi(maxConn);
+            }
             m_lastConnection=-1;
             m_pError=NULL;
             m_queriesExecuted=0;

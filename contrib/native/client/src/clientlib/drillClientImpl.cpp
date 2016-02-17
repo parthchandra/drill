@@ -1534,17 +1534,18 @@ DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
     DrillClientImpl* pDrillClientImpl = NULL;
     while(pDrillClientImpl==NULL){
         if(m_queriesExecuted == 0){
+            // First query ever sent can use the connection already established to authenticate the user
             pDrillClientImpl=m_clientConnections[0];// There should be one connection in the list when the first query is executed
         }else if(m_clientConnections.size() == m_maxConcurrentConnections){
+            // Pool is full. Use one of the already established connections
             pDrillClientImpl = m_clientConnections[m_queriesExecuted%m_maxConcurrentConnections];
             if(!pDrillClientImpl->Active()){
-                m_clientConnections.erase( std::remove(m_clientConnections.begin(), m_clientConnections.end(), pDrillClientImpl), m_clientConnections.end() );
+                Utils::eraseRemove(m_clientConnections, pDrillClientImpl);
                 pDrillClientImpl=NULL;
             }
         }else{
             int tries=0;
             connectionStatus_t ret=CONN_SUCCESS;
-            
             while(pDrillClientImpl==NULL && tries++ < 3){
                 if((ret=connect(m_connectStr.c_str()))==CONN_SUCCESS){
                     pDrillClientImpl=m_clientConnections.back();
@@ -1555,15 +1556,18 @@ DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
                     }
                 }
             } // try a few times
+            if(ret!=CONN_SUCCESS){
+                break;
+            }
         } // need a new connection 
     }// while
 
-    //TODO: DRILL_4313 - If still not found, then iterate over all the remaining connections in the pool
-    // If still not found, return failure.
-
+    if(pDrillClientImpl==NULL){
+        connectionStatus_t status = CONN_NOTCONNECTED;
+        handleConnError(status, getMessage(status));
+    }
     return pDrillClientImpl;
 }
-/* **************************************************** */
 
 char ZookeeperImpl::s_drillRoot[]="/drill/";
 char ZookeeperImpl::s_defaultCluster[]="drillbits1";
