@@ -63,6 +63,43 @@ class RecordBatch;
 class RpcEncoder;
 class RpcDecoder;
 
+/*
+ * Defines the interface used by DrillClient and implemented by DrillClientImpl and PooledDrillClientImpl
+ * */
+class DrillClientImplBase{
+    public:
+        DrillClientImplBase(){
+        }
+
+        virtual ~DrillClientImplBase(){
+        }
+
+        //Connect via Zookeeper or directly.
+        //Makes an initial connection to a drillbit. successful connect adds the first drillbit to the pool.
+        virtual connectionStatus_t connect(const char* connStr)=0;
+
+        // Test whether the client is active. Returns true if any one of the underlying connections is active
+        virtual bool Active()=0;
+
+        // Closes all open connections. 
+        virtual void Close()=0;
+
+        // Returns the last error encountered by any of the underlying executing queries or connections
+        virtual DrillClientError* getError()=0;
+
+        // Submits a query to a drillbit. 
+        virtual DrillClientQueryResult* SubmitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx)=0;
+
+        //Waits as a connection has results pending
+        virtual void waitForResults()=0;
+
+        //Validates handshake at connect time.
+        virtual connectionStatus_t validateHandshake(DrillUserProperties* props)=0;
+
+        virtual void freeQueryResources(DrillClientQueryResult* pQryResult)=0;
+
+};
+
 class DrillClientQueryResult{
     friend class DrillClientImpl;
     public:
@@ -198,7 +235,7 @@ class DrillClientQueryResult{
     void * m_pListenerCtx;
 };
 
-class DrillClientImpl{
+class DrillClientImpl : public DrillClientImplBase{
     public:
         DrillClientImpl():
             m_coordinationId(1),
@@ -265,6 +302,10 @@ class DrillClientImpl{
         DrillClientQueryResult* SubmitQuery(::exec::shared::QueryType t, const std::string& plan, pfnQueryResultsListener listener, void* listenerCtx);
         void waitForResults();
         connectionStatus_t validateHandshake(DrillUserProperties* props);
+        void freeQueryResources(DrillClientQueryResult* pQryResult){
+            // Doesn't need to do anything
+            return;
+        };
 
     private:
         friend class DrillClientQueryResult;
@@ -399,7 +440,7 @@ inline bool DrillClientImpl::Active() {
  *  Every submitQuery uses a different DrillClientImpl to distribute the load.
  *  DrillClient can use this class instead of DrillClientImpl to get better load balancing.
  * */
-class PooledDrillClientImpl{
+class PooledDrillClientImpl : public DrillClientImplBase{
     public:
         PooledDrillClientImpl(){
             m_bIsDirectConnection=false;
