@@ -52,6 +52,8 @@ int32_t DrillClientConfig::s_socketTimeout=0;
 int32_t DrillClientConfig::s_handshakeTimeout=5;
 int32_t DrillClientConfig::s_queryTimeout=180;
 int32_t DrillClientConfig::s_heartbeatFrequency=15; // 15 seconds
+bool DrillClientConfig::s_enableConnectionPool=false; // 15 seconds
+int32_t DrillClientConfig::s_connectionPoolMax=DEFAULT_MAX_CONCURRENT_CONNECTIONS; // 10
 
 boost::mutex DrillClientConfig::s_mutex;
 
@@ -113,6 +115,18 @@ void DrillClientConfig::setHeartbeatFrequency(int32_t t){
     }
 }
 
+void DrillClientConfig::enableConnectionPooling(){
+    boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+    s_enableConnectionPool=true;
+}
+
+void DrillClientConfig::setConnectionPoolMax(int32_t t){
+    if (t>0 && t!=DEFAULT_MAX_CONCURRENT_CONNECTIONS){
+        boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+        s_connectionPoolMax=t;
+    }
+}
+
 int32_t DrillClientConfig::getSocketTimeout(){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     return s_socketTimeout;
@@ -136,6 +150,20 @@ int32_t DrillClientConfig::getHeartbeatFrequency(){
 logLevel_t DrillClientConfig::getLogLevel(){
     boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
     return s_logLevel;
+}
+
+bool DrillClientConfig::isConnectionPoolingEnabled(){
+    boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+    const char* enablePooledClient=std::getenv(ENABLE_CONNECTION_POOL_ENV);
+    bool enabled= s_enableConnectionPool || (enablePooledClient!=NULL && atoi(enablePooledClient)!=0);
+    return enabled;
+}
+
+int32_t DrillClientConfig::getConnectionPoolMax(){
+    boost::lock_guard<boost::mutex> configLock(DrillClientConfig::s_mutex);
+    const char* strConnPoolMax=std::getenv(ENABLE_CONNECTION_POOL_ENV);
+    int32_t connPoolMax = strConnPoolMax!=NULL && s_connectionPoolMax!= atoi(strConnPoolMax) ? atoi(strConnPoolMax) : s_connectionPoolMax;
+    return connPoolMax;
 }
 
 //Using boost assign to initialize maps. 

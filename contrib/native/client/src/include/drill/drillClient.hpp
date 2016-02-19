@@ -108,6 +108,10 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
         static int32_t getQueryTimeout();
         static int32_t getHeartbeatFrequency();
         static logLevel_t getLogLevel();
+        static void enableConnectionPooling();
+        static bool isConnectionPoolingEnabled();
+        static void setConnectionPoolMax(int32_t l);
+        static int32_t getConnectionPoolMax();
     private:
         // The logging level
         static logLevel_t s_logLevel;
@@ -139,6 +143,8 @@ class DECLSPEC_DRILL_CLIENT DrillClientConfig{
         static int32_t s_queryTimeout;
         static int32_t s_heartbeatFrequency;
         static boost::mutex s_mutex;
+        static bool s_enableConnectionPool;
+        static int32_t s_connectionPoolMax;
 };
 
 
