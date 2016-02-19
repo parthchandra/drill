@@ -452,6 +452,7 @@ class PooledDrillClientImpl : public DrillClientImplBase{
             m_lastConnection=-1;
             m_pError=NULL;
             m_queriesExecuted=0;
+            m_pUserProperties=NULL;
         }
 
         ~PooledDrillClientImpl(){
@@ -459,6 +460,7 @@ class PooledDrillClientImpl : public DrillClientImplBase{
                 delete *it;
             }
             m_clientConnections.clear();
+            if(m_pUserProperties!=NULL){ delete m_pUserProperties; m_pUserProperties=NULL;}
             if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
         }
 
@@ -520,6 +522,8 @@ class PooledDrillClientImpl : public DrillClientImplBase{
         DrillClientImpl* getOneConnection();
 
         std::vector<std::string> m_drillbits;
+
+        DrillUserProperties* m_pUserProperties;//Keep a copy of user properties
 };
 
 class ZookeeperImpl{

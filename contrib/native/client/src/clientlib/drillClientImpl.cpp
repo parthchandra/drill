@@ -1449,10 +1449,20 @@ connectionStatus_t PooledDrillClientImpl::connect(const char* connStr){
 connectionStatus_t PooledDrillClientImpl::validateHandshake(DrillUserProperties* props){
     // Assume there is one valid connection to at least one drillbit
     connectionStatus_t stat=CONN_FAILURE;
+    // Keep a copy of the user properties
+    if(props!=NULL){
+        m_pUserProperties = new DrillUserProperties;
+        for(size_t i=0; i<props->size(); i++){
+            m_pUserProperties->setProperty(
+                    props->keyAt(i),
+                    props->valueAt(i)
+                    );
+        }
+    }
     DrillClientImpl* pDrillClientImpl = getOneConnection();
     if(pDrillClientImpl != NULL){
         DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Validating handshake: (Pooled) " << pDrillClientImpl->m_connectedHost << std::endl;)
-        stat=pDrillClientImpl->validateHandshake(props);
+        stat=pDrillClientImpl->validateHandshake(m_pUserProperties);
     }
     else{
         stat =  handleConnError(CONN_NOTCONNECTED, getMessage(ERR_CONN_NOCONN));
@@ -1549,7 +1559,7 @@ DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
             while(pDrillClientImpl==NULL && tries++ < 3){
                 if((ret=connect(m_connectStr.c_str()))==CONN_SUCCESS){
                     pDrillClientImpl=m_clientConnections.back();
-                    ret=pDrillClientImpl->validateHandshake(NULL);
+                    ret=pDrillClientImpl->validateHandshake(m_pUserProperties);
                     if(ret!=CONN_SUCCESS){
                         delete pDrillClientImpl; pDrillClientImpl=NULL;
                         m_clientConnections.erase(m_clientConnections.end());
