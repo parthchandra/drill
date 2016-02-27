@@ -89,6 +89,14 @@ class Utils{
             vector.erase(std::remove(vector.begin(), vector.end(), elem), vector.end());
         }
 
+        // Provide a to_string that works with older C++ compilers
+        template <typename T> static std::string to_string(T val) {
+            std::stringstream stream;
+            stream << val;
+            return stream.str();
+        }
+
+        
 }; // Utils
 
 } // namespace Drill
