@@ -57,6 +57,7 @@ public class DrillRestServer extends ResourceConfig {
     register(ThreadsResources.class);
     register(FreemarkerMvcFeature.class);
     register(MultiPartFeature.class);
+    register(DrillbitResources.class);
     property(ServerProperties.METAINF_SERVICES_LOOKUP_DISABLE, true);
 
     final boolean isAuthEnabled =
