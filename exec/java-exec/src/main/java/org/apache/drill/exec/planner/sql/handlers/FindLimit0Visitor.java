@@ -23,6 +23,7 @@ import com.google.common.collect.Lists;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelShuttleImpl;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.logical.LogicalIntersect;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -50,6 +51,13 @@ import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.direct.DirectGroupScan;
 
 import java.util.List;
+import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.drill.exec.planner.common.DrillAggregateRelBase;
+import org.apache.drill.exec.planner.common.DrillJoinRelBase;
+import org.apache.drill.exec.planner.common.DrillUnionRelBase;
+
+import java.math.BigDecimal;
 
 /**
  * Visitor that will identify whether the root portion of the RelNode tree contains a limit 0 pattern. In this case, we
@@ -119,6 +127,42 @@ public class FindLimit0Visitor extends RelShuttleImpl {
 
   private boolean contains = false;
 
+  /**
+   * TODO(DRILL-3993): Use RelBuilder to create a limit node to allow for applying this optimization in potentially
+   * any of the transformations, but currently this can be applied after Drill logical transformation, and before
+   * Drill physical transformation.
+   */
+  public static DrillRel addLimitOnTopOfLeafNodes(final RelNode rel) {
+    final RelShuttleImpl shuttle = new RelShuttleImpl() {
+
+      private RelNode addLimitAsParent(RelNode node) {
+        final RexBuilder builder = node.getCluster().getRexBuilder();
+        final RexLiteral offset = builder.makeExactLiteral(BigDecimal.ZERO);
+        final RexLiteral fetch = builder.makeExactLiteral(BigDecimal.ZERO);
+        return new DrillLimitRel(node.getCluster(), node.getTraitSet(), node, offset, fetch);
+      }
+
+      @Override
+      public RelNode visit(LogicalValues values) {
+        return addLimitAsParent(values);
+      }
+
+      @Override
+      public RelNode visit(TableScan scan) {
+        return addLimitAsParent(scan);
+      }
+
+      @Override
+      public RelNode visit(RelNode other) {
+        if (other.getInputs().size() == 0) { // leaf operator
+          return addLimitAsParent(other);
+        }
+        return super.visit(other);
+      }
+    };
+    return (DrillRel) rel.accept(shuttle);
+  }
+
   private FindLimit0Visitor() {
   }
 
@@ -153,6 +197,11 @@ public class FindLimit0Visitor extends RelShuttleImpl {
 
   @Override
   public RelNode visit(RelNode other) {
+    if (other instanceof DrillJoinRelBase ||
+        other instanceof DrillAggregateRelBase ||
+        other instanceof DrillUnionRelBase) {
+      return other;
+    }
     if (other instanceof DrillLimitRel) {
       if (isLimit0(((DrillLimitRel) other).getFetch())) {
         contains = true;
@@ -163,6 +212,7 @@ public class FindLimit0Visitor extends RelShuttleImpl {
     return super.visit(other);
   }
 
+  // TODO: The following nodes are never visited because this visitor is used after logical transformation!
   // The following set of RelNodes should terminate a search for the limit 0 pattern as they want convey its meaning.
 
   @Override
