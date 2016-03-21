@@ -331,7 +331,10 @@ public interface ExecConstants {
   OptionValidator AFFINITY_FACTOR = new DoubleValidator(AFFINITY_FACTOR_KEY);
 
   String EARLY_LIMIT0_OPT_KEY = "planner.enable_limit0_optimization";
-  BooleanValidator EARLY_LIMIT0_OPT = new BooleanValidator(EARLY_LIMIT0_OPT_KEY, true);
+  BooleanValidator EARLY_LIMIT0_OPT = new BooleanValidator(EARLY_LIMIT0_OPT_KEY);
+
+  String LATE_LIMIT0_OPT_KEY = "planner.enable_limit0_on_scan";
+  BooleanValidator LATE_LIMIT0_OPT = new BooleanValidator(LATE_LIMIT0_OPT_KEY);
 
   String ENABLE_MEMORY_ESTIMATION_KEY = "planner.memory.enable_memory_estimation";
   OptionValidator ENABLE_MEMORY_ESTIMATION = new BooleanValidator(ENABLE_MEMORY_ESTIMATION_KEY);
