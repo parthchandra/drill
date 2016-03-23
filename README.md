@@ -17,3 +17,5 @@ Please see the [Apache Drill Website](http://drill.apache.org/) or the [Apache D
 
 ## Join the community!
 Apache Drill is an Apache Foundation project and is seeking all types of contributions.  Please say hello on the Apache Drill mailing list or join our Google Hangouts for more information.  (More information can be found at the Apache Drill website).
+
+Commit 1
