@@ -20,3 +20,4 @@ Apache Drill is an Apache Foundation project and is seeking all types of contrib
 
 Commit 1
 Commit 3
+Commit 4
