@@ -271,7 +271,9 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
         // If the query contains a limit 0 clause, disable distributed mode since it is overkill for determining schema.
         if (FindLimit0Visitor.containsLimit0(convertedRelNodeWithSum0)) {
           context.getPlannerSettings().forceSingleMode();
-          return FindLimit0Visitor.addLimitOnTopOfLeafNodes(convertedRelNodeWithSum0);
+          if (context.getOptions().getOption(ExecConstants.LATE_LIMIT0_OPT)) {
+            return FindLimit0Visitor.addLimitOnTopOfLeafNodes(drillRel);
+          }
         }
 
         return drillRel;

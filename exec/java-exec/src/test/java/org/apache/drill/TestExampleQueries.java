@@ -301,21 +301,6 @@ public class TestExampleQueries extends BaseTestQuery {
   }
 
   @Test
-  public void countDistinct() throws Exception {
-    PlanTestBase.testPlanMatchingPatterns("SELECT * FROM " +
-            "(SELECT COUNT(employee_id), " +
-            "SUM(employee_id), " +
-            "COUNT(DISTINCT employee_id) " +
-            "FROM cp.`employee.json`) " +
-        "T LIMIT 0",
-        new String[]{
-            ".*Limit\\(offset=\\[0\\], fetch=\\[0\\]\\).*\n" +
-                ".*\n" +
-                ".*Scan.*"
-        }, new String[]{});
-  }
-
-  @Test
   public void testWhere() throws Exception {
     test("select * from cp.`employee.json` ");
   }

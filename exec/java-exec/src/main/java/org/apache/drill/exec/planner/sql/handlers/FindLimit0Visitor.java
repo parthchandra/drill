@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelShuttle;
 import org.apache.calcite.rel.RelShuttleImpl;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalAggregate;
@@ -30,10 +31,14 @@ import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalMinus;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalUnion;
+import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.types.TypeProtos;
@@ -42,22 +47,25 @@ import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.impl.OutputMutator;
+import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillDirectScanRel;
 import org.apache.drill.exec.planner.logical.DrillLimitRel;
 import org.apache.drill.exec.planner.logical.DrillRel;
+import org.apache.drill.exec.planner.sql.DrillSqlOperator;
 import org.apache.drill.exec.planner.sql.TypeInferenceUtils;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.direct.DirectGroupScan;
 
 import java.util.List;
-import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.drill.exec.planner.common.DrillAggregateRelBase;
 import org.apache.drill.exec.planner.common.DrillJoinRelBase;
 import org.apache.drill.exec.planner.common.DrillUnionRelBase;
+import org.apache.drill.exec.util.Pointer;
 
 import java.math.BigDecimal;
+import java.util.Set;
 
 /**
  * Visitor that will identify whether the root portion of the RelNode tree contains a limit 0 pattern. In this case, we
@@ -127,13 +135,70 @@ public class FindLimit0Visitor extends RelShuttleImpl {
 
   private boolean contains = false;
 
+  private static final Set<String> unsupportedFunctions = ImmutableSet.<String>builder()
+      // see Mappify
+      .add("KVGEN")
+      .add("MAPPIFY")
+      // see DummyFlatten
+      .add("FLATTEN")
+      // see JsonConvertFrom
+      .add("CONVERT_FROMJSON")
+      // see JsonConvertTo class
+      .add("CONVERT_TOJSON")
+      .add("CONVERT_TOSIMPLEJSON")
+      .add("CONVERT_TOEXTENDEDJSON")
+      .build();
+
+  private static boolean isUnsupportedScalarFunction(final SqlOperator operator) {
+    return operator instanceof DrillSqlOperator &&
+        unsupportedFunctions.contains(operator.getName().toUpperCase());
+  }
+
   /**
    * TODO(DRILL-3993): Use RelBuilder to create a limit node to allow for applying this optimization in potentially
    * any of the transformations, but currently this can be applied after Drill logical transformation, and before
    * Drill physical transformation.
    */
-  public static DrillRel addLimitOnTopOfLeafNodes(final RelNode rel) {
-    final RelShuttleImpl shuttle = new RelShuttleImpl() {
+  public static DrillRel addLimitOnTopOfLeafNodes(final DrillRel rel) {
+    final Pointer<Boolean> isUnsupported = new Pointer<>(false);
+
+    // to visit unsupported functions
+    final RexShuttle unsupportedFunctionsVisitor = new RexShuttle() {
+      @Override
+      public RexNode visitCall(RexCall call) {
+        final SqlOperator operator = call.getOperator();
+        if (isUnsupportedScalarFunction(operator)) {
+          isUnsupported.value = true;
+          return call;
+        }
+        return super.visitCall(call);
+      }
+    };
+
+    // to visit unsupported operators
+    final RelShuttle unsupportedOperationsVisitor = new RelShuttleImpl() {
+      @Override
+      public RelNode visit(RelNode other) {
+        if (other instanceof DrillUnionRelBase) {
+          isUnsupported.value = true;
+          return rel;
+        } else if (other instanceof DrillProjectRelBase) {
+          other.accept(unsupportedFunctionsVisitor);
+          if (isUnsupported.value) {
+            return rel;
+          }
+        }
+        return super.visit(other);
+      }
+    };
+
+    rel.accept(unsupportedOperationsVisitor);
+    if (isUnsupported.value) {
+      return rel;
+    }
+
+    // to add LIMIT (0) on top of leaf nodes
+    final RelShuttle addLimitOnScanVisitor = new RelShuttleImpl() {
 
       private RelNode addLimitAsParent(RelNode node) {
         final RexBuilder builder = node.getCluster().getRexBuilder();
@@ -160,7 +225,8 @@ public class FindLimit0Visitor extends RelShuttleImpl {
         return super.visit(other);
       }
     };
-    return (DrillRel) rel.accept(shuttle);
+
+    return (DrillRel) rel.accept(addLimitOnScanVisitor);
   }
 
   private FindLimit0Visitor() {
