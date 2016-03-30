@@ -87,6 +87,25 @@ public class TestLateLimit0Optimization extends BaseTestQuery {
   }
 
   @Test
+  public void flatten2() throws Exception {
+    checkThatQueryIsNotOptimized("select uid, lst_lst, d.lst_lst[1], flatten(d.lst_lst) lst " +
+        "from cp.`tpch/region.parquet` d order by d.lst_lst[1][2]"); // table is just for validation
+  }
+
+  @Test
+  public void flatten3() throws Exception {
+    checkThatQueryIsNotOptimized("select s.evnts.evnt_id from (select d.type type, flatten(d.events) evnts from " +
+        "cp.`tpch/region.parquet` d where d.type='web' order by d.uid) s " +
+        "where s.evnts.type = 'cmpgn4' and s.type='web'"); // table is just for validation
+  }
+
+  @Test
+  public void flatten4() throws Exception {
+    checkThatQueryIsNotOptimized("select flatten(lst) from (select uid, flatten(d.lst_lst) lst from " +
+        "cp.`tpch/region.parquet` d) s1 order by s1.lst[3]"); // table is just for validation
+  }
+
+  @Test
   public void countDistinct() throws Exception {
     checkThatQueryIsOptimized("SELECT COUNT(employee_id), " +
             "SUM(employee_id), " +

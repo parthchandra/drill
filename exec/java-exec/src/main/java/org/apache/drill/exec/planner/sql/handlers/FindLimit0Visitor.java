@@ -181,11 +181,11 @@ public class FindLimit0Visitor extends RelShuttleImpl {
       public RelNode visit(RelNode other) {
         if (other instanceof DrillUnionRelBase) {
           isUnsupported.value = true;
-          return rel;
+          return other;
         } else if (other instanceof DrillProjectRelBase) {
           other.accept(unsupportedFunctionsVisitor);
           if (isUnsupported.value) {
-            return rel;
+            return other;
           }
         }
         return super.visit(other);
