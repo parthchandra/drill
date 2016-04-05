@@ -39,10 +39,23 @@ import javax.inject.Inject;
 public class DirectoryExplorers {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DirectoryExplorers.class);
 
-  <#list [ { "name" : "\"maxdir\"", "functionClassName" : "MaxDir", "comparison" : "compareTo(curr) < 0", "goal" : "maximum", "comparisonType" : "case-sensitive"},
-           { "name" : "\"imaxdir\"", "functionClassName" : "IMaxDir", "comparison" : "compareToIgnoreCase(curr) < 0", "goal" : "maximum", "comparisonType" : "case-insensitive"},
-           { "name" : "\"mindir\"", "functionClassName" : "MinDir", "comparison" : "compareTo(curr) > 0", "goal" : "minimum", "comparisonType" : "case-sensitive"},
-           { "name" : "\"imindir\"", "functionClassName" : "IMinDir", "comparison" : "compareToIgnoreCase(curr) > 0", "goal" : "minimum", "comparisonType" : "case-insensitive"}
+  <#list [ { "parameterAmount" : 1, "name" : "\"maxdir\"", "functionClassName" : "MaxDirOnePar", "comparison" : "compareTo(curr) < 0", "goal" : "maximum", "comparisonType" :
+               "case-sensitive"},
+           { "parameterAmount" : 1, "name" : "\"imaxdir\"", "functionClassName" : "IMaxDirOnePar", "comparison" : "compareToIgnoreCase(curr) < 0", "goal" : "maximum",
+               "comparisonType" : "case-insensitive"},
+           { "parameterAmount" : 1, "name" : "\"mindir\"", "functionClassName" : "MinDirOnePar", "comparison" : "compareTo(curr) > 0", "goal" : "minimum", "comparisonType" :
+               "case-sensitive"},
+           { "parameterAmount" : 1, "name" : "\"imindir\"", "functionClassName" : "IMinDirOnePar", "comparison" : "compareToIgnoreCase(curr) > 0", "goal" : "minimum",
+               "comparisonType" : "case-insensitive"}
+
+           { "parameterAmount" : 2, "name" : "\"maxdir\"", "functionClassName" : "MaxDirTwoPar", "comparison" : "compareTo(curr) < 0", "goal" : "maximum", "comparisonType" :
+               "case-sensitive"},
+           { "parameterAmount" : 2, "name" : "\"imaxdir\"", "functionClassName" : "IMaxDirTwoPar", "comparison" : "compareToIgnoreCase(curr) < 0", "goal" : "maximum",
+               "comparisonType" : "case-insensitive"},
+           { "parameterAmount" : 2, "name" : "\"mindir\"", "functionClassName" : "MinDirTwoPar", "comparison" : "compareTo(curr) > 0", "goal" : "minimum", "comparisonType" :
+               "case-sensitive"},
+           { "parameterAmount" : 2, "name" : "\"imindir\"", "functionClassName" : "IMinDirTwoPar", "comparison" : "compareToIgnoreCase(curr) > 0", "goal" : "minimum",
+               "comparisonType" : "case-insensitive"}
   ] as dirAggrProps>
 
 
@@ -50,7 +63,9 @@ public class DirectoryExplorers {
   public static class ${dirAggrProps.functionClassName} implements DrillSimpleFunc {
 
     @Param VarCharHolder schema;
+  <#if dirAggrProps.parameterAmount==2>
     @Param  VarCharHolder table;
+  </#if>
     @Output VarCharHolder out;
     @Inject DrillBuf buffer;
     @Inject org.apache.drill.exec.store.PartitionExplorer partitionExplorer;
@@ -63,23 +78,39 @@ public class DirectoryExplorers {
       try {
         subPartitions = partitionExplorer.getSubPartitions(
             org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.getStringFromVarCharHolder(schema),
+          <#if dirAggrProps.parameterAmount==2>
             org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.getStringFromVarCharHolder(table),
+          <#elseif dirAggrProps.parameterAmount==1>
+            ".",
+          </#if>
             new java.util.ArrayList<String>(),
             new java.util.ArrayList<String>());
       } catch (org.apache.drill.exec.store.PartitionNotFoundException e) {
         throw new RuntimeException(
+          <#if dirAggrProps.parameterAmount==2>
             String.format("Error in %s function: Table %s does not exist in schema %s ",
+          <#elseif dirAggrProps.parameterAmount==1>
+            String.format("Error in %s function: Scheam/table %s does not exist ",
+          </#if>
                 ${dirAggrProps.name},
+          <#if dirAggrProps.parameterAmount==2>
                 org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.getStringFromVarCharHolder(table),
+          </#if>
                 org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.getStringFromVarCharHolder(schema))
         );
       }
       java.util.Iterator partitionIterator = subPartitions.iterator();
       if (!partitionIterator.hasNext()) {
         throw new RuntimeException(
+          <#if dirAggrProps.parameterAmount==2>
             String.format("Error in %s function: Table %s in schema %s does not contain sub-partitions.",
+          <#elseif dirAggrProps.parameterAmount==1>
+            String.format("Error in %s function: Scheam/table %s does not contain sub-partitions.",
+          </#if>
                 ${dirAggrProps.name},
+          <#if dirAggrProps.parameterAmount==2>
                 org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.getStringFromVarCharHolder(table),
+          </#if>
                 org.apache.drill.exec.expr.fn.impl.StringFunctionHelpers.getStringFromVarCharHolder(schema)
             )
         );
