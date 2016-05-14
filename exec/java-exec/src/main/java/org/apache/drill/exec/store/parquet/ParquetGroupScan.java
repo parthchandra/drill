@@ -104,7 +104,7 @@ import com.google.common.collect.Sets;
 @JsonTypeName("parquet-scan")
 public class ParquetGroupScan extends AbstractFileGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ParquetGroupScan.class);
-  static final MetricRegistry metrics = DrillMetrics.getInstance();
+  static final MetricRegistry metrics = DrillMetrics.getRegistry();
   static final String READ_FOOTER_TIMER = MetricRegistry.name(ParquetGroupScan.class, "readFooter");
 
 
