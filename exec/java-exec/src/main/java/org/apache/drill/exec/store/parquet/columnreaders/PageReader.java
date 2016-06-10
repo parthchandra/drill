@@ -48,7 +48,7 @@ import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.schema.PrimitiveType;
 import parquet.FileReader.BufferedDirectBufInputStream;
-import parquet.FileReader.ChunkedBufferedDirectBufInputStream;
+import parquet.FileReader.BasicBufferedDirectBufInputStream;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -69,7 +69,7 @@ final class PageReader {
 
   private final org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentColumnReader;
   //private final ColumnDataReader dataReader;
-  private final ChunkedBufferedDirectBufInputStream dataReader;
+  private final BasicBufferedDirectBufInputStream dataReader;
   //der; buffer to store bytes of current page
   DrillBuf pageData;
 
@@ -126,7 +126,7 @@ final class PageReader {
       inputStream  = fs.open(path);
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       //TODO: make read batch size configurable
-      this.dataReader = new ChunkedBufferedDirectBufInputStream(inputStream, allocator, path.getName(),
+      this.dataReader = new BasicBufferedDirectBufInputStream(inputStream, allocator, path.getName(),
           columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024, true);
       dataReader.init();
 
