@@ -48,7 +48,7 @@ public abstract class ColumnReader<V extends ValueVector> {
   // metadata of the column, from the parquet library
   final ColumnChunkMetaData columnChunkMetaData;
   // status information on the current page
-  PageReader pageReader;
+  AsyncPageReader pageReader;
 
   final SchemaElement schemaElement;
   boolean usingDictionary;
@@ -70,7 +70,7 @@ public abstract class ColumnReader<V extends ValueVector> {
   protected DrillBuf vectorData;
   // when reading definition levels for nullable columns, it is a one-way stream of integers
   // when reading var length data, where we don't know if all of the records will fit until we've read all of them
-  // we must store the last definition level an use it in at the start of the next batch
+  // we must store the last definition level and use it at the start of the next batch
   int currDefLevel;
 
   // variables for a single read pass
@@ -84,7 +84,7 @@ public abstract class ColumnReader<V extends ValueVector> {
     this.isFixedLength = fixedLength;
     this.schemaElement = schemaElement;
     this.valueVec =  v;
-    this.pageReader = new PageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(), columnChunkMetaData);
+    this.pageReader = new AsyncPageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(), columnChunkMetaData);
 
     if (columnDescriptor.getType() != PrimitiveType.PrimitiveTypeName.BINARY) {
       if (columnDescriptor.getType() == PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY) {
