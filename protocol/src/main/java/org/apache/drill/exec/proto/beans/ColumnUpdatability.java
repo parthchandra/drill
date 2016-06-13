@@ -20,17 +20,15 @@
 
 package org.apache.drill.exec.proto.beans;
 
-public enum QueryType implements com.dyuproject.protostuff.EnumLite<QueryType>
+public enum ColumnUpdatability implements com.dyuproject.protostuff.EnumLite<ColumnUpdatability>
 {
-    SQL(1),
-    LOGICAL(2),
-    PHYSICAL(3),
-    EXECUTION(4),
-    PREPARED_STATEMENT(5);
+    READ_ONLY(1),
+    WRITABLE(2),
+    UNKNOWN(3);
     
     public final int number;
     
-    private QueryType (int number)
+    private ColumnUpdatability (int number)
     {
         this.number = number;
     }
@@ -40,15 +38,13 @@ public enum QueryType implements com.dyuproject.protostuff.EnumLite<QueryType>
         return number;
     }
     
-    public static QueryType valueOf(int number)
+    public static ColumnUpdatability valueOf(int number)
     {
         switch(number) 
         {
-            case 1: return SQL;
-            case 2: return LOGICAL;
-            case 3: return PHYSICAL;
-            case 4: return EXECUTION;
-            case 5: return PREPARED_STATEMENT;
+            case 1: return READ_ONLY;
+            case 2: return WRITABLE;
+            case 3: return UNKNOWN;
             default: return null;
         }
     }
