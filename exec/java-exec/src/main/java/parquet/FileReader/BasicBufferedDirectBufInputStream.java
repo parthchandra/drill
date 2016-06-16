@@ -619,11 +619,11 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
         for (;;) {
             DrillBuf byteBuf = allocator.buffer(len);
             int nread = read1(byteBuf, off + n, len - n);
-            byteBuf.nioBuffer().get(bytes, off + n, len - n);
-            byteBuf.release();
             if (nread <= 0) {
                 return (n == 0) ? nread : n;
             }
+            byteBuf.nioBuffer().get(bytes, off + n, len - n);
+            byteBuf.release();
             n += nread;
             if (n >= len) {
                 return n;
