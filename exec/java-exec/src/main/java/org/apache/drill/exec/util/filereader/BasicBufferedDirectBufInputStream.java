@@ -41,25 +41,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
- * A <code>BasicBufferedDirectBufInputStream</code> adds
- * functionality to another input stream-namely,
- * the ability to buffer the input and to
- * support the <code>mark</code> and <code>reset</code>
- * methods. When  the <code>BasicBufferedDirectBufInputStream</code>
- * is created, an internal buffer array is
- * created. As bytes  from the stream are read
- * or skipped, the internal buffer is refilled
- * as necessary  from the contained input stream,
- * many bytes at a time. The <code>mark</code>
- * operation  remembers a point in the input
- * stream and the <code>reset</code> operation
- * causes all the  bytes read since the most
- * recent <code>mark</code> operation to be
- * reread before new bytes re  taken from
- * the contained input stream.
- *
- * @author  Arthur van Hoff
- * @since   JDK1.0
+ * <code>BasicBufferedDirectBufInputStream</code>  reads from the
+ * underlying <code>InputStream</code> in blocks of data, into an
+ * internal buffer. The internal buffer is a direct memory backed
+ * buffer. The implementation is similar to the <code>BufferedInputStream</code>
+ * class except that the internal buffer is a Drillbuf and
+ * not a byte array. The mark and reset methods of the underlying
+ * <code>InputStream</code>are not supported.
  */
 public
 class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream implements Closeable {
@@ -68,12 +56,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
     private static int defaultBufferSize = 8192*1024; // 8 MB
 
-    /**
-     * The internal buffer array where the data is stored. When necessary,
-     * it may be replaced by another array of
-     * a different size.
-     */
-    protected volatile DrillBuf buf;
+    protected volatile DrillBuf buf; // the internal buffer
 
     /**
      * Atomic updater to provide compareAndSet for buf. This is
@@ -312,7 +295,6 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
         if (pos >= buffer.capacity()) { //  no room left in buffer
             int nsz = pos * 2;
             DrillBuf nbuf = allocator.buffer(nsz);
-            //System.arraycopy(buffer, 0, nbuf, 0, pos);
             buffer.getBytes(0, nbuf, 0, pos); // Copy bytes into new buffer
             buf.release();
             if (!bufUpdater.compareAndSet(this, buffer, nbuf)) {
