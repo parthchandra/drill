@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package parquet.FileReader;
+package org.apache.drill.exec.util.filereader;
 
 import com.google.common.base.Preconditions;
 import io.netty.buffer.DrillBuf;
