@@ -19,15 +19,13 @@ package org.apache.drill.exec.store.parquet.columnreaders;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import org.apache.hadoop.fs.Seekable;
-import parquet.FileReader.BasicBufferedDirectBufInputStream;
+import org.apache.drill.exec.util.filereader.BasicBufferedDirectBufInputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.store.parquet.ParquetFormatPlugin;
 import org.apache.drill.exec.store.parquet.ParquetReaderStats;
-import org.apache.drill.exec.store.parquet.columnreaders.ColumnReader;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -47,11 +45,9 @@ import org.apache.parquet.hadoop.CodecFactory;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.schema.PrimitiveType;
-import parquet.FileReader.BufferedDirectBufInputStream;
-import parquet.FileReader.BasicBufferedDirectBufInputStream;
+import org.apache.drill.exec.util.filereader.BufferedDirectBufInputStream;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -126,6 +122,7 @@ final class PageReader {
       inputStream  = fs.open(path);
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       //TODO: make read batch size configurable
+      columnChunkMetaData.getTotalUncompressedSize();
       this.dataReader = new BasicBufferedDirectBufInputStream(inputStream, allocator, path.getName(),
           columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024, true);
       dataReader.init();
