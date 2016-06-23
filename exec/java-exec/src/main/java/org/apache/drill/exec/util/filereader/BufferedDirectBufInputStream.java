@@ -27,9 +27,6 @@ import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
-/**
- * Created by pchandra on 5/5/16.
- */
 public abstract class BufferedDirectBufInputStream extends FilterInputStream {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BufferedDirectBufInputStream.class);
@@ -40,7 +37,7 @@ public abstract class BufferedDirectBufInputStream extends FilterInputStream {
     this.enableHints = enableHints;
   }
 
-  public abstract void init();
+  public abstract void init() throws IOException, UnsupportedOperationException;
 
   public abstract DrillBuf getNext(int bytes) throws IOException;
 
