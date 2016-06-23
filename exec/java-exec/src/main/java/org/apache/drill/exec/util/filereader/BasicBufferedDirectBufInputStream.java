@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 /**
  * <code>BasicBufferedDirectBufInputStream</code>  reads from the
@@ -56,91 +55,32 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
     private static int defaultBufferSize = 8192*1024; // 8 MB
 
-    protected volatile DrillBuf buf; // the internal buffer
-
     /**
-     * Atomic updater to provide compareAndSet for buf. This is
-     * necessary because closes can be asynchronous. We use nullness
-     * of buf[] as primary indicator that this stream is closed. (The
-     * "in" field is also nulled out on close.)
+     * The internal buffer to keep data read from the underlying inputStream.
+     * <code>internalBuffer[0]</code>  through <code>internalBuffer[count-1] </code>
+     * contains data read from the underlying  input stream.
      */
-    private static final
-        AtomicReferenceFieldUpdater<BasicBufferedDirectBufInputStream, DrillBuf> bufUpdater =
-        AtomicReferenceFieldUpdater.newUpdater
-        (BasicBufferedDirectBufInputStream.class,  DrillBuf.class, "buf");
+    protected volatile DrillBuf internalBuffer; // the internal buffer
 
     /**
-     * The index one greater than the index of the last valid byte in
-     * the buffer.
-     * This value is always
-     * in the range <code>0</code> through <code>buf.length</code>;
-     * elements <code>buf[0]</code>  through <code>buf[count-1]
-     * </code>contain buffered input data obtained
-     * from the underlying  input stream.
+     * The number of valid bytes in <code>internalBuffer</code>.
+     * <code> count </code> is always in the range <code>[0,internalBuffer.capacity]</code>
+     * <code>internalBuffer[count-1]</code> is the last valid byte in the buffer.
      */
     protected int count;
 
     /**
-     * The current position in the buffer. This is the index of the next
-     * character to be read from the <code>buf</code> array.
+     * The current read position in the buffer; the index of the next
+     * character to be read from the <code>internalBuffer</code> array.
      * <p>
-     * This value is always in the range <code>0</code>
-     * through <code>count</code>. If it is less
-     * than <code>count</code>, then  <code>buf[pos]</code>
-     * is the next byte to be supplied as input;
-     * if it is equal to <code>count</code>, then
-     * the  next <code>read</code> or <code>skip</code>
-     * operation will require more bytes to be
-     * read from the contained  input stream.
-     *
-     * @see     java.io.BufferedInputStream#buf
+     * This value is always in the range <code>[0,count]</code>.
+     * If <code>curPosInBuffer</code> is equal to <code>count></code> then we have read
+     * all the buffered data and the next read (or skip) will require more data to be read
+     * from the underlying input stream.
      */
-    protected int pos;
+    protected int curPosInBuffer;
 
-    /**
-     * The value of the <code>pos</code> field at the time the last
-     * <code>mark</code> method was called.
-     * <p>
-     * This value is always
-     * in the range <code>-1</code> through <code>pos</code>.
-     * If there is no marked position in  the input
-     * stream, this field is <code>-1</code>. If
-     * there is a marked position in the input
-     * stream,  then <code>buf[markpos]</code>
-     * is the first byte to be supplied as input
-     * after a <code>reset</code> operation. If
-     * <code>markpos</code> is not <code>-1</code>,
-     * then all bytes from positions <code>buf[markpos]</code>
-     * through  <code>buf[pos-1]</code> must remain
-     * in the buffer array (though they may be
-     * moved to  another place in the buffer array,
-     * with suitable adjustments to the values
-     * of <code>count</code>,  <code>pos</code>,
-     * and <code>markpos</code>); they may not
-     * be discarded unless and until the difference
-     * between <code>pos</code> and <code>markpos</code>
-     * exceeds <code>marklimit</code>.
-     *
-     * @see     java.io.BufferedInputStream#mark(int)
-     * @see     java.io.BufferedInputStream#pos
-     */
-    //protected int markpos = -1;
-
-    /**
-     * The maximum read ahead allowed after a call to the
-     * <code>mark</code> method before subsequent calls to the
-     * <code>reset</code> method fail.
-     * Whenever the difference between <code>pos</code>
-     * and <code>markpos</code> exceeds <code>marklimit</code>,
-     * then the  mark may be dropped by setting
-     * <code>markpos</code> to <code>-1</code>.
-     *
-     * @see     java.io.BufferedInputStream#mark(int)
-     * @see     java.io.BufferedInputStream#reset()
-     */
-    //protected int marklimit;
-
-    protected int curpos; // current offset in the input stream
+    protected long curPosInStream; // current offset in the input stream
 
     protected String streamId; // a name for logging purposes only
 
@@ -150,40 +90,38 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
     protected BufferAllocator allocator;
     private final int bufSize;
 
-    /**
-     * Check to make sure that underlying input stream has not been
-     * nulled out due to close; if not return it;
-     */
-    private FSDataInputStream getInIfOpen() throws IOException {
-        InputStream input = in;
-        if (input == null) {
-            throw new IOException("Stream closed");
+    private FSDataInputStream getInputStream() throws IOException {
+        // Make sure stream is open
+        checkInputStreamState();
+        return (FSDataInputStream)in;
+    }
+
+    private void checkInputStreamState() throws IOException{
+        if(in == null){
+            throw new IOException("Input stream is closed.");
         }
-        // Make input stream a stream that supports ByteBuffer
+    }
+
+    private void checkStreamSupportsByteBuffer() throws UnsupportedOperationException{
+        // iCheck input stream supports ByteBuffer
         if ( !(in instanceof ByteBufferReadable) ) {
             throw new UnsupportedOperationException("The input stream is not ByteBuffer readable.");
         }
-
-        return (FSDataInputStream)input;
     }
 
-    /**
-     * Check to make sure that buffer has not been nulled out due to
-     * close; if not return it;
-     */
-    private DrillBuf getBufIfOpen() throws IOException {
-        DrillBuf buffer = buf;
-        if (buffer == null) {
-            throw new IOException("Stream closed");
+    private DrillBuf getBuf() throws IOException {
+        checkInputStreamState();
+        if (internalBuffer == null) {
+            throw new IOException("Input stream is closed.");
         }
-        return buf;
+        return internalBuffer;
     }
 
     /**
      * Creates a <code>BasicBufferedDirectBufInputStream</code>
      * and saves its  argument, the input stream
      * <code>in</code>, for later use. An internal
-     * buffer array is created and  stored in <code>buf</code>.
+     * buffer array is created and  stored in <code>internalBuffer</code>.
      *
      * @param   in   the underlying input stream.
      */
@@ -197,12 +135,8 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      * with the specified buffer size,
      * and saves its  argument, the input stream
      * <code>in</code>, for later use.  An internal
-     * buffer array of length  <code>size</code>
-     * is created and stored in <code>buf</code>.
-     *
-     * @param   in     the underlying input stream.
-     * @param   bufSize   the buffer size.
-     * @exception IllegalArgumentException if size <= 0.
+     * buffer of length  <code>size</code>
+     * is created and stored in <code>internalBuffer</code>.
      */
     public BasicBufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
         long startOffset, long totalByteSize, int bufSize, boolean enableHints) {
@@ -231,20 +165,19 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
         this.totalByteSize = totalByteSize;
     }
 
-    public void init() {
+    public void init() throws UnsupportedOperationException, IOException{
+        checkStreamSupportsByteBuffer();
         //do a late allocation of the buffer
-        buf = allocator.buffer(bufSize);
-        //TODO: issue fadvise here.
-        // Need a reflection based call here.
-        try {
+        internalBuffer = allocator.buffer(bufSize);
+        //try {
             if (enableHints) {
-                fadviseIfAvailable(getInIfOpen(), startOffset, totalByteSize);
+                fadviseIfAvailable(getInputStream(), startOffset, totalByteSize);
             }
-            getInIfOpen().seek(startOffset);
-            fill();
-        } catch (IOException e) {
-            //TODO: Throw UserException here
-        }
+            getInputStream().seek(startOffset);
+            getNextBlock();
+        //} catch (IOException e) {
+        //TODO: Throw UserException here
+        //}
     }
 
     /**
@@ -252,84 +185,127 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      * shuffling and other tricks for dealing with marks.
      * Assumes that it is being called by a synchronized method.
      * This method also assumes that all data has already been read in,
-     * hence pos > count.
+     * hence curPosInBuffer > count.
      */
     /*
     private void fill() throws IOException {
-        DrillBuf buffer = getBufIfOpen();
+        DrillBuf buffer = getBuf();
         if (markpos < 0)
-            pos = 0;            // no mark: throw away the buffer
-        else if (pos >= buffer.length) //  no room left in buffer
+            curPosInBuffer = 0;            // no mark: throw away the buffer
+        else if (curPosInBuffer >= buffer.length) //  no room left in buffer
             if (markpos > 0) {  // can throw away early part of the buffer
-                int sz = pos - markpos;
+                int sz = curPosInBuffer - markpos;
                 System.arraycopy(buffer, markpos, buffer, 0, sz);
-                pos = sz;
+                curPosInBuffer = sz;
                 markpos = 0;
             } else if (buffer.length >= marklimit) {
                 markpos = -1;   //  buffer got too big, invalidate mark
-                pos = 0;        //  drop buffer contents
+                curPosInBuffer = 0;        //  drop buffer contents
             } else {            //  grow buffer
-                int nsz = pos * 2;
+                int nsz = curPosInBuffer * 2;
                 if (nsz > marklimit)
                     nsz = marklimit;
                 byte nbuf[] = new byte[nsz];
-                System.arraycopy(buffer, 0, nbuf, 0, pos);
+                System.arraycopy(buffer, 0, nbuf, 0, curPosInBuffer);
                 if (!bufUpdater.compareAndSet(this, buffer, nbuf)) {
-                    // Can't replace buf if there was an async close.
+                    // Can't replace internalBuffer if there was an async close.
                     // Note: This would need to be changed if fill()
                     // is ever made accessible to multiple threads.
                     // But for now, the only way CAS can fail is via close.
-                    // assert buf == null;
+                    // assert internalBuffer == null;
                     throw new IOException("Stream closed");
                 }
                 buffer = nbuf;
             }
-        count = pos;
-        int n = getInIfOpen().read(buffer, pos, buffer.length - pos);
+        count = curPosInBuffer;
+        int n = getInputStream().read(buffer, curPosInBuffer, buffer.length - curPosInBuffer);
         if (n > 0)
-            count = n + pos;
+            count = n + curPosInBuffer;
     }
     */
-    private void fill() throws IOException {
-        DrillBuf buffer = getBufIfOpen();
-        if (pos >= buffer.capacity()) { //  no room left in buffer
-            int nsz = pos * 2;
-            DrillBuf nbuf = allocator.buffer(nsz);
-            buffer.getBytes(0, nbuf, 0, pos); // Copy bytes into new buffer
-            buf.release();
-            if (!bufUpdater.compareAndSet(this, buffer, nbuf)) {
-                // Can't replace buf if there was an async close.
-                // Note: This would need to be changed if fill()
-                // is ever made accessible to multiple threads.
-                // But for now, the only way CAS can fail is via close.
-                // assert buf == null;
-                throw new IOException("Stream closed");
-            }
-            buffer = nbuf;
-        }
-        count = pos;
+    /**
+     * Read one more block from the underlying stream.
+     * Assumes we have reached the end of buffered date
+     * Assumes it is being called from a synchronized block.
+     */
+    private void getNextBlock() throws IOException{
+        Preconditions.checkState(this.curPosInBuffer >= this.count,
+            "Internal error: Buffered stream has not been consumed and trying to read more from underlying stream");
+        DrillBuf buffer = getBuf();
+        count = curPosInBuffer = 0;
 
-        int remainingCapacity = buffer.capacity() - pos;
-        long currentPos = getInIfOpen().getPos();
+
+        // We *cannot* rely on the totalByteSize being correct because
+        // metadata for Parquet files is incorrect. So we read as
+        // musch as we can up to the size of the buffer
+        //int bytesToRead = buffer.capacity() <= (totalByteSize + startOffset - curPosInStream ) ?
+        //    buffer.Capacity() :
+        //    (int) (totalByteSize + startOffset - curPosInStream );
+        int bytesToRead = buffer.capacity();
+
+        ByteBuffer directBuffer = buffer.nioBuffer(curPosInBuffer, bytesToRead);
+        // The DFS can return *more* bytes than requested if the capacity of the buffer is greater.
+        // i.e 'n' can be greater than bytes requested which is pretty stupid and violates
+        // the API contract; but we still have to deal with it. So we make sure the size of the
+        // buffer is exactly the same as the number of bytes requested
+        if (bytesToRead > 0) {
+            int n = CompatibilityUtil.getBuf(getInputStream(), directBuffer, bytesToRead);
+            if (n > 0) {
+                buffer.writerIndex(n);
+                count = n + curPosInBuffer;
+            }
+        }
+        this.curPosInStream = getInputStream().getPos();
+
+    }
+
+    /*
+    private void fill() throws IOException {
+        DrillBuf buffer = getBuf();
+        //if (curPosInBuffer >= buffer.capacity()) { //  no room left in buffer
+        //    int nsz = curPosInBuffer * 2;
+        //    DrillBuf nbuf = allocator.buffer(nsz);
+        //    buffer.getBytes(0, nbuf, 0, curPosInBuffer); // Copy bytes into new buffer
+        //    synchronized(this) {
+        //        //if (!bufUpdater.compareAndSet(this, buffer, nbuf)) {
+        //            // Can't replace internalBuffer if there was an async close.
+        //            // Note: This would need to be changed if fill()
+        //            // is ever made accessible to multiple threads.
+        //            // But for now, the only way CAS can fail is via close.
+        //            // assert internalBuffer == null;
+        //        if(internalBuffer != null) {
+        //            internalBuffer = nbuf;
+        //        } else {
+        //           throw new IOException("Stream closed");
+        //        }
+        //        buffer.release();
+        //    }
+        //    buffer = nbuf;
+        //}
+        count = curPosInBuffer = 0;
+
+        int remainingCapacity = buffer.capacity() - curPosInBuffer;
+        long currentPos = getInputStream().getPos();
 
         //int bytesToRead = remainingCapacity <= (totalByteSize + startOffset - currentPos ) ?
         //    remainingCapacity :
         //    (int) (totalByteSize + startOffset - currentPos );
         int bytesToRead = remainingCapacity;
 
-        ByteBuffer directBuffer = buffer.nioBuffer(pos, bytesToRead);
+        ByteBuffer directBuffer = buffer.nioBuffer(curPosInBuffer, bytesToRead);
         // The DFS can return *more* bytes than requested if the capacity of the buffer is greater.
         // i.e 'n' can be greater than bytes requested which is pretty stupid and violates
         // the API contract; but we still have to deal with it.i Se we make sure the size of the
         // buffer is exactly the same as the number of bytes requested
         if (bytesToRead > 0) {
-            int n = CompatibilityUtil.getBuf(getInIfOpen(), directBuffer, bytesToRead);
+            int n = CompatibilityUtil.getBuf(getInputStream(), directBuffer, bytesToRead);
             if (n > 0) {
                 buffer.writerIndex(n);
-                count = n + pos;
+                count = n + curPosInBuffer;
             }
         }
     }
+    */
 
     /**
      * See
@@ -344,14 +320,14 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      * @see        java.io.FilterInputStream#in
      */
     public synchronized int read() throws IOException {
-        if (pos >= count) {
-            fill();
-            if (pos >= count) {
+        if (curPosInBuffer >= count) {
+            getNextBlock();
+            if (curPosInBuffer >= count) {
                 return -1;
             }
         }
-        pos++;
-        return getBufIfOpen().nioBuffer().get() & 0xff;
+        curPosInBuffer++;
+        return getBuf().nioBuffer().get() & 0xff;
     }
 
     /**
@@ -359,21 +335,21 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      * stream at most once if necessary.
      */
     private int read1(DrillBuf b, int off, int len) throws IOException {
-        int avail = count - pos;
+        int avail = count - curPosInBuffer;
         if (avail <= 0) {
             /* If the requested length is at least as large as the buffer, and
                if there is no mark/reset activity, do not bother to copy the
                bytes into the local buffer.  In this way buffered streams will
                cascade harmlessly. */
-            if (len >= getBufIfOpen().capacity() ) {
-                long currentPos = getInIfOpen().getPos();
+            if (len >= getBuf().capacity() ) {
+                long currentPos = getInputStream().getPos();
                 //int bytesToRead = len <= (totalByteSize + startOffset - currentPos ) ?
                 //    len :
                 //    (int) (totalByteSize + startOffset - currentPos );
                 int bytesToRead = len;
                 ByteBuffer directBuffer = b.nioBuffer(off, bytesToRead);
                 if (bytesToRead > 0) {
-                    int n = CompatibilityUtil.getBuf(getInIfOpen(), directBuffer, bytesToRead);
+                    int n = CompatibilityUtil.getBuf(getInputStream(), directBuffer, bytesToRead);
                     if (n > 0) {
                         b.writerIndex(n);
                     }else{
@@ -382,18 +358,18 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
                     return n;
                 }
             }
-            fill();
-            avail = count - pos;
+            getNextBlock();
+            avail = count - curPosInBuffer;
             if (avail <= 0)  {
                 return -1;
             }
         }
         int cnt = (avail < len) ? avail : len;
-        //System.arraycopy(getBufIfOpen(), pos, b, off, cnt);
+        //System.arraycopy(getBuf(), curPosInBuffer, b, off, cnt);
         //TODO: Avoid this copy ...
-        getBufIfOpen().getBytes(pos, b, off, cnt); // Copy bytes into new buffer
+        getBuf().getBytes(curPosInBuffer, b, off, cnt); // Copy bytes into new buffer
         b.writerIndex(off+cnt);
-        pos += cnt;
+        curPosInBuffer += cnt;
         return cnt;
     }
 
@@ -435,7 +411,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      *                          or an I/O error occurs.
      */
     public synchronized int read(DrillBuf b, int off, int len) throws IOException {
-        getBufIfOpen(); // Check for closed stream
+        getBuf(); // Check for closed stream
         if ((off | len | (off + len) | (b.capacity() - (off + len))) < 0) {
             throw new IndexOutOfBoundsException();
         } else if (len == 0) {
@@ -481,24 +457,24 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      *                          I/O error occurs.
      */
     public synchronized long skip(long n) throws IOException {
-        getBufIfOpen(); // Check for closed stream
+        getBuf(); // Check for closed stream
         if (n <= 0) {
             return 0;
         }
-        long avail = count - pos;
+        long avail = count - curPosInBuffer;
 
         if (avail <= 0) {
 
             // Fill in buffer to save bytes for reset
-            fill();
-            avail = count - pos;
+            getNextBlock();
+            avail = count - curPosInBuffer;
             if (avail <= 0) {
                 return 0;
             }
         }
 
         long skipped = (avail < n) ? avail : n;
-        pos += skipped;
+        curPosInBuffer += skipped;
         return skipped;
     }
 
@@ -510,7 +486,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      * many bytes will not block, but may read or skip fewer bytes.
      * <p>
      * This method returns the sum of the number of bytes remaining to be read in
-     * the buffer (<code>count&nbsp;- pos</code>) and the result of calling the
+     * the buffer (<code>count&nbsp;- curPosInBuffer</code>) and the result of calling the
      * {@link java.io.FilterInputStream#in in}.available().
      *
      * @return     an estimate of the number of bytes that can be read (or skipped
@@ -520,8 +496,8 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      *                          or an I/O error occurs.
      */
     public synchronized int available() throws IOException {
-        int n = count - pos;
-        int avail = getInIfOpen().available();
+        int n = count - curPosInBuffer;
+        int avail = getInputStream().available();
         return n > (Integer.MAX_VALUE - avail)
                     ? Integer.MAX_VALUE
                     : n + avail;
@@ -546,7 +522,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
      * If <code>markpos</code> is <code>-1</code>
      * (no mark has been set or the mark has been
      * invalidated), an <code>IOException</code>
-     * is thrown. Otherwise, <code>pos</code> is
+     * is thrown. Otherwise, <code>curPosInBuffer</code> is
      * set equal to <code>markpos</code>.
      *
      * @exception  IOException  if this stream has not been marked or,
@@ -578,7 +554,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
       Returns the current position from the beginning of the underlying input stream
      */
     public long getPos() throws IOException {
-        return getInIfOpen().getPos();
+        return getInputStream().getPos();
     }
 
     public boolean hasRemainder() throws IOException{
@@ -593,7 +569,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
     @Override
     public int read(byte[] bytes, int off, int len)
         throws IOException {
-        getBufIfOpen(); // Check for closed stream
+        getBuf(); // Check for closed stream
         if ((off | len | (off + len) | (bytes.length - (off + len))) < 0) {
             throw new IndexOutOfBoundsException();
         } else if (len == 0) {
@@ -632,20 +608,17 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
          */
     public void close() throws IOException {
         DrillBuf buffer;
-        while ( (buffer = buf) != null) {
-            buf.release();
-            if (bufUpdater.compareAndSet(this, buffer, null)) {
-                InputStream input = in;
-                in = null;
-                if (input != null) {
-                    input.close();
-                }
-                return;
-            }
-            // Else retry in case a new buf wa
-            // CASed in fill()
+        InputStream inp;
+        if((inp = in) != null){
+            in=null;
+            inp.close();
         }
-        getInIfOpen().close();
+        if((buffer= internalBuffer)!=null){
+            synchronized(this){
+                internalBuffer = null;
+                buffer.release();
+            }
+        }
     }
 
     public static void main(String[] args) {
