@@ -351,77 +351,29 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
     }
 
 
-    /**
-     * Returns an estimate of the number of bytes that can be read (or
-     * skipped over) from this input stream without blocking by the next
-     * invocation of a method for this input stream. The next invocation might be
-     * the same thread or another thread.  A single read or skip of this
-     * many bytes will not block, but may read or skip fewer bytes.
-     * <p>
-     * This method returns the sum of the number of bytes remaining to be read in
-     * the buffer (<code>count&nbsp;- curPosInBuffer</code>) and the result of calling the
-     * {@link java.io.FilterInputStream#in in}.available().
-     *
-     * @return     an estimate of the number of bytes that can be read (or skipped
-     *             over) from this input stream without blocking.
-     * @exception  IOException  if this input stream has been closed by
-     *                          invoking its {@link #close()} method,
-     *                          or an I/O error occurs.
-     */
     public synchronized int available() throws IOException {
-        int n = count - curPosInBuffer;
-        int avail = getInputStream().available();
-        return n > (Integer.MAX_VALUE - avail)
-                    ? Integer.MAX_VALUE
-                    : n + avail;
+        checkInputStreamState();
+        int bytesAvailable = this.count - this.curPosInBuffer;
+        int underlyingAvailable = getInputStream().available();
+        int available = bytesAvailable + underlyingAvailable;
+        if (available < 0) { // overflow
+            return Integer.MAX_VALUE;
+        }
+        return available;
     }
 
-    /**
-     * See the general contract of the <code>mark</code>
-     * method of <code>InputStream</code>.
-     *
-     * @param   readlimit   the maximum limit of bytes that can be read before
-     *                      the mark position becomes invalid.
-     * @see     java.io.BufferedInputStream#reset()
-     */
     public synchronized void mark(int readlimit) {
         throw new UnsupportedOperationException("Mark/reset is not supported.");
     }
 
-    /**
-     * See the general contract of the <code>reset</code>
-     * method of <code>InputStream</code>.
-     * <p>
-     * If <code>markpos</code> is <code>-1</code>
-     * (no mark has been set or the mark has been
-     * invalidated), an <code>IOException</code>
-     * is thrown. Otherwise, <code>curPosInBuffer</code> is
-     * set equal to <code>markpos</code>.
-     *
-     * @exception  IOException  if this stream has not been marked or,
-     *                  if the mark has been invalidated, or the stream
-     *                  has been closed by invoking its {@link #close()}
-     *                  method, or an I/O error occurs.
-     * @see        java.io.BufferedInputStream#mark(int)
-     */
     public synchronized void reset() throws IOException {
         throw new UnsupportedOperationException("Mark/reset is not supported.");
     }
 
-    /**
-     * Tests if this input stream supports the <code>mark</code>
-     * and <code>reset</code> methods. The <code>markSupported</code>
-     * method of <code>BasicBufferedDirectBufInputStream</code> returns
-     * <code>true</code>.
-     *
-     * @return  a <code>boolean</code> indicating if this stream type supports
-     *          the <code>mark</code> and <code>reset</code> methods.
-     * @see     InputStream#mark(int)
-     * @see     InputStream#reset()
-     */
     public boolean markSupported() {
         return false;
     }
+
 
     /*
       Returns the current position from the beginning of the underlying input stream
