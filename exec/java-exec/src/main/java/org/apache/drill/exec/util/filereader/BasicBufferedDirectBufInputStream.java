@@ -421,25 +421,16 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
     }
 
 
-        /**
-         * Closes this input stream and releases any system resources
-         * associated with the stream.
-         * Once the stream has been closed, further read(), available(), reset(),
-         * or skip() invocations will throw an IOException.
-         * Closing a previously closed stream has no effect.
-         *
-         * @exception  IOException  if an I/O error occurs.
-         */
     public void close() throws IOException {
         DrillBuf buffer;
         InputStream inp;
-        if((inp = in) != null){
-            in=null;
+        if ((inp = in) != null) {
+            in = null;
             inp.close();
         }
-        if((buffer= internalBuffer)!=null){
-            synchronized(this){
-                internalBuffer = null;
+        if ((buffer = this.internalBuffer) != null) {
+            synchronized (this) {
+                this.internalBuffer = null;
                 buffer.release();
             }
         }
