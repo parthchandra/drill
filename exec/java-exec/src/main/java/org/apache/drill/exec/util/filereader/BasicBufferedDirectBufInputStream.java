@@ -281,70 +281,37 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
     }
 
-
-
     /**
-     * Reads bytes from this byte-input stream into the specified byte array,
-     * starting at the given offset.
-     *
-     * <p> This method implements the general contract of the corresponding
-     * <code>{@link InputStream#read(byte[], int, int) read}</code> method of
-     * the <code>{@link InputStream}</code> class.  As an additional
-     * convenience, it attempts to read as many bytes as possible by repeatedly
-     * invoking the <code>read</code> method of the underlying stream.  This
-     * iterated <code>read</code> continues until one of the following
-     * conditions becomes true: <ul>
-     *
-     *   <li> The specified number of bytes have been read,
-     *
-     *   <li> The <code>read</code> method of the underlying stream returns
-     *   <code>-1</code>, indicating end-of-file, or
-     *
-     *   <li> The <code>available</code> method of the underlying stream
-     *   returns zero, indicating that further input requests would block.
-     *
-     * </ul> If the first <code>read</code> on the underlying stream returns
-     * <code>-1</code> to indicate end-of-file then this method returns
-     * <code>-1</code>.  Otherwise this method returns the number of bytes
-     * actually read.
-     *
-     * <p> Subclasses of this class are encouraged, but not required, to
-     * attempt to read as many bytes as possible in the same fashion.
-     *
-     * @param      b     destination buffer.
-     * @param      off   offset at which to start storing bytes.
-     * @param      len   maximum number of bytes to read.
-     * @return     the number of bytes read, or <code>-1</code> if the end of
-     *             the stream has been reached.
-     * @exception  IOException  if this input stream has been closed by
-     *                          invoking its {@link #close()} method,
-     *                          or an I/O error occurs.
+     Has the same contract as {@link java.io.InputStream#read(byte[], int, int)}
+     Except with DrillBuf
      */
-    public synchronized int read(DrillBuf b, int off, int len) throws IOException {
-        getBuf(); // Check for closed stream
-        if ((off | len | (off + len) | (b.capacity() - (off + len))) < 0) {
-            throw new IndexOutOfBoundsException();
-        } else if (len == 0) {
-            return 0;
-        }
-
-        int n = 0;
-        for (;;) {
-            int nread = readInternal(b, off + n, len - n);
-            if (nread <= 0) {
-                return (n == 0) ? nread : n;
+    public synchronized int read(DrillBuf buf, int off, int len) throws IOException {
+        checkInputStreamState();
+        Preconditions.checkArgument((off >= 0) && (len >= 0) && (buf.capacity()) >= (off + len));
+        int bytesRead = 0;
+        do {
+            int readStart = off + bytesRead;
+            int lenToRead = len - bytesRead;
+            int nRead = readInternal(buf, readStart, lenToRead);
+            if (nRead <= 0) {// if End of stream
+                if (bytesRead == 0) { // no bytes read at all
+                    return -1;
+                } else {
+                    return bytesRead;
+                }
+            } else {
+                bytesRead += nRead;
+                // If the last read caused us to reach the end of stream
+                // we are done
+                InputStream input = in;
+                if (input != null && input.available() <= 0) {
+                    return bytesRead;
+                }
             }
-            n += nread;
-            if (n >= len) {
-                return n;
-            }
-            // if not closed but no bytes available, return
-            InputStream input = in;
-            if (input != null && input.available() <= 0) {
-                return n;
-            }
-        }
+        } while (bytesRead < len);
+        return bytesRead;
     }
+
 
     public synchronized DrillBuf getNext(int bytes) throws IOException {
         //TODO: this is an unnecessary copy being made here
