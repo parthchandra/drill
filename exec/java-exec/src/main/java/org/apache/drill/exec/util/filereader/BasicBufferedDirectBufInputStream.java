@@ -376,10 +376,11 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
 
     /*
-      Returns the current position from the beginning of the underlying input stream
+      Returns the current position from the beginning of the
+      underlying input stream
      */
     public long getPos() throws IOException {
-        return getInputStream().getPos();
+        return getInputStream().getPos() - this.startOffset;
     }
 
     public boolean hasRemainder() throws IOException{
@@ -392,35 +393,33 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
 
     @Override
-    public int read(byte[] bytes, int off, int len)
-        throws IOException {
-        getBuf(); // Check for closed stream
-        if ((off | len | (off + len) | (bytes.length - (off + len))) < 0) {
-            throw new IndexOutOfBoundsException();
-        } else if (len == 0) {
+    public int read(byte[] buf, int off, int len) throws IOException {
+        checkInputStreamState();
+        Preconditions.checkArgument((off >= 0) && (len >= 0) && (buf.length) >= (off + len));
+        int bytesRead = 0;
+        if( len == 0){
             return 0;
         }
-
-        int n = 0;
-        for (;;) {
-            DrillBuf byteBuf = allocator.buffer(len);
-            int nread = readInternal(byteBuf, off + n, len - n);
-            if (nread <= 0) {
-                return (n == 0) ? nread : n;
+        do {
+            DrillBuf byteBuf = this.allocator.buffer(len);
+            int readStart = off + bytesRead;
+            int lenToRead = len - bytesRead;
+            int nRead = readInternal(byteBuf, readStart, lenToRead);
+            if (nRead <= 0) {// if End of stream
+                if (bytesRead == 0) { // no bytes read at all
+                    return -1;
+                } else {
+                    return bytesRead;
+                }
+            } else {
+                byteBuf.nioBuffer().get(buf, off + bytesRead, len - bytesRead);
+                byteBuf.release();
+                bytesRead += nRead;
             }
-            byteBuf.nioBuffer().get(bytes, off + n, len - n);
-            byteBuf.release();
-            n += nread;
-            if (n >= len) {
-                return n;
-            }
-            // if not closed but no bytes available, return
-            InputStream input = in;
-            if (input != null && input.available() <= 0) {
-                return n;
-            }
-        }
+        } while (bytesRead < len);
+        return bytesRead;
     }
+
 
         /**
          * Closes this input stream and releases any system resources
