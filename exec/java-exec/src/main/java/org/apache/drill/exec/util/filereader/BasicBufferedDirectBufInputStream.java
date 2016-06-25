@@ -218,72 +218,70 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
         return this.count - this.curPosInBuffer;
     }
 
-
     /**
-     * See
-     * the general contract of the <code>read</code>
-     * method of <code>InputStream</code>.
-     *
-     * @return     the next byte of data, or <code>-1</code> if the end of the
-     *             stream is reached.
-     * @exception  IOException  if this input stream has been closed by
-     *                          invoking its {@link #close()} method,
-     *                          or an I/O error occurs.
-     * @see        java.io.FilterInputStream#in
+     * Implements the  <code>read</code> method of <code>InputStream</code>.
+     * returns one more byte or -1 if end of stream is reached.
      */
     public synchronized int read() throws IOException {
-        if (curPosInBuffer >= count) {
+        if (this.count - this.curPosInBuffer <= 0) {
             getNextBlock();
-            if (curPosInBuffer >= count) {
-                return -1;
-            }
         }
-        curPosInBuffer++;
+        // reached end of stream
+        if (this.count - this.curPosInBuffer <= 0) {
+            return -1;
+        }
+        this.curPosInBuffer++;
         return getBuf().nioBuffer().get() & 0xff;
     }
 
-    /**
-     * Read characters into a portion of an array, reading from the underlying
-     * stream at most once if necessary.
-     */
-    private int read1(DrillBuf b, int off, int len) throws IOException {
-        int avail = count - curPosInBuffer;
-        if (avail <= 0) {
-            /* If the requested length is at least as large as the buffer, and
-               if there is no mark/reset activity, do not bother to copy the
-               bytes into the local buffer.  In this way buffered streams will
-               cascade harmlessly. */
-            if (len >= getBuf().capacity() ) {
-                long currentPos = getInputStream().getPos();
-                //int bytesToRead = len <= (totalByteSize + startOffset - currentPos ) ?
-                //    len :
-                //    (int) (totalByteSize + startOffset - currentPos );
-                int bytesToRead = len;
-                ByteBuffer directBuffer = b.nioBuffer(off, bytesToRead);
-                if (bytesToRead > 0) {
-                    int n = CompatibilityUtil.getBuf(getInputStream(), directBuffer, bytesToRead);
-                    if (n > 0) {
-                        b.writerIndex(n);
-                    }else{
-                        n = 0;
-                    }
-                    return n;
-                }
-            }
-            getNextBlock();
-            avail = count - curPosInBuffer;
-            if (avail <= 0)  {
+    // reads from the internal Buffer into the output buffer
+    // May read less than the requested size if the remaining data in the buffer
+    // is less than the requested amount
+    private int readInternal(DrillBuf buf, int off, int len) throws IOException {
+        // check how many bytes are available in the buffer.
+        int bytesAvailable = this.count - this.curPosInBuffer;
+        if (bytesAvailable <= 0) {
+            // read more
+            int bytesRead = getNextBlock();
+            if (this.count - this.curPosInBuffer <= 0) { // End of stream
                 return -1;
             }
         }
-        int cnt = (avail < len) ? avail : len;
-        //System.arraycopy(getBuf(), curPosInBuffer, b, off, cnt);
-        //TODO: Avoid this copy ...
-        getBuf().getBytes(curPosInBuffer, b, off, cnt); // Copy bytes into new buffer
-        b.writerIndex(off+cnt);
-        curPosInBuffer += cnt;
-        return cnt;
+        bytesAvailable = this.count - this.curPosInBuffer;
+        //copy into output buffer
+        int copyBytes = bytesAvailable < len ? bytesAvailable : len;
+        getBuf().getBytes(curPosInBuffer, buf, off, copyBytes);
+        buf.writerIndex(off + copyBytes);
+        this.curPosInBuffer += copyBytes;
+
+        return copyBytes;
     }
+
+    // reads from the internal Buffer into the output buffer
+    // May read less than the requested size if the remaining data in the buffer
+    // is less than the requested amount
+    // Does not make a copy but returns a slice of the internal buffer.
+    // Returns null if end of stream is reached
+    private DrillBuf readInternal(int off, int len) throws IOException {
+        // check how many bytes are available in the buffer.
+        int bytesAvailable = this.count - this.curPosInBuffer;
+        if (bytesAvailable <= 0) {
+            // read more
+            int bytesRead = getNextBlock();
+            if (this.count - this.curPosInBuffer <= 0) { // End of stream
+                return null;
+            }
+        }
+        bytesAvailable = this.count - this.curPosInBuffer;
+        // return a slice as the  output
+        int bytesToRead = bytesAvailable < len ? bytesAvailable : len;
+        DrillBuf newBuf = this.getBuf().slice(off, bytesToRead);
+        newBuf.retain();
+        return newBuf;
+
+    }
+
+
 
     /**
      * Reads bytes from this byte-input stream into the specified byte array,
@@ -332,7 +330,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
         int n = 0;
         for (;;) {
-            int nread = read1(b, off + n, len - n);
+            int nread = readInternal(b, off + n, len - n);
             if (nread <= 0) {
                 return (n == 0) ? nread : n;
             }
@@ -491,7 +489,7 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
         int n = 0;
         for (;;) {
             DrillBuf byteBuf = allocator.buffer(len);
-            int nread = read1(byteBuf, off + n, len - n);
+            int nread = readInternal(byteBuf, off + n, len - n);
             if (nread <= 0) {
                 return (n == 0) ? nread : n;
             }
