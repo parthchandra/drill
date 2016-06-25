@@ -376,11 +376,10 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
 
 
     /*
-      Returns the current position from the beginning of the
-      underlying input stream
+      Returns the current position from the beginning of the underlying input stream
      */
     public long getPos() throws IOException {
-        return getInputStream().getPos() - this.startOffset;
+        return getInputStream().getPos();
     }
 
     public boolean hasRemainder() throws IOException{
