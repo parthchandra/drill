@@ -325,35 +325,31 @@ class BasicBufferedDirectBufInputStream extends BufferedDirectBufInputStream imp
     }
 
     /**
-     * See the general contract of the <code>skip</code>
-     * method of <code>InputStream</code>.
-     *
-     * @exception  IOException  if the stream does not support seek,
-     *                          or if this input stream has been closed by
-     *                          invoking its {@link #close()} method, or an
-     *                          I/O error occurs.
+     Has the same contract as {@link java.io.InputStream#skip(long)}
+     * Skips upto the next n bytes.
+     * Skip may return with less than n bytes skipped
      */
     public synchronized long skip(long n) throws IOException {
-        getBuf(); // Check for closed stream
+        checkInputStreamState();
+        long bytesAvailable = this.count - this.curPosInBuffer;
+        long bytesSkipped = 0;
         if (n <= 0) {
             return 0;
         }
-        long avail = count - curPosInBuffer;
-
-        if (avail <= 0) {
-
-            // Fill in buffer to save bytes for reset
+        if(bytesAvailable <= 0){
+            checkInputStreamState();
             getNextBlock();
-            avail = count - curPosInBuffer;
-            if (avail <= 0) {
+            bytesAvailable = this.count - this.curPosInBuffer;
+            if (bytesAvailable <= 0) { // End of stream
                 return 0;
             }
         }
+        bytesSkipped = bytesAvailable < n ? bytesAvailable : n;
+        this.curPosInBuffer += bytesSkipped;
 
-        long skipped = (avail < n) ? avail : n;
-        curPosInBuffer += skipped;
-        return skipped;
+        return bytesSkipped;
     }
+
 
     /**
      * Returns an estimate of the number of bytes that can be read (or
