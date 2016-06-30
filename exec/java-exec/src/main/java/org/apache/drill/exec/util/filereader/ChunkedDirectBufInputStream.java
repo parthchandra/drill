@@ -43,10 +43,10 @@ import java.util.List;
  * Data is read from disk in chunks of configurable size and reading is asynchronous.
  * No more than two chunks worth of data is kept in memory at a time.
  */
-public class ChunkedBufferedDirectBufInputStream extends BufferedDirectBufInputStream implements Closeable{
+public abstract class ChunkedDirectBufInputStream extends DirectBufInputStream implements Closeable{
 
   private static final org.slf4j.Logger logger =
-      org.slf4j.LoggerFactory.getLogger(ChunkedBufferedDirectBufInputStream.class);
+      org.slf4j.LoggerFactory.getLogger(ChunkedDirectBufInputStream.class);
 
   private final FSDataInputStream fileInputStream;
   private final BufferAllocator allocator;
@@ -66,7 +66,7 @@ public class ChunkedBufferedDirectBufInputStream extends BufferedDirectBufInputS
 
   private DrillBuf currentChunk;
 
-  public ChunkedBufferedDirectBufInputStream(FSDataInputStream fileInputStream, BufferAllocator allocator,
+  public ChunkedDirectBufInputStream(FSDataInputStream fileInputStream, BufferAllocator allocator,
       String streamId, long startOffset, long totalByteSize, int chunkSize, boolean enableHints) {
     super(fileInputStream, enableHints);
     this.fileInputStream = fileInputStream;
@@ -271,7 +271,7 @@ public class ChunkedBufferedDirectBufInputStream extends BufferedDirectBufInputS
   @Override public boolean markSupported() {
     return false;
   }
-
+  /*
   public static void main(String[] args) {
     final DrillConfig config = DrillConfig.create();
     final BufferAllocator allocator = RootAllocatorFactory.newRoot(config);
@@ -292,8 +292,8 @@ public class ChunkedBufferedDirectBufInputStream extends BufferedDirectBufInputS
           long startOffset = columnMetadata.getStartingPos();
           long totalByteSize = columnMetadata.getTotalSize();
           String streamId = fileName + ":" + columnMetadata.toString();
-          ChunkedBufferedDirectBufInputStream reader =
-              new ChunkedBufferedDirectBufInputStream(inputStream, allocator, streamId, startOffset, totalByteSize,
+          ChunkedDirectBufInputStream reader =
+              new ChunkedDirectBufInputStream(inputStream, allocator, streamId, startOffset, totalByteSize,
                   BUFSZ, true);
           reader.init();
           while (true) {
@@ -317,5 +317,6 @@ public class ChunkedBufferedDirectBufInputStream extends BufferedDirectBufInputS
     allocator.close();
     return;
   }
+  */
 
 }
