@@ -187,6 +187,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
         "Internal error: Buffered stream has not been consumed and trying to read more from underlying stream");
     checkInputStreamState();
     DrillBuf buffer = getBuf();
+    buffer.clear();
     this.count = this.curPosInBuffer = 0;
 
     // We *cannot* rely on the totalByteSize being correct because
@@ -203,13 +204,18 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     // the API contract; but we still have to deal with it. So we make sure the size of the
     // buffer is exactly the same as the number of bytes requested
     int bytesRead = -1;
+    int nBytes = 0;
     if (bytesToRead > 0) {
-      int n = CompatibilityUtil.getBuf(getInputStream(), directBuffer, bytesToRead);
-      if (n > 0) {
-        buffer.writerIndex(n);
-        this.count = n + this.curPosInBuffer;
+      try {
+        nBytes = CompatibilityUtil.getBuf(getInputStream(), directBuffer, bytesToRead);
+      } catch (Exception e) {
+        logger.error("Error reading from stream {}. Error was : {}", this.streamId, e.getMessage());
+      }
+      if (nBytes > 0) {
+        buffer.writerIndex(nBytes);
+        this.count = nBytes + this.curPosInBuffer;
         this.curPosInStream = getInputStream().getPos();
-        bytesRead = n;
+        bytesRead = nBytes;
         logger.trace(
             "Stream: {}, StartOffset: {}, TotalByteSize: {}, BufferSize: {}, BytesRead: {}, Count: {}, " +
             "CurPosInStream: {}, CurPosInBuffer: {}",
