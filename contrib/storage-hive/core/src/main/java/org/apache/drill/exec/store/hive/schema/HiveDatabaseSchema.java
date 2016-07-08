@@ -20,23 +20,19 @@ package org.apache.drill.exec.store.hive.schema;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.schema.Schema;
 import org.apache.calcite.schema.Statistic;
 import org.apache.calcite.schema.Table;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.exec.store.AbstractSchema;
 import org.apache.drill.exec.store.SchemaConfig;
 import org.apache.drill.exec.store.hive.DrillHiveMetaStoreClient;
 import org.apache.drill.exec.store.hive.HiveStoragePluginConfig;
 import org.apache.drill.exec.store.hive.schema.HiveSchemaFactory.HiveSchema;
-
 import org.apache.thrift.TException;
 
 public class HiveDatabaseSchema extends AbstractSchema{
@@ -86,30 +82,23 @@ public class HiveDatabaseSchema extends AbstractSchema{
     final int totalTables = tableNames.size();
     final String schemaName = getName();
     final List<org.apache.hadoop.hive.metastore.api.Table> tables = Lists.newArrayList();
+    final List<Pair<String, ? extends Table>> tableNameToTable = Lists.newArrayList();
 
     // In each round, Drill asks for a sub-list of all the requested tables
     for(int fromIndex = 0; fromIndex < totalTables; fromIndex += bulkSize) {
       final int toIndex = Math.min(fromIndex + bulkSize, totalTables);
       final List<String> eachBulkofTableNames = tableNames.subList(fromIndex, toIndex);
       List<org.apache.hadoop.hive.metastore.api.Table> eachBulkofTables;
-      // Retries once if the first call to fetch the metadata fails
       synchronized(mClient) {
         try {
-          eachBulkofTables = mClient.getTableObjectsByName(schemaName, eachBulkofTableNames);
-        } catch (TException tException) {
-          try {
-            mClient.reconnect();
-            eachBulkofTables = mClient.getTableObjectsByName(schemaName, eachBulkofTableNames);
-          } catch (Exception e) {
-            logger.warn("Exception occurred while trying to read tables from {}: {}", schemaName, e.getCause());
-            return ImmutableList.of();
-          }
+          eachBulkofTables = DrillHiveMetaStoreClient.getTableObjectsByNameHelper(mClient, schemaName, eachBulkofTableNames);
+        } catch (TException e) {
+          logger.warn("Exception occurred while trying to read tables from {}: {}", schemaName, e.getCause());
+          return tableNameToTable;
         }
         tables.addAll(eachBulkofTables);
       }
     }
-
-    final List<Pair<String, ? extends Table>> tableNameToTable = Lists.newArrayList();
     for(final org.apache.hadoop.hive.metastore.api.Table table : tables) {
       if(table == null) {
         continue;
