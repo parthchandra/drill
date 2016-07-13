@@ -53,7 +53,9 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
   private static final org.slf4j.Logger logger =
       org.slf4j.LoggerFactory.getLogger(BufferedDirectBufInputStream.class);
 
-  private static int defaultBufferSize = 8192 * 1024; // 8 MB
+  private static int defaultBufferSize = 8192 * 1024; // 8 MiB
+  private static int defaultTempBufferSize = 8192; // 8 KiB
+
   /**
    * The internal buffer to keep data read from the underlying inputStream.
    * <code>internalBuffer[0]</code>  through <code>internalBuffer[count-1] </code>
@@ -96,6 +98,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   protected BufferAllocator allocator;
   private final int bufSize;
+
+  private volatile DrillBuf tempBuffer; // a temp Buffer for use by read(byte[] buf, int off, int len)
 
   private FSDataInputStream getInputStream() throws IOException {
     // Make sure stream is open
@@ -166,6 +170,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
   public void init() throws UnsupportedOperationException, IOException {
     checkStreamSupportsByteBuffer();
     this.internalBuffer = this.allocator.buffer(this.bufSize);
+    this.tempBuffer = this.allocator.buffer(defaultTempBufferSize);
     if (enableHints) {
       fadviseIfAvailable(getInputStream(), this.startOffset, this.totalByteSize);
     }
@@ -330,7 +335,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
   }
 
   @Override public int read(byte[] b) throws IOException {
-    return read(b, (int) 0, b.length);
+    return b.length == 1 ? read() : read(b, (int) 0, b.length);
   }
 
 
@@ -341,8 +346,13 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     if (len == 0) {
       return 0;
     }
+    DrillBuf byteBuf;
+    if(len <= defaultTempBufferSize){
+      byteBuf = tempBuffer;
+    } else {
+      byteBuf = this.allocator.buffer(len);
+    }
     do {
-      DrillBuf byteBuf = this.allocator.buffer(len);
       int readStart = off + bytesRead;
       int lenToRead = len - bytesRead;
       int nRead = readInternal(byteBuf, readStart, lenToRead);
@@ -354,10 +364,15 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
         }
       } else {
         byteBuf.nioBuffer().get(buf, off + bytesRead, len - bytesRead);
-        byteBuf.release();
+        byteBuf.clear();
         bytesRead += nRead;
       }
     } while (bytesRead < len);
+
+    if(len > defaultTempBufferSize){
+      byteBuf.release();
+    }
+
     return bytesRead;
   }
 
@@ -420,7 +435,6 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     Returns the current position from the beginning of the underlying input stream
    */
   public long getPos() throws IOException {
-    //return getInputStream().getPos();
     return curPosInBuffer+startOffset;
   }
 
@@ -438,6 +452,12 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     if ((buffer = this.internalBuffer) != null) {
       synchronized (this) {
         this.internalBuffer = null;
+        buffer.release();
+      }
+    }
+    if ((buffer = this.tempBuffer) != null) {
+      synchronized (this) {
+        this.tempBuffer = null;
         buffer.release();
       }
     }
