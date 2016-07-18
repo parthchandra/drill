@@ -168,6 +168,8 @@ public class ParquetFixedWidthDictionaryReaders {
         readLength = (int) Math.ceil(readLengthInBits / 8.0);
         int writerIndex = valueVec.getBuffer().writerIndex();
         valueVec.getBuffer().setIndex(0, writerIndex + (int)readLength);
+      } else {
+        super.readField(recordsToReadInThisPass);
       }
     }
   }
