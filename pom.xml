@@ -1279,7 +1279,8 @@
           <dependency>
             <groupId>org.apache.calcite</groupId>
             <artifactId>calcite-core</artifactId>
-            <version>1.4.0-drill-r12</version>
+            <!-- Drill fork calcite git source url : https://github.com/mapr/incubator-calcite/tree/DrillCalcite1.4.0-mapr-1.6.0 -->
+            <version>1.4.0-drill-1.6.0-r1</version>
             <exclusions>
               <exclusion>
                 <groupId>org.jgrapht</groupId>
