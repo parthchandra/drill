@@ -84,6 +84,7 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       PlannerSettings.PLANNER_MEMORY_LIMIT,
       PlannerSettings.HEP_PARTITION_PRUNING,
       PlannerSettings.TYPE_INFERENCE,
+      PlannerSettings.IN_SUBQUERY_THRESHOLD,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,
