@@ -47,6 +47,10 @@ public abstract class OperatorContext {
 
   public abstract ExecutorService getExecutor();
 
+  public abstract ExecutorService getScanExecutor();
+
+  public abstract ExecutorService getScanDecodeExecutor();
+
   public abstract ExecutionControls getExecutionControls();
 
   public abstract DrillFileSystem newFileSystem(Configuration conf) throws IOException;
