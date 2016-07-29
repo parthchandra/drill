@@ -178,7 +178,7 @@ final class PageReader {
     this.dictionary = page.getEncoding().initDictionary(parentStatus.columnDescriptor, page);
   }
 
-  public DrillBuf readPage(PageHeader pageHeader, int compressedSize, int uncompressedSize) throws IOException {
+  private DrillBuf readPage(PageHeader pageHeader, int compressedSize, int uncompressedSize) throws IOException {
     DrillBuf pageDataBuf = null;
     Stopwatch timer = Stopwatch.createUnstarted();
     long timeToRead;
@@ -385,14 +385,14 @@ final class PageReader {
     }
   }
 
-  public void clearBuffers() {
+  protected void clearBuffers() {
     if (pageData != null) {
       pageData.release();
       pageData = null;
     }
   }
 
-  public void clearDictionaryBuffers() {
+  protected void clearDictionaryBuffers() {
     for (ByteBuf b : allocatedDictionaryBuffers) {
       b.release();
     }
