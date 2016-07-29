@@ -20,8 +20,11 @@ package org.apache.drill.exec.server;
 import com.codahale.metrics.MetricRegistry;
 import io.netty.channel.EventLoopGroup;
 
-import java.util.concurrent.*;
-
+import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.SynchronousQueue;
 import org.apache.drill.common.DrillAutoCloseables;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.scanner.persistence.ScanResult;
