@@ -97,6 +97,10 @@ public interface ExecConstants {
   /** Size of JDBC batch queue (in batches) above which throttling begins. */
   String JDBC_BATCH_QUEUE_THROTTLING_THRESHOLD =
       "drill.jdbc.batch_queue_throttling_threshold";
+  // Size of the thread pool used to read data from disk. Used by Parquet
+  String SCAN_THREADPOOL_SIZE = "drill.exec.scan.threadpool_size";
+  // Size of the thread pool used by a scan to decode the data. Used by Parquet
+  String SCAN_DECODE_THREADPOOL_SIZE = "drill.exec.scan.decode_threadpool_size";
 
   /**
    * Currently if a query is cancelled, but one of the fragments reports the status as FAILED instead of CANCELLED or
@@ -136,6 +140,10 @@ public interface ExecConstants {
   // Use a buffering reader for parquet page reader
   String PARQUET_PAGEREADER_USE_BUFFERED_READ = "store.parquet.reader.pagereader.bufferedread";
   OptionValidator PARQUET_PAGEREADER_USE_BUFFERED_READ_VALIDATOR = new  BooleanValidator(PARQUET_PAGEREADER_USE_BUFFERED_READ, true);
+
+  // Size in MiB of the buffer the Parquet page reader will use to read from disk. Default is 8 MiB
+  String PARQUET_PAGEREADER_BUFFER_SIZE = "store.parquet.reader.pagereader.buffersize";
+  OptionValidator PARQUET_PAGEREADER_BUFFER_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_BUFFER_SIZE, 8*1024*1024);
 
   OptionValidator COMPILE_SCALAR_REPLACEMENT = new BooleanValidator("exec.compile.scalar_replacement", false);
 
