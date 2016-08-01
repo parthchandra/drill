@@ -22,6 +22,7 @@ import io.netty.buffer.DrillBuf;
 import java.io.IOException;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
+import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.vector.BaseDataValueVector;
 import org.apache.drill.exec.vector.ValueVector;
 
@@ -117,11 +118,23 @@ public abstract class ColumnReader<V extends ValueVector> {
   }
 
   public void readValues(long recordsToRead) {
-    readField(recordsToRead);
+    try {
+      readField(recordsToRead);
 
-    valuesReadInCurrentPass += recordsReadInThisIteration;
-    pageReader.valuesRead += recordsReadInThisIteration;
-    pageReader.readPosInBytes = readStartInBytes + readLength;
+      valuesReadInCurrentPass += recordsReadInThisIteration;
+      pageReader.valuesRead += recordsReadInThisIteration;
+      pageReader.readPosInBytes = readStartInBytes + readLength;
+    } catch (Exception e) {
+      UserException ex = UserException.dataReadError(e)
+          .message("Error reading from Parquet file")
+          .pushContext("Row Group Start: ", this.columnChunkMetaData.getStartingPos())
+          .pushContext("Column: ", this.schemaElement.getName())
+          .pushContext("File: ", this.parentReader.getHadoopPath().toString() )
+          .build(logger);
+      throw ex;
+
+    }
+
   }
 
   protected abstract void readField(long recordsToRead);
