@@ -140,40 +140,40 @@ public class OperatorStats {
   }
 
   public synchronized void startSetup() {
-    //assert !inSetup  : assertionError("starting setup");
+    assert !inSetup  : assertionError("starting setup");
     stopProcessing();
     inSetup = true;
     setupMark = System.nanoTime();
   }
 
   public synchronized void stopSetup() {
-    //assert inSetup :  assertionError("stopping setup");
+    assert inSetup :  assertionError("stopping setup");
     startProcessing();
     setupNanos += System.nanoTime() - setupMark;
     inSetup = false;
   }
 
   public synchronized void startProcessing() {
-    //assert !inProcessing : assertionError("starting processing");
+    assert !inProcessing : assertionError("starting processing");
     processingMark = System.nanoTime();
     inProcessing = true;
   }
 
   public synchronized void stopProcessing() {
-    //assert inProcessing : assertionError("stopping processing");
+    assert inProcessing : assertionError("stopping processing");
     processingNanos += System.nanoTime() - processingMark;
     inProcessing = false;
   }
 
   public synchronized void startWait() {
-    //assert !inWait : assertionError("starting waiting");
+    assert !inWait : assertionError("starting waiting");
     stopProcessing();
     inWait = true;
     waitMark = System.nanoTime();
   }
 
   public synchronized void stopWait() {
-    //assert inWait : assertionError("stopping waiting");
+    assert inWait : assertionError("stopping waiting");
     startProcessing();
     waitNanos += System.nanoTime() - waitMark;
     inWait = false;

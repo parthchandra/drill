@@ -55,6 +55,8 @@ public abstract class OperatorContext {
 
   public abstract DrillFileSystem newFileSystem(Configuration conf) throws IOException;
 
+  public abstract DrillFileSystem newNonTrackingFileSystem(Configuration conf) throws IOException;
+
   /**
    * Run the callable as the given proxy user.
    *
