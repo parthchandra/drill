@@ -73,7 +73,7 @@ public class ParquetScanBatchCreator implements BatchCreator<ParquetRowGroupScan
 
     DrillFileSystem fs;
     try {
-      fs = oContext.newFileSystem(rowGroupScan.getStorageEngine().getFsConf());
+      fs = oContext.newNonTrackingFileSystem(rowGroupScan.getStorageEngine().getFsConf());
     } catch(IOException e) {
       throw new ExecutionSetupException(String.format("Failed to create DrillFileSystem: %s", e.getMessage()), e);
     }

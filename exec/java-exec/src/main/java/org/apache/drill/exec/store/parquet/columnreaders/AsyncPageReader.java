@@ -133,6 +133,14 @@ final class AsyncPageReader {
     try {
       inputStream  = fs.open(path);
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
+
+      // Instead of a the input stream parameter, we will use the wrapped stream that it contains. This is
+      // because the input stream passed in tracks operator stats for each operator using the stream.
+      // However, if (as in this case) the operator decides to have many parallel input streams, the
+      // operator stats get clobbered as each stream will in parallel start and stop the wait time
+      // for the operator.
+      // These stats are best tracked by the operator and not the input stream.
+
       boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
       if (useBufferedReader) {
@@ -147,7 +155,6 @@ final class AsyncPageReader {
 
       loadDictionaryIfExists(parentStatus, columnChunkMetaData, dataReader);
       // start reading the next page
-      parentColumnReader.parentReader.getOperatorContext().getStats().startSetup();
       asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
     } catch (IOException e) {
       throw new ExecutionSetupException("Error opening or reading metadata for parquet file at location: "
