@@ -447,17 +447,17 @@ public class FragmentExecutor implements Runnable {
     }
   }
 
-  private enum EVENT_TYPE {
+  private enum EventType {
     CANCEL,
     CANCEL_AND_FINISH,
     RECEIVER_FINISHED
   }
 
-  private class FragmentEvent {
-    private final EVENT_TYPE type;
+  private static class FragmentEvent {
+    private final EventType type;
     private final FragmentHandle handle;
 
-    FragmentEvent(EVENT_TYPE type, FragmentHandle handle) {
+    FragmentEvent(EventType type, FragmentHandle handle) {
       this.type = type;
       this.handle = handle;
     }
@@ -471,15 +471,15 @@ public class FragmentExecutor implements Runnable {
   private class FragmentEventProcessor extends EventProcessor<FragmentEvent> {
 
     void cancel() {
-      sendEvent(new FragmentEvent(EVENT_TYPE.CANCEL, null));
+      sendEvent(new FragmentEvent(EventType.CANCEL, null));
     }
 
     void cancelAndFinish() {
-      sendEvent(new FragmentEvent(EVENT_TYPE.CANCEL_AND_FINISH, null));
+      sendEvent(new FragmentEvent(EventType.CANCEL_AND_FINISH, null));
     }
 
     void receiverFinished(FragmentHandle handle) {
-      sendEvent(new FragmentEvent(EVENT_TYPE.RECEIVER_FINISHED, handle));
+      sendEvent(new FragmentEvent(EventType.RECEIVER_FINISHED, handle));
     }
 
     @Override
