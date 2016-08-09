@@ -174,6 +174,7 @@ final class AsyncPageReader {
       }
       asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
       readDictionaryPage(asyncPageRead, parentStatus);
+      asyncPageRead = null; // reset after consuming
     }
   }
 
@@ -324,6 +325,8 @@ final class AsyncPageReader {
     try {
       readStatus = asyncPageRead.get();
       pageHeader = readStatus.getPageHeader();
+      // reset this. At the time of calling close, if this is not null then a pending asyncPageRead needs to be consumed
+      asyncPageRead = null;
     } catch (Exception e) {
       handleAndThrowException(e, "Error reading page data.");
     }
@@ -503,6 +506,15 @@ final class AsyncPageReader {
   }
 
   public void clear(){
+    if(asyncPageRead != null){
+      asyncPageRead.cancel(true);
+      try {
+        ReadStatus r = asyncPageRead.get();
+        r.getPageData().release();
+      } catch (Exception e) {
+        // Do nothing.
+      }
+    }
     try {
       this.inputStream.close();
       this.dataReader.close();
