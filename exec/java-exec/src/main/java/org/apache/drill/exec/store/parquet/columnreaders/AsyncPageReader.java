@@ -70,7 +70,7 @@ final class AsyncPageReader {
   private final ColumnReader<?> parentColumnReader;
   //private final ColumnDataReader dataReader;
   private final DirectBufInputStream dataReader;
-  //der; buffer to store bytes of current page
+  //buffer to store bytes of current page
   DrillBuf pageData;
 
   // for variable length data we need to keep track of our current position in the page data
@@ -144,8 +144,8 @@ final class AsyncPageReader {
 
       boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
-      scanBufferSize = (parentColumnReader.parentReader.getFragmentContext().getConfig().getInt(
-          ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE));
+      scanBufferSize = parentColumnReader.parentReader.getFragmentContext().getOptions()
+          .getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
       if (useBufferedReader) {
       this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
             columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
