@@ -71,14 +71,15 @@ public class BootStrapContext implements AutoCloseable {
     // Setup two threadpools one for reading raw data from disk and another for decoding the data
     // A good guideline is to have the number threads in the pool to be a small multiple (fractional
     // numbers are ok) of the number of cores.
-    final int numScanThreads = (int) (Runtime.getRuntime().availableProcessors() * config
-        .getDouble(ExecConstants.SCAN_THREADPOOL_SIZE_MULTIPLE));
+    final int numDisks = config.getInt(ExecConstants.SCAN_NUM_DISKS);
+    final int numScanThreads =
+        (int) (numDisks * config.getDouble(ExecConstants.SCAN_THREADPOOL_SIZE_MULTIPLE));
     final int numScanDecodeThreads = (int) (Runtime.getRuntime().availableProcessors() * config
         .getDouble(ExecConstants.SCAN_DECODE_THREADPOOL_SIZE_MULTIPLE));
 
-    this.scanExecutor = Executors.newFixedThreadPool(numScanThreads, new NamedThreadFactory("scan"));
+    this.scanExecutor = Executors.newFixedThreadPool(numScanThreads, new NamedThreadFactory("scan-"));
     this.scanDecodeExecutor =
-        Executors.newFixedThreadPool(numScanDecodeThreads, new NamedThreadFactory("scan-decode"));
+        Executors.newFixedThreadPool(numScanDecodeThreads, new NamedThreadFactory("scan-decode-1"));
   }
 
   public ExecutorService getExecutor() {
