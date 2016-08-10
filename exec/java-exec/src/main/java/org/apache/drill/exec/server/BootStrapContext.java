@@ -79,7 +79,7 @@ public class BootStrapContext implements AutoCloseable {
 
     this.scanExecutor = Executors.newFixedThreadPool(numScanThreads, new NamedThreadFactory("scan-"));
     this.scanDecodeExecutor =
-        Executors.newFixedThreadPool(numScanDecodeThreads, new NamedThreadFactory("scan-decode-1"));
+        Executors.newFixedThreadPool(numScanDecodeThreads, new NamedThreadFactory("scan-decode-"));
   }
 
   public ExecutorService getExecutor() {
