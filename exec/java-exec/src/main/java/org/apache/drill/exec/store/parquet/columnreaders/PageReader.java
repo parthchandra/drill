@@ -127,8 +127,8 @@ final class PageReader {
       columnChunkMetaData.getTotalUncompressedSize();
       boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
-      scanBufferSize = (parentColumnReader.parentReader.getFragmentContext().getConfig().getInt(
-          ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE));
+      scanBufferSize = parentColumnReader.parentReader.getFragmentContext().getOptions()
+          .getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
       if (useBufferedReader) {
       this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
             columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
