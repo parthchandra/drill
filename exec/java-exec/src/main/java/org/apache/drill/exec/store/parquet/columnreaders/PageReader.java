@@ -111,6 +111,7 @@ final class PageReader {
   private final CodecFactory codecFactory;
 
   private final ParquetReaderStats stats;
+  private final int scanBufferSize;
 
   PageReader(org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentStatus, FileSystem fs, Path path, ColumnChunkMetaData columnChunkMetaData)
     throws ExecutionSetupException {
@@ -126,9 +127,11 @@ final class PageReader {
       columnChunkMetaData.getTotalUncompressedSize();
       boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
+      scanBufferSize = (parentColumnReader.parentReader.getFragmentContext().getConfig().getInt(
+          ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE));
       if (useBufferedReader) {
-        this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
-            columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024,
+      this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
+            columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
             true);
       } else {
         this.dataReader = new DirectBufInputStream(inputStream, allocator, path.getName(),

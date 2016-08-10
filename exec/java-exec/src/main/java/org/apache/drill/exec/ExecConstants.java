@@ -97,9 +97,10 @@ public interface ExecConstants {
   /** Size of JDBC batch queue (in batches) above which throttling begins. */
   String JDBC_BATCH_QUEUE_THROTTLING_THRESHOLD =
       "drill.jdbc.batch_queue_throttling_threshold";
-  // Size of the thread pool used to read data from disk. Used by Parquet
+  String SCAN_NUM_DISKS = "drill.exec.scan.num_disks";
+  // Multiple of the number of disks to determine the size of the thread pool used to read data from disk. Used by Parquet
   String SCAN_THREADPOOL_SIZE_MULTIPLE = "drill.exec.scan.threadpool_size_multiple";
-  // Size of the thread pool used by a scan to decode the data. Used by Parquet
+  // Multiple of the number of cores to determine the size of the thread pool used by a scan to decode the data. Used by Parquet
   String SCAN_DECODE_THREADPOOL_SIZE_MULTIPLE = "drill.exec.scan.decode_threadpool_size_multiple";
 
   /**

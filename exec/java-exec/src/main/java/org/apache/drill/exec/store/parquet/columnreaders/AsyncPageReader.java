@@ -118,6 +118,7 @@ final class AsyncPageReader {
   private final String fileName;
   private final ExecutorService threadPool;
   private Future<ReadStatus> asyncPageRead;
+  private final int scanBufferSize;
 
   AsyncPageReader(ColumnReader<?> parentStatus, FileSystem fs, Path path,
       ColumnChunkMetaData columnChunkMetaData)
@@ -143,9 +144,11 @@ final class AsyncPageReader {
 
       boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
+      scanBufferSize = (parentColumnReader.parentReader.getFragmentContext().getConfig().getInt(
+          ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE));
       if (useBufferedReader) {
       this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
-            columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024,
+            columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
             true);
       } else {
         this.dataReader = new DirectBufInputStream(inputStream, allocator, path.getName(),
