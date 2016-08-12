@@ -61,25 +61,25 @@ import static org.apache.parquet.column.Encoding.valueOf;
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.fromParquetStatistics;
 
 // class to keep track of the read position of variable length columns
-final class AsyncPageReader {
+class AsyncPageReader extends PageReader{
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(
       AsyncPageReader.class);
 
-  public static final ParquetMetadataConverter METADATA_CONVERTER = ParquetFormatPlugin.parquetMetadataConverter;
+  //public static final ParquetMetadataConverter METADATA_CONVERTER = ParquetFormatPlugin.parquetMetadataConverter;
 
-  private final ColumnReader<?> parentColumnReader;
+  //private final ColumnReader<?> parentColumnReader;
   //private final ColumnDataReader dataReader;
-  private final DirectBufInputStream dataReader;
+  //private final BufferedDirectBufInputStream dataReader;
   //buffer to store bytes of current page
-  DrillBuf pageData;
+  //DrillBuf pageData;
 
   // for variable length data we need to keep track of our current position in the page data
   // as the values and lengths are intermixed, making random access to the length data impossible
-  long readyToReadPosInBytes;
+  //long readyToReadPosInBytes;
   // read position in the current page, stored in the ByteBuf in ParquetRecordReader called bufferWithAllData
-  long readPosInBytes;
+  //long readPosInBytes;
   // bit shift needed for the next page if the last one did not line up with a byte boundary
-  int bitShift;
+  //int bitShift;
   // storage space for extra bits at the end of a page if they did not line up with a byte boundary
   // prevents the need to keep the entire last page, as these pageDataByteArray need to be added to the next batch
   //byte extraBits;
@@ -90,83 +90,80 @@ final class AsyncPageReader {
   // variable amount of space
   // For example: if nulls are stored without extra space left in the data vector
   // (this is currently simplifying random access to the data during processing, but increases the size of the vectors)
-  int valuesReadyToRead;
+  //int valuesReadyToRead;
 
   // the number of values read out of the last page
-  int valuesRead;
-  int byteLength;
+  //int valuesRead;
+  //int byteLength;
   //int rowGroupIndex;
-  ValuesReader definitionLevels;
-  ValuesReader repetitionLevels;
-  ValuesReader valueReader;
-  ValuesReader dictionaryLengthDeterminingReader;
-  ValuesReader dictionaryValueReader;
-  Dictionary dictionary;
-  PageHeader pageHeader = null;
+  //ValuesReader definitionLevels;
+  //ValuesReader repetitionLevels;
+  //ValuesReader valueReader;
+  //ValuesReader dictionaryLengthDeterminingReader;
+  //ValuesReader dictionaryValueReader;
+  //Dictionary dictionary;
+  //PageHeader pageHeader = null;
 
-  int currentPageCount = -1;
+  //int currentPageCount = -1;
 
-  private FSDataInputStream inputStream;
+  //private FSDataInputStream inputStream;
 
   // These need to be held throughout reading of the entire column chunk
-  List<ByteBuf> allocatedDictionaryBuffers;
+  //List<ByteBuf> allocatedDictionaryBuffers;
 
-  private final CodecFactory codecFactory;
+  //private final CodecFactory codecFactory;
 
-  private final ParquetReaderStats stats;
+  //private final ParquetReaderStats stats;
 
-  private final String fileName;
-  private final ExecutorService threadPool;
+  //private final String fileName;
+  private ExecutorService threadPool;
   private Future<ReadStatus> asyncPageRead;
-  private final int scanBufferSize;
+  //private final int scanBufferSize;
 
   AsyncPageReader(ColumnReader<?> parentStatus, FileSystem fs, Path path,
       ColumnChunkMetaData columnChunkMetaData)
     throws ExecutionSetupException {
-    this.parentColumnReader = parentStatus;
-    allocatedDictionaryBuffers = new ArrayList<ByteBuf>();
-    codecFactory = parentColumnReader.parentReader.getCodecFactory();
-    this.stats = parentColumnReader.parentReader.parquetReaderStats;
-    this.fileName = path.toString();
-    threadPool =  parentColumnReader.parentReader.getOperatorContext().getScanExecutor();
+    super(parentStatus, fs, path, columnChunkMetaData);
+    //this.parentColumnReader = parentStatus;
+    //allocatedDictionaryBuffers = new ArrayList<ByteBuf>();
+    //codecFactory = parentColumnReader.parentReader.getCodecFactory();
+    //this.stats = parentColumnReader.parentReader.parquetReaderStats;
+    //this.fileName = path.toString();
+    if(threadPool == null) {
+      threadPool = parentColumnReader.parentReader.getOperatorContext().getScanExecutor();
+    }
 
-    long start = columnChunkMetaData.getFirstDataPageOffset();
-    try {
-      inputStream  = fs.open(path);
-      BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
-
+    //long start = columnChunkMetaData.getFirstDataPageOffset();
+    //try {
+    //  inputStream  = fs.open(path);
+    //  BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
+      //TODO: make read batch size configurable
       // Instead of a the input stream parameter, we will use the wrapped stream that it contains. This is
       // because the input stream passed in tracks operator stats for each operator using the stream.
       // However, if (as in this case) the operator decides to have many parallel input streams, the
       // operator stats get clobbered as each stream will in parallel start and stop the wait time
       // for the operator.
       // These stats are best tracked by the operator and not the input stream.
+      //parentColumnReader.parentReader.getOperatorContext().
+    //  scanBufferSize = parentColumnReader.parentReader.getFragmentContext().getOptions()
+    //      .getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
+    //  this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
+    //      columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize, true);
 
-      boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
-          .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
-      scanBufferSize = parentColumnReader.parentReader.getFragmentContext().getOptions()
-          .getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
-      if (useBufferedReader) {
-      this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
-            columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
-            true);
-      } else {
-        this.dataReader = new DirectBufInputStream(inputStream, allocator, path.getName(),
-            columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), true);
-      }
-      dataReader.init();
+    //  dataReader.init();
 
-      loadDictionaryIfExists(parentStatus, columnChunkMetaData, dataReader);
+    //  loadDictionaryIfExists(parentStatus, columnChunkMetaData, dataReader);
       // start reading the next page
       asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
-    } catch (IOException e) {
-      throw new ExecutionSetupException("Error opening or reading metadata for parquet file at location: "
-          + path.getName(), e);
-    }
+    //} catch (IOException e) {
+    //  throw new ExecutionSetupException("Error opening or reading metadata for parquet file at location: "
+    //      + path.getName(), e);
+    //}
 
   }
 
-  private void loadDictionaryIfExists(final ColumnReader<?> parentStatus,
+  @Override
+  protected void loadDictionaryIfExists(final ColumnReader<?> parentStatus,
       final ColumnChunkMetaData columnChunkMetaData, final DirectBufInputStream f) throws UserException {
     Stopwatch timer = Stopwatch.createUnstarted();
     if (columnChunkMetaData.getDictionaryPageOffset() > 0) {
@@ -174,6 +171,10 @@ final class AsyncPageReader {
         dataReader.skip(columnChunkMetaData.getDictionaryPageOffset() - dataReader.getPos());
       } catch (IOException e) {
         handleAndThrowException(e, "Error Reading dictionary page.");
+      }
+      // parent constructir may call this method before the thread pool is set.
+      if(threadPool == null) {
+        threadPool = parentColumnReader.parentReader.getOperatorContext().getScanExecutor();
       }
       asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
       readDictionaryPage(asyncPageRead, parentStatus);
@@ -264,66 +265,8 @@ final class AsyncPageReader {
     return pageDataBuf;
   }
 
-  public DrillBuf readPage(PageHeader pageHeader, int compressedSize, int uncompressedSize) throws IOException {
-    DrillBuf pageDataBuf = null;
-    Stopwatch timer = Stopwatch.createUnstarted();
-    long timeToRead;
-    long start=dataReader.getPos();
-    if (parentColumnReader.columnChunkMetaData.getCodec() == CompressionCodecName.UNCOMPRESSED) {
-      timer.start();
-      pageDataBuf = dataReader.getNext(compressedSize);
-      timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
-      this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, uncompressedSize);
-    } else {
-      DrillBuf compressedData = null;
-      pageDataBuf=allocateTemporaryBuffer(uncompressedSize);
-
-      try {
-      timer.start();
-      compressedData = dataReader.getNext(compressedSize);
-       // dataReader.loadPage(compressedData, compressedSize);
-      timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
-      timer.reset();
-      this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, compressedSize);
-      start=dataReader.getPos();
-      timer.start();
-      codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData
-          .getCodec()).decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
-          pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
-        timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
-        this.updateStats(pageHeader, "Decompress", start, timeToRead, compressedSize, uncompressedSize);
-      } finally {
-        if(compressedData != null) {
-          compressedData.release();
-        }
-      }
-    }
-    return pageDataBuf;
-  }
-
-  public static BytesInput asBytesInput(DrillBuf buf, int offset, int length) throws IOException {
-    return BytesInput.from(buf.nioBuffer(offset, length), 0, length);
-  }
-
-  /**
-   * Grab the next page.
-   *
-   * @return - if another page was present
-   * @throws IOException
-   */
-  public boolean next() throws IOException {
-    Stopwatch timer = Stopwatch.createUnstarted();
-    currentPageCount = -1;
-    valuesRead = 0;
-    valuesReadyToRead = 0;
-
-    // TODO - the metatdata for total size appears to be incorrect for impala generated files, need to find cause
-    // and submit a bug report
-    if(!dataReader.hasRemainder() || parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
-      return false;
-    }
-    clearBuffers();
-
+  @Override
+  protected void nextInternal() throws IOException{
     ReadStatus readStatus = null;
     try {
       readStatus = asyncPageRead.get();
@@ -372,6 +315,30 @@ final class AsyncPageReader {
     //pageData = readPage(pageHeader, compressedSize, uncompressedSize);
     int compressedSize = pageHeader.getCompressed_page_size();
     int uncompressedSize = pageHeader.getUncompressed_page_size();
+
+  }
+
+
+  /**
+   * Grab the next page.
+   *
+   * @return - if another page was present
+   * @throws IOException
+   */
+  /*
+  public boolean next() throws IOException {
+    Stopwatch timer = Stopwatch.createUnstarted();
+    currentPageCount = -1;
+    valuesRead = 0;
+    valuesReadyToRead = 0;
+
+    // TODO - the metatdata for total size appears to be incorrect for impala generated files, need to find cause
+    // and submit a bug report
+    if(!dataReader.hasRemainder() || parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
+      return false;
+    }
+    clearBuffers();
+
 
     currentPageCount = pageHeader.data_page_header.num_values;
     final int uncompressedPageSize = pageHeader.uncompressed_page_size;
@@ -432,82 +399,84 @@ final class AsyncPageReader {
     readyToReadPosInBytes = readPosInBytes;
     return true;
   }
+  */
 
   /**
    * Allocate a page data buffer. Note that only one page data buffer should be active at a time. The reader will ensure
    * that the page data is released after the reader is completed.
    */
-  private void allocatePageData(int size) {
-    Preconditions.checkArgument(pageData == null);
-    pageData = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-  }
+  //private void allocatePageData(int size) {
+  //  Preconditions.checkArgument(pageData == null);
+  //  pageData = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+  //}
 
   /**
    * Allocate a buffer which the user should release immediately. The reader does not manage release of these buffers.
    */
-  private DrillBuf allocateTemporaryBuffer(int size) {
-    return parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-  }
+  //private DrillBuf allocateTemporaryBuffer(int size) {
+  //  return parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+  //}
 
   /**
    * Allocate and return a dictionary buffer. These are maintained for the life of the reader and then released when the
    * reader is cleared.
    */
-  private DrillBuf allocateDictionaryBuffer(int size) {
-    DrillBuf buf = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-    allocatedDictionaryBuffers.add(buf);
-    return buf;
-  }
+  //private DrillBuf allocateDictionaryBuffer(int size) {
+  //  DrillBuf buf = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+  //  allocatedDictionaryBuffers.add(buf);
+  //  return buf;
+  //}
 
-  protected boolean hasPage() {
-    return currentPageCount != -1;
-  }
+  //protected boolean hasPage() {
+  //  return currentPageCount != -1;
+  //}
 
-  private void updateStats(PageHeader pageHeader, String op, long start, long time, long bytesin, long bytesout) {
-    String pageType = "Data Page";
-    if (pageHeader.type == PageType.DICTIONARY_PAGE) {
-      pageType = "Dictionary Page";
-    }
-    logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}", op, pageType.toString(),
-        this.parentColumnReader.parentReader.hadoopPath,
-        this.parentColumnReader.columnDescriptor.toString(), start, bytesin, bytesout, time);
-    if (pageHeader.type != PageType.DICTIONARY_PAGE) {
-      if (bytesin == bytesout) {
-        this.stats.timePageLoads += time;
-        this.stats.numPageLoads++;
-        this.stats.totalPageReadBytes += bytesin;
-      } else {
-        this.stats.timePagesDecompressed += time;
-        this.stats.numPagesDecompressed++;
-        this.stats.totalDecompressedBytes += bytesin;
-      }
-    } else {
-      if (bytesin == bytesout) {
-        this.stats.timeDictPageLoads += time;
-        this.stats.numDictPageLoads++;
-        this.stats.totalDictPageReadBytes += bytesin;
-      } else {
-        this.stats.timeDictPagesDecompressed += time;
-        this.stats.numDictPagesDecompressed++;
-        this.stats.totalDictDecompressedBytes += bytesin;
-      }
-    }
-  }
+  //private void updateStats(PageHeader pageHeader, String op, long start, long time, long bytesin, long bytesout) {
+  //  String pageType = "Data Page";
+  //  if (pageHeader.type == PageType.DICTIONARY_PAGE) {
+  //    pageType = "Dictionary Page";
+  //  }
+  //  logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}", op, pageType.toString(),
+  //      this.parentColumnReader.parentReader.hadoopPath,
+  //      this.parentColumnReader.columnDescriptor.toString(), start, bytesin, bytesout, time);
+  //  if (pageHeader.type != PageType.DICTIONARY_PAGE) {
+  //    if (bytesin == bytesout) {
+  //      this.stats.timePageLoads += time;
+  //      this.stats.numPageLoads++;
+  //      this.stats.totalPageReadBytes += bytesin;
+  //    } else {
+  //      this.stats.timePagesDecompressed += time;
+  //      this.stats.numPagesDecompressed++;
+  //      this.stats.totalDecompressedBytes += bytesin;
+  //    }
+  //  } else {
+  //    if (bytesin == bytesout) {
+  //      this.stats.timeDictPageLoads += time;
+  //      this.stats.numDictPageLoads++;
+  //      this.stats.totalDictPageReadBytes += bytesin;
+  //    } else {
+  //      this.stats.timeDictPagesDecompressed += time;
+  //      this.stats.numDictPagesDecompressed++;
+  //      this.stats.totalDictDecompressedBytes += bytesin;
+  //    }
+  //  }
+  //}
 
-  public void clearBuffers() {
-    if (pageData != null) {
-      pageData.release();
-      pageData = null;
-    }
-  }
+  //public void clearBuffers() {
+  //  if (pageData != null) {
+  //    pageData.release();
+  //    pageData = null;
+  //  }
+  //}
 
-  public void clearDictionaryBuffers() {
-    for (ByteBuf b : allocatedDictionaryBuffers) {
-      b.release();
-    }
-    allocatedDictionaryBuffers.clear();
-  }
+  //public void clearDictionaryBuffers() {
+  //  for (ByteBuf b : allocatedDictionaryBuffers) {
+  //    b.release();
+  //  }
+  //  allocatedDictionaryBuffers.clear();
+  //}
 
+  @Override
   public void clear(){
     if(asyncPageRead != null){
       asyncPageRead.cancel(true);
@@ -518,17 +487,7 @@ final class AsyncPageReader {
         // Do nothing.
       }
     }
-    try {
-      this.inputStream.close();
-      this.dataReader.close();
-    } catch (IOException e) {
-      //Swallow the exception which is OK for input streams
-    }
-    // Free all memory, including fixed length types. (Data is being copied for all types not just var length types)
-    //if(!this.parentColumnReader.isFixedLength) {
-    clearBuffers();
-    clearDictionaryBuffers();
-    //}
+    super.clear();
   }
 
   public static class ReadStatus {

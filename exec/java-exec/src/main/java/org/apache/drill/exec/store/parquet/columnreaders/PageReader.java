@@ -20,6 +20,7 @@ package org.apache.drill.exec.store.parquet.columnreaders;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.store.parquet.ColumnDataReader;
 import org.apache.drill.exec.util.filereader.BufferedDirectBufInputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
@@ -58,17 +59,17 @@ import static org.apache.parquet.column.Encoding.valueOf;
 import static org.apache.parquet.format.converter.ParquetMetadataConverter.fromParquetStatistics;
 
 // class to keep track of the read position of variable length columns
-final class PageReader {
+class PageReader {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(
       org.apache.drill.exec.store.parquet.columnreaders.PageReader.class);
 
   public static final ParquetMetadataConverter METADATA_CONVERTER = ParquetFormatPlugin.parquetMetadataConverter;
 
-  private final org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentColumnReader;
+  protected final org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentColumnReader;
   //private final ColumnDataReader dataReader;
-  private final DirectBufInputStream dataReader;
+  protected final DirectBufInputStream dataReader;
   //der; buffer to store bytes of current page
-  DrillBuf pageData;
+  protected DrillBuf pageData;
 
   // for variable length data we need to keep track of our current position in the page data
   // as the values and lengths are intermixed, making random access to the length data impossible
@@ -103,14 +104,15 @@ final class PageReader {
 
   int currentPageCount = -1;
 
-  private FSDataInputStream inputStream;
+  protected FSDataInputStream inputStream;
 
   // These need to be held throughout reading of the entire column chunk
   List<ByteBuf> allocatedDictionaryBuffers;
 
-  private final CodecFactory codecFactory;
+  protected final CodecFactory codecFactory;
+  protected final String fileName;
 
-  private final ParquetReaderStats stats;
+  protected final ParquetReaderStats stats;
   private final int scanBufferSize;
 
   PageReader(org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentStatus, FileSystem fs, Path path, ColumnChunkMetaData columnChunkMetaData)
@@ -119,18 +121,18 @@ final class PageReader {
     allocatedDictionaryBuffers = new ArrayList<ByteBuf>();
     codecFactory = parentColumnReader.parentReader.getCodecFactory();
     this.stats = parentColumnReader.parentReader.parquetReaderStats;
+    this.fileName = path.toString();
     long start = columnChunkMetaData.getFirstDataPageOffset();
     try {
       inputStream  = fs.open(path);
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
-      //TODO: make read batch size configurable
       columnChunkMetaData.getTotalUncompressedSize();
       boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
       scanBufferSize = parentColumnReader.parentReader.getFragmentContext().getOptions()
           .getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
       if (useBufferedReader) {
-      this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
+        this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
             columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
             true);
       } else {
@@ -148,7 +150,7 @@ final class PageReader {
 
   }
 
-  private void loadDictionaryIfExists(final org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentStatus,
+  protected void loadDictionaryIfExists(final org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentStatus,
       final ColumnChunkMetaData columnChunkMetaData, final DirectBufInputStream f) throws IOException {
     Stopwatch timer = Stopwatch.createUnstarted();
     if (columnChunkMetaData.getDictionaryPageOffset() > 0) {
@@ -222,25 +224,12 @@ final class PageReader {
     return BytesInput.from(buf.nioBuffer(offset, length), 0, length);
   }
 
+
   /**
-   * Grab the next page.
-   *
-   * @return - if another page was present
-   * @throws IOException
+   * Get the page header and the pageData (uncompressed) for the next page
    */
-  public boolean next() throws IOException {
+  protected void nextInternal() throws IOException{
     Stopwatch timer = Stopwatch.createUnstarted();
-    currentPageCount = -1;
-    valuesRead = 0;
-    valuesReadyToRead = 0;
-
-    // TODO - the metatdata for total size appears to be incorrect for impala generated files, need to find cause
-    // and submit a bug report
-    if(!dataReader.hasRemainder() || parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
-      return false;
-    }
-    clearBuffers();
-
     // next, we need to decompress the bytes
     // TODO - figure out if we need multiple dictionary pages, I believe it may be limited to one
     // I think we are clobbering parts of the dictionary if there can be multiple pages of dictionary
@@ -267,8 +256,32 @@ final class PageReader {
     int uncompressedSize = pageHeader.getUncompressed_page_size();
     pageData = readPage(pageHeader, compressedSize, uncompressedSize);
 
+  }
+
+  /**
+   * Grab the next page.
+   *
+   * @return - if another page was present
+   * @throws IOException
+   */
+  public boolean next() throws IOException {
+    //Stopwatch timer = Stopwatch.createUnstarted();
+    currentPageCount = -1;
+    valuesRead = 0;
+    valuesReadyToRead = 0;
+
+    // TODO - the metatdata for total size appears to be incorrect for impala generated files, need to find cause
+    // and submit a bug report
+    if(!dataReader.hasRemainder() || parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
+      return false;
+    }
+    clearBuffers();
+
+
+    nextInternal();
+
     currentPageCount = pageHeader.data_page_header.num_values;
-    final int uncompressedPageSize = pageHeader.uncompressed_page_size;
+  //  final int uncompressedPageSize = pageHeader.uncompressed_page_size;
     final Statistics<?> stats = fromParquetStatistics(pageHeader.data_page_header.getStatistics(), parentColumnReader
         .getColumnDescriptor().getType());
 
@@ -331,15 +344,15 @@ final class PageReader {
    * Allocate a page data buffer. Note that only one page data buffer should be active at a time. The reader will ensure
    * that the page data is released after the reader is completed.
    */
-  private void allocatePageData(int size) {
-    Preconditions.checkArgument(pageData == null);
-    pageData = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-  }
+  //private void allocatePageData(int size) {
+  //  Preconditions.checkArgument(pageData == null);
+  //  pageData = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+  //}
 
   /**
    * Allocate a buffer which the user should release immediately. The reader does not manage release of these buffers.
    */
-  private DrillBuf allocateTemporaryBuffer(int size) {
+  protected DrillBuf allocateTemporaryBuffer(int size) {
     return parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
   }
 
@@ -347,17 +360,17 @@ final class PageReader {
    * Allocate and return a dictionary buffer. These are maintained for the life of the reader and then released when the
    * reader is cleared.
    */
-  private DrillBuf allocateDictionaryBuffer(int size) {
-    DrillBuf buf = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-    allocatedDictionaryBuffers.add(buf);
-    return buf;
-  }
+  //private DrillBuf allocateDictionaryBuffer(int size) {
+  //  DrillBuf buf = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
+  //  allocatedDictionaryBuffers.add(buf);
+  //  return buf;
+  //}
 
   protected boolean hasPage() {
     return currentPageCount != -1;
   }
 
-  private void updateStats(PageHeader pageHeader, String op, long start, long time, long bytesin, long bytesout) {
+  protected void updateStats(PageHeader pageHeader, String op, long start, long time, long bytesin, long bytesout) {
     String pageType = "Data Page";
     if (pageHeader.type == PageType.DICTIONARY_PAGE) {
       pageType = "Dictionary Page";
@@ -404,15 +417,14 @@ final class PageReader {
 
   public void clear(){
     try {
+      this.inputStream.close();
       this.dataReader.close();
     } catch (IOException e) {
-      //TODO: Throw UserException
+      //Swallow the exception which is OK for input streams
     }
     // Free all memory, including fixed length types. (Data is being copied for all types not just var length types)
-    //if(!this.parentColumnReader.isFixedLength) {
     clearBuffers();
     clearDictionaryBuffers();
-    //}
   }
 
 
