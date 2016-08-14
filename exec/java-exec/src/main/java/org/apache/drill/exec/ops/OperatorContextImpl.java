@@ -95,11 +95,6 @@ class OperatorContextImpl extends OperatorContext implements AutoCloseable {
     return manager.getManagedBuffer(size);
   }
 
-  // Allow and operator to use the thread pool
-  public ExecutorService getExecutor() {
-    return executor;
-  }
-
   public ExecutionControls getExecutionControls() {
     return executionControls;
   }
