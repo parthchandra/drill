@@ -207,6 +207,10 @@ public class ParquetRecordReader extends AbstractRecordReader {
     return operatorContext;
   }
 
+  public FragmentContext getFragmentContext() {
+    return fragmentContext;
+  }
+
   @Override
   public void setup(OperatorContext operatorContext, OutputMutator output) throws ExecutionSetupException {
     this.operatorContext = operatorContext;
