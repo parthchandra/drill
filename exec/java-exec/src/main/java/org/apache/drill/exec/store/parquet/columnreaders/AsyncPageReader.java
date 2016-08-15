@@ -139,8 +139,8 @@ final class AsyncPageReader {
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       //TODO: make read batch size configurable
       columnChunkMetaData.getTotalUncompressedSize();
-      boolean useBufferedReader = (parentColumnReader.parentReader.getFragmentContext().getConfig().getBoolean(
-          ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ));
+      boolean useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
+          .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
       if (useBufferedReader) {
         this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
             columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024,
