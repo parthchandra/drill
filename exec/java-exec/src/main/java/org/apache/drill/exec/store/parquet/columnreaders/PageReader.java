@@ -65,7 +65,7 @@ final class PageReader {
 
   private final org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentColumnReader;
   //private final ColumnDataReader dataReader;
-  private final BufferedDirectBufInputStream dataReader;
+  private final DirectBufInputStream dataReader;
   //der; buffer to store bytes of current page
   DrillBuf pageData;
 
@@ -123,8 +123,10 @@ final class PageReader {
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       //TODO: make read batch size configurable
       columnChunkMetaData.getTotalUncompressedSize();
+      //this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
+      //    columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024, true);
       this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
-          columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024, true);
+          columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), true);
       dataReader.init();
 
       loadDictionaryIfExists(parentStatus, columnChunkMetaData, dataReader);
