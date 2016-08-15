@@ -128,7 +128,7 @@ final class AsyncPageReader {
       ColumnChunkMetaData columnChunkMetaData)
     throws ExecutionSetupException {
     this.parentColumnReader = parentStatus;
-    this.threadPool = Executors.newFixedThreadPool(12) ; // TODO : Make this configurable/
+    this.threadPool = parentColumnReader.parentReader.getOperatorContext().getExecutor();
     allocatedDictionaryBuffers = new ArrayList<ByteBuf>();
     codecFactory = parentColumnReader.parentReader.getCodecFactory();
     this.stats = parentColumnReader.parentReader.parquetReaderStats;
