@@ -327,7 +327,7 @@ int main(int argc, char* argv[]) {
 		strcpy(logpathPrefix,tempPath);
 		strcat(logpathPrefix, "\\drillclient");
 #else
-		char* logpathPrefix = "/var/log/drill/drillclient";
+		const char* logpathPrefix = "/var/log/drill/drillclient";
 #endif
 		// To log to file
         Drill::DrillClient::initLogging(logpathPrefix, l);
