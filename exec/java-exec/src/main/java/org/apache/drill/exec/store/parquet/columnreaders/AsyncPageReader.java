@@ -52,6 +52,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -69,7 +70,7 @@ final class AsyncPageReader {
 
   private final ColumnReader<?> parentColumnReader;
   //private final ColumnDataReader dataReader;
-  private final BufferedDirectBufInputStream dataReader;
+  private final DirectBufInputStream dataReader;
   //der; buffer to store bytes of current page
   DrillBuf pageData;
 
@@ -127,7 +128,7 @@ final class AsyncPageReader {
       ColumnChunkMetaData columnChunkMetaData)
     throws ExecutionSetupException {
     this.parentColumnReader = parentStatus;
-    this.threadPool = parentColumnReader.parentReader.getOperatorContext().getExecutor();
+    this.threadPool = Executors.newFixedThreadPool(12) ; // TODO : Make this configurable/
     allocatedDictionaryBuffers = new ArrayList<ByteBuf>();
     codecFactory = parentColumnReader.parentReader.getCodecFactory();
     this.stats = parentColumnReader.parentReader.parquetReaderStats;
@@ -137,8 +138,10 @@ final class AsyncPageReader {
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       //TODO: make read batch size configurable
       columnChunkMetaData.getTotalUncompressedSize();
-      this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
-          columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024, true);
+      //this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
+      //    columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), 8 * 1024 * 1024, true);
+      this.dataReader = new DirectBufInputStream(inputStream, allocator, path.getName(),
+          columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), true);
       dataReader.init();
 
       loadDictionaryIfExists(parentStatus, columnChunkMetaData, dataReader);
