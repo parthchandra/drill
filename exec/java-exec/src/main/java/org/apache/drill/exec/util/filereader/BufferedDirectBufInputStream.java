@@ -83,42 +83,10 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   protected long curPosInStream; // current offset in the input stream
 
-  protected String streamId; // a name for logging purposes only
-
-  /**
-   * The offset in the underlying stream to start reading from
-   */
-  private final long startOffset;
-  /**
-   * The length of the data we expect to read. The caller may, in fact,
-   * ask for more or less bytes. However this is useful for providing hints where
-   * the underlying InputStream supports hints (e.g. fadvise)
-   */
-  private final long totalByteSize;
-
-  protected BufferAllocator allocator;
   private final int bufSize;
 
   private volatile DrillBuf tempBuffer; // a temp Buffer for use by read(byte[] buf, int off, int len)
 
-  private FSDataInputStream getInputStream() throws IOException {
-    // Make sure stream is open
-    checkInputStreamState();
-    return (FSDataInputStream) in;
-  }
-
-  private void checkInputStreamState() throws IOException {
-    if (in == null) {
-      throw new IOException("Input stream is closed.");
-    }
-  }
-
-  private void checkStreamSupportsByteBuffer() throws UnsupportedOperationException {
-    // Check input stream supports ByteBuffer
-    if (!(in instanceof ByteBufferReadable)) {
-      throw new UnsupportedOperationException("The input stream is not ByteBuffer readable.");
-    }
-  }
 
   private DrillBuf getBuf() throws IOException {
     checkInputStreamState();
@@ -143,12 +111,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
       long startOffset, long totalByteSize, int bufSize, boolean enableHints) {
-    super(in, enableHints);
-    Preconditions.checkArgument(startOffset >= 0);
-    Preconditions.checkArgument(totalByteSize >= 0);
+    super(in, allocator, id, startOffset, totalByteSize, enableHints);
     Preconditions.checkArgument(bufSize >= 0);
-    this.streamId = id;
-    this.allocator = allocator;
     // We make the buffer size the smaller of the buffer Size parameter or the total Byte Size
     // rounded to next highest pwoer of two
     int bSize = bufSize < (int) totalByteSize ? bufSize : (int) totalByteSize;
@@ -162,19 +126,13 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     bSize++;
     this.bufSize = bSize;
 
-    this.startOffset = startOffset;
-    this.totalByteSize = totalByteSize;
   }
 
   @Override
   public void init() throws UnsupportedOperationException, IOException {
-    checkStreamSupportsByteBuffer();
+    super.init();
     this.internalBuffer = this.allocator.buffer(this.bufSize);
     this.tempBuffer = this.allocator.buffer(defaultTempBufferSize);
-    if (enableHints) {
-      fadviseIfAvailable(getInputStream(), this.startOffset, this.totalByteSize);
-    }
-    getInputStream().seek(this.startOffset);
     int bytesRead = getNextBlock();
     if (bytesRead <= 0) {
       throw new IOException("End of stream reached while initializing buffered reader.");
@@ -324,15 +282,6 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     return bytesRead;
   }
 
-  public synchronized DrillBuf getNext(int bytes) throws IOException {
-    DrillBuf b = allocator.buffer(bytes);
-    int bytesRead = read(b, 0, bytes);
-    if (bytesRead <= -1) {
-      b.release();
-      return null;
-    }
-    return b;
-  }
 
   @Override public int read(byte[] b) throws IOException {
     return b.length == 1 ? read() : read(b, (int) 0, b.length);
