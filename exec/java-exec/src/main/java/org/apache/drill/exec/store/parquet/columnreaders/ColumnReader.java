@@ -23,6 +23,7 @@ import java.io.IOException;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.vector.BaseDataValueVector;
 import org.apache.drill.exec.vector.ValueVector;
 
@@ -49,7 +50,7 @@ public abstract class ColumnReader<V extends ValueVector> {
   // metadata of the column, from the parquet library
   final ColumnChunkMetaData columnChunkMetaData;
   // status information on the current page
-  AsyncPageReader pageReader;
+  PageReader pageReader;
 
   final SchemaElement schemaElement;
   boolean usingDictionary;
@@ -85,7 +86,17 @@ public abstract class ColumnReader<V extends ValueVector> {
     this.isFixedLength = fixedLength;
     this.schemaElement = schemaElement;
     this.valueVec =  v;
-    this.pageReader = new AsyncPageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(), columnChunkMetaData);
+    boolean useAsyncPageReader  = parentReader.getFragmentContext().getOptions()
+        .getOption(ExecConstants.PARQUET_PAGEREADER_ASYNC).bool_val;
+    if (useAsyncPageReader) {
+      this.pageReader =
+          new AsyncPageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),
+              columnChunkMetaData);
+    } else {
+      this.pageReader =
+          new PageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),
+              columnChunkMetaData);
+    }
 
     if (columnDescriptor.getType() != PrimitiveType.PrimitiveTypeName.BINARY) {
       if (columnDescriptor.getType() == PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY) {
