@@ -16,19 +16,27 @@
  * limitations under the License.
  */
 
-#ifndef ENV_H
-#define ENV_H
+#ifndef PREPAREDSTATEMENT_H
+#define PREPAREDSTATEMENT_H
 
+#include <cstddef>
+#include <string>
+#include <vector>
 
-#define DRILL_VERSION @PROJECT_VERSION@
+namespace Drill {
+class DECLSPEC_DRILL_CLIENT PreparedStatement{
+  // binary handle of the server prepared statement
+  std::string m_handle;
+  std::vector<FieldMetadata> m_fieldDefs;
 
-#define DRILL_VERSION_MAJOR @PROJECT_VERSION_MAJOR@
-#define DRILL_VERSION_MINOR @PROJECT_VERSION_MINOR@
-#define DRILL_VERSION_PATCH @PROJECT_VERSION_PATCH@
+  public:
+  std::size_t getNumFields() const { return m_fieldDefs.size(); }
+  const Drill::FieldMetadata& getFieldMetadata(std::size_t index) const {
+    return m_fieldDefs.at(index);
+  }
+};
 
-#define GIT_SHA_PROP  @GIT_SHA_PROP@
-#define GIT_COMMIT_PROP @GIT_COMMIT_PROP@
+} // namespace Drill
 
-#endif
-
+#endif // PREPAREDSTATEMENT_H
 

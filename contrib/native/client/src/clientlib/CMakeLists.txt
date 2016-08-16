@@ -22,6 +22,7 @@ set (CLIENTLIB_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/decimalUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/drillClientImpl.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/fieldmeta.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/recordBatch.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/rpcEncoder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/rpcDecoder.cpp

@@ -34,6 +34,7 @@
 #include <boost/assign.hpp>
 
 #include "drill/drillClient.hpp"
+#include "drill/fieldmeta.hpp"
 #include "drill/recordBatch.hpp"
 #include "drillClientImpl.hpp"
 #include "errmsgs.hpp"

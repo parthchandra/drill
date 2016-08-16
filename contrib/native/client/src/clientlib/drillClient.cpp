@@ -20,6 +20,7 @@
 #include <boost/assign.hpp>
 #include "drill/common.hpp"
 #include "drill/drillClient.hpp"
+#include "drill/fieldmeta.hpp"
 #include "drill/recordBatch.hpp"
 #include "drillClientImpl.hpp"
 #include "errmsgs.hpp"
@@ -387,6 +388,15 @@ RecordIterator* DrillClient::submitQuery(Drill::QueryType t, const std::string& 
     return pIter;
 }
 
+status_t DrillClient::prepareQuery(const std::string& sql, pfnPreparedStatementListener listener, void* listenerCtx, QueryHandle_t* qHandle) {
+    return QRY_FAILURE;
+}
+
+status_t DrillClient::executeQuery(const PreparedStatement& pstmt, pfnQueryResultsListener listener, void* listenerCtx, QueryHandle_t* qHandle) {
+    return QRY_FAILURE;
+}
+
+
 void* DrillClient::getApplicationContext(QueryHandle_t handle){
     assert(handle!=NULL);
     return ((DrillClientQueryResult*)handle)->getListenerContext();
@@ -424,4 +434,10 @@ void DrillClient::freeRecordBatch(RecordBatch* pRecordBatch){
     delete pRecordBatch;
 }
 
+Metadata* DrillClient::getMetadata() {
+    return NULL;
+}
+
+void DrillClient::freeMetadata(Metadata**) {
+}
 } // namespace Drill
