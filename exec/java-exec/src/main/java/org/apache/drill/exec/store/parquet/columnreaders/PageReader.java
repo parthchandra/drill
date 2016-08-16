@@ -76,8 +76,6 @@ class PageReader {
   long readyToReadPosInBytes;
   // read position in the current page, stored in the ByteBuf in ParquetRecordReader called bufferWithAllData
   long readPosInBytes;
-  // bit shift needed for the next page if the last one did not line up with a byte boundary
-  int bitShift;
   // storage space for extra bits at the end of a page if they did not line up with a byte boundary
   // prevents the need to keep the entire last page, as these pageDataByteArray need to be added to the next batch
   //byte extraBits;
@@ -124,7 +122,6 @@ class PageReader {
     codecFactory = parentColumnReader.parentReader.getCodecFactory();
     this.stats = parentColumnReader.parentReader.parquetReaderStats;
     this.fileName = path.toString();
-    long start = columnChunkMetaData.getFirstDataPageOffset();
     try {
       inputStream  = fs.open(path);
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
@@ -204,7 +201,6 @@ class PageReader {
       try {
       timer.start();
       compressedData = dataReader.getNext(compressedSize);
-       // dataReader.loadPage(compressedData, compressedSize);
       timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
       timer.reset();
       this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, compressedSize);
@@ -345,30 +341,11 @@ class PageReader {
   }
 
   /**
-   * Allocate a page data buffer. Note that only one page data buffer should be active at a time. The reader will ensure
-   * that the page data is released after the reader is completed.
-   */
-  //private void allocatePageData(int size) {
-  //  Preconditions.checkArgument(pageData == null);
-  //  pageData = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-  //}
-
-  /**
    * Allocate a buffer which the user should release immediately. The reader does not manage release of these buffers.
    */
   protected DrillBuf allocateTemporaryBuffer(int size) {
     return parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
   }
-
-  /**
-   * Allocate and return a dictionary buffer. These are maintained for the life of the reader and then released when the
-   * reader is cleared.
-   */
-  //private DrillBuf allocateDictionaryBuffer(int size) {
-  //  DrillBuf buf = parentColumnReader.parentReader.getOperatorContext().getAllocator().buffer(size);
-  //  allocatedDictionaryBuffers.add(buf);
-  //  return buf;
-  //}
 
   protected boolean hasPage() {
     return currentPageCount != -1;
