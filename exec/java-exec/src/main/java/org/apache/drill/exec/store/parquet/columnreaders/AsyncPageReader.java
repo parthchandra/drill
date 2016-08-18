@@ -75,9 +75,11 @@ class AsyncPageReader extends PageReader {
 
   private DrillBuf getDecompressedPageData(ReadStatus readStatus) {
     DrillBuf data;
+    boolean isDictionary = false;
     synchronized (this) {
       data = readStatus.getPageData();
       readStatus.setPageData(null);
+      isDictionary = readStatus.isDictionaryPage;
     }
     if (parentColumnReader.columnChunkMetaData.getCodec() != CompressionCodecName.UNCOMPRESSED) {
       DrillBuf uncompressedData = data;
@@ -86,6 +88,12 @@ class AsyncPageReader extends PageReader {
         readStatus.setPageData(null);
       }
       uncompressedData.release();
+    } else {
+      if (isDictionary) {
+        stats.totalDictPageReadBytes.addAndGet(readStatus.bytesRead);
+      } else {
+        stats.totalDataPageReadBytes.addAndGet(readStatus.bytesRead);
+      }
     }
     return data;
   }
@@ -94,10 +102,16 @@ class AsyncPageReader extends PageReader {
   private void readDictionaryPage(final Future<ReadStatus> asyncPageRead,
       final ColumnReader<?> parentStatus) throws UserException {
     try {
+      Stopwatch timer = Stopwatch.createStarted();
       ReadStatus readStatus = asyncPageRead.get();
+      long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
+      stats.timeDiskScanWait.addAndGet(timeBlocked);
+      stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
+      stats.numDictPageLoads.incrementAndGet();
+      stats.timeDictPageLoads.addAndGet(timeBlocked+readStatus.getDiskScanTime());
       readDictionaryPageData(readStatus, parentStatus);
     } catch (Exception e) {
-      handleAndThrowException(e, "Error Reading dictionary page.");
+      handleAndThrowException(e, "Error reading dictionary page.");
     }
   }
 
@@ -107,15 +121,17 @@ class AsyncPageReader extends PageReader {
     try {
       pageHeader = readStatus.getPageHeader();
       int uncompressedSize = pageHeader.getUncompressed_page_size();
-
       final DrillBuf dictionaryData = getDecompressedPageData(readStatus);
+      Stopwatch timer = Stopwatch.createStarted();
       allocatedDictionaryBuffers.add(dictionaryData);
       DictionaryPage page = new DictionaryPage(asBytesInput(dictionaryData, 0, uncompressedSize),
           pageHeader.uncompressed_page_size, pageHeader.dictionary_page_header.num_values,
           valueOf(pageHeader.dictionary_page_header.encoding.name()));
       this.dictionary = page.getEncoding().initDictionary(parentStatus.columnDescriptor, page);
+      long timeToDecode = timer.elapsed(TimeUnit.NANOSECONDS);
+      stats.timeDictPageDecode.addAndGet(timeToDecode);
     } catch (Exception e) {
-      handleAndThrowException(e, "Error Reading dictionary page.");
+      handleAndThrowException(e, "Error decoding dictionary page.");
     }
   }
 
@@ -150,7 +166,18 @@ class AsyncPageReader extends PageReader {
   @Override protected void nextInternal() throws IOException {
     ReadStatus readStatus = null;
     try {
+      Stopwatch timer = Stopwatch.createStarted();
       readStatus = asyncPageRead.get();
+      long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
+      stats.timeDiskScanWait.addAndGet(timeBlocked);
+      stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
+      if (readStatus.isDictionaryPage) {
+        stats.numDictPageLoads.incrementAndGet();
+        stats.timeDictPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
+      } else {
+        stats.numDataPageLoads.incrementAndGet();
+        stats.timeDataPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
+      }
       pageHeader = readStatus.getPageHeader();
       // reset this. At the time of calling close, if this is not null then a pending asyncPageRead needs to be consumed
       asyncPageRead = null;
@@ -200,6 +227,7 @@ class AsyncPageReader extends PageReader {
     private boolean isDictionaryPage = false;
     private long bytesRead = 0;
     private long valuesRead = 0;
+    private long diskScanTime = 0;
 
     public synchronized PageHeader getPageHeader() {
       return pageHeader;
@@ -240,6 +268,14 @@ class AsyncPageReader extends PageReader {
     public synchronized void setValuesRead(long valuesRead) {
       this.valuesRead = valuesRead;
     }
+
+    public long getDiskScanTime() {
+      return diskScanTime;
+    }
+
+    public void setDiskScanTime(long diskScanTime) {
+      this.diskScanTime = diskScanTime;
+    }
   }
 
 
@@ -258,12 +294,14 @@ class AsyncPageReader extends PageReader {
 
       long bytesRead = 0;
       long valuesRead = 0;
+      Stopwatch timer = Stopwatch.createStarted();
 
       DrillBuf pageData = null;
       try {
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
         int compressedSize = pageHeader.getCompressed_page_size();
         pageData = parent.dataReader.getNext(compressedSize);
+        bytesRead = compressedSize;
         synchronized (parent) {
           if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
             readStatus.setIsDictionaryPage(true);
@@ -271,11 +309,12 @@ class AsyncPageReader extends PageReader {
           } else {
             valuesRead += pageHeader.getData_page_header().getNum_values();
           }
-
+          long timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
           readStatus.setPageHeader(pageHeader);
           readStatus.setPageData(pageData);
           readStatus.setBytesRead(bytesRead);
           readStatus.setValuesRead(valuesRead);
+          readStatus.setDiskScanTime(timeToRead);
         }
 
       } catch (Exception e) {

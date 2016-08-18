@@ -17,10 +17,8 @@
  */
 package org.apache.drill.exec.store.parquet.columnreaders;
 
-import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.store.parquet.ColumnDataReader;
 import org.apache.drill.exec.util.filereader.BufferedDirectBufInputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
@@ -37,7 +35,6 @@ import org.apache.parquet.column.Dictionary;
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.ValuesType;
 import org.apache.parquet.column.page.DictionaryPage;
-import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.column.values.ValuesReader;
 import org.apache.parquet.column.values.dictionary.DictionaryValuesReader;
 import org.apache.parquet.format.PageHeader;
@@ -159,7 +156,7 @@ class PageReader {
       long start=dataReader.getPos();
       timer.start();
       final PageHeader pageHeader = Util.readPageHeader(f);
-      long timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+      long timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       long pageHeaderBytes=dataReader.getPos()-start;
       this.updateStats(pageHeader, "Page Header", start, timeToRead, pageHeaderBytes, pageHeaderBytes);
       assert pageHeader.type == PageType.DICTIONARY_PAGE;
@@ -192,7 +189,7 @@ class PageReader {
     if (parentColumnReader.columnChunkMetaData.getCodec() == CompressionCodecName.UNCOMPRESSED) {
       timer.start();
       pageDataBuf = dataReader.getNext(compressedSize);
-      timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+      timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, uncompressedSize);
     } else {
       DrillBuf compressedData = null;
@@ -201,7 +198,7 @@ class PageReader {
       try {
       timer.start();
       compressedData = dataReader.getNext(compressedSize);
-      timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+      timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       timer.reset();
       this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, compressedSize);
       start=dataReader.getPos();
@@ -209,7 +206,7 @@ class PageReader {
       codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData
           .getCodec()).decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
           pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
-        timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+        timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
         this.updateStats(pageHeader, "Decompress", start, timeToRead, compressedSize, uncompressedSize);
       } finally {
         if(compressedData != null) {
@@ -237,7 +234,7 @@ class PageReader {
       long start=dataReader.getPos();
       timer.start();
       pageHeader = Util.readPageHeader(dataReader);
-      long timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+      long timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       long pageHeaderBytes=dataReader.getPos()-start;
       this.updateStats(pageHeader, "Page Header", start, timeToRead, pageHeaderBytes, pageHeaderBytes);
       logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}","Page Header Read","",
@@ -265,7 +262,7 @@ class PageReader {
    * @throws IOException
    */
   public boolean next() throws IOException {
-    //Stopwatch timer = Stopwatch.createUnstarted();
+    Stopwatch timer = Stopwatch.createUnstarted();
     currentPageCount = -1;
     valuesRead = 0;
     valuesReadyToRead = 0;
@@ -277,17 +274,12 @@ class PageReader {
     }
     clearBuffers();
 
-
     nextInternal();
 
+    timer.start();
     currentPageCount = pageHeader.data_page_header.num_values;
-  //  final int uncompressedPageSize = pageHeader.uncompressed_page_size;
-    final Statistics<?> stats = fromParquetStatistics(pageHeader.data_page_header.getStatistics(), parentColumnReader
-        .getColumnDescriptor().getType());
-
 
     final Encoding rlEncoding = METADATA_CONVERTER.getEncoding(pageHeader.data_page_header.repetition_level_encoding);
-
     final Encoding dlEncoding = METADATA_CONVERTER.getEncoding(pageHeader.data_page_header.definition_level_encoding);
     final Encoding valueEncoding = METADATA_CONVERTER.getEncoding(pageHeader.data_page_header.encoding);
 
@@ -337,6 +329,9 @@ class PageReader {
     // fit one record at a time, such as for variable length data. Both operations must start in the same location after the
     // definition and repetition level data which is stored alongside the page data itself
     readyToReadPosInBytes = readPosInBytes;
+    long timeDecode = timer.elapsed(TimeUnit.NANOSECONDS);
+    stats.numDataPagesDecoded.incrementAndGet();
+    stats.timeDataPageDecode.addAndGet(timeDecode);
     return true;
   }
 
@@ -359,25 +354,26 @@ class PageReader {
     logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}", op, pageType.toString(),
         this.parentColumnReader.parentReader.hadoopPath,
         this.parentColumnReader.columnDescriptor.toString(), start, bytesin, bytesout, time);
+
     if (pageHeader.type != PageType.DICTIONARY_PAGE) {
       if (bytesin == bytesout) {
-        this.stats.timePageLoads += time;
-        this.stats.numPageLoads++;
-        this.stats.totalPageReadBytes += bytesin;
+        this.stats.timeDataPageLoads.addAndGet(time);
+        this.stats.numDataPageLoads.incrementAndGet();
+        this.stats.totalDataPageReadBytes.addAndGet(bytesin);
       } else {
-        this.stats.timePagesDecompressed += time;
-        this.stats.numPagesDecompressed++;
-        this.stats.totalDecompressedBytes += bytesin;
+        this.stats.timeDataPagesDecompressed.addAndGet(time);
+        this.stats.numDataPagesDecompressed.incrementAndGet();
+        this.stats.totalDataDecompressedBytes.addAndGet(bytesin);
       }
     } else {
       if (bytesin == bytesout) {
-        this.stats.timeDictPageLoads += time;
-        this.stats.numDictPageLoads++;
-        this.stats.totalDictPageReadBytes += bytesin;
+        this.stats.timeDictPageLoads.addAndGet(time);
+        this.stats.numDictPageLoads.incrementAndGet();
+        this.stats.totalDictPageReadBytes.addAndGet(bytesin);
       } else {
-        this.stats.timeDictPagesDecompressed += time;
-        this.stats.numDictPagesDecompressed++;
-        this.stats.totalDictDecompressedBytes += bytesin;
+        this.stats.timeDictPagesDecompressed.addAndGet(time);
+        this.stats.numDictPagesDecompressed.incrementAndGet();
+        this.stats.totalDictDecompressedBytes.addAndGet(bytesin);
       }
     }
   }
