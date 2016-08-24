@@ -20,6 +20,9 @@ package org.apache.drill.exec.store.parquet.columnreaders;
 import io.netty.buffer.DrillBuf;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
@@ -77,6 +80,7 @@ public abstract class ColumnReader<V extends ValueVector> {
 
   // variables for a single read pass
   long readStartInBytes = 0, readLength = 0, readLengthInBits = 0, recordsReadInThisIteration = 0;
+  private ExecutorService threadPool;
 
   protected ColumnReader(ParquetRecordReader parentReader, int allocateSize, ColumnDescriptor descriptor,
       ColumnChunkMetaData columnChunkMetaData, boolean fixedLength, V v, SchemaElement schemaElement) throws ExecutionSetupException {
@@ -105,12 +109,20 @@ public abstract class ColumnReader<V extends ValueVector> {
         dataTypeLengthInBits = ParquetRecordReader.getTypeLengthInBits(columnDescriptor.getType());
       }
     }
-
+    if(threadPool == null) {
+      threadPool = parentReader.getOperatorContext().getScanDecodeExecutor();
+    }
   }
 
   public int getRecordsReadInCurrentPass() {
     return valuesReadInCurrentPass;
   }
+
+  public Future<Long> processPagesAsync(long recordsToReadInThisPass){
+    Future<Long> r = threadPool.submit(new ColumnReaderTask(recordsToReadInThisPass));
+    return r;
+  }
+
 
   public void processPages(long recordsToReadInThisPass) throws IOException {
     reset();
@@ -256,6 +268,28 @@ public abstract class ColumnReader<V extends ValueVector> {
     int ch2 = in.getByte(offset + 2) & 0xff;
     int ch1 = in.getByte(offset + 3) & 0xff;
     return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
+  }
+
+  private class ColumnReaderTask implements Callable<Long> {
+
+    private final ColumnReader parent = ColumnReader.this;
+
+    private final long recordsToReadInThisPass;
+    public ColumnReaderTask(long recordsToReadInThisPass){
+      this.recordsToReadInThisPass = recordsToReadInThisPass;
+    }
+
+    @Override public Long call() throws IOException{
+
+      String oldname = Thread.currentThread().getName();
+      Thread.currentThread().setName("Decode-"+this.parent.columnChunkMetaData.toString());
+
+      this.parent.processPages(recordsToReadInThisPass);
+
+      Thread.currentThread().setName(oldname);
+      return recordsToReadInThisPass;
+    }
+
   }
 
 }
