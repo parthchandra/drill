@@ -25,7 +25,9 @@ import java.io.File;
 import java.io.FileWriter;
 import java.math.BigDecimal;
 import java.sql.Date;
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,13 +38,12 @@ import org.apache.drill.common.util.DrillVersionInfo;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.fn.interp.TestConstantFolding;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.store.parquet.ParquetRecordWriter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.parquet.format.converter.ParquetMetadataConverter;
-import org.apache.parquet.format.converter.ParquetMetadataConverter.MetadataFilter;
+import org.apache.log4j.Level;
+import org.apache.parquet.Log;
 import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.joda.time.DateTime;
@@ -53,9 +54,18 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+@RunWith(Parameterized.class)
 public class TestParquetWriter extends BaseTestQuery {
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestParquetWriter.class);
+
+  @Parameterized.Parameters
+  public static Collection<Object[]> data() {
+    return Arrays.asList(new Object[][] { {100} });
+  }
 
   @Rule
   public TemporaryFolder folder = new TemporaryFolder();
@@ -103,6 +113,9 @@ public class TestParquetWriter extends BaseTestQuery {
 
 
   private String allTypesTable = "cp.`/parquet/alltypes.json`";
+
+  @Parameterized.Parameter
+  public int repeat = 1;
 
   @BeforeClass
   public static void initFs() throws Exception {
@@ -358,7 +371,7 @@ public class TestParquetWriter extends BaseTestQuery {
     runTestAndValidate("*", "*", inputTable, "nullable_test");
   }
 
-  @Ignore("Binary file too large for version control, TODO - make available on S3 bucket or similar service")
+  @Ignore("Test file not available")
   @Test
   public void testBitError_Drill_2031() throws Exception {
     compareParquetReadersHyperVector("*", "dfs.`/tmp/wide2/0_0_3.parquet`");
@@ -370,8 +383,7 @@ public class TestParquetWriter extends BaseTestQuery {
         "cast(salary as decimal(24,2)) as decimal24, cast(salary as decimal(38,2)) as decimal38";
     String validateSelection = "decimal8, decimal15, decimal24, decimal38";
     String inputTable = "cp.`employee.json`";
-    runTestAndValidate(selection, validateSelection, inputTable,
-        "parquet_decimal");
+    runTestAndValidate(selection, validateSelection, inputTable, "parquet_decimal");
   }
 
   @Test
@@ -438,17 +450,13 @@ public class TestParquetWriter extends BaseTestQuery {
       testBuilder()
         .ordered()
         .sqlQuery(query)
-        .optionSettingQueriesForTestQuery(
-            "alter system set `store.parquet.use_new_reader` = false")
+        .optionSettingQueriesForTestQuery("alter system set `store.parquet.use_new_reader` = false")
         .sqlBaselineQuery(query)
-        .optionSettingQueriesForBaseline(
-            "alter system set `store.parquet.use_new_reader` = true")
+        .optionSettingQueriesForBaseline("alter system set `store.parquet.use_new_reader` = true")
         .build().run();
     } finally {
-      test("alter system set `%s` = %b",
-          ExecConstants.PARQUET_NEW_RECORD_READER,
-          ExecConstants.PARQUET_RECORD_READER_IMPLEMENTATION_VALIDATOR
-              .getDefault().bool_val);
+      test("alter system set `%s` = %b", ExecConstants.PARQUET_NEW_RECORD_READER,
+          ExecConstants.PARQUET_RECORD_READER_IMPLEMENTATION_VALIDATOR.getDefault().bool_val);
     }
   }
 
@@ -474,47 +482,44 @@ public class TestParquetWriter extends BaseTestQuery {
     }
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void testReadVoter() throws Exception {
     compareParquetReadersHyperVector("*", "dfs.`/tmp/voter.parquet`");
   }
 
-  @Ignore
+  @Ignore("Test file not available")
   @Test
   public void testReadSf_100_supplier() throws Exception {
     compareParquetReadersHyperVector("*", "dfs.`/tmp/sf100_supplier.parquet`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void testParquetRead_checkNulls_NullsFirst() throws Exception {
     compareParquetReadersColumnar("*",
         "dfs.`/tmp/parquet_with_nulls_should_sum_100000_nulls_first.parquet`");
   }
 
-  @Ignore
+  @Ignore("Test file not available")
   @Test
   public void testParquetRead_checkNulls() throws Exception {
-    compareParquetReadersColumnar("*",
-        "dfs.`/tmp/parquet_with_nulls_should_sum_100000.parquet`");
+    compareParquetReadersColumnar("*", "dfs.`/tmp/parquet_with_nulls_should_sum_100000.parquet`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void test958_sql() throws Exception {
-    compareParquetReadersHyperVector("ss_ext_sales_price",
-        "dfs.`/tmp/store_sales`");
+    compareParquetReadersHyperVector("ss_ext_sales_price", "dfs.`/tmp/store_sales`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void testReadSf_1_supplier() throws Exception {
-    compareParquetReadersHyperVector("*",
-        "dfs.`/tmp/orders_part-m-00001.parquet`");
+    compareParquetReadersHyperVector("*", "dfs.`/tmp/orders_part-m-00001.parquet`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void test958_sql_all_columns() throws Exception {
     compareParquetReadersHyperVector("*", "dfs.`/tmp/store_sales`");
@@ -525,13 +530,13 @@ public class TestParquetWriter extends BaseTestQuery {
 //        "dfs.`/tmp/store_sales`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void testDrill_1314() throws Exception {
     compareParquetReadersColumnar("l_partkey ", "dfs.`/tmp/drill_1314.parquet`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void testDrill_1314_all_columns() throws Exception {
     compareParquetReadersHyperVector("*", "dfs.`/tmp/drill_1314.parquet`");
@@ -540,19 +545,19 @@ public class TestParquetWriter extends BaseTestQuery {
         "dfs.`/tmp/drill_1314.parquet`");
   }
 
-  @Ignore
+  @Ignore("Test file not available")
   @Test
   public void testParquetRead_checkShortNullLists() throws Exception {
     compareParquetReadersColumnar("*", "dfs.`/tmp/short_null_lists.parquet`");
   }
 
-  @Ignore
+  @Ignore("Test file not available")
   @Test
   public void testParquetRead_checkStartWithNull() throws Exception {
     compareParquetReadersColumnar("*", "dfs.`/tmp/start_with_null.parquet`");
   }
 
-  @Ignore
+  @Ignore("Binary file too large for version control")
   @Test
   public void testParquetReadWebReturns() throws Exception {
     compareParquetReadersColumnar("wr_returning_customer_sk", "dfs.`/tmp/web_returns`");
@@ -775,14 +780,15 @@ public class TestParquetWriter extends BaseTestQuery {
   */
   @Test
   public void testHiveParquetTimestampAsInt96_compare() throws Exception {
-    compareParquetReadersColumnar("convert_from(timestamp_field, 'TIMESTAMP_IMPALA')", "cp.`parquet/part1/hive_all_types.parquet`");
+    compareParquetReadersColumnar("convert_from(timestamp_field, 'TIMESTAMP_IMPALA')",
+        "cp.`parquet/part1/hive_all_types.parquet`");
   }
 
   /*
   Test the conversion from int96 to impala timestamp with hive data including nulls. Validate against expected values
   */
   @Test
-  @Ignore("relies on particular time zone")
+  //@Ignore("relies on particular time zone")
   public void testHiveParquetTimestampAsInt96_basic() throws Exception {
     final String q = "SELECT cast(convert_from(timestamp_field, 'TIMESTAMP_IMPALA') as varchar(19))  as timestamp_field "
             + "from cp.`parquet/part1/hive_all_types.parquet` ";
@@ -857,6 +863,41 @@ public class TestParquetWriter extends BaseTestQuery {
     compareParquetReadersColumnar(
         "c_varchar, c_integer, c_bigint, c_float, c_double, c_date, c_time, c_timestamp, c_boolean",
         "cp.`parquet/last_page_one_null.parquet`");
+  }
+
+  @Test
+  public void testTPCHReadWriteRunRepeated() throws Exception {
+    for (int i = 1; i <= repeat; i++) {
+      if(i%100 == 0) {
+        System.out.println("\n\n Iteration : "+i +"\n");
+      }
+      testTPCHReadWriteGzip();
+      testTPCHReadWriteSnappy();
+    }
+  }
+
+  @Test
+  public void testTPCHReadWriteGzip() throws Exception {
+    try {
+      test(String.format("alter session set `%s` = 'gzip'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE));
+      String inputTable = "cp.`tpch/supplier.parquet`";
+//      runTestAndValidate("s_suppkey, s_nationkey, s_acctbal", "s_suppkey, s_nationkey, s_acctbal", inputTable, "suppkey_parquet_dict_gzip");
+        runTestAndValidate("*", "*", inputTable, "suppkey_parquet_dict_gzip");
+    } finally {
+      test(String.format("alter session set `%s` = '%s'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE, ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE_VALIDATOR.getDefault().string_val));
+    }
+  }
+
+  @Test
+  public void testTPCHReadWriteSnappy() throws Exception {
+    try {
+      test(String.format("alter session set `%s` = 'snappy'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE));
+      String inputTable = "cp.`supplier_snappy.parquet`";
+      //      runTestAndValidate("s_suppkey, s_nationkey, s_acctbal", "s_suppkey, s_nationkey, s_acctbal", inputTable, "suppkey_parquet_dict_gzip");
+      runTestAndValidate("*", "*", inputTable, "suppkey_parquet_dict_snappy");
+    } finally {
+      test(String.format("alter session set `%s` = '%s'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE, ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE_VALIDATOR.getDefault().string_val));
+    }
   }
 
 }
