@@ -125,4 +125,8 @@ public class HashJoinPrel  extends JoinPrel {
     return this.swapped;
   }
 
+  public boolean isRowKeyJoin() {
+    return scanForRowKeyJoin != null;
+  }
+
 }
