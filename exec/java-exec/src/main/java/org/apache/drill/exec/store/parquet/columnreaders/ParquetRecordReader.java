@@ -444,9 +444,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
     for(Future f: futures){
       try {
         f.get();
-      } catch (InterruptedException e) {
-        handleAndRaise(null, e);
-      } catch (ExecutionException e) {
+      } catch (Exception e) {
+        f.cancel(true);
         handleAndRaise(null, e);
       }
     }
