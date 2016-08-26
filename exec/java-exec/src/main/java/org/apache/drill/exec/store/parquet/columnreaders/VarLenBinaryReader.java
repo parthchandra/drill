@@ -17,19 +17,27 @@
  */
 package org.apache.drill.exec.store.parquet.columnreaders;
 
+import com.google.common.collect.Lists;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.vector.ValueVector;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 
 public class VarLenBinaryReader {
 
   ParquetRecordReader parentReader;
   final List<VarLengthColumn<? extends ValueVector>> columns;
+  final boolean useAsyncTasks;
 
   public VarLenBinaryReader(ParquetRecordReader parentReader, List<VarLengthColumn<? extends ValueVector>> columns) {
     this.parentReader = parentReader;
     this.columns = columns;
+    useAsyncTasks = parentReader.getFragmentContext().getOptions()
+        .getOption(ExecConstants.PARQUET_COLUMNREADER_ASYNC).bool_val;
   }
 
   /**
@@ -73,13 +81,45 @@ public class VarLenBinaryReader {
       totalVariableLengthData += lengthVarFieldsInCurrentRecord;
     } while (recordsReadInCurrentPass < recordsToReadInThisPass);
 
+    if(useAsyncTasks){
+      readRecordsParallel(recordsReadInCurrentPass);
+    }else{
+      readRecordsSerial(recordsReadInCurrentPass);
+    }
+    return recordsReadInCurrentPass;
+  }
+
+  private void readRecordsSerial(long recordsReadInCurrentPass) {
     for (VarLengthColumn<?> columnReader : columns) {
       columnReader.readRecords(columnReader.pageReader.valuesReadyToRead);
     }
     for (VarLengthColumn<?> columnReader : columns) {
-      columnReader.valueVec.getMutator().setValueCount((int) recordsReadInCurrentPass);
+      columnReader.valueVec.getMutator().setValueCount((int)recordsReadInCurrentPass);
     }
-    return recordsReadInCurrentPass;
+  }
+
+  private void readRecordsParallel(long recordsReadInCurrentPass){
+    ArrayList<Future<Integer>> futures = Lists.newArrayList();
+    for (VarLengthColumn<?> columnReader : columns) {
+      Future<Integer> f = columnReader.readRecordsAsync(columnReader.pageReader.valuesReadyToRead);
+      futures.add(f);
+    }
+    for (Future f : futures) {
+      try {
+        f.get();
+      } catch (Exception e) {
+        f.cancel(true);
+        handleAndRaise(null, e);
+      }
+    }
+    for (VarLengthColumn<?> columnReader : columns) {
+      columnReader.valueVec.getMutator().setValueCount((int)recordsReadInCurrentPass);
+    }
+  }
+
+  protected void handleAndRaise(String s, Exception e) {
+    String message = "Error in parquet record reader.\nMessage: " + s;
+    throw new DrillRuntimeException(message, e);
   }
 
 }
