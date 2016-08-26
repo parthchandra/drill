@@ -19,8 +19,12 @@ package org.apache.drill.exec.store.parquet.columnreaders;
 
 import com.google.common.base.Stopwatch;
 import io.netty.buffer.DrillBuf;
+import io.netty.buffer.ByteBufUtil;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
+import org.apache.hadoop.io.compress.Decompressor;
+import org.apache.hadoop.io.compress.GzipCodec;
+import org.apache.parquet.hadoop.CodecFactory;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.drill.exec.util.filereader.DirectBufInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -30,8 +34,8 @@ import org.apache.parquet.format.PageHeader;
 import org.apache.parquet.format.PageType;
 import org.apache.parquet.format.Util;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
-
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -152,9 +156,38 @@ class AsyncPageReader extends PageReader {
     pageDataBuf = allocateTemporaryBuffer(uncompressedSize);
     try {
       timer.start();
-      codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData.getCodec())
-          .decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
-              pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
+      logger.trace("Decompress (1)==> Col: {}  readPos: {}  compressed_size: {}  compressedPageData: {}",
+          parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
+          pageHeader.getCompressed_page_size(), ByteBufUtil.hexDump(compressedData));
+      CompressionCodecName codecName = parentColumnReader.columnChunkMetaData.getCodec();
+      // GZip != thread_safe, so we go off and do our own thing.
+      // The hadoop interface does not support ByteBuffer so we incur some
+      // expensive copying.
+      if (codecName == CompressionCodecName.GZIP) {
+        GzipCodec codec = new GzipCodec();
+        Decompressor decompressor = codec.createDecompressor();
+        decompressor.reset();
+        ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
+        ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
+        byte[] inputBytes = new byte[compressedSize];
+        input.position(0);
+        input.get(inputBytes);
+        decompressor.setInput(inputBytes, 0, inputBytes.length);
+        byte[] outputBytes = new byte[uncompressedSize];
+        decompressor.decompress(outputBytes, 0, uncompressedSize);
+        output.clear();
+        output.put(outputBytes);
+      } else {
+        CodecFactory.BytesDecompressor decompressor =
+            codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData.getCodec());
+        decompressor.decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
+            pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
+      }
+      pageDataBuf.writerIndex(uncompressedSize);
+      logger.trace(
+          "Decompress (2)==> Col: {}  readPos: {}  uncompressed_size: {}  uncompressedPageData: {}",
+          parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
+          pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageDataBuf));
       timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
       this.updateStats(pageHeader, "Decompress", 0, timeToRead, compressedSize, uncompressedSize);
     } catch (IOException e) {
@@ -204,6 +237,12 @@ class AsyncPageReader extends PageReader {
 
     pageHeader = readStatus.getPageHeader();
     pageData = getDecompressedPageData(readStatus);
+    logger.trace("AsyncPageReader: Col: {}  pageData: {}", this.parentColumnReader.columnChunkMetaData.toString(),
+        ByteBufUtil.hexDump(pageData));
+    logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  Uncompressed_size: {}  pageData: {}", parentColumnReader.columnChunkMetaData.toString(),
+        dataReader.getPos(),
+        pageHeader.getUncompressed_page_size(),
+        ByteBufUtil.hexDump(pageData));
 
   }
 
@@ -324,6 +363,10 @@ class AsyncPageReader extends PageReader {
         throw e;
       }
       Thread.currentThread().setName(oldname);
+      logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  bytesRead: {}  pageData: {}", parent.parentColumnReader.columnChunkMetaData.toString(),
+          parent.dataReader.getPos(),
+          bytesRead,
+          ByteBufUtil.hexDump(pageData));
       return readStatus;
     }
 

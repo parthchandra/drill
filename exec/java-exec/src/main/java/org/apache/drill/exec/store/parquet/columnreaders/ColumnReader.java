@@ -123,7 +123,6 @@ public abstract class ColumnReader<V extends ValueVector> {
     return r;
   }
 
-
   public void processPages(long recordsToReadInThisPass) throws IOException {
     reset();
     if(recordsToReadInThisPass>0) {
@@ -132,6 +131,7 @@ public abstract class ColumnReader<V extends ValueVector> {
 
       } while (valuesReadInCurrentPass < recordsToReadInThisPass && pageReader.hasPage());
     }
+    logger.trace("Column Reader: {} - Values read in this pass: {} - ", this.getColumnDescriptor().toString(), valuesReadInCurrentPass);
     valueVec.getMutator().setValueCount(valuesReadInCurrentPass);
   }
 
@@ -273,8 +273,8 @@ public abstract class ColumnReader<V extends ValueVector> {
   private class ColumnReaderTask implements Callable<Long> {
 
     private final ColumnReader parent = ColumnReader.this;
-
     private final long recordsToReadInThisPass;
+
     public ColumnReaderTask(long recordsToReadInThisPass){
       this.recordsToReadInThisPass = recordsToReadInThisPass;
     }
