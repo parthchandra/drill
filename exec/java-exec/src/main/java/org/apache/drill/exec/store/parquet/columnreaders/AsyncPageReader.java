@@ -25,6 +25,7 @@ import org.apache.drill.common.exceptions.UserException;
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.GzipCodec;
 import org.apache.parquet.hadoop.CodecFactory;
+import org.apache.parquet.hadoop.codec.SnappyCodec;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.drill.exec.util.filereader.DirectBufInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -34,6 +35,8 @@ import org.apache.parquet.format.PageHeader;
 import org.apache.parquet.format.PageType;
 import org.apache.parquet.format.Util;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.xerial.snappy.Snappy;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
@@ -177,6 +180,16 @@ class AsyncPageReader extends PageReader {
         decompressor.decompress(outputBytes, 0, uncompressedSize);
         output.clear();
         output.put(outputBytes);
+      } else if ( codecName == CompressionCodecName.SNAPPY) {
+        SnappyCodec codec = new SnappyCodec();
+        Decompressor decompressor = codec.createDecompressor();
+        decompressor.reset();
+        ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
+        ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
+        //public void decompress(ByteBuffer src, int compressedSize, ByteBuffer dst, int uncompressedSize) throws IOException {
+          output.clear();
+          int size = Snappy.uncompress(input, output);
+          output.limit(size);
       } else {
         CodecFactory.BytesDecompressor decompressor =
             codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData.getCodec());
@@ -188,7 +201,7 @@ class AsyncPageReader extends PageReader {
           "Decompress (2)==> Col: {}  readPos: {}  uncompressed_size: {}  uncompressedPageData: {}",
           parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
           pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageDataBuf));
-      timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+      timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       this.updateStats(pageHeader, "Decompress", 0, timeToRead, compressedSize, uncompressedSize);
     } catch (IOException e) {
       handleAndThrowException(e, "Error decompressing data.");
