@@ -163,12 +163,14 @@ public abstract class ColumnReader<V extends ValueVector> {
 
   protected abstract void readField(long recordsToRead);
 
+  /*
   public Future<Boolean> determineSizeAsync(long recordsReadInCurrentPass,
       Integer lengthVarFieldsInCurrentRecord) throws IOException {
     Future<Boolean> r = threadPool.submit(
         new ColumnReaderDetermineSizeTask(recordsReadInCurrentPass, lengthVarFieldsInCurrentRecord));
     return r;
   }
+  */
 
   /**
    * Determines the size of a single value in a variable column.
@@ -176,7 +178,7 @@ public abstract class ColumnReader<V extends ValueVector> {
    * Return value indicates if we have finished a row group and should stop reading
    *
    * @param recordsReadInCurrentPass
-   * @param lengthVarFieldsInCurrentRecord
+   * @ param lengthVarFieldsInCurrentRecord
    * @return - true if we should stop reading
    * @throws IOException
    */
@@ -192,7 +194,8 @@ public abstract class ColumnReader<V extends ValueVector> {
       return true;
     }
 
-    lengthVarFieldsInCurrentRecord += dataTypeLengthInBits;
+    //lengthVarFieldsInCurrentRecord += dataTypeLengthInBits;
+    lengthVarFieldsInCurrentRecord = -1;
 
     doneReading = checkVectorCapacityReached();
     if (doneReading) {
@@ -234,6 +237,15 @@ public abstract class ColumnReader<V extends ValueVector> {
 
   public int capacity() {
     return (int) (valueVec.getValueCapacity() * dataTypeLengthInBits / 8.0);
+  }
+
+  public Future<Boolean> readPageAsync() {
+    Future<Boolean> f = threadPool.submit(new Callable<Boolean>() {
+      @Override public Boolean call() throws Exception {
+        return new Boolean(readPage());
+      }
+    });
+    return f;
   }
 
   // Read a page if we need more data, returns true if we need to exit the read loop
@@ -305,6 +317,7 @@ public abstract class ColumnReader<V extends ValueVector> {
 
   }
 
+  /*
   private class ColumnReaderDetermineSizeTask implements Callable<Boolean> {
 
     private final ColumnReader parent = ColumnReader.this;
@@ -328,6 +341,7 @@ public abstract class ColumnReader<V extends ValueVector> {
     }
 
   }
+  */
 
   private class ColumnReaderReadRecordsTask implements Callable<Integer> {
 
