@@ -159,9 +159,11 @@ class AsyncPageReader extends PageReader {
     pageDataBuf = allocateTemporaryBuffer(uncompressedSize);
     try {
       timer.start();
-      logger.trace("Decompress (1)==> Col: {}  readPos: {}  compressed_size: {}  compressedPageData: {}",
-          parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
-          pageHeader.getCompressed_page_size(), ByteBufUtil.hexDump(compressedData));
+      if (logger.isTraceEnabled()) {
+        logger.trace("Decompress (1)==> Col: {}  readPos: {}  compressed_size: {}  compressedPageData: {}",
+            parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
+            pageHeader.getCompressed_page_size(), ByteBufUtil.hexDump(compressedData));
+      }
       CompressionCodecName codecName = parentColumnReader.columnChunkMetaData.getCodec();
       // GZip != thread_safe, so we go off and do our own thing.
       // The hadoop interface does not support ByteBuffer so we incur some
@@ -181,9 +183,9 @@ class AsyncPageReader extends PageReader {
         output.clear();
         output.put(outputBytes);
       } else if ( codecName == CompressionCodecName.SNAPPY) {
-        SnappyCodec codec = new SnappyCodec();
-        Decompressor decompressor = codec.createDecompressor();
-        decompressor.reset();
+        //SnappyCodec codec = new SnappyCodec();
+        //Decompressor decompressor = codec.createDecompressor();
+        //decompressor.reset();
         ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
         ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
         //public void decompress(ByteBuffer src, int compressedSize, ByteBuffer dst, int uncompressedSize) throws IOException {
@@ -197,10 +199,12 @@ class AsyncPageReader extends PageReader {
             pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
       }
       pageDataBuf.writerIndex(uncompressedSize);
-      logger.trace(
-          "Decompress (2)==> Col: {}  readPos: {}  uncompressed_size: {}  uncompressedPageData: {}",
-          parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
-          pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageDataBuf));
+      if (logger.isTraceEnabled()) {
+        logger.trace(
+            "Decompress (2)==> Col: {}  readPos: {}  uncompressed_size: {}  uncompressedPageData: {}",
+            parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
+            pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageDataBuf));
+      }
       timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       this.updateStats(pageHeader, "Decompress", 0, timeToRead, compressedSize, uncompressedSize);
     } catch (IOException e) {
@@ -250,12 +254,13 @@ class AsyncPageReader extends PageReader {
 
     pageHeader = readStatus.getPageHeader();
     pageData = getDecompressedPageData(readStatus);
-    logger.trace("AsyncPageReader: Col: {}  pageData: {}", this.parentColumnReader.columnChunkMetaData.toString(),
-        ByteBufUtil.hexDump(pageData));
-    logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  Uncompressed_size: {}  pageData: {}", parentColumnReader.columnChunkMetaData.toString(),
-        dataReader.getPos(),
-        pageHeader.getUncompressed_page_size(),
-        ByteBufUtil.hexDump(pageData));
+    if (logger.isTraceEnabled()) {
+      logger.trace("AsyncPageReader: Col: {}  pageData: {}",
+          this.parentColumnReader.columnChunkMetaData.toString(), ByteBufUtil.hexDump(pageData));
+      logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  Uncompressed_size: {}  pageData: {}",
+          parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
+          pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageData));
+    }
 
   }
 
@@ -376,10 +381,10 @@ class AsyncPageReader extends PageReader {
         throw e;
       }
       Thread.currentThread().setName(oldname);
-      logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  bytesRead: {}  pageData: {}", parent.parentColumnReader.columnChunkMetaData.toString(),
-          parent.dataReader.getPos(),
-          bytesRead,
-          ByteBufUtil.hexDump(pageData));
+      if(logger.isTraceEnabled()) {
+        logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  bytesRead: {}  pageData: {}", parent.parentColumnReader.columnChunkMetaData.toString(),
+            parent.dataReader.getPos(), bytesRead, ByteBufUtil.hexDump(pageData));
+      }
       return readStatus;
     }
 
