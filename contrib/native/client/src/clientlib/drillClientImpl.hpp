@@ -98,6 +98,9 @@ class DrillClientImplBase{
 
         virtual void freeQueryResources(DrillClientQueryResult* pQryResult)=0;
 
+        virtual Metadata* getMetadata() = 0;
+
+        virtual void freeMetadata(Metadata** metadata) = 0;
 };
 
 class DrillClientQueryResult{
@@ -306,6 +309,10 @@ class DrillClientImpl : public DrillClientImplBase{
             // Doesn't need to do anything
             return;
         };
+        
+        Metadata* getMetadata();
+
+        void freeMetadata(Metadata** metadata);
 
     private:
         friend class DrillClientQueryResult;
@@ -491,6 +498,10 @@ class PooledDrillClientImpl : public DrillClientImplBase{
         void freeQueryResources(DrillClientQueryResult* pQryResult);
 
         int getDrillbitCount(){ return m_drillbits.size();};
+        
+        Metadata* getMetadata();
+
+        void freeMetadata(Metadata** metadata);
 
     private:
         

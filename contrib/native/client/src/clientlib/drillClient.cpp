@@ -435,9 +435,10 @@ void DrillClient::freeRecordBatch(RecordBatch* pRecordBatch){
 }
 
 Metadata* DrillClient::getMetadata() {
-    return NULL;
+    return this->m_pImpl->getMetadata();
 }
 
-void DrillClient::freeMetadata(Metadata**) {
+void DrillClient::freeMetadata(Metadata** metadata) {
+    this->m_pImpl->freeMetadata(metadata);
 }
 } // namespace Drill

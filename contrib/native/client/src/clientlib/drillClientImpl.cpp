@@ -39,6 +39,7 @@
 #include "drillClientImpl.hpp"
 #include "errmsgs.hpp"
 #include "logger.hpp"
+#include "metadata.hpp"
 #include "rpcEncoder.hpp"
 #include "rpcDecoder.hpp"
 #include "rpcMessage.hpp"
@@ -1194,6 +1195,15 @@ void DrillClientImpl::shutdownSocket(){
     DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Socket shutdown" << std::endl;)
 }
 
+Metadata* DrillClientImpl::getMetadata() {
+    return new meta::BasicMetadata;
+}
+
+void DrillClientImpl::freeMetadata(Metadata** metadata) {
+    delete *metadata;
+    metadata = NULL;
+}
+
 // This COPIES the FieldMetadata definition for the record batch.  ColumnDefs held by this
 // class are used by the async callbacks.
 status_t DrillClientQueryResult::setupColumnDefs(exec::shared::QueryData* pQueryData) {
@@ -1511,6 +1521,15 @@ void PooledDrillClientImpl::freeQueryResources(DrillClientQueryResult* pQryResul
     // to implement this call to free any query specific resources the pool might have 
     // allocated
     return;
+}
+
+Metadata* PooledDrillClientImpl::getMetadata() {
+    return new meta::BasicMetadata;
+}
+
+void PooledDrillClientImpl::freeMetadata(Metadata** metadata) {
+    delete *metadata;
+    metadata = NULL;
 }
 
 bool PooledDrillClientImpl::Active(){

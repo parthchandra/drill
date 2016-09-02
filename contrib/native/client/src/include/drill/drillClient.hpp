@@ -244,32 +244,26 @@ namespace meta {
   inline T
   operator&(T __a, T __b)
   { return T(static_cast<int>(__a) & static_cast<int>(__b)); }
-
   template<typename T>
   inline T
   operator|(T __a, T __b)
   { return T(static_cast<int>(__a) | static_cast<int>(__b)); }
-
   template<typename T>
   inline T
   operator^(T __a, T __b)
   { return T(static_cast<int>(__a) ^ static_cast<int>(__b)); }
-
   template<typename T>
   inline T&
   operator|=(T& __a, T __b)
   { return __a = __a | __b; }
-
   template<typename T>
   inline T&
   operator&=(T& __a, T __b)
   { return __a = __a & __b; }
-
   template<typename T>
   inline T&
   operator^=(T& __a, T __b)
   { return __a = __a ^ __b; }
-
   template<typename T>
   inline T
   operator~(T __a)
@@ -835,7 +829,6 @@ class DECLSPEC_DRILL_CLIENT Metadata {
     virtual status_t getColumns(const std::string& catalogPattern, const std::string& schemaPattern, const std:: string& tablePattern, const std::string& columnPattern, pfnColumnMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) = 0;
 
     // Capabilities
-
     /**
      * Return if the current user can use all tables returned by the getTables method
      *
