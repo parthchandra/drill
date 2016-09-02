@@ -876,6 +876,7 @@ public class TestParquetWriter extends BaseTestQuery {
     }
   }
 
+  @Test
   public void testTPCHReadWriteGzip() throws Exception {
     try {
       test(String.format("alter session set `%s` = 'gzip'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE));
@@ -887,6 +888,7 @@ public class TestParquetWriter extends BaseTestQuery {
     }
   }
 
+  @Test
   public void testTPCHReadWriteSnappy() throws Exception {
     try {
       test(String.format("alter session set `%s` = 'snappy'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE));

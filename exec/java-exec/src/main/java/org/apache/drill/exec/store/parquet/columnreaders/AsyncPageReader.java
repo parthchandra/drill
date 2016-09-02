@@ -23,6 +23,7 @@ import io.netty.buffer.ByteBufUtil;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.hadoop.io.compress.Decompressor;
+import org.apache.hadoop.io.compress.DirectDecompressor;
 import org.apache.hadoop.io.compress.GzipCodec;
 import org.apache.parquet.hadoop.CodecFactory;
 import org.apache.parquet.hadoop.codec.SnappyCodec;
@@ -165,39 +166,10 @@ class AsyncPageReader extends PageReader {
             pageHeader.getCompressed_page_size(), ByteBufUtil.hexDump(compressedData));
       }
       CompressionCodecName codecName = parentColumnReader.columnChunkMetaData.getCodec();
-      // GZip != thread_safe, so we go off and do our own thing.
-      // The hadoop interface does not support ByteBuffer so we incur some
-      // expensive copying.
-      if (codecName == CompressionCodecName.GZIP) {
-        GzipCodec codec = new GzipCodec();
-        Decompressor decompressor = codec.createDecompressor();
-        decompressor.reset();
-        ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
-        ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
-        byte[] inputBytes = new byte[compressedSize];
-        input.position(0);
-        input.get(inputBytes);
-        decompressor.setInput(inputBytes, 0, inputBytes.length);
-        byte[] outputBytes = new byte[uncompressedSize];
-        decompressor.decompress(outputBytes, 0, uncompressedSize);
-        output.clear();
-        output.put(outputBytes);
-      } else if ( codecName == CompressionCodecName.SNAPPY) {
-        //SnappyCodec codec = new SnappyCodec();
-        //Decompressor decompressor = codec.createDecompressor();
-        //decompressor.reset();
-        ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
-        ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
-        //public void decompress(ByteBuffer src, int compressedSize, ByteBuffer dst, int uncompressedSize) throws IOException {
-          output.clear();
-          int size = Snappy.uncompress(input, output);
-          output.limit(size);
-      } else {
-        CodecFactory.BytesDecompressor decompressor =
-            codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData.getCodec());
-        decompressor.decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
-            pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
-      }
+      ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
+      ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
+      DecompressionHelper decompressionHelper = new DecompressionHelper(codecName);
+      decompressionHelper.decompress(input, compressedSize, output, uncompressedSize);
       pageDataBuf.writerIndex(uncompressedSize);
       if (logger.isTraceEnabled()) {
         logger.trace(
@@ -387,6 +359,53 @@ class AsyncPageReader extends PageReader {
       }
       return readStatus;
     }
+
+  }
+
+  private class DecompressionHelper {
+    final CompressionCodecName codecName;
+
+    public DecompressionHelper(CompressionCodecName codecName){
+      this.codecName = codecName;
+    }
+
+    public void decompress (ByteBuffer input, int compressedSize, ByteBuffer output, int uncompressedSize)
+        throws IOException {
+      // GZip != thread_safe, so we go off and do our own thing.
+      // The hadoop interface does not support ByteBuffer so we incur some
+      // expensive copying.
+      if (codecName == CompressionCodecName.GZIP) {
+        GzipCodec codec = new GzipCodec();
+        DirectDecompressor directDecompressor = codec.createDirectDecompressor();
+        if (directDecompressor != null) {
+          logger.debug("Using GZIP direct decompressor.");
+          directDecompressor.decompress(input, output);
+        } else {
+          logger.debug("Using GZIP (in)direct decompressor.");
+          Decompressor decompressor = codec.createDecompressor();
+          decompressor.reset();
+          byte[] inputBytes = new byte[compressedSize];
+          input.position(0);
+          input.get(inputBytes);
+          decompressor.setInput(inputBytes, 0, inputBytes.length);
+          byte[] outputBytes = new byte[uncompressedSize];
+          decompressor.decompress(outputBytes, 0, uncompressedSize);
+          output.clear();
+          output.put(outputBytes);
+        }
+      } else if (codecName == CompressionCodecName.SNAPPY) {
+        // For Snappy, just call the Snappy decompressor directly.
+        // It is thread safe. The Hadoop layers though, appear to be
+        // not quite reliable in a multithreaded environment
+        output.clear();
+        int size = Snappy.uncompress(input, output);
+        output.limit(size);
+      } else {
+        CodecFactory.BytesDecompressor decompressor = codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData.getCodec());
+        decompressor.decompress(input, compressedSize, output, uncompressedSize);
+      }
+    }
+
 
   }
 
