@@ -23,12 +23,19 @@ import java.util.Map;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
 import com.google.common.collect.Maps;
+import org.apache.drill.exec.server.options.OptionList;
 
 public class PlanningSet implements Iterable<Wrapper> {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PlanningSet.class);
 
   private final Map<Fragment, Wrapper> fragmentMap = Maps.newHashMap();
   private int majorFragmentIdIndex = 0;
+
+  public Wrapper get(Fragment node, OptionList options) {
+    Wrapper wrapper = get(node);
+    wrapper.setOptions(options);
+    return wrapper;
+  }
 
   public Wrapper get(Fragment node) {
     Wrapper wrapper = fragmentMap.get(node);

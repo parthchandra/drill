@@ -123,7 +123,7 @@ public class SimpleParallelizer implements ParallelizationParameters {
       Collection<DrillbitEndpoint> activeEndpoints, PhysicalPlanReader reader, Fragment rootFragment,
       UserSession session, QueryContextInformation queryContextInfo) throws ExecutionSetupException {
 
-    final PlanningSet planningSet = getFragmentsHelper(activeEndpoints, rootFragment);
+    final PlanningSet planningSet = getFragmentsHelper(options, activeEndpoints, rootFragment);
     return generateWorkUnit(
         options, foremanNode, queryId, reader, rootFragment, planningSet, session, queryContextInfo);
   }
@@ -154,11 +154,11 @@ public class SimpleParallelizer implements ParallelizationParameters {
    * @return
    * @throws ExecutionSetupException
    */
-  protected PlanningSet getFragmentsHelper(Collection<DrillbitEndpoint> activeEndpoints, Fragment rootFragment) throws ExecutionSetupException {
+  protected PlanningSet getFragmentsHelper(OptionList options, Collection<DrillbitEndpoint> activeEndpoints, Fragment rootFragment) throws ExecutionSetupException {
 
     PlanningSet planningSet = new PlanningSet();
 
-    initFragmentWrappers(rootFragment, planningSet);
+    initFragmentWrappers(options, rootFragment, planningSet);
 
     final Set<Wrapper> leafFragments = constructFragmentDependencyGraph(planningSet);
 
@@ -168,6 +168,16 @@ public class SimpleParallelizer implements ParallelizationParameters {
     }
 
     return planningSet;
+  }
+
+  // For every fragment, create a Wrapper in PlanningSet.
+  @VisibleForTesting
+  public void initFragmentWrappers(OptionList options, Fragment rootFragment, PlanningSet planningSet) {
+    planningSet.get(rootFragment, options);
+
+    for(ExchangeFragmentPair fragmentPair : rootFragment) {
+      initFragmentWrappers(options, fragmentPair.getNode(), planningSet);
+    }
   }
 
   // For every fragment, create a Wrapper in PlanningSet.

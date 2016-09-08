@@ -40,6 +40,7 @@ import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
+import org.apache.drill.exec.server.options.OptionList;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 
 @JsonTypeName("sys")
@@ -146,7 +147,6 @@ public class SystemTableScan extends AbstractGroupScan implements SubScan {
   public DistributionAffinity getDistributionAffinity() {
     return table.isDistributed() ? DistributionAffinity.HARD : DistributionAffinity.SOFT;
   }
-
   @Override
   public GroupScan clone(List<SchemaPath> columns) {
     return this;

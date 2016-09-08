@@ -34,6 +34,8 @@ import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
+import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.physical.PhysicalOperatorSetupException;
 import org.apache.drill.exec.physical.base.AbstractFileGroupScan;
@@ -42,7 +44,9 @@ import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
+import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
+import org.apache.drill.exec.server.options.OptionList;
 import org.apache.drill.exec.store.ParquetOutputRecordWriter;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
@@ -115,6 +119,9 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
   private List<RowGroupInfo> rowGroupInfos;
   private Metadata.ParquetTableMetadataBase parquetTableMetadata = null;
   private String cacheFileRoot = null;
+
+  private Map<DrillbitEndpoint, Integer> numEndpointAssignments;
+  private Map<DrillbitEndpoint, Long> numAssignedBytes;
 
   /*
    * total number of rows (obtained from parquet footer)
@@ -198,6 +205,8 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     super(that);
     this.columns = that.columns == null ? null : Lists.newArrayList(that.columns);
     this.endpointAffinities = that.endpointAffinities == null ? null : Lists.newArrayList(that.endpointAffinities);
+    this.numAssignedBytes = that.numAssignedBytes == null ? null : new HashMap<>(that.numAssignedBytes);
+    this.numEndpointAssignments = that.numEndpointAssignments == null ? null : new HashMap<>(that.numEndpointAssignments);
     this.entries = that.entries == null ? null : Lists.newArrayList(that.entries);
     this.formatConfig = that.formatConfig;
     this.formatPlugin = that.formatPlugin;
@@ -521,6 +530,7 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
     private int rowGroupIndex;
     private String root;
     private long rowCount;  // rowCount = -1 indicates to include all rows.
+    private DrillbitEndpoint preferredEndpoint;
 
     @JsonCreator
     public RowGroupInfo(@JsonProperty("path") String path, @JsonProperty("start") long start,
@@ -722,6 +732,49 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
 
     this.endpointAffinities = AffinityCreator.getAffinityMap(rowGroupInfos);
 
+    numEndpointAssignments = Maps.newHashMap();
+    numAssignedBytes = Maps.newHashMap();
+
+    for (RowGroupInfo rowGroupInfo : rowGroupInfos) {
+      EndpointByteMap endpointByteMap = rowGroupInfo.getByteMap();
+      List<DrillbitEndpoint> topEndpoints = endpointByteMap.getTopEndpoints();
+
+      long minBytes = 0, numBytes = 0;
+      DrillbitEndpoint nodePicked = null;
+      for (DrillbitEndpoint endpoint : topEndpoints) {
+        if (nodePicked == null) {
+          nodePicked = endpoint;
+          if (numAssignedBytes.containsKey(nodePicked)) {
+            minBytes = numAssignedBytes.get(nodePicked);
+          }
+        }
+
+        if (numAssignedBytes.containsKey(endpoint)) {
+          numBytes = numAssignedBytes.get(endpoint);
+        } else {
+          numBytes = 0;
+        }
+
+        if (numBytes < minBytes) {
+          nodePicked = endpoint;
+          minBytes = numBytes;
+        }
+      }
+
+      numAssignedBytes.put(nodePicked, endpointByteMap.get(nodePicked) + minBytes);
+      rowGroupInfo.preferredEndpoint = nodePicked;
+
+      if (numEndpointAssignments.containsKey(nodePicked)) {
+        numEndpointAssignments.put(nodePicked, numEndpointAssignments.get(nodePicked) + 1);
+      } else {
+        numEndpointAssignments.put(nodePicked, 1);
+      }
+
+    }
+
+    this.numEndpointAssignments = numEndpointAssignments;
+    this.numAssignedBytes = numAssignedBytes;
+
     columnValueCounts = Maps.newHashMap();
     this.rowCount = 0;
     boolean first = true;
@@ -805,6 +858,20 @@ public class ParquetGroupScan extends AbstractFileGroupScan {
       }
     } else {
       fileStatuses.add(fileStatus);
+    }
+  }
+
+  @Override
+  public Map<DrillbitEndpoint, Integer> getNumEndpointAssignments() {
+    return this.numEndpointAssignments;
+  }
+
+  @Override
+  public DistributionAffinity getDistributionAffinity(OptionList options) {
+   if (this.formatPlugin.getContext().getOptionManager().getOption(ExecConstants.PARQUET_LOCAL_AFFINITY).bool_val) {
+      return DistributionAffinity.LOCAL;
+    } else {
+      return DistributionAffinity.SOFT;
     }
   }
 

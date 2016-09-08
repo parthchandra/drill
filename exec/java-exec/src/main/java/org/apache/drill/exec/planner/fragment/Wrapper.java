@@ -32,6 +32,7 @@ import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.drill.exec.server.options.OptionList;
 
 /**
  * A wrapping class that allows us to add additional information to each fragment node for planning purposes.
@@ -46,6 +47,7 @@ public class Wrapper {
   private boolean endpointsAssigned;
   private long initialAllocation = 0;
   private long maxAllocation = 0;
+  private OptionList sessionOptions;
 
   // List of fragments this particular fragment depends on for determining its parallelization and endpoint assignments.
   private final List<Wrapper> fragmentDependencies = Lists.newArrayList();
@@ -58,10 +60,15 @@ public class Wrapper {
     this.majorFragmentId = majorFragmentId;
     this.node = node;
     this.stats = new Stats();
+    this.sessionOptions = null;
   }
 
   public Stats getStats() {
     return stats;
+  }
+
+  public OptionList getSessionOptions() {
+    return sessionOptions;
   }
 
   public void resetAllocation() {
@@ -196,5 +203,9 @@ public class Wrapper {
    */
   public List<Wrapper> getFragmentDependencies() {
     return ImmutableList.copyOf(fragmentDependencies);
+  }
+
+  public void setOptions(OptionList options) {
+    sessionOptions = options;
   }
 }

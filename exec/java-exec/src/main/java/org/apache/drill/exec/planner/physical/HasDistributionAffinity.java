@@ -18,6 +18,7 @@
 package org.apache.drill.exec.planner.physical;
 
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
+import org.apache.drill.exec.server.options.OptionList;
 
 /**
  * Implement this interface if a Prel has distribution affinity requirements.
@@ -25,4 +26,6 @@ import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 public interface HasDistributionAffinity {
 
   DistributionAffinity getDistributionAffinity();
+
+  DistributionAffinity getDistributionAffinity(OptionList options);
 }

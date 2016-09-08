@@ -18,11 +18,15 @@
 package org.apache.drill.exec.physical.base;
 
 import java.util.List;
+import java.util.Map;
 
+import org.apache.avro.hadoop.file.SortedKeyValueFile;
 import org.apache.drill.exec.physical.EndpointAffinity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
+import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
+import org.apache.drill.exec.server.options.OptionList;
 
 /**
  * Describes a physical operator that has affinity to particular nodes. Used for assignment decisions.
@@ -35,6 +39,16 @@ public interface HasAffinity extends PhysicalOperator {
    */
   @JsonIgnore
   List<EndpointAffinity> getOperatorAffinity();
+
+  @JsonIgnore
+  Map<DrillbitEndpoint, Integer> getNumEndpointAssignments();
+
+
+  /**
+   * Get distribution affinity which describes the parallelization strategy of the operator.
+   */
+  @JsonIgnore
+  DistributionAffinity getDistributionAffinity(OptionList options);
 
   /**
    * Get distribution affinity which describes the parallelization strategy of the operator.

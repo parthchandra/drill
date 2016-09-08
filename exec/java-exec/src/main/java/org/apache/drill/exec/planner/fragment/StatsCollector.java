@@ -103,7 +103,8 @@ public class StatsCollector extends AbstractOpWrapperVisitor<Void, RuntimeExcept
     if (op instanceof HasAffinity) {
       final HasAffinity hasAffinity = (HasAffinity)op;
       stats.addEndpointAffinities(hasAffinity.getOperatorAffinity());
-      stats.setDistributionAffinity(hasAffinity.getDistributionAffinity());
+      stats.setNumEndpointAssignments(hasAffinity.getNumEndpointAssignments());
+      stats.setDistributionAffinity(hasAffinity.getDistributionAffinity(wrapper.getSessionOptions()));
     }
     stats.addCost(op.getCost());
     for (PhysicalOperator child : op) {

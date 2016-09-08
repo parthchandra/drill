@@ -21,16 +21,20 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.Lists;
 
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.Iterators;
+import org.apache.drill.exec.server.options.OptionList;
 
 public abstract class AbstractGroupScan extends AbstractBase implements GroupScan {
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractGroupScan.class);
@@ -51,6 +55,11 @@ public abstract class AbstractGroupScan extends AbstractBase implements GroupSca
   @Override
   public List<EndpointAffinity> getOperatorAffinity() {
     return Collections.emptyList();
+  }
+
+  @Override
+  public Map<DrillbitEndpoint, Integer>  getNumEndpointAssignments() {
+    return Collections.emptyMap();
   }
 
   @Override
@@ -166,5 +175,10 @@ public abstract class AbstractGroupScan extends AbstractBase implements GroupSca
   @Override
   public DistributionAffinity getDistributionAffinity() {
     return DistributionAffinity.SOFT;
+  }
+
+  @Override
+  public DistributionAffinity getDistributionAffinity(OptionList options) {
+    return getDistributionAffinity();
   }
 }

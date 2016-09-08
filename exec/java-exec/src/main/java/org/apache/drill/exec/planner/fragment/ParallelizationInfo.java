@@ -38,17 +38,30 @@ public class ParallelizationInfo {
       ParallelizationInfo.create(1, Integer.MAX_VALUE);
 
   private final Map<DrillbitEndpoint, EndpointAffinity> affinityMap;
+  private final Map<DrillbitEndpoint, Integer> numEndpointAssignments;
   private final int minWidth;
   private final int maxWidth;
 
-  private ParallelizationInfo(int minWidth, int maxWidth, Map<DrillbitEndpoint, EndpointAffinity> affinityMap) {
+  private ParallelizationInfo(int minWidth, int maxWidth, Map<DrillbitEndpoint, EndpointAffinity> affinityMap, Map<DrillbitEndpoint, Integer> numEndpointAssignments) {
     this.minWidth = minWidth;
     this.maxWidth = maxWidth;
     this.affinityMap = ImmutableMap.copyOf(affinityMap);
+    this.numEndpointAssignments = ImmutableMap.copyOf(numEndpointAssignments);
   }
 
   public static ParallelizationInfo create(int minWidth, int maxWidth) {
-    return create(minWidth, maxWidth, ImmutableList.<EndpointAffinity>of());
+    return create(minWidth, maxWidth, ImmutableList.<EndpointAffinity>of(), ImmutableMap.<DrillbitEndpoint, Integer>of());
+  }
+
+  public static ParallelizationInfo create(int minWidth, int maxWidth, List<EndpointAffinity> endpointAffinities, Map<DrillbitEndpoint, Integer> endpointAssignments) {
+    Map<DrillbitEndpoint, EndpointAffinity> affinityMap = Maps.newHashMap();
+
+    for(EndpointAffinity epAffinity : endpointAffinities) {
+      affinityMap.put(epAffinity.getEndpoint(), epAffinity);
+    }
+
+    Map<DrillbitEndpoint, Integer> numEndpointAssignments = Maps.newHashMap();
+    return new ParallelizationInfo(minWidth, maxWidth, affinityMap, numEndpointAssignments);
   }
 
   public static ParallelizationInfo create(int minWidth, int maxWidth, List<EndpointAffinity> endpointAffinities) {
@@ -58,7 +71,8 @@ public class ParallelizationInfo {
       affinityMap.put(epAffinity.getEndpoint(), epAffinity);
     }
 
-    return new ParallelizationInfo(minWidth, maxWidth, affinityMap);
+    Map<DrillbitEndpoint, Integer> numEndpointAssignments = Maps.newHashMap();
+    return new ParallelizationInfo(minWidth, maxWidth, affinityMap, numEndpointAssignments);
   }
 
   public int getMinWidth() {
@@ -73,12 +87,16 @@ public class ParallelizationInfo {
     return affinityMap;
   }
 
-  @Override
-  public String toString() {
-    return getDigest(minWidth, maxWidth, affinityMap);
+  public Map<DrillbitEndpoint, Integer> getNumEndpointAssignments() {
+    return numEndpointAssignments;
   }
 
-  private static String getDigest(int minWidth, int maxWidth, Map<DrillbitEndpoint, EndpointAffinity> affinityMap) {
+  @Override
+  public String toString() {
+    return getDigest(minWidth, maxWidth, affinityMap, numEndpointAssignments);
+  }
+
+  private static String getDigest(int minWidth, int maxWidth, Map<DrillbitEndpoint, EndpointAffinity> affinityMap,  Map<DrillbitEndpoint, Integer> numEndpointAssignments) {
     StringBuilder sb = new StringBuilder();
     sb.append(String.format("[minWidth = %d, maxWidth=%d, epAff=[", minWidth, maxWidth));
     sb.append(Joiner.on(",").join(affinityMap.values()));
@@ -94,6 +112,7 @@ public class ParallelizationInfo {
     private int minWidth = 1;
     private int maxWidth = Integer.MAX_VALUE;
     private final Map<DrillbitEndpoint, EndpointAffinity> affinityMap = Maps.newHashMap();
+    private final Map<DrillbitEndpoint, Integer> numEndpointAssignments = Maps.newHashMap();
 
     public void add(ParallelizationInfo parallelizationInfo) {
       minWidth = Math.max(minWidth, parallelizationInfo.minWidth);
@@ -137,12 +156,18 @@ public class ParallelizationInfo {
      * Get a ParallelizationInfo instance based on the current state of collected info.
      */
     public ParallelizationInfo get() {
-      return new ParallelizationInfo(minWidth, maxWidth, affinityMap);
+      return new ParallelizationInfo(minWidth, maxWidth, affinityMap, numEndpointAssignments);
+    }
+
+    public void setNumEndpointAssignments(Map<DrillbitEndpoint, Integer> EndpointAssignments) {
+      for (Map.Entry<DrillbitEndpoint, Integer> endpointAssignment: EndpointAssignments.entrySet()) {
+        numEndpointAssignments.put(endpointAssignment.getKey(), endpointAssignment.getValue());
+      }
     }
 
     @Override
     public String toString() {
-      return getDigest(minWidth, maxWidth, affinityMap);
+      return getDigest(minWidth, maxWidth, affinityMap, numEndpointAssignments);
     }
   }
 }

@@ -19,8 +19,10 @@ package org.apache.drill.exec.planner.fragment;
 
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.planner.fragment.ParallelizationInfo.ParallelizationInfoCollector;
+import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
 import java.util.List;
+import java.util.Map;
 
 public class Stats {
   private final ParallelizationInfoCollector collector = new ParallelizationInfoCollector();
@@ -51,6 +53,10 @@ public class Stats {
 
   public void addEndpointAffinities(List<EndpointAffinity> endpointAffinityList) {
     collector.addEndpointAffinities(endpointAffinityList);
+  }
+
+  public void setNumEndpointAssignments(Map<DrillbitEndpoint, Integer> numEndpointAssignments) {
+    collector.setNumEndpointAssignments(numEndpointAssignments);
   }
 
   public ParallelizationInfo getParallelizationInfo() {

@@ -81,7 +81,7 @@ public class SplittingParallelizer extends SimpleParallelizer {
       Collection<DrillbitEndpoint> activeEndpoints, PhysicalPlanReader reader, Fragment rootFragment,
       UserSession session, QueryContextInformation queryContextInfo) throws ExecutionSetupException {
 
-    final PlanningSet planningSet = getFragmentsHelper(activeEndpoints, rootFragment);
+    final PlanningSet planningSet = getFragmentsHelper(options, activeEndpoints, rootFragment);
 
     return generateWorkUnits(
         options, foremanNode, queryId, reader, rootFragment, planningSet, session, queryContextInfo);

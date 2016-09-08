@@ -34,6 +34,10 @@ import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import org.apache.drill.exec.server.options.OptionList;
+
+import java.util.Map;
+import java.util.HashMap;
 
 @JsonTypeName("screen")
 public class Screen extends AbstractStore {
@@ -50,6 +54,13 @@ public class Screen extends AbstractStore {
   @Override
   public List<EndpointAffinity> getOperatorAffinity() {
     return Collections.singletonList(new EndpointAffinity(endpoint, 1, true, /* maxWidth = */ 1));
+  }
+
+  @Override
+  public  Map<DrillbitEndpoint, Integer> getNumEndpointAssignments() {
+    Map<DrillbitEndpoint, Integer> numEndpointAssignments = new HashMap<>();
+    numEndpointAssignments.put(endpoint, 1);
+    return numEndpointAssignments;
   }
 
   @Override
@@ -106,5 +117,10 @@ public class Screen extends AbstractStore {
   @Override
   public DistributionAffinity getDistributionAffinity() {
     return DistributionAffinity.HARD;
+  }
+
+  @Override
+  public DistributionAffinity getDistributionAffinity(OptionList options) {
+    return getDistributionAffinity();
   }
 }

@@ -30,6 +30,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 
+import java.util.Map;
+import java.util.HashMap;
+
 @JsonTypeName("mock-store")
 public class MockStorePOP extends AbstractStore {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MockStorePOP.class);
@@ -46,6 +49,11 @@ public class MockStorePOP extends AbstractStore {
   @Override
   public List<EndpointAffinity> getOperatorAffinity() {
     return Collections.emptyList();
+  }
+
+  @Override
+  public  Map<DrillbitEndpoint, Integer> getNumEndpointAssignments() {
+       return new HashMap<>();
   }
 
   @Override

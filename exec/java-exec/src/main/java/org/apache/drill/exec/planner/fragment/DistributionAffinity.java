@@ -37,7 +37,13 @@ public enum DistributionAffinity {
    * Hard distribution affinity to one or more endpoints. Fragments having the operator must be scheduled on the nodes
    * with affinity.
    */
-  HARD(HardAffinityFragmentParallelizer.INSTANCE);
+  HARD(HardAffinityFragmentParallelizer.INSTANCE),
+
+  /**
+   * Local distribution affinity to one or more endpoints. Fragments having the operator must be scheduled on the nodes
+   * with affinity.
+   */
+  LOCAL(LocalAffinityFragmentParallelizer.INSTANCE);
 
   private final FragmentParallelizer fragmentParallelizer;
 
