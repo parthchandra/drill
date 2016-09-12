@@ -58,26 +58,11 @@ static std::map<exec::shared::QueryResult_QueryState, status_t> QUERYSTATE_TO_ST
     (exec::shared::QueryResult_QueryState_FAILED, QRY_FAILED)
     ;
 
-RpcEncoder DrillClientImpl::s_encoder;
-RpcDecoder DrillClientImpl::s_decoder;
+static RpcEncoder s_encoder;
+static RpcDecoder s_decoder;
 
-std::string debugPrintQid(const exec::shared::QueryId& qid){
+static std::string debugPrintQid(const exec::shared::QueryId& qid){
     return std::string("[")+boost::lexical_cast<std::string>(qid.part1()) +std::string(":") + boost::lexical_cast<std::string>(qid.part2())+std::string("] ");
-}
-
-void setSocketTimeout(boost::asio::ip::tcp::socket& socket, int32_t timeout){
-#if defined _WIN32
-    int32_t timeoutMsecs=timeout*1000;
-    setsockopt(socket.native(), SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeoutMsecs, sizeof(timeoutMsecs));
-    setsockopt(socket.native(), SOL_SOCKET, SO_SNDTIMEO, (const char*)&timeoutMsecs, sizeof(timeoutMsecs));
-#else
-    struct timeval tv;
-    tv.tv_sec  = timeout;
-    tv.tv_usec = 0;
-    int e=0;
-    e=setsockopt(socket.native(), SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    e=setsockopt(socket.native(), SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-#endif
 }
 
 connectionStatus_t DrillClientImpl::connect(const char* connStr){
@@ -142,7 +127,7 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port){
             return handleConnError(CONN_FAILURE, getMessage(ERR_CONN_FAILURE, host, port, ec.message().c_str()));
         }
 
-    }catch(std::exception e){
+    }catch(const std::exception & e){
         // Handle case when the hostname cannot be resolved. "resolve" is hard-coded in boost asio resolver.resolve
         if (!strcmp(e.what(), "resolve")) {
             return handleConnError(CONN_HOSTNAME_RESOLUTION_ERROR, getMessage(ERR_CONN_EXCEPT, e.what()));
@@ -234,7 +219,7 @@ void DrillClientImpl::Close() {
 
 
 connectionStatus_t DrillClientImpl::sendSync(OutBoundRpcMessage& msg){
-    DrillClientImpl::s_encoder.Encode(m_wbuf, msg);
+    s_encoder.Encode(m_wbuf, msg);
     boost::system::error_code ec;
     size_t s=m_socket.write_some(boost::asio::buffer(m_wbuf), ec);
     if(!ec && s!=0){
@@ -296,7 +281,7 @@ void DrillClientImpl::handleHandshake(ByteBuf_t _buf,
     if(!error){
         InBoundRpcMessage msg;
         uint32_t length = 0;
-        int bytes_read = DrillClientImpl::s_decoder.LengthDecode(m_rbuf, &length);
+        int bytes_read = s_decoder.LengthDecode(m_rbuf, &length);
         if(length>0){
             size_t leftover = LEN_PREFIX_BUFLEN - bytes_read;
             ByteBuf_t b=m_rbuf + LEN_PREFIX_BUFLEN;
@@ -311,7 +296,7 @@ void DrillClientImpl::handleHandshake(ByteBuf_t _buf,
                 bytesToRead-=dataBytesRead;
                 b+=dataBytesRead;
             }
-            DrillClientImpl::s_decoder.Decode(m_rbuf+bytes_read, length, msg);
+            s_decoder.Decode(m_rbuf+bytes_read, length, msg);
         }else{
             DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "DrillClientImpl::handleHandshake: ERR_CONN_RDFAIL. No handshake.\n";)
             handleConnError(CONN_FAILURE, getMessage(ERR_CONN_RDFAIL, "No handshake"));
@@ -592,7 +577,7 @@ status_t DrillClientImpl::readMsg(ByteBuf_t _buf,
         // We need to protect the readLength and read buffer, and the pending requests counter,
         // but we don't have to keep the lock while we decode the rest of the buffer.
         boost::lock_guard<boost::mutex> lock(this->m_dcMutex);
-        int bytes_read = DrillClientImpl::s_decoder.LengthDecode(_buf, &rmsgLen);
+        int bytes_read = s_decoder.LengthDecode(_buf, &rmsgLen);
         DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "len bytes = " << bytes_read << std::endl;)
         DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "rmsgLen = " << rmsgLen << std::endl;)
 
@@ -628,7 +613,7 @@ status_t DrillClientImpl::readMsg(ByteBuf_t _buf,
             
             if(!error){
                 // read data successfully
-                DrillClientImpl::s_decoder.Decode(currentBuffer->m_pBuffer, rmsgLen, msg);
+                s_decoder.Decode(currentBuffer->m_pBuffer, rmsgLen, msg);
                 DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Done decoding chunk. Coordination id: " <<msg.m_coord_id<< std::endl;)
             }else{
                 Utils::freeBuffer(_buf, LEN_PREFIX_BUFLEN);
@@ -1635,7 +1620,7 @@ DrillClientImpl* PooledDrillClientImpl::getOneConnection(){
 char ZookeeperImpl::s_drillRoot[]="/drill/";
 char ZookeeperImpl::s_defaultCluster[]="drillbits1";
 
-ZookeeperImpl::ZookeeperImpl(){
+ZookeeperImpl::ZookeeperImpl(): m_zh(NULL), m_state(0){
     m_pDrillbits=new String_vector;
     m_bConnecting=true;
     memset(&m_id, 0, sizeof(m_id));

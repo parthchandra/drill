@@ -106,10 +106,11 @@ class DrillClientImplBase{
 class DrillClientQueryResult{
     friend class DrillClientImpl;
     public:
-    DrillClientQueryResult(DrillClientImpl * pClient, uint64_t coordId, const std::string& query):
+    DrillClientQueryResult(DrillClientImpl * pClient, int32_t coordId, const std::string& query):
         m_pClient(pClient),
         m_coordinationId(coordId),
         m_query(query),
+		m_status(QRY_SUCCESS),
         m_numBatches(0),
         m_columnDefs(new std::vector<Drill::FieldMetadata*>),
         m_bIsQueryPending(true),
@@ -140,11 +141,11 @@ class DrillClientQueryResult{
         m_pSchemaListener=l;
     }
 
-    // Synchronous call to get data. Caller assumes ownership of the recod batch
+    // Synchronous call to get data. Caller assumes ownership of the record batch
     // returned and it is assumed to have been consumed.
     RecordBatch*  getNext();
     // Synchronous call to get a look at the next Record Batch. This
-    // call does not move the current pointer forward. Repeatied calls
+    // call does not move the current pointer forward. Repeated calls
     // to peekNext return the same value until getNext is called.
     RecordBatch*  peekNext();
     // Blocks until data is available.
@@ -194,7 +195,7 @@ class DrillClientQueryResult{
     DrillClientImpl* m_pClient;
 
     int32_t m_coordinationId;
-    const std::string& m_query;
+    std::string m_query;
 
     size_t m_numBatches; // number of record batches received so far
 
@@ -244,6 +245,7 @@ class DrillClientImpl : public DrillClientImplBase{
             m_coordinationId(1),
             m_handshakeVersion(0),
             m_handshakeStatus(exec::user::SUCCESS),
+			m_bIsDirectConnection(false),
             m_bIsConnected(false),
             m_pendingRequests(0),
             m_pError(NULL),
@@ -376,10 +378,6 @@ class DrillClientImpl : public DrillClientImplBase{
         void sendCancel(exec::shared::QueryId* pQueryId);
 
         void shutdownSocket();
-
-
-        static RpcEncoder s_encoder;
-        static RpcDecoder s_decoder;
 
         int32_t m_coordinationId;
         int32_t m_handshakeVersion;

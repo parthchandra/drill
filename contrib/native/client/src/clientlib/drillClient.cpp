@@ -426,7 +426,7 @@ void DrillClient::registerSchemaChangeListener(QueryHandle_t* handle, pfnSchemaL
 }
 
 void DrillClient::freeQueryResources(QueryHandle_t* handle){
-    delete (DrillClientQueryResult*)(*handle);
+	this->m_pImpl->freeQueryResources((DrillClientQueryResult*)(*handle));
     *handle=NULL;
 }
 

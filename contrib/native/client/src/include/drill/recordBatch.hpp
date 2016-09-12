@@ -647,7 +647,7 @@ template <class VALUEHOLDER_CLASS_TYPE, class VALUE_VECTOR_TYPE>
                     sstr<<"NULL";
                     strncpy(buf, sstr.str().c_str(), nChars);
                 }else{
-                    return m_pVector->getValueAt(index, buf, nChars);
+                    m_pVector->getValueAt(index, buf, nChars);
                 }
             }
 
