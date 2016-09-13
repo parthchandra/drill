@@ -36,13 +36,10 @@
 #include <boost/asio.hpp>
 
 #if defined _WIN32  || defined _WIN64
-#include <zookeeper.h>
 //Windows header files redefine 'random'
 #ifdef random
 #undef random
 #endif
-#else
-#include <zookeeper/zookeeper.h>
 #endif
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/thread.hpp>
@@ -512,8 +509,6 @@ class PooledDrillClientImpl : public DrillClientImplBase{
         std::vector<DrillClientImpl*> m_clientConnections; 
 		boost::mutex m_poolMutex; // protect access to the vector
         
-        //ZookeeperImpl zook;
-        
         // Use this to decide which drillbit to select next from the list of drillbits.
         size_t m_lastConnection;
 		boost::mutex m_cMutex;
@@ -534,43 +529,6 @@ class PooledDrillClientImpl : public DrillClientImplBase{
         std::vector<std::string> m_drillbits;
 
         DrillUserProperties* m_pUserProperties;//Keep a copy of user properties
-};
-
-class ZookeeperImpl{
-    public:
-        ZookeeperImpl();
-        ~ZookeeperImpl();
-        static ZooLogLevel getZkLogLevel();
-        // comma separated host:port pairs, each corresponding to a zk
-        // server. e.g. "127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
-        DEPRECATED int connectToZookeeper(const char* connectStr, const char* pathToDrill);
-        void close();
-        static void watcher(zhandle_t *zzh, int type, int state, const char *path, void* context);
-        void debugPrint();
-        std::string& getError(){return m_err;}
-        const exec::DrillbitEndpoint& getEndPoint(){ return m_drillServiceInstance.endpoint();}
-        // return unshuffled list of drillbits
-        int getAllDrillbits(const char* connectStr, const char* pathToDrill, std::vector<std::string>& drillbits);
-        // picks the index drillbit and returns the corresponding endpoint object
-        int getEndPoint(std::vector<std::string>& drillbits, size_t index, exec::DrillbitEndpoint& endpoint);
-        
-
-    private:
-        static char s_drillRoot[];
-        static char s_defaultCluster[];
-        zhandle_t* m_zh;
-        clientid_t m_id;
-        int m_state;
-        std::string m_err;
-
-        struct String_vector* m_pDrillbits;
-
-        boost::mutex m_cvMutex;
-        // Condition variable to signal connection callback has been processed
-        boost::condition_variable m_cv;
-        bool m_bConnecting;
-        exec::DrillServiceInstance m_drillServiceInstance;
-        std::string m_rootDir;
 };
 
 } // namespace Drill
