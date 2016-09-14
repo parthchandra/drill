@@ -84,6 +84,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   private final int bufSize;
 
+  private final boolean enforceSizeLimit;
+
   private volatile DrillBuf tempBuffer; // a temp Buffer for use by read(byte[] buf, int off, int len)
 
 
@@ -100,8 +102,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    * with the default (8 MiB) buffer size.
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
-      long startOffset, long totalByteSize, boolean enableHints) {
-    this(in, allocator, id, startOffset, totalByteSize, defaultBufferSize, enableHints);
+      long startOffset, long totalByteSize, boolean enableHints, boolean enforceSizeLimit) {
+    this(in, allocator, id, startOffset, totalByteSize, defaultBufferSize, enableHints, enforceSizeLimit);
   }
 
   /**
@@ -109,9 +111,10 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    * with the specified buffer size.
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
-      long startOffset, long totalByteSize, int bufSize, boolean enableHints) {
+      long startOffset, long totalByteSize, int bufSize, boolean enableHints, boolean enforceSizeLimit) {
     super(in, allocator, id, startOffset, totalByteSize, enableHints);
     Preconditions.checkArgument(bufSize >= 0);
+    this.enforceSizeLimit = enforceSizeLimit;
     // We make the buffer size the smaller of the buffer Size parameter or the total Byte Size
     // rounded to next highest pwoer of two
     int bSize = bufSize < (int) totalByteSize ? bufSize : (int) totalByteSize;
@@ -152,12 +155,17 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     this.count = this.curPosInBuffer = 0;
 
     // We *cannot* rely on the totalByteSize being correct because
-    // metadata for Parquet files is incorrect. So we read as
-    // much as we can up to the size of the buffer
-    //int bytesToRead = buffer.capacity() <= (totalByteSize + startOffset - curPosInStream ) ?
-    //    buffer.Capacity() :
-    //    (int) (totalByteSize + startOffset - curPosInStream );
-    int bytesToRead = buffer.capacity();
+    // metadata for Parquet files is incorrect (sometimes). So we read as
+    // much as we can up to the size of the buffer unless the enforce flag
+    // is passed in.
+    int bytesToRead;
+    if(enforceSizeLimit) {
+      bytesToRead = buffer.capacity() <= (totalByteSize + startOffset - curPosInStream) ?
+          buffer.capacity() :
+          (int) (totalByteSize + startOffset - curPosInStream);
+    } else {
+      bytesToRead = buffer.capacity();
+    }
 
     ByteBuffer directBuffer = buffer.nioBuffer(curPosInBuffer, bytesToRead);
     // The DFS can return *more* bytes than requested if the capacity of the buffer is greater.
