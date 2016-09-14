@@ -788,7 +788,7 @@ public class TestParquetWriter extends BaseTestQuery {
   Test the conversion from int96 to impala timestamp with hive data including nulls. Validate against expected values
   */
   @Test
-  //@Ignore("relies on particular time zone")
+  @Ignore("relies on particular time zone")
   public void testHiveParquetTimestampAsInt96_basic() throws Exception {
     final String q = "SELECT cast(convert_from(timestamp_field, 'TIMESTAMP_IMPALA') as varchar(19))  as timestamp_field "
             + "from cp.`parquet/part1/hive_all_types.parquet` ";
@@ -865,6 +865,7 @@ public class TestParquetWriter extends BaseTestQuery {
         "cp.`parquet/last_page_one_null.parquet`");
   }
 
+  @Ignore ("Used to test decompression in AsyncPageReader. Takes too long.")
   @Test
   public void testTPCHReadWriteRunRepeated() throws Exception {
     for (int i = 1; i <= repeat; i++) {
@@ -881,7 +882,6 @@ public class TestParquetWriter extends BaseTestQuery {
     try {
       test(String.format("alter session set `%s` = 'gzip'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE));
       String inputTable = "cp.`tpch/supplier.parquet`";
-//      runTestAndValidate("s_suppkey, s_nationkey, s_acctbal", "s_suppkey, s_nationkey, s_acctbal", inputTable, "suppkey_parquet_dict_gzip");
         runTestAndValidate("*", "*", inputTable, "suppkey_parquet_dict_gzip");
     } finally {
       test(String.format("alter session set `%s` = '%s'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE, ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE_VALIDATOR.getDefault().string_val));
@@ -893,7 +893,6 @@ public class TestParquetWriter extends BaseTestQuery {
     try {
       test(String.format("alter session set `%s` = 'snappy'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE));
       String inputTable = "cp.`supplier_snappy.parquet`";
-      //      runTestAndValidate("s_suppkey, s_nationkey, s_acctbal", "s_suppkey, s_nationkey, s_acctbal", inputTable, "suppkey_parquet_dict_gzip");
       runTestAndValidate("*", "*", inputTable, "suppkey_parquet_dict_snappy");
     } finally {
       test(String.format("alter session set `%s` = '%s'", ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE, ExecConstants.PARQUET_WRITER_COMPRESSION_TYPE_VALIDATOR.getDefault().string_val));
