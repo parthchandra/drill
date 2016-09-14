@@ -54,6 +54,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   private static int defaultBufferSize = 8192 * 1024; // 8 MiB
   private static int defaultTempBufferSize = 8192; // 8 KiB
+  private static int smallBufferSize = 64 * 1024; // 64 KiB
 
   /**
    * The internal buffer to keep data read from the underlying inputStream.
@@ -82,10 +83,9 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   protected long curPosInStream; // current offset in the input stream
 
-  private final int bufSize;
+  private int bufSize;
 
   private volatile DrillBuf tempBuffer; // a temp Buffer for use by read(byte[] buf, int off, int len)
-
 
   private DrillBuf getBuf() throws IOException {
     checkInputStreamState();
@@ -137,6 +137,14 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     }
   }
 
+  private DrillBuf reallocBuffer(int newSize ){
+    this.internalBuffer.release();
+    this.bufSize = newSize;
+    this.internalBuffer = this.allocator.buffer(this.bufSize);
+    logger.debug("Internal buffer resized to {}", newSize);
+    return this.internalBuffer;
+  }
+
   /**
    * Read one more block from the underlying stream.
    * Assumes we have reached the end of buffered data
@@ -152,11 +160,14 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     this.count = this.curPosInBuffer = 0;
 
     // We *cannot* rely on the totalByteSize being correct because
-    // metadata for Parquet files is incorrect. So we read as
-    // much as we can up to the size of the buffer
-    //int bytesToRead = buffer.capacity() <= (totalByteSize + startOffset - curPosInStream ) ?
-    //    buffer.Capacity() :
-    //    (int) (totalByteSize + startOffset - curPosInStream );
+    // metadata for Parquet files is incorrect (sometimes). So we read
+    // beyond the totalByteSize parameter. However, to prevent ourselves from reading too
+    // much data, we reduce the size of the buffer, down to 64KiB.
+    if (buffer.capacity() >= (totalByteSize + startOffset - curPosInStream)) {
+      if (buffer.capacity() > smallBufferSize) {
+        buffer = this.reallocBuffer(smallBufferSize);
+      }
+    }
     int bytesToRead = buffer.capacity();
 
     ByteBuffer directBuffer = buffer.nioBuffer(curPosInBuffer, bytesToRead);
@@ -269,12 +280,13 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
         }
       } else {
         bytesRead += nRead;
+        //TODO: Uncomment this when the InputStream.available() call is fixed.
         // If the last read caused us to reach the end of stream
-        // we are done
-        InputStream input = in;
-        if (input != null && input.available() <= 0) {
-          return bytesRead;
-        }
+        // we are done.
+        //InputStream input = in;
+        //if (input != null && input.available() <= 0) {
+        //  return bytesRead;
+        //}
       }
     } while (bytesRead < len);
     return bytesRead;
@@ -310,7 +322,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
           return bytesRead;
         }
       } else {
-        byteBuf.nioBuffer().get(buf, off + bytesRead, len - bytesRead);
+        byteBuf.nioBuffer().get(buf, off + bytesRead, nRead);
         byteBuf.clear();
         bytesRead += nRead;
       }
@@ -378,10 +390,6 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    */
   public long getPos() throws IOException {
     return curPosInBuffer + startOffset;
-  }
-
-  public boolean hasRemainder() throws IOException {
-    return available() > 0;
   }
 
   public void close() throws IOException {
