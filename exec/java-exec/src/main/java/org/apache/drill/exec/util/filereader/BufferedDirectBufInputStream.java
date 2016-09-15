@@ -54,6 +54,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   private static int defaultBufferSize = 8192 * 1024; // 8 MiB
   private static int defaultTempBufferSize = 8192; // 8 KiB
+  private static int smallBufferSize = 64 * 1024; // 64 KiB
 
   /**
    * The internal buffer to keep data read from the underlying inputStream.
@@ -82,12 +83,9 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   protected long curPosInStream; // current offset in the input stream
 
-  private final int bufSize;
-
-  private final boolean enforceSizeLimit;
+  private int bufSize;
 
   private volatile DrillBuf tempBuffer; // a temp Buffer for use by read(byte[] buf, int off, int len)
-
 
   private DrillBuf getBuf() throws IOException {
     checkInputStreamState();
@@ -102,8 +100,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    * with the default (8 MiB) buffer size.
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
-      long startOffset, long totalByteSize, boolean enableHints, boolean enforceSizeLimit) {
-    this(in, allocator, id, startOffset, totalByteSize, defaultBufferSize, enableHints, enforceSizeLimit);
+      long startOffset, long totalByteSize, boolean enableHints) {
+    this(in, allocator, id, startOffset, totalByteSize, defaultBufferSize, enableHints);
   }
 
   /**
@@ -111,10 +109,9 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    * with the specified buffer size.
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
-      long startOffset, long totalByteSize, int bufSize, boolean enableHints, boolean enforceSizeLimit) {
+      long startOffset, long totalByteSize, int bufSize, boolean enableHints) {
     super(in, allocator, id, startOffset, totalByteSize, enableHints);
     Preconditions.checkArgument(bufSize >= 0);
-    this.enforceSizeLimit = enforceSizeLimit;
     // We make the buffer size the smaller of the buffer Size parameter or the total Byte Size
     // rounded to next highest pwoer of two
     int bSize = bufSize < (int) totalByteSize ? bufSize : (int) totalByteSize;
@@ -140,6 +137,14 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     }
   }
 
+  private DrillBuf reallocBuffer(int newSize ){
+    this.internalBuffer.release();
+    this.bufSize = newSize;
+    this.internalBuffer = this.allocator.buffer(this.bufSize);
+    logger.debug("Internal buffer resized to {}", newSize);
+    return this.internalBuffer;
+  }
+
   /**
    * Read one more block from the underlying stream.
    * Assumes we have reached the end of buffered data
@@ -155,17 +160,15 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     this.count = this.curPosInBuffer = 0;
 
     // We *cannot* rely on the totalByteSize being correct because
-    // metadata for Parquet files is incorrect (sometimes). So we read as
-    // much as we can up to the size of the buffer unless the enforce flag
-    // is passed in.
-    int bytesToRead;
-    if(enforceSizeLimit) {
-      bytesToRead = buffer.capacity() <= (totalByteSize + startOffset - curPosInStream) ?
-          buffer.capacity() :
-          (int) (totalByteSize + startOffset - curPosInStream);
-    } else {
-      bytesToRead = buffer.capacity();
+    // metadata for Parquet files is incorrect (sometimes). So we read
+    // beyond the totalByteSize parameter. However, to prevent ourselves from reading too
+    // much data, we reduce the size of the buffer, down to 64KiB.
+    if (buffer.capacity() >= (totalByteSize + startOffset - curPosInStream)) {
+      if (buffer.capacity() > smallBufferSize) {
+        buffer = this.reallocBuffer(smallBufferSize);
+      }
     }
+    int bytesToRead = buffer.capacity();
 
     ByteBuffer directBuffer = buffer.nioBuffer(curPosInBuffer, bytesToRead);
     // The DFS can return *more* bytes than requested if the capacity of the buffer is greater.

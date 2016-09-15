@@ -152,10 +152,6 @@ public interface ExecConstants {
   String PARQUET_PAGEREADER_BUFFER_SIZE = "store.parquet.reader.pagereader.buffersize";
   OptionValidator PARQUET_PAGEREADER_BUFFER_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_BUFFER_SIZE, 8*1024*1024);
 
-  // In the buffering reader, return an EOF once the column chunk's total size number of bytes has been read
-  String PARQUET_PAGEREADER_ENFORCECOLUMNCHUNKSIZE = "store.parquet.reader.pagereader.enforce_column_chunk_size";
-  OptionValidator PARQUET_PAGEREADER_ENFORCECOLUMNCHUNKSIZE_VALIDATOR = new  BooleanValidator(PARQUET_PAGEREADER_ENFORCECOLUMNCHUNKSIZE, true);
-
   // try to use fadvise if available
   String PARQUET_PAGEREADER_USE_FADVISE = "store.parquet.reader.pagereader.usefadvise";
   OptionValidator PARQUET_PAGEREADER_USE_FADVISE_VALIDATOR = new  BooleanValidator(PARQUET_PAGEREADER_USE_FADVISE, false);
