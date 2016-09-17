@@ -321,7 +321,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
           return bytesRead;
         }
       } else {
-        byteBuf.nioBuffer().get(buf, off + bytesRead, len - bytesRead);
+        byteBuf.nioBuffer().get(buf, off + bytesRead, nRead);
         byteBuf.clear();
         bytesRead += nRead;
       }
