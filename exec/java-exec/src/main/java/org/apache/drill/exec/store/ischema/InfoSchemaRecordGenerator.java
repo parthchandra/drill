@@ -309,12 +309,12 @@ public abstract class InfoSchemaRecordGenerator<S> {
       }
     }
 
-    public boolean visitTableWithType(String schemaName, String tableName, TableType type) {
+    private void visitTableWithType(String schemaName, String tableName, TableType type) {
       Preconditions
           .checkNotNull(type, "Error. Type information for table %s.%s provided is null.", schemaName,
               tableName);
       records.add(new Records.Table(IS_CATALOG_NAME, schemaName, tableName, type.toString()));
-      return false;
+      return;
     }
 
     @Override
