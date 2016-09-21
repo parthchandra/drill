@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.parquet;
 
+import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.DrillBuf;
 
 import java.io.IOException;
@@ -31,19 +32,26 @@ import org.apache.parquet.format.Util;
 import org.apache.parquet.hadoop.util.CompatibilityUtil;
 
 public class ColumnDataReader {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ColumnDataReader.class);
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ColumnDataReader.class);
 
   private final long endPosition;
   public final FSDataInputStream input;
+  public final String name;
 
-  public ColumnDataReader(FSDataInputStream input, long start, long length) throws IOException{
+  public ColumnDataReader(FSDataInputStream input, long start, long length, String name) throws IOException{
     this.input = input;
     this.input.seek(start);
     this.endPosition = start + length;
+    this.name = name;
   }
 
   public PageHeader readPageHeader() throws IOException{
-    return Util.readPageHeader(input);
+    long s = input.getPos();
+    PageHeader ph =  Util.readPageHeader(input);
+    long e = input.getPos();
+    logger.trace("[{}]: Read Page Header ( {} bytes}", name, e-s);
+    return ph;
+
   }
 
   public FSDataInputStream getInputStream() {
@@ -64,6 +72,7 @@ public class ColumnDataReader {
       lengthLeftToRead -= CompatibilityUtil.getBuf(input, directBuffer, lengthLeftToRead);
     }
     target.writerIndex(pageLength);
+    logger.trace("[{}]: Read Page Data ( {} bytes}:: {}", name, pageLength, ByteBufUtil.hexDump(target));
   }
 
   public void clear(){

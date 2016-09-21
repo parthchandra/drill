@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import io.netty.buffer.ByteBufUtil;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.store.parquet.ColumnDataReader;
 import org.apache.drill.exec.store.parquet.ParquetFormatPlugin;
@@ -101,6 +102,8 @@ final class PageReader {
 
   private FSDataInputStream inputStream;
 
+  private final String name;
+
   // These need to be held throughout reading of the entire column chunk
   List<ByteBuf> allocatedDictionaryBuffers;
 
@@ -117,7 +120,8 @@ final class PageReader {
     long start = columnChunkMetaData.getFirstDataPageOffset();
     try {
       inputStream  = fs.open(path);
-      this.dataReader = new ColumnDataReader(inputStream, start, columnChunkMetaData.getTotalSize());
+      name = path+parentColumnReader.columnChunkMetaData.toString();
+      this.dataReader = new ColumnDataReader(inputStream, start, columnChunkMetaData.getTotalSize(), name);
       loadDictionaryIfExists(parentStatus, columnChunkMetaData, inputStream);
 
     } catch (IOException e) {
@@ -183,6 +187,7 @@ final class PageReader {
           .getCodec()).decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
           dest.nioBuffer(0, uncompressedSize), uncompressedSize);
         timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
+        logger.trace("[{}]: Decompress Page Data ( {} bytes}:: {}", name, uncompressedSize, ByteBufUtil.hexDump(dest));
         this.updateStats(pageHeader, "Decompress", start, timeToRead, compressedSize, uncompressedSize);
       } finally {
         compressedData.release();
