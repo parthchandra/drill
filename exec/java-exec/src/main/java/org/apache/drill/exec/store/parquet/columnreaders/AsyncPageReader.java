@@ -214,6 +214,7 @@ class AsyncPageReader extends PageReader {
       if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
         readDictionaryPageData(readStatus, parentColumnReader);
         // Ugly. Use the Async task to make a synchronous read call.
+        readStatus.getPageData().release();
         readStatus = new AsyncPageReaderTask().call();
         pageHeader = readStatus.getPageHeader();
       }

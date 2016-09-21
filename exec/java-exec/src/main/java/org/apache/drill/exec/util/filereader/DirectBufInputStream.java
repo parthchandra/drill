@@ -89,7 +89,13 @@ public class DirectBufInputStream extends FilterInputStream {
 
   public synchronized DrillBuf getNext(int bytes) throws IOException {
     DrillBuf b = allocator.buffer(bytes);
-    int bytesRead = read(b, 0, bytes);
+    int bytesRead = -1;
+    try {
+    bytesRead = read(b, 0, bytes);
+    } catch (IOException e){
+      b.release();
+      throw e;
+    }
     if (bytesRead <= -1) {
       b.release();
       return null;
@@ -114,6 +120,14 @@ public class DirectBufInputStream extends FilterInputStream {
   protected void checkInputStreamState() throws IOException {
     if (in == null) {
       throw new IOException("Input stream is closed.");
+    }
+  }
+
+  public synchronized void close() throws IOException {
+    InputStream inp;
+    if ((inp = in) != null) {
+      in = null;
+      inp.close();
     }
   }
 
