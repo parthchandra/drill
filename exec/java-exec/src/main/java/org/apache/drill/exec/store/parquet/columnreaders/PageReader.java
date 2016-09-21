@@ -18,6 +18,7 @@
 package org.apache.drill.exec.store.parquet.columnreaders;
 
 import com.google.common.base.Stopwatch;
+import io.netty.buffer.ByteBufUtil;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.util.filereader.BufferedDirectBufInputStream;
 import io.netty.buffer.ByteBuf;
@@ -189,6 +190,11 @@ class PageReader {
     if (parentColumnReader.columnChunkMetaData.getCodec() == CompressionCodecName.UNCOMPRESSED) {
       timer.start();
       pageDataBuf = dataReader.getNext(compressedSize);
+      if (logger.isTraceEnabled()) {
+        logger.trace("PageReaderTask==> Col: {}  readPos: {}  Uncompressed_size: {}  pageData: {}",
+            parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
+            pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageData));
+      }
       timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, uncompressedSize);
     } else {
