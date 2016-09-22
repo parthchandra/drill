@@ -49,7 +49,9 @@ public class ColumnDataReader {
     long s = input.getPos();
     PageHeader ph =  Util.readPageHeader(input);
     long e = input.getPos();
-    logger.trace("[{}]: Read Page Header ( {} bytes}", name, e-s);
+    if(logger.isTraceEnabled()) {
+      logger.trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} ", name, s, e - s);
+    }
     return ph;
 
   }
@@ -68,11 +70,21 @@ public class ColumnDataReader {
     target.clear();
     ByteBuffer directBuffer = target.nioBuffer(0, pageLength);
     int lengthLeftToRead = pageLength;
+    long s = input.getPos();
     while (lengthLeftToRead > 0) {
       lengthLeftToRead -= CompatibilityUtil.getBuf(input, directBuffer, lengthLeftToRead);
     }
     target.writerIndex(pageLength);
-    logger.trace("[{}]: Read Page Data ( {} bytes}:: {}", name, pageLength, ByteBufUtil.hexDump(target));
+    long e = input.getPos();
+    if(logger.isTraceEnabled()) {
+      DrillBuf bufStart = target.slice(0, pageLength>100?100:pageLength);
+      int endOffset = pageLength>100?pageLength-100:0;
+      DrillBuf bufEnd = target.slice(endOffset, pageLength-endOffset);
+      logger
+          .trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} : Buf Start = {} : Buf End = {} ",
+              name, s, e - s, ByteBufUtil.hexDump(bufStart), ByteBufUtil.hexDump(bufEnd));
+
+    }
   }
 
   public void clear(){

@@ -187,7 +187,6 @@ final class PageReader {
           .getCodec()).decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
           dest.nioBuffer(0, uncompressedSize), uncompressedSize);
         timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
-        logger.trace("[{}]: Decompress Page Data ( {} bytes}:: {}", name, uncompressedSize, ByteBufUtil.hexDump(dest));
         this.updateStats(pageHeader, "Decompress", start, timeToRead, compressedSize, uncompressedSize);
       } finally {
         compressedData.release();
@@ -227,9 +226,6 @@ final class PageReader {
       pageHeader = dataReader.readPageHeader();
       long timeToRead = timer.elapsed(TimeUnit.MICROSECONDS);
       this.updateStats(pageHeader, "Page Header Read", start, timeToRead, 0,0);
-      logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}","Page Header Read","",
-          this.parentColumnReader.parentReader.hadoopPath,
-          this.parentColumnReader.columnDescriptor.toString(), start, 0, 0, timeToRead);
       timer.reset();
       if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
         readDictionaryPage(pageHeader, parentColumnReader);
@@ -334,9 +330,6 @@ final class PageReader {
     if (pageHeader.type == PageType.DICTIONARY_PAGE) {
       pageType = "Dictionary Page";
     }
-    logger.trace("ParquetTrace,{},{},{},{},{},{},{},{}", op, pageType.toString(),
-        this.parentColumnReader.parentReader.hadoopPath,
-        this.parentColumnReader.columnDescriptor.toString(), start, bytesin, bytesout, time);
     if (pageHeader.type != PageType.DICTIONARY_PAGE) {
       if (bytesin == bytesout) {
         this.stats.timePageLoads += time;
