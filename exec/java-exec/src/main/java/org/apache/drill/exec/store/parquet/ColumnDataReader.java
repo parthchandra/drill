@@ -81,7 +81,7 @@ public class ColumnDataReader {
       int endOffset = pageLength>100?pageLength-100:0;
       DrillBuf bufEnd = target.slice(endOffset, pageLength-endOffset);
       logger
-          .trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} : Buf Start = {} : Buf End = {} ",
+          .trace("[{}]: Read Page Data : ReadPos = {} : Bytes Read = {} : Buf Start = {} : Buf End = {} ",
               name, s, e - s, ByteBufUtil.hexDump(bufStart), ByteBufUtil.hexDump(bufEnd));
 
     }
