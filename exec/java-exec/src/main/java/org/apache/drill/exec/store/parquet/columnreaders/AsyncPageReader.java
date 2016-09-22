@@ -240,7 +240,6 @@ class AsyncPageReader extends PageReader {
 
   @Override public void clear() {
     if (asyncPageRead != null) {
-      asyncPageRead.cancel(true);
       try {
         ReadStatus r = asyncPageRead.get();
         r.getPageData().release();

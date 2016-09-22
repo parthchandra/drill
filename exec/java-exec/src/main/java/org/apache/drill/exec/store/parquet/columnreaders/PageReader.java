@@ -401,7 +401,7 @@ class PageReader {
 
   public void clear(){
     try {
-      this.inputStream.close();
+      // data reader also owns the input stream and will close it.
       this.dataReader.close();
     } catch (IOException e) {
       //Swallow the exception which is OK for input streams
