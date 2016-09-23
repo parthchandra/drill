@@ -226,13 +226,7 @@ class AsyncPageReader extends PageReader {
 
     pageHeader = readStatus.getPageHeader();
     pageData = getDecompressedPageData(readStatus);
-    //if (logger.isTraceEnabled()) {
-    //  logger.trace("AsyncPageReader: Col: {}  pageData: {}",
-    //      this.parentColumnReader.columnChunkMetaData.toString(), ByteBufUtil.hexDump(pageData));
-    //  logger.trace("AsyncPageReaderTask==> Col: {}  readPos: {}  Uncompressed_size: {}  pageData: {}",
-    //      parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
-    //      pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageData));
-    //}
+
 
   }
 
