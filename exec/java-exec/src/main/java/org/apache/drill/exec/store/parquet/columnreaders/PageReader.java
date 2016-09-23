@@ -276,7 +276,7 @@ class PageReader {
 
     // TODO - the metatdata for total size appears to be incorrect for impala generated files, need to find cause
     // and submit a bug report
-    if(!dataReader.hasRemainder() || parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
+    if(parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
       return false;
     }
     clearBuffers();

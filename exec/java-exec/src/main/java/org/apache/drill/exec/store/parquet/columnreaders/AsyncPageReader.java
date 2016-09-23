@@ -219,7 +219,7 @@ class AsyncPageReader extends PageReader {
       }
     } while (pageHeader.getType() == PageType.DICTIONARY_PAGE);
 
-    if (dataReader.hasRemainder() && parentColumnReader.totalValuesRead + readStatus.getValuesRead()
+    if (parentColumnReader.totalValuesRead + readStatus.getValuesRead()
         < parentColumnReader.columnChunkMetaData.getValueCount()) {
       asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
     }
