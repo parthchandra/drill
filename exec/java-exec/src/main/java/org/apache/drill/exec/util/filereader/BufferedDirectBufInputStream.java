@@ -391,10 +391,6 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     return curPosInBuffer + startOffset;
   }
 
-  public boolean hasRemainder() throws IOException {
-    return available() > 0;
-  }
-
   public void close() throws IOException {
     DrillBuf buffer;
     InputStream inp;

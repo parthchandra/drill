@@ -108,7 +108,10 @@ public class DirectBufInputStream extends FilterInputStream {
   }
 
   public boolean hasRemainder() throws IOException {
-    return getInputStream().available() > 0;
+    // We use the following instead of "getInputStream.available() > 0" because
+    // available() on HDFS seems to have issues with file sizes
+    // that are greater than Integer.MAX_VALUE
+    return (this.getPos() < (this.startOffset + this.totalByteSize));
   }
 
   protected FSDataInputStream getInputStream() throws IOException {
