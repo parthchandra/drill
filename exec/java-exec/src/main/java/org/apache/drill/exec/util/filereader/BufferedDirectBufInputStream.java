@@ -280,12 +280,13 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
         }
       } else {
         bytesRead += nRead;
+        //TODO: Uncomment this when the InputStream.available() call is fixed.
         // If the last read caused us to reach the end of stream
-        // we are done
-        InputStream input = in;
-        if (input != null && input.available() <= 0) {
-          return bytesRead;
-        }
+        // we are done.
+        //InputStream input = in;
+        //if (input != null && input.available() <= 0) {
+        //  return bytesRead;
+        //}
       }
     } while (bytesRead < len);
     return bytesRead;
