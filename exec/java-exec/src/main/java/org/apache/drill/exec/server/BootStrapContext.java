@@ -37,6 +37,7 @@ import org.apache.drill.exec.rpc.TransportCheck;
 
 public class BootStrapContext implements AutoCloseable {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(BootStrapContext.class);
+  private static final int MIN_SCAN_THREADPOOL_SIZE = 8; // Magic num
 
   private final DrillConfig config;
   private final EventLoopGroup loop;
@@ -69,17 +70,20 @@ public class BootStrapContext implements AutoCloseable {
       }
     };
     // Setup two threadpools one for reading raw data from disk and another for decoding the data
-    // A good guideline is to have the number threads in the pool to be a small multiple (fractional
+    // A good guideline is to have the number threads in the scan pool to be a multiple (fractional
+    // numbers are ok) of the number of disks.
+    // A good guideline is to have the number threads in the decode pool to be a small multiple (fractional
     // numbers are ok) of the number of cores.
-    final int numDisks = config.getInt(ExecConstants.SCAN_NUM_DISKS);
-    final int numScanThreads =
-        (int) (numDisks * config.getDouble(ExecConstants.SCAN_THREADPOOL_SIZE_MULTIPLE));
-    final int numScanDecodeThreads = (int) (Runtime.getRuntime().availableProcessors() * config
-        .getDouble(ExecConstants.SCAN_DECODE_THREADPOOL_SIZE_MULTIPLE));
+    final int numCores = Runtime.getRuntime().availableProcessors();
+    final int numScanThreads = (int) (config.getDouble(ExecConstants.SCAN_THREADPOOL_SIZE));
+    final int numScanDecodeThreads = (int) config.getDouble(ExecConstants.SCAN_DECODE_THREADPOOL_SIZE);
+    final int scanThreadPoolSize =
+        MIN_SCAN_THREADPOOL_SIZE > numScanThreads ? MIN_SCAN_THREADPOOL_SIZE : numScanThreads;
+    final int scanDecodeThreadPoolSize = numCores > numScanDecodeThreads ? numCores : numScanDecodeThreads;
 
-    this.scanExecutor = Executors.newFixedThreadPool(numScanThreads, new NamedThreadFactory("scan-"));
+    this.scanExecutor = Executors.newFixedThreadPool(scanThreadPoolSize, new NamedThreadFactory("scan-"));
     this.scanDecodeExecutor =
-        Executors.newFixedThreadPool(numScanDecodeThreads, new NamedThreadFactory("scan-decode-"));
+        Executors.newFixedThreadPool(scanDecodeThreadPoolSize, new NamedThreadFactory("scan-decode-"));
   }
 
   public ExecutorService getExecutor() {
