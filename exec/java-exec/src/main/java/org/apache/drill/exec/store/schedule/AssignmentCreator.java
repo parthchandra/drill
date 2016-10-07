@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.common.exceptions.DrillRuntimeException;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
 import com.carrotsearch.hppc.cursors.ObjectLongCursor;
@@ -90,23 +91,29 @@ public class AssignmentCreator<T extends CompleteWork> {
    * @return A multimap that maps each minor fragment id to a list of work units
    */
   public static <T extends CompleteWork> ListMultimap<Integer,T> getMappings(List<DrillbitEndpoint> incomingEndpoints, List<T> units) {
+    return getMappings(incomingEndpoints, units, false);
+  }
+
+  public static <T extends CompleteWork> ListMultimap<Integer,T> getMappings(List<DrillbitEndpoint> incomingEndpoints, List<T> units, boolean localAffinity) {
     AssignmentCreator<T> creator = new AssignmentCreator<>(incomingEndpoints, units);
-    return creator.getMappings();
+    return creator.getMappings(localAffinity);
   }
 
   /**
    * Does the work of creating the mappings for this AssignmentCreator
    * @return the minor fragment id to work units mapping
    */
-  private ListMultimap<Integer, T> getMappings() {
+  private ListMultimap<Integer, T> getMappings(boolean localAffinity) {
     Stopwatch watch = Stopwatch.createStarted();
     maxWork = (int) Math.ceil(units.size() / ((float) incomingEndpoints.size()));
     LinkedList<WorkEndpointListPair<T>> workList = getWorkList();
     LinkedList<WorkEndpointListPair<T>> unassignedWorkList;
     Map<DrillbitEndpoint,FragIteratorWrapper> endpointIterators = getEndpointIterators();
 
+    if (localAffinity) {
+      workList = assignLocal(workList, endpointIterators);
+    }
     unassignedWorkList = assign(workList, endpointIterators, true);
-
     assignLeftovers(unassignedWorkList, endpointIterators, true);
     assignLeftovers(unassignedWorkList, endpointIterators, false);
 
@@ -145,6 +152,32 @@ public class AssignmentCreator<T extends CompleteWork> {
     }
     return currentUnassignedList;
   }
+
+
+  private LinkedList<WorkEndpointListPair<T>> assignLocal(List<WorkEndpointListPair<T>> workList,
+                                                          Map<DrillbitEndpoint,FragIteratorWrapper> endpointIterators) {
+    LinkedList<WorkEndpointListPair<T>> currentUnassignedList = Lists.newLinkedList();
+    for (WorkEndpointListPair<T> workPair : workList) {
+      DrillbitEndpoint endpoint = workPair.work.getPreferredEndpoint();
+      if (endpoint == null) {
+        currentUnassignedList.add(workPair);
+        continue;
+      }
+
+      FragIteratorWrapper iteratorWrapper = endpointIterators.get(endpoint);
+      if (iteratorWrapper == null) {
+        currentUnassignedList.add(workPair);
+        continue;
+      }
+
+      Integer assignment = iteratorWrapper.iter.next();
+      iteratorWrapper.count++;
+      mappings.put(assignment, workPair.work);
+    }
+
+    return currentUnassignedList;
+  }
+
 
   /**
    *

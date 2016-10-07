@@ -145,6 +145,11 @@ public class KuduGroupScan extends AbstractGroupScan {
     public int compareTo(CompleteWork o) {
       return 0;
     }
+
+    @Override
+    public DrillbitEndpoint getPreferredEndpoint() {
+      return null;
+    }
   }
 
   /**

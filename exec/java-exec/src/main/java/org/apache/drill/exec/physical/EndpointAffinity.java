@@ -31,6 +31,9 @@ public class EndpointAffinity {
   private final DrillbitEndpoint endpoint;
   private double affinity = 0.0d;
 
+  // work assignments for this endpoint
+  private int numLocalWorkUnits;
+
   // Requires including this endpoint at least once? Default is not required.
   private boolean mandatory;
 
@@ -75,6 +78,7 @@ public class EndpointAffinity {
     this.affinity = affinity;
     this.mandatory = mandatory;
     this.maxWidth = maxWidth;
+    this.numLocalWorkUnits = 0;
   }
 
   /**
@@ -140,6 +144,14 @@ public class EndpointAffinity {
   public void setMaxWidth(final int maxWidth) {
     Preconditions.checkArgument(maxWidth >= 1, "MaxWidth for given endpoint should be at least one.");
     this.maxWidth = Math.min(this.maxWidth, maxWidth);
+  }
+
+  public void setNumLocalWorkUnits(final int localWorkUnits) {
+    numLocalWorkUnits = localWorkUnits;
+  }
+
+  public int getNumLocalWorkUnits() {
+    return numLocalWorkUnits;
   }
 
   @Override
