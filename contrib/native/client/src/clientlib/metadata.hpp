@@ -20,13 +20,144 @@
 #ifndef DRILL_METADATA_H
 #define DRILL_METADATA_H
 
+#include <boost/ref.hpp>
+
 #include "drill/common.hpp"
 #include "drill/drillClient.hpp"
 #include "env.h"
+#include "User.pb.h"
 
 namespace Drill {
+class DrillClientImpl;
+
 namespace meta {
-    class BasicMetadata: public Metadata {
+	class DrillCatalogMetadata: public meta::CatalogMetadata {
+	public:
+		DrillCatalogMetadata(const ::exec::user::CatalogMetadata& metadata):
+			meta::CatalogMetadata(),
+			m_pMetadata(metadata){
+		}
+
+	  bool hasCatalogName() const { return m_pMetadata.get().has_catalog_name(); }
+	  const std::string& getCatalogName() const { return m_pMetadata.get().catalog_name(); }
+
+	  bool hasDescription() const { return m_pMetadata.get().has_description(); }
+	  const std::string& getDescription() const { return m_pMetadata.get().description(); }
+
+	  bool hasConnect() const { return m_pMetadata.get().has_connect(); }
+	  const std::string& getConnect() const { return m_pMetadata.get().connect(); }
+
+	private:
+		boost::reference_wrapper<const ::exec::user::CatalogMetadata> m_pMetadata;
+	};
+
+	class DrillSchemaMetadata: public meta::SchemaMetadata {
+	public:
+		DrillSchemaMetadata(const ::exec::user::SchemaMetadata& metadata):
+			meta::SchemaMetadata(),
+			m_pMetadata(metadata){
+		}
+
+		bool hasCatalogName() const { return m_pMetadata.get().has_catalog_name(); }
+		const std::string& getCatalogName() const { return m_pMetadata.get().catalog_name(); }
+
+		bool hasSchemaName() const { return m_pMetadata.get().has_schema_name(); }
+		const std::string& getSchemaName() const { return m_pMetadata.get().schema_name(); }
+
+		bool hasOwnerName() const { return m_pMetadata.get().has_owner(); }
+		const std::string& getOwner() const { return m_pMetadata.get().owner(); }
+
+		bool hasType() const { return m_pMetadata.get().has_type(); }
+		const std::string& getType() const { return m_pMetadata.get().type(); }
+
+		bool hasMutable() const { return m_pMetadata.get().has_mutable_(); }
+		const std::string& getMutable() const { return m_pMetadata.get().mutable_(); }
+
+	private:
+		boost::reference_wrapper<const ::exec::user::SchemaMetadata> m_pMetadata;
+	};
+
+	class DrillTableMetadata: public meta::TableMetadata {
+	public:
+		DrillTableMetadata(const ::exec::user::TableMetadata& metadata):
+			meta::TableMetadata(),
+			m_pMetadata(metadata){
+		}
+
+	  bool hasCatalogName() const { return m_pMetadata.get().has_catalog_name(); }
+	  const std::string& getCatalogName() const { return m_pMetadata.get().catalog_name(); }
+
+	  bool hasSchemaName() const { return m_pMetadata.get().has_schema_name(); }
+	  const std::string& getSchemaName() const { return m_pMetadata.get().schema_name(); }
+
+	  bool hasTableName() const { return m_pMetadata.get().has_table_name(); }
+	  const std::string& getTableName() const { return m_pMetadata.get().table_name(); }
+
+	  bool hasType() const { return m_pMetadata.get().has_type(); }
+	  const std::string& getType() const { return m_pMetadata.get().type(); }
+
+	private:
+	  boost::reference_wrapper<const ::exec::user::TableMetadata> m_pMetadata;
+	};
+
+	class DrillColumnMetadata: public meta::ColumnMetadata {
+	public:
+		DrillColumnMetadata(const ::exec::user::ColumnMetadata& metadata):
+			meta::ColumnMetadata(),
+			m_pMetadata(metadata){
+		}
+
+		bool hasCatalogName() const { return m_pMetadata.get().has_catalog_name(); }
+		const std::string& getCatalogName() const { return m_pMetadata.get().catalog_name(); }
+
+		bool hasSchemaName() const { return m_pMetadata.get().has_schema_name(); }
+		const std::string& getSchemaName() const { return m_pMetadata.get().schema_name(); }
+
+		bool hasTableName() const { return m_pMetadata.get().has_table_name(); }
+		const std::string& getTableName() const { return m_pMetadata.get().table_name(); }
+
+		bool hasColumnName() const { return m_pMetadata.get().has_column_name(); }
+		const std::string& getColumnName() const { return m_pMetadata.get().column_name(); }
+
+		bool hasOrdinalPosition() const { return m_pMetadata.get().has_ordinal_position(); }
+		std::size_t getOrdinalPosition() const { return m_pMetadata.get().ordinal_position(); }
+
+		bool hasDefaultValue() const { return m_pMetadata.get().has_default_value(); }
+		const std::string& getDefaultValue() const { return m_pMetadata.get().default_value(); }
+
+		bool hasNullable() const { return m_pMetadata.get().has_is_nullable(); }
+		bool isNullable() const { return m_pMetadata.get().is_nullable(); }
+
+		bool hasDataType() const { return m_pMetadata.get().has_data_type(); }
+		const std::string& getDataType() const { return m_pMetadata.get().data_type(); }
+
+		bool hasCharMaxLength() const { return m_pMetadata.get().has_char_max_length(); }
+		std::size_t getCharMaxLength() const { return m_pMetadata.get().char_max_length(); }
+
+		bool hasCharOctetLength() const { return m_pMetadata.get().has_char_octet_length(); }
+		std::size_t getCharOctetLength() const { return m_pMetadata.get().char_octet_length(); }
+
+		bool hasNumericPrecision() const { return m_pMetadata.get().has_numeric_precision(); }
+		int32_t getNumericPrecision() const { return m_pMetadata.get().numeric_precision(); }
+
+		bool hasNumericRadix() const { return m_pMetadata.get().has_numeric_precision_radix(); }
+		int32_t getNumericRadix() const { return m_pMetadata.get().numeric_precision_radix(); }
+
+		bool hasNumericScale() const { return m_pMetadata.get().has_numeric_scale(); }
+		int32_t getNumericScale() const { return m_pMetadata.get().numeric_scale(); }
+
+		bool hasIntervalType() const { return m_pMetadata.get().has_interval_type(); }
+		const std::string& getIntervalType() const { return m_pMetadata.get().interval_type(); }
+
+		bool hasIntervalPrecision() const { return m_pMetadata.get().has_interval_precision(); }
+		int32_t getIntervalPrecision() const { return m_pMetadata.get().interval_precision(); }
+
+	private:
+		boost::reference_wrapper<const ::exec::user::ColumnMetadata> m_pMetadata;
+	};
+
+    class DrillMetadata: public Metadata {
+    public:
         static const std::string s_connectorName; 
         static const std::string s_connectorVersion; 
 
@@ -47,6 +178,11 @@ namespace meta {
         static const std::string s_tableTerm;
         static const std::vector<std::string> s_dateTimeFunctions;
 
+        DrillMetadata(DrillClientImpl& client): Metadata(), m_client(client) {}
+        ~DrillMetadata() {}
+
+        DrillClientImpl& client() { return m_client; }
+
         const std::string& getConnectorName() const { return s_connectorName; };
         const std::string& getConnectorVersion() const { return s_connectorVersion; }
         uint32_t getConnectorMajorVersion() const { return DRILL_VERSION_MAJOR; } 
@@ -59,11 +195,10 @@ namespace meta {
         uint32_t getServerMinorVersion() const { return 0; } 
         uint32_t getServerPatchVersion() const { return 0; } 
 
-
-        status_t getCatalogs(const std::string& catalogPattern, Metadata::pfnCatalogMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) { return QRY_FAILURE; }
-        status_t getSchemas(const std::string& catalogPattern, const std::string& schemaPattern, Metadata::pfnSchemaMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) { return QRY_FAILURE; }
-        status_t getTables(const std::string& catalogPattern, const std::string& schemaPattern, const std::string& tablePattern, Metadata::pfnTableMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) { return QRY_FAILURE; }
-        status_t getColumns(const std::string& catalogPattern, const std::string& schemaPattern, const std:: string& tablePattern, const std::string& columnPattern, Metadata::pfnColumnMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) { return QRY_FAILURE; }
+        status_t getCatalogs(const std::string& catalogPattern, Metadata::pfnCatalogMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle);
+        status_t getSchemas(const std::string& catalogPattern, const std::string& schemaPattern, Metadata::pfnSchemaMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle);
+        status_t getTables(const std::string& catalogPattern, const std::string& schemaPattern, const std::string& tablePattern, Metadata::pfnTableMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle);
+        status_t getColumns(const std::string& catalogPattern, const std::string& schemaPattern, const std:: string& tablePattern, const std::string& columnPattern, Metadata::pfnColumnMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle);
 
         bool areAllTableSelectable() const { return false; }
         bool isCatalogAtStart() const { return true; }
@@ -140,6 +275,9 @@ namespace meta {
         bool isTransactionSupported() const { return false; }
         meta::UnionSupport getUnionSupport() const { return meta::U_UNION | meta::U_UNION_ALL; }
         bool isSelectForUpdateSupported() const { return false; }
+
+    private:
+        DrillClientImpl& m_client;
     };
 } // namespace meta
 } // namespace Drill

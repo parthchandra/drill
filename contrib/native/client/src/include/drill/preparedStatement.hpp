@@ -25,15 +25,11 @@
 
 namespace Drill {
 class DECLSPEC_DRILL_CLIENT PreparedStatement{
-  // binary handle of the server prepared statement
-  std::string m_handle;
-  std::vector<FieldMetadata> m_fieldDefs;
+public:
+	virtual std::size_t getNumFields() const = 0;
+	virtual const Drill::FieldMetadata& getFieldMetadata(std::size_t index) const = 0;
 
-  public:
-  std::size_t getNumFields() const { return m_fieldDefs.size(); }
-  const Drill::FieldMetadata& getFieldMetadata(std::size_t index) const {
-    return m_fieldDefs.at(index);
-  }
+	virtual ~PreparedStatement() {};
 };
 
 } // namespace Drill

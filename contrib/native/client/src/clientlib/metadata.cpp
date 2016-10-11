@@ -19,18 +19,20 @@
 #include <boost/assign.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/unordered_set.hpp>
+#include "drillClientImpl.hpp"
 
 #include "metadata.hpp"
 
-const std::string Drill::meta::BasicMetadata::s_connectorName(DRILL_CONNECTOR_NAME);
-const std::string Drill::meta::BasicMetadata::s_connectorVersion(DRILL_VERSION_STRING);
-const std::string Drill::meta::BasicMetadata::s_serverName(DRILL_NAME);
-const std::string Drill::meta::BasicMetadata::s_serverVersion("0.0.0");
+const std::string Drill::meta::DrillMetadata::s_connectorName(DRILL_CONNECTOR_NAME);
+const std::string Drill::meta::DrillMetadata::s_connectorVersion(DRILL_VERSION_STRING);
+const std::string Drill::meta::DrillMetadata::s_serverName(DRILL_NAME);
+const std::string Drill::meta::DrillMetadata::s_serverVersion("0.0.0");
 
-const std::string Drill::meta::BasicMetadata::s_catalogSeparator(".");
-const std::string Drill::meta::BasicMetadata::s_catalogTerm("catalog");
-const std::string Drill::meta::BasicMetadata::s_identifierQuoteString("`");
-const std::vector<std::string> Drill::meta::BasicMetadata::s_sqlKeywords = boost::assign::list_of
+const std::string Drill::meta::DrillMetadata::s_catalogSeparator(".");
+const std::string Drill::meta::DrillMetadata::s_catalogTerm("catalog");
+const std::string Drill::meta::DrillMetadata::s_identifierQuoteString("`");
+
+const std::vector<std::string> Drill::meta::DrillMetadata::s_sqlKeywords = boost::assign::list_of
 		("ABS")("ALLOW")("ARRAY")("ASENSITIVE")("ASYMMETRIC")("ATOMIC")("BIGINT")("BINARY")("BLOB")
 		("BOOLEAN")("CALL")("CALLED")("CARDINALITY")("CEIL")("CEILING")("CLOB")("COLLECT")("CONDITION")
 		("CORR")("COVAR_POP")("COVAR_SAMP")("CUBE")("CUME_DIST")("CURRENT_CATALOG")
@@ -51,26 +53,27 @@ const std::vector<std::string> Drill::meta::BasicMetadata::s_sqlKeywords = boost
 		("UESCAPE")("UNNEST")("UPSERT")("USE")("VARBINARY")("VAR_POP")("VAR_SAMP")("WIDTH_BUCKET")
 		("WINDOW")("WITHIN")("WITHOUT");
 
-const std::vector<std::string> Drill::meta::BasicMetadata::s_numericFunctions = boost::assign::list_of
+const std::vector<std::string> Drill::meta::DrillMetadata::s_numericFunctions = boost::assign::list_of
 		("ABS")("ACOS")("ASIN")("ATAN")("ATAN2")("CEILING")("COS")("COT")
 		("DEGREES")("EXP")("FLOOR")("LOG")("LOG10")("MOD")("PI")
 		("POWER")("RADIANS")("RAND")("ROUND")("SIGN")("SIN")("SQRT")
 		("TAN")("TRUNCATE");
-const std::string Drill::meta::BasicMetadata::s_schemaTerm("schema");
-const std::string Drill::meta::BasicMetadata::s_searchEscapeString("\\");
-const std::string Drill::meta::BasicMetadata::s_specialCharacters;
 
-const std::vector<std::string> Drill::meta::BasicMetadata::s_stringFunctions = boost::assign::list_of
+const std::string Drill::meta::DrillMetadata::s_schemaTerm("schema");
+const std::string Drill::meta::DrillMetadata::s_searchEscapeString("\\");
+const std::string Drill::meta::DrillMetadata::s_specialCharacters;
+
+const std::vector<std::string> Drill::meta::DrillMetadata::s_stringFunctions = boost::assign::list_of
 		("ASCII")("CHAR")("CONCAT")("DIFFERENCE")("INSERT")("LCASE")
 		("LEFT")("LENGTH")("LOCATE")("LTRIM")("REPEAT")("REPLACE")
 		("RIGHT")("RTRIM")("SOUNDEX")("SPACE")("SUBSTRING")("UCASE");
 
-const std::vector<std::string> Drill::meta::BasicMetadata::s_systemFunctions = boost::assign::list_of
+const std::vector<std::string> Drill::meta::DrillMetadata::s_systemFunctions = boost::assign::list_of
 		("DATABASE")("IFNULL")("USER");
 
-const std::string Drill::meta::BasicMetadata::s_tableTerm("table");
+const std::string Drill::meta::DrillMetadata::s_tableTerm("table");
 
-const std::vector<std::string> Drill::meta::BasicMetadata::s_dateTimeFunctions = boost::assign::list_of
+const std::vector<std::string> Drill::meta::DrillMetadata::s_dateTimeFunctions = boost::assign::list_of
 		("CURDATE")("CURTIME")("DAYNAME")("DAYOFMONTH")("DAYOFWEEK")
 		("DAYOFYEAR")("HOUR")("MINUTE")("MONTH")("MONTHNAME")("NOW")
 		("QUARTER")("SECOND")("TIMESTAMPADD")("TIMESTAMPDIFF")("WEEK")("YEAR");
@@ -685,9 +688,45 @@ static boost::unordered_set<FromTo> s_convertMap = boost::assign::list_of
 } // anonymous namespace
 
 // Conversion scalar function support
-bool BasicMetadata::isConvertSupported(common::MinorType from, common::MinorType to) const {
+bool DrillMetadata::isConvertSupported(common::MinorType from, common::MinorType to) const {
 	return s_convertMap.find(FromTo(from,to)) != s_convertMap.end();
 }
 
+status_t DrillMetadata::getCatalogs(const std::string& catalogPattern, Metadata::pfnCatalogMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) {
+	DrillClientCatalogResult* result = m_client.getCatalogs(catalogPattern, listener, listenerCtx);
+	if(result==NULL){
+		*qHandle=NULL;
+		return static_cast<status_t>(m_client.getError()->status);
+	}
+	*qHandle=reinterpret_cast<QueryHandle_t>(result);
+	return QRY_SUCCESS;
+}
+status_t DrillMetadata::getSchemas(const std::string& catalogPattern, const std::string& schemaPattern, Metadata::pfnSchemaMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) {
+	DrillClientSchemaResult* result = m_client.getSchemas(catalogPattern, schemaPattern, listener, listenerCtx);
+	if(result==NULL){
+		*qHandle=NULL;
+		return static_cast<status_t>(m_client.getError()->status);
+	}
+	*qHandle=reinterpret_cast<QueryHandle_t>(result);
+	return QRY_SUCCESS;
+}
+status_t DrillMetadata::getTables(const std::string& catalogPattern, const std::string& schemaPattern, const std::string& tablePattern, Metadata::pfnTableMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) {
+	DrillClientTableResult* result = m_client.getTables(catalogPattern, schemaPattern, tablePattern, listener, listenerCtx);
+	if(result==NULL){
+		*qHandle=NULL;
+		return static_cast<status_t>(m_client.getError()->status);
+	}
+	*qHandle=reinterpret_cast<QueryHandle_t>(result);
+	return QRY_SUCCESS;
+}
+status_t DrillMetadata::getColumns(const std::string& catalogPattern, const std::string& schemaPattern, const std:: string& tablePattern, const std::string& columnPattern, Metadata::pfnColumnMetadataListener listener, void* listenerCtx, QueryHandle_t* qHandle) {
+	DrillClientColumnResult* result = m_client.getColumns(catalogPattern, schemaPattern, tablePattern, columnPattern, listener, listenerCtx);
+	if(result==NULL){
+		*qHandle=NULL;
+		return static_cast<status_t>(m_client.getError()->status);
+	}
+	*qHandle=reinterpret_cast<QueryHandle_t>(result);
+	return QRY_SUCCESS;
+}
 } // namespace meta
 } // namespace Drill

@@ -25,8 +25,7 @@ set (CLIENTLIB_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/fieldmeta.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/metadata.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/recordBatch.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/rpcEncoder.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/rpcDecoder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/rpcMessage.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/errmsgs.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/logger.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp
