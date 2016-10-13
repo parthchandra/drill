@@ -45,13 +45,10 @@ public class InfoSchemaStoragePlugin extends AbstractStoragePlugin {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(InfoSchemaStoragePlugin.class);
 
   private final InfoSchemaConfig config;
-  private final DrillbitContext context;
-  private final String name;
 
   public InfoSchemaStoragePlugin(InfoSchemaConfig config, DrillbitContext context, String name){
+    super(context, name);
     this.config = config;
-    this.context = context;
-    this.name = name;
   }
 
   @Override

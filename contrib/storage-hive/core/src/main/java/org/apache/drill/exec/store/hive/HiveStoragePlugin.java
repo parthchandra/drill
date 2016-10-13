@@ -52,14 +52,11 @@ public class HiveStoragePlugin extends AbstractStoragePlugin {
 
   private final HiveStoragePluginConfig config;
   private final HiveSchemaFactory schemaFactory;
-  private final DrillbitContext context;
-  private final String name;
   private final HiveConf hiveConf;
 
   public HiveStoragePlugin(HiveStoragePluginConfig config, DrillbitContext context, String name) throws ExecutionSetupException {
+    super(context, name);
     this.config = config;
-    this.context = context;
-    this.name = name;
     this.hiveConf = createHiveConf(config.getHiveConfigOverride());
     this.schemaFactory = new HiveSchemaFactory(this, name, hiveConf);
   }
@@ -70,14 +67,6 @@ public class HiveStoragePlugin extends AbstractStoragePlugin {
 
   public HiveStoragePluginConfig getConfig() {
     return config;
-  }
-
-  public String getName(){
-    return name;
-  }
-
-  public DrillbitContext getContext() {
-    return context;
   }
 
   @Override
