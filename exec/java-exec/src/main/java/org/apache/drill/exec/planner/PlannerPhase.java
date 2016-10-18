@@ -38,6 +38,7 @@ import org.apache.calcite.rel.rules.UnionToDistinctRule;
 import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
+import org.apache.drill.exec.planner.index.DbScanToIndexScanPrule;
 import org.apache.drill.exec.planner.logical.DrillAggregateRule;
 import org.apache.drill.exec.planner.logical.DrillFilterAggregateTransposeRule;
 import org.apache.drill.exec.planner.logical.DrillFilterJoinRules;
@@ -450,6 +451,11 @@ public enum PlannerPhase {
     // broadcast join enabled.
     if (ps.isNestedLoopJoinEnabled() && ps.isBroadcastJoinEnabled()) {
       ruleList.add(NestedLoopJoinPrule.INSTANCE);
+    }
+
+    if (ps.isIndexPlanningEnabled()) {
+      ruleList.add(DbScanToIndexScanPrule.getFilterOnProject(optimizerRulesContext));
+      ruleList.add(DbScanToIndexScanPrule.getFilterOnScan(optimizerRulesContext));
     }
 
     return RuleSets.ofList(ImmutableSet.copyOf(ruleList));

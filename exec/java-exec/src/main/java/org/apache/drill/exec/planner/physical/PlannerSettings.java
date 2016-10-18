@@ -82,6 +82,7 @@ public class PlannerSettings implements Context{
       INITIAL_OFF_HEAP_ALLOCATION_IN_BYTES, MAX_OFF_HEAP_ALLOCATION_IN_BYTES, DEFAULT_MAX_OFF_HEAP_ALLOCATION_IN_BYTES);
   public static final String UNIONALL_DISTRIBUTE_KEY = "planner.enable_unionall_distribute";
   public static final BooleanValidator UNIONALL_DISTRIBUTE = new BooleanValidator(UNIONALL_DISTRIBUTE_KEY, false);
+  public static final BooleanValidator INDEX_PLANNING = new BooleanValidator("planner.enable_index_planning", true);
 
   public static final OptionValidator IDENTIFIER_MAX_LENGTH =
       new RangeLongValidator("planner.identifier_max_length", 128 /* A minimum length is needed because option names are identifiers themselves */,
@@ -260,6 +261,10 @@ public class PlannerSettings implements Context{
 
   public long getParquetRowGroupFilterPushDownThreshold() {
     return options.getOption(PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING_THRESHOLD);
+  }
+
+  public boolean isIndexPlanningEnabled() {
+    return options.getOption(INDEX_PLANNING);
   }
 
   @Override
