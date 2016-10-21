@@ -304,7 +304,7 @@ public abstract class InfoSchemaRecordGenerator<S> {
         final String tableName = tableNameAndType.getKey();
         final TableType tableType = tableNameAndType.getValue();
         // Visit the table, and if requested ...
-        if (shouldVisitTable(schemaPath, tableName)) {
+        if (shouldVisitTable(schemaPath, tableName, tableType)) {
           visitTableWithType(schemaPath, tableName, tableType);
         }
       }
