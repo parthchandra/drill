@@ -307,12 +307,17 @@ class PageReader {
 
     // TODO - the metatdata for total size appears to be incorrect for impala generated files, need to find cause
     // and submit a bug report
-    if(parentColumnReader.totalValuesRead == parentColumnReader.columnChunkMetaData.getValueCount()) {
+    long totalValueCount = parentColumnReader.columnChunkMetaData.getValueCount();
+    if(parentColumnReader.totalValuesRead >= totalValueCount) {
       return false;
     }
     clearBuffers();
 
     nextInternal();
+    if(pageData == null || pageHeader == null){
+      //TODO: Is this an error condition or a normal condition??
+      return false;
+    }
 
     long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     timer.start();

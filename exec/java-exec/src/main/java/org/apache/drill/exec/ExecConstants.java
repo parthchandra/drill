@@ -155,6 +155,10 @@ public interface ExecConstants {
   String PARQUET_PAGEREADER_ASYNC = "store.parquet.reader.pagereader.async";
   OptionValidator PARQUET_PAGEREADER_ASYNC_VALIDATOR = new BooleanValidator(PARQUET_PAGEREADER_ASYNC, true);
 
+  // Number of pages the Async Parquet page reader will read before blocking
+  String PARQUET_PAGEREADER_QUEUE_SIZE = "store.parquet.reader.pagereader.queuesize";
+  OptionValidator PARQUET_PAGEREADER_QUEUE_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_QUEUE_SIZE, 4);
+
   String PARQUET_COLUMNREADER_ASYNC = "store.parquet.reader.columnreader.async";
   OptionValidator PARQUET_COLUMNREADER_ASYNC_VALIDATOR = new BooleanValidator(PARQUET_COLUMNREADER_ASYNC, false);
 
