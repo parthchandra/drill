@@ -249,8 +249,7 @@ public abstract class DrillHiveMetaStoreClient extends HiveMetaStoreClient {
       List<org.apache.hadoop.hive.metastore.api.Table> eachBulkofTables;
       // Retries once if the first call to fetch the metadata fails
       try {
-        eachBulkofTables =
-            DrillHiveMetaStoreClient.getTableObjectsByNameHelper(mClient, schemaName, eachBulkofTableNames);
+        eachBulkofTables = DrillHiveMetaStoreClient.getTableObjectsByNameHelper(mClient, schemaName, eachBulkofTableNames);
       } catch (Exception e) {
         logger.warn("Exception occurred while trying to read tables from {}: {}", schemaName, e.getCause());
         return ImmutableList.of();
