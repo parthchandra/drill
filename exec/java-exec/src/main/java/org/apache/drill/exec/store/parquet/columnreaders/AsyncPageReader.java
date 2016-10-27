@@ -63,10 +63,12 @@ class AsyncPageReader extends PageReader {
     asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
   }
 
-  @Override protected void loadDictionaryIfExists(final ColumnReader<?> parentStatus,
+  @Override
+  protected void loadDictionaryIfExists(final ColumnReader<?> parentStatus,
       final ColumnChunkMetaData columnChunkMetaData, final DirectBufInputStream f) throws UserException {
     if (columnChunkMetaData.getDictionaryPageOffset() > 0) {
       try {
+        assert(columnChunkMetaData.getDictionaryPageOffset() >= dataReader.getPos() );
         dataReader.skip(columnChunkMetaData.getDictionaryPageOffset() - dataReader.getPos());
       } catch (IOException e) {
         handleAndThrowException(e, "Error Reading dictionary page.");
@@ -90,12 +92,12 @@ class AsyncPageReader extends PageReader {
       isDictionary = readStatus.isDictionaryPage;
     }
     if (parentColumnReader.columnChunkMetaData.getCodec() != CompressionCodecName.UNCOMPRESSED) {
-      DrillBuf uncompressedData = data;
-      data = decompress(readStatus.getPageHeader(), uncompressedData);
+      DrillBuf compressedData = data;
+      data = decompress(readStatus.getPageHeader(), compressedData);
       synchronized (this) {
         readStatus.setPageData(null);
       }
-      uncompressedData.release();
+      compressedData.release();
     } else {
       if (isDictionary) {
         stats.totalDictPageReadBytes.addAndGet(readStatus.bytesRead);
@@ -223,8 +225,8 @@ class AsyncPageReader extends PageReader {
   @Override public void clear() {
     if (asyncPageRead != null) {
       try {
-        ReadStatus r = asyncPageRead.get();
-        r.getPageData().release();
+        final ReadStatus readStatus = asyncPageRead.get();
+        readStatus.getPageData().release();
       } catch (Exception e) {
         // Do nothing.
       }
@@ -313,7 +315,7 @@ class AsyncPageReader extends PageReader {
         long s = parent.dataReader.getPos();
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
         long e = parent.dataReader.getPos();
-        if(logger.isTraceEnabled()) {
+        if (logger.isTraceEnabled()) {
           logger.trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} ", name, s, e - s);
         }
         int compressedSize = pageHeader.getCompressed_page_size();
@@ -322,7 +324,7 @@ class AsyncPageReader extends PageReader {
         e = parent.dataReader.getPos();
         bytesRead = compressedSize;
 
-        if(logger.isTraceEnabled()) {
+        if (logger.isTraceEnabled()) {
           DrillBuf bufStart = pageData.slice(0, compressedSize>100?100:compressedSize);
           int endOffset = compressedSize>100?compressedSize-100:0;
           DrillBuf bufEnd = pageData.slice(endOffset, compressedSize-endOffset);
@@ -362,7 +364,7 @@ class AsyncPageReader extends PageReader {
   private class DecompressionHelper {
     final CompressionCodecName codecName;
 
-    public DecompressionHelper(CompressionCodecName codecName){
+    public DecompressionHelper(CompressionCodecName codecName) {
       this.codecName = codecName;
     }
 
@@ -373,6 +375,7 @@ class AsyncPageReader extends PageReader {
       // expensive copying.
       if (codecName == CompressionCodecName.GZIP) {
         GzipCodec codec = new GzipCodec();
+        // DirectDecompressor: @see https://hadoop.apache.org/docs/r2.7.2/api/org/apache/hadoop/io/compress/DirectDecompressor.html
         DirectDecompressor directDecompressor = codec.createDirectDecompressor();
         if (directDecompressor != null) {
           logger.debug("Using GZIP direct decompressor.");
@@ -391,9 +394,10 @@ class AsyncPageReader extends PageReader {
           output.put(outputBytes);
         }
       } else if (codecName == CompressionCodecName.SNAPPY) {
-        // For Snappy, just call the Snappy decompressor directly.
-        // It is thread safe. The Hadoop layers though, appear to be
-        // not quite reliable in a multithreaded environment
+        // For Snappy, just call the Snappy decompressor directly instead
+        // of going thru the DirectDecompressor class.
+        // The Snappy codec is itself thread safe, while going thru the DirectDecompressor path
+        // seems to have concurrency issues.
         output.clear();
         int size = Snappy.uncompress(input, output);
         output.limit(size);
