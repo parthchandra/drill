@@ -17,18 +17,17 @@
  */
 package org.apache.drill;
 
-import static org.apache.drill.TestBuilder.listOf;
-import static org.junit.Assert.assertEquals;
-
-import java.math.BigDecimal;
-
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.common.util.TestTools;
 import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.compile.ClassTransformer;
 import org.junit.Ignore;
 import org.junit.Test;
+
+import java.math.BigDecimal;
+
+import static org.apache.drill.TestBuilder.listOf;
+import static org.junit.Assert.assertEquals;
 
 public class TestExampleQueries extends BaseTestQuery {
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestExampleQueries.class);
@@ -1194,5 +1193,6 @@ public class TestExampleQueries extends BaseTestQuery {
         .build()
         .run();
   }
+
 
 }

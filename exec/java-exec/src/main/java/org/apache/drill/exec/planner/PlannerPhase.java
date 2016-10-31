@@ -91,6 +91,7 @@ import org.apache.drill.exec.store.StoragePlugin;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
+import org.apache.drill.exec.store.parquet.ParquetPushDownFilter;
 
 public enum PlannerPhase {
   //private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillRuleSets.class);
@@ -151,6 +152,12 @@ public enum PlannerPhase {
   PARTITION_PRUNING("Partition Prune Planning") {
     public RuleSet getRules(OptimizerRulesContext context, Collection<StoragePlugin> plugins) {
       return PlannerPhase.mergedRuleSets(getPruneScanRules(context), getStorageRules(context, plugins, this));
+    }
+  },
+
+  PHYSICAL_PARTITION_PRUNING("Physical Partition Prune Planning") {
+    public RuleSet getRules(OptimizerRulesContext context, Collection<StoragePlugin> plugins) {
+      return PlannerPhase.mergedRuleSets(getPhysicalPruneScanRules(context), getStorageRules(context, plugins, this));
     }
   },
 
@@ -337,8 +344,24 @@ public enum PlannerPhase {
             PruneScanRule.getDirFilterOnScan(optimizerRulesContext),
             ParquetPruneScanRule.getFilterOnProjectParquet(optimizerRulesContext),
             ParquetPruneScanRule.getFilterOnScanParquet(optimizerRulesContext),
+//            ParquetPushDownFilter.getFilterOnProject(optimizerRulesContext),
+//            ParquetPushDownFilter.getFilterOnScan(optimizerRulesContext),
             DrillPushLimitToScanRule.LIMIT_ON_SCAN,
             DrillPushLimitToScanRule.LIMIT_ON_PROJECT
+        )
+        .build();
+
+    return RuleSets.ofList(pruneRules);
+  }
+
+  /**
+   *   Get an immutable list of partition pruning rules that will be used in logical planning.
+   */
+  static RuleSet getPhysicalPruneScanRules(OptimizerRulesContext optimizerRulesContext) {
+    final ImmutableSet<RelOptRule> pruneRules = ImmutableSet.<RelOptRule>builder()
+        .add(
+            ParquetPushDownFilter.getFilterOnProject(optimizerRulesContext),
+            ParquetPushDownFilter.getFilterOnScan(optimizerRulesContext)
         )
         .build();
 

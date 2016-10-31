@@ -99,6 +99,9 @@ public class PlannerSettings implements Context{
   public static final LongValidator IN_SUBQUERY_THRESHOLD =
       new PositiveLongValidator("planner.in_subquery_threshold", Integer.MAX_VALUE, 20); /* Same as Calcite's default IN List subquery size */
 
+  public static final String PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING_KEY = "planner.enable_parquet_rowgroup_filter_pushdown_planning";
+  public static final BooleanValidator PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING = new BooleanValidator(PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING_KEY, true);
+
   public OptionManager options = null;
   public FunctionImplementationRegistry functionImplementationRegistry = null;
 
@@ -245,6 +248,10 @@ public class PlannerSettings implements Context{
 
   public boolean isUnionAllDistributeEnabled() {
     return options.getOption(UNIONALL_DISTRIBUTE);
+  }
+
+  public boolean isParquetRowGroupFilterPushdownPlanningEnabled() {
+    return options.getOption(PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING);
   }
 
   @Override
