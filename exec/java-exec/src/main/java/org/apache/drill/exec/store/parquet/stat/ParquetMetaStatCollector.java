@@ -112,7 +112,7 @@ public class ParquetMetaStatCollector implements  ColumnStatCollector{
     if (min != null && max != null ) {
       switch (type.getMinorType()) {
       case INT :
-      caseTIME:
+      case TIME:
         ((IntStatistics) stat).setMinMax(((Integer) min).intValue(), ((Integer) max).intValue());
         break;
       case BIGINT:
