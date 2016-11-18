@@ -33,7 +33,12 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.EndpointAffinity;
-import org.apache.drill.exec.physical.base.AbstractGroupScan;
+import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
+import org.apache.drill.exec.planner.index.IndexCollection;
+import org.apache.drill.exec.planner.index.IndexDiscover;
+import org.apache.drill.exec.planner.index.IndexDiscoverFactory;
+import org.apache.drill.exec.planner.index.MapRDBIndexDiscover;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -46,7 +51,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-public abstract class MapRDBGroupScan extends AbstractGroupScan {
+public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBGroupScan.class);
 
   protected FileSystemPlugin storagePlugin;
@@ -60,6 +65,8 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
   protected Map<Integer, List<MapRDBSubScanSpec>> endpointFragmentMapping;
 
   protected NavigableMap<TabletFragmentInfo, String> regionsToScan;
+
+  protected double costFactor = 1.0;
 
   private boolean filterPushedDown = false;
 
@@ -82,6 +89,7 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
     this.storagePlugin = that.storagePlugin;
     this.regionsToScan = that.regionsToScan;
     this.filterPushedDown = that.filterPushedDown;
+    this.costFactor = that.costFactor;
   }
 
   public MapRDBGroupScan(FileSystemPlugin storagePlugin,
@@ -280,4 +288,18 @@ public abstract class MapRDBGroupScan extends AbstractGroupScan {
 
   protected abstract MapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo key);
 
+  public void setCostFactor(double sel) {
+    this.costFactor = sel;
+  }
+
+  @Override
+  public IndexCollection getSecondaryIndexCollection(ScanPrel prel) {
+    IndexDiscover discover = IndexDiscoverFactory.getIndexDiscover(
+        getStorageConfig(), this, prel, MapRDBIndexDiscover.class);
+
+    return discover.getTableIndex(getTableName());
+  }
+
+  @JsonIgnore
+  public abstract String getTableName();
 }

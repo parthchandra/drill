@@ -15,32 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.common.logical;
+package org.apache.drill.exec.planner.index;
+
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelDistribution;
 
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import java.util.List;
 
+public interface IndexStatistics {
+    /** Returns the approximate number of rows in the table. */
+    double getRowCount();
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property="type")
-public abstract class StoragePluginConfig{
+    /** Returns the collections of columns on which this table is sorted. */
+    List<RelCollation> getCollations();
 
-  private boolean enabled = true;
+    /** Returns the distribution of the data in query result table. */
+    RelDistribution getDistribution();
 
-  public boolean isEnabled() {
-    return enabled;
-  }
-
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
-
-  @Override
-  public abstract boolean equals(Object o);
-
-  @Override
-  public abstract int hashCode();
-
-  public String getValue(String key) {
-    return null;
-  }
 }

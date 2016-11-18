@@ -38,24 +38,17 @@ import com.google.common.collect.ImmutableSet;
 public class HBaseStoragePlugin extends AbstractStoragePlugin {
   private static final HBaseConnectionManager hbaseConnectionManager = HBaseConnectionManager.INSTANCE;
 
-  private final DrillbitContext context;
   private final HBaseStoragePluginConfig storeConfig;
   private final HBaseSchemaFactory schemaFactory;
   private final HBaseConnectionKey connectionKey;
 
-  private final String name;
 
   public HBaseStoragePlugin(HBaseStoragePluginConfig storeConfig, DrillbitContext context, String name)
       throws IOException {
-    this.context = context;
+    super(context, name);
     this.schemaFactory = new HBaseSchemaFactory(this, name);
     this.storeConfig = storeConfig;
-    this.name = name;
     this.connectionKey = new HBaseConnectionKey();
-  }
-
-  public DrillbitContext getContext() {
-    return this.context;
   }
 
   @Override
@@ -118,7 +111,7 @@ public class HBaseStoragePlugin extends AbstractStoragePlugin {
     public int hashCode() {
       final int prime = 31;
       int result = 1;
-      result = prime * result + ((name == null) ? 0 : name.hashCode());
+      result = prime * result + ((getName() == null) ? 0 : getName().hashCode());
       result = prime * result + ((storeConfig == null) ? 0 : storeConfig.hashCode());
       return result;
     }
@@ -134,11 +127,11 @@ public class HBaseStoragePlugin extends AbstractStoragePlugin {
       }
 
       HBaseStoragePlugin other = ((HBaseConnectionKey) obj).getHBaseStoragePlugin();
-      if (name == null) {
-        if (other.name != null) {
+      if (getName() == null) {
+        if (other.getName() != null) {
           return false;
         }
-      } else if (!name.equals(other.name)) {
+      } else if (!getName().equals(other.getName())) {
         return false;
       }
       if (storeConfig == null) {

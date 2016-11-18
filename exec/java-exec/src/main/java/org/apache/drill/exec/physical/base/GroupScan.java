@@ -23,6 +23,7 @@ import java.util.List;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.PhysicalOperatorSetupException;
+import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 
@@ -133,5 +134,7 @@ public interface GroupScan extends Scan, HasAffinity{
    * hasFiles().  If this GroupScan cannot provide file names, it returns null.
    */
   public Collection<String> getFiles();
+
+  public void addJoinForRestrictedScan(HashJoinBatch batch, int minorFragmentId);
 
 }

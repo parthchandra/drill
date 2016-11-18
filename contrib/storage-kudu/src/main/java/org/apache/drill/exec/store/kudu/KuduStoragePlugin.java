@@ -32,20 +32,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class KuduStoragePlugin extends AbstractStoragePlugin {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(KuduStoragePlugin.class);
 
-  private final DrillbitContext context;
   private final KuduStoragePluginConfig engineConfig;
   private final KuduSchemaFactory schemaFactory;
 
-  @SuppressWarnings("unused")
-  private final String name;
   private final KuduClient client;
 
   public KuduStoragePlugin(KuduStoragePluginConfig configuration, DrillbitContext context, String name)
       throws IOException {
-    this.context = context;
+    super(context, name);
     this.schemaFactory = new KuduSchemaFactory(this, name);
     this.engineConfig = configuration;
-    this.name = name;
     this.client = new KuduClient.KuduClientBuilder(configuration.getMasterAddresses()).build();
   }
 

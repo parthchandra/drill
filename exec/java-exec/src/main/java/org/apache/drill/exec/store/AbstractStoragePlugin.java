@@ -29,13 +29,20 @@ import org.apache.drill.exec.physical.base.AbstractGroupScan;
 import org.apache.drill.exec.planner.PlannerPhase;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.drill.exec.server.DrillbitContext;
 
 /** Abstract class for StorePlugin implementations.
  * See StoragePlugin for description of the interface intent and its methods.
  */
 public abstract class AbstractStoragePlugin implements StoragePlugin {
 
-  protected AbstractStoragePlugin() { }
+  protected final DrillbitContext context;
+  final String name;
+
+  protected AbstractStoragePlugin(DrillbitContext inContext, String inName) {
+    this.context = inContext;
+    this.name = inName;
+  }
 
   @Override
   public boolean supportsRead() {
@@ -110,4 +117,12 @@ public abstract class AbstractStoragePlugin implements StoragePlugin {
 
   @Override
   public void close() throws Exception { }
+
+  public DrillbitContext getContext() {
+    return context;
+  }
+
+  public String getName() {
+    return name;
+  }
 }

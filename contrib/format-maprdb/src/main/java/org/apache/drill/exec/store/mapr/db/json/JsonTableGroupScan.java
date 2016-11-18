@@ -198,6 +198,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     return new JsonTableGroupScan(this);
   }
 
+  @Override
   @JsonIgnore
   public String getTableName() {
     return scanSpec.getTableName();

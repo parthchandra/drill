@@ -63,6 +63,7 @@ public class FileSystemPlugin extends AbstractStoragePlugin {
   private final LogicalPlanPersistence lpPersistance;
 
   public FileSystemPlugin(FileSystemConfig config, DrillbitContext context, String name) throws ExecutionSetupException{
+    super(context, name);
     this.config = config;
     this.lpPersistance = context.getLpPersistence();
     try {

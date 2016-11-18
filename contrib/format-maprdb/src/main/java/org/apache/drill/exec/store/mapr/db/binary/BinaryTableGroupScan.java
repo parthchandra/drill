@@ -202,6 +202,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
     return getFormatPlugin().getHBaseConf();
   }
 
+  @Override
   @JsonIgnore
   public String getTableName() {
     return getHBaseScanSpec().getTableName();

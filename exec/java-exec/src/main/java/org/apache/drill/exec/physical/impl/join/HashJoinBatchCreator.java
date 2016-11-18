@@ -33,6 +33,11 @@ public class HashJoinBatchCreator implements BatchCreator<HashJoinPOP> {
   public HashJoinBatch getBatch(FragmentContext context, HashJoinPOP config, List<RecordBatch> children)
       throws ExecutionSetupException {
     Preconditions.checkArgument(children.size() == 2);
-    return new HashJoinBatch(config, context, children.get(0), children.get(1));
+    HashJoinBatch hjBatch = new HashJoinBatch(config, context, children.get(0), children.get(1));
+    if (config.getScanForRowKeyJoin() != null) {
+      config.getScanForRowKeyJoin().addJoinForRestrictedScan(hjBatch, context.getHandle().getMinorFragmentId());
+    }
+    return hjBatch;
   }
+
 }

@@ -15,32 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.common.logical;
+package org.apache.drill.exec.planner.index;
 
+import org.apache.calcite.rex.RexNode;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+public class IndexConditionInfo {
+  public final RexNode indexCondition;
+  public final RexNode remainderCondition;
+  public final boolean hasIndexCol;
 
-
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property="type")
-public abstract class StoragePluginConfig{
-
-  private boolean enabled = true;
-
-  public boolean isEnabled() {
-    return enabled;
+  public IndexConditionInfo(RexNode indexCondition, RexNode remainderCondition, boolean hasIndexCol) {
+    this.indexCondition = indexCondition;
+    this.remainderCondition = remainderCondition;
+    this.hasIndexCol = hasIndexCol;
   }
 
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
-
-  @Override
-  public abstract boolean equals(Object o);
-
-  @Override
-  public abstract int hashCode();
-
-  public String getValue(String key) {
-    return null;
-  }
 }

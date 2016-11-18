@@ -65,7 +65,8 @@ public class SwapHashJoinVisitor extends BasePrelVisitor<Prel, Double, RuntimeEx
   public Prel visitJoin(JoinPrel prel, Double value) throws RuntimeException {
     JoinPrel newJoin = (JoinPrel) visitPrel(prel, value);
 
-    if (prel instanceof HashJoinPrel) {
+    if (prel instanceof HashJoinPrel &&
+        !((HashJoinPrel) prel).isRowKeyJoin() /* don't swap for rowkey joins */) {
       // Mark left/right is swapped, when INNER hash join's left row count < ( 1+ margin factor) right row count.
       if (newJoin.getLeft().getRows() < (1 + value.doubleValue() ) * newJoin.getRight().getRows() &&
           newJoin.getJoinType() == JoinRelType.INNER) {

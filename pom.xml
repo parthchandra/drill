@@ -39,7 +39,7 @@
     <janino.version>2.7.6</janino.version>
     <sqlline.version>1.1.9-drill-r7</sqlline.version>
     <jackson.version>2.7.8</jackson.version>
-    <mapr.release.version>5.2.2-mapr</mapr.release.version>
+    <mapr.release.version>6.0.0-sidev-SNAPSHOT</mapr.release.version>
     <ojai.version>1.1</ojai.version>
     <kerby.version>1.0.0-RC2</kerby.version>
     <findbugs.version>3.0.0</findbugs.version>

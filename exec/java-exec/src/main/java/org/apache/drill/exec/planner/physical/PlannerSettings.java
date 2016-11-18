@@ -83,6 +83,7 @@ public class PlannerSettings implements Context{
       INITIAL_OFF_HEAP_ALLOCATION_IN_BYTES, MAX_OFF_HEAP_ALLOCATION_IN_BYTES);
   public static final String UNIONALL_DISTRIBUTE_KEY = "planner.enable_unionall_distribute";
   public static final BooleanValidator UNIONALL_DISTRIBUTE = new BooleanValidator(UNIONALL_DISTRIBUTE_KEY);
+  public static final BooleanValidator INDEX_PLANNING = new BooleanValidator("planner.enable_index_planning");
 
   public static final OptionValidator IDENTIFIER_MAX_LENGTH =
       new RangeLongValidator("planner.identifier_max_length", 128 /* A minimum length is needed because option names are identifiers themselves */,
@@ -313,6 +314,10 @@ public class PlannerSettings implements Context{
 
   public boolean isJoinOptimizationEnabled() {
     return options.getOption(JOIN_OPTIMIZATION);
+  }
+
+  public boolean isIndexPlanningEnabled() {
+    return options.getOption(INDEX_PLANNING);
   }
 
   @Override

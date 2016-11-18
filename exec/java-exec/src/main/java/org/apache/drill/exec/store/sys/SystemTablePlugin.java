@@ -46,15 +46,12 @@ public class SystemTablePlugin extends AbstractStoragePlugin {
 
   public static final String SYS_SCHEMA_NAME = "sys";
 
-  private final DrillbitContext context;
-  private final String name;
   private final SystemTablePluginConfig config;
   private final SystemSchema schema = new SystemSchema();
 
   public SystemTablePlugin(SystemTablePluginConfig config, DrillbitContext context, String name) {
+    super(context, name);
     this.config = config;
-    this.context = context;
-    this.name = name;
   }
 
   @Override
@@ -104,7 +101,7 @@ public class SystemTablePlugin extends AbstractStoragePlugin {
     public DrillTable getTable(String name) {
       for (SystemTable table : SystemTable.values()) {
         if (table.getTableName().equalsIgnoreCase(name)) {
-          return new StaticDrillTable(SystemTablePlugin.this.name, SystemTablePlugin.this, TableType.SYSTEM_TABLE,
+          return new StaticDrillTable(SystemTablePlugin.this.getName(), SystemTablePlugin.this, TableType.SYSTEM_TABLE,
             table, new PojoDataType(table.getPojoClass()));
         }
       }

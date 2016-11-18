@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.physical.impl.common;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.exec.compile.TemplateClassDefinition;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.memory.BufferAllocator;
@@ -77,6 +78,10 @@ public interface HashTable {
   public void setMaxVarcharSize(int size);
 
   public boolean outputKeys(int batchIdx, VectorContainer outContainer, int outStartIndex, int numRecords, int numExpectedRecords);
+  public void addNewKeyBatch();
+
+  public Pair<VectorContainer, Integer> nextBatch();
+
 }
 
 

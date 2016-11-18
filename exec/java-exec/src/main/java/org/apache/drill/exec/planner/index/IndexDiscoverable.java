@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,32 +15,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.common.logical;
+package org.apache.drill.exec.planner.index;
+
+import org.apache.drill.exec.planner.logical.DrillTable;
 
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
+/**
+ * SchemaFactory of a storage plugin that can used to store index tables should expose this interface to allow
+ * IndexDiscovers discovering the index table without adding dependency to the storage plugin.
+ */
+public interface IndexDiscoverable {
 
+  /**
+   * return the found DrillTable with path (e.g. names={"elasticsearch", "staffidx", "stjson"})
+   * @param discover
+   * @param desc
+   * @return
+   */
+    DrillTable findTable(IndexDiscover discover, DrillIndexDescriptor desc);
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property="type")
-public abstract class StoragePluginConfig{
-
-  private boolean enabled = true;
-
-  public boolean isEnabled() {
-    return enabled;
-  }
-
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
-
-  @Override
-  public abstract boolean equals(Object o);
-
-  @Override
-  public abstract int hashCode();
-
-  public String getValue(String key) {
-    return null;
-  }
 }
