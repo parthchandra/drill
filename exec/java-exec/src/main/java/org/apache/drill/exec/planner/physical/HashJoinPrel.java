@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.calcite.rel.core.Join;
 import org.apache.drill.common.logical.data.JoinCondition;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.physical.impl.join.JoinUtils;
@@ -42,23 +43,25 @@ import com.google.common.collect.Lists;
 public class HashJoinPrel  extends JoinPrel {
 
   private boolean swapped = false;
+  protected GroupScan scanForRowKeyJoin = null;
 
   public HashJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
                       JoinRelType joinType) throws InvalidRelException {
-    this(cluster, traits, left, right, condition, joinType, false);
+    this(cluster, traits, left, right, condition, joinType, false, null);
   }
 
   public HashJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
-      JoinRelType joinType, boolean swapped) throws InvalidRelException {
+      JoinRelType joinType, boolean swapped, GroupScan scanForRowKeyJoin) throws InvalidRelException {
     super(cluster, traits, left, right, condition, joinType);
     this.swapped = swapped;
+    this.scanForRowKeyJoin = scanForRowKeyJoin;
     joincategory = JoinUtils.getJoinCategory(left, right, condition, leftKeys, rightKeys, filterNulls);
   }
 
   @Override
   public Join copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     try {
-      return new HashJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType, this.swapped);
+      return new HashJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType, this.swapped, scanForRowKeyJoin);
     }catch (InvalidRelException e) {
       throw new AssertionError(e);
     }
@@ -80,9 +83,9 @@ public class HashJoinPrel  extends JoinPrel {
     // Depending on whether the left/right is swapped for hash inner join, pass in different
     // combinations of parameters.
     if (! swapped) {
-      return getHashJoinPop(creator, left, right, leftKeys, rightKeys);
+      return getHashJoinPop(creator, left, right, leftKeys, rightKeys, scanForRowKeyJoin);
     } else {
-      return getHashJoinPop(creator, right, left, rightKeys, leftKeys);
+      return getHashJoinPop(creator, right, left, rightKeys, leftKeys, scanForRowKeyJoin);
     }
   }
 
@@ -97,7 +100,8 @@ public class HashJoinPrel  extends JoinPrel {
   }
 
   private PhysicalOperator getHashJoinPop(PhysicalPlanCreator creator, RelNode left, RelNode right,
-                                          List<Integer> leftKeys, List<Integer> rightKeys) throws IOException{
+                                          List<Integer> leftKeys, List<Integer> rightKeys,
+                                          GroupScan scanForRowKeyJoin) throws IOException{
     final List<String> fields = getRowType().getFieldNames();
     assert isUnique(fields);
 
@@ -113,7 +117,7 @@ public class HashJoinPrel  extends JoinPrel {
 
     buildJoinConditions(conditions, leftFields, rightFields, leftKeys, rightKeys);
 
-    HashJoinPOP hjoin = new HashJoinPOP(leftPop, rightPop, conditions, jtype);
+    HashJoinPOP hjoin = new HashJoinPOP(leftPop, rightPop, conditions, jtype, scanForRowKeyJoin);
     return creator.addMetadata(this, hjoin);
   }
 

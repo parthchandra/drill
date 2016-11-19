@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.exec.physical.base.AbstractBase;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.PhysicalVisitor;
 import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
@@ -44,19 +45,31 @@ public class HashJoinPOP extends AbstractBase {
     private final PhysicalOperator right;
     private final List<JoinCondition> conditions;
     private final JoinRelType joinType;
+    private final GroupScan scanForRowKeyJoin;
+
+    public HashJoinPOP(
+            PhysicalOperator left,
+            PhysicalOperator right,
+            List<JoinCondition> conditions,
+            JoinRelType joinType
+    ) {
+        this(left, right, conditions, joinType, null);
+    }
 
     @JsonCreator
     public HashJoinPOP(
             @JsonProperty("left") PhysicalOperator left,
             @JsonProperty("right") PhysicalOperator right,
             @JsonProperty("conditions") List<JoinCondition> conditions,
-            @JsonProperty("joinType") JoinRelType joinType
+            @JsonProperty("joinType") JoinRelType joinType,
+            @JsonProperty("scanForRowKeyJoin") GroupScan scanForRowKeyJoin
     ) {
         this.left = left;
         this.right = right;
         this.conditions = conditions;
         Preconditions.checkArgument(joinType != null, "Join type is missing!");
         this.joinType = joinType;
+        this.scanForRowKeyJoin = scanForRowKeyJoin;
     }
 
     @Override
@@ -67,7 +80,7 @@ public class HashJoinPOP extends AbstractBase {
     @Override
     public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
         Preconditions.checkArgument(children.size() == 2);
-        return new HashJoinPOP(children.get(0), children.get(1), conditions, joinType);
+        return new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, scanForRowKeyJoin);
     }
 
     @Override
@@ -91,13 +104,17 @@ public class HashJoinPOP extends AbstractBase {
         return conditions;
     }
 
+    public GroupScan getScanForRowKeyJoin() {
+      return scanForRowKeyJoin;
+    }
+
     public HashJoinPOP flipIfRight(){
         if(joinType == JoinRelType.RIGHT){
             List<JoinCondition> flippedConditions = Lists.newArrayList();
             for(JoinCondition c : conditions){
                 flippedConditions.add(c.flip());
             }
-            return new HashJoinPOP(right, left, flippedConditions, JoinRelType.LEFT);
+            return new HashJoinPOP(right, left, flippedConditions, JoinRelType.LEFT, scanForRowKeyJoin);
         }else{
             return this;
         }
