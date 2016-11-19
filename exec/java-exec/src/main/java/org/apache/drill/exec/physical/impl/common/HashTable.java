@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.physical.impl.common;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.exec.compile.TemplateClassDefinition;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
@@ -75,6 +76,9 @@ public interface HashTable {
   public boolean outputKeys(int batchIdx, VectorContainer outContainer, int outStartIndex, int numRecords);
 
   public void addNewKeyBatch();
+
+  public Pair<VectorContainer, Integer> nextBatch();
+
 }
 
 

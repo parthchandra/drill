@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.google.common.collect.Lists;
+
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.common.logical.data.NamedExpression;
@@ -59,6 +60,7 @@ import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.AbstractContainerVector;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.commons.lang3.tuple.Pair;
 
 import com.sun.codemodel.JExpr;
 import com.sun.codemodel.JExpression;
@@ -110,6 +112,11 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
   // Schema of the build side
   private BatchSchema rightSchema = null;
 
+  // Whether this HashJoin is used for a row-key based join
+  private boolean isRowKeyJoin = false;
+
+  // An iterator over the build side hash table (only applicable for row-key joins)
+  private boolean buildComplete = false;
 
   // Generator mapping for the build side
   // Generator mapping for the build side : scalar
@@ -221,6 +228,25 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
         // Build the hash table, using the build side record batches.
         executeBuildPhase();
         //                IterOutcome next = next(HashJoinHelper.LEFT_INPUT, left);
+
+        buildComplete = true;
+
+        if (isRowKeyJoin) {
+          // discard the first left batch which was fetched by buildSchema, and get the new
+          // one based on rowkey join
+          leftUpstream = next(left);
+
+          if (leftUpstream == IterOutcome.STOP || rightUpstream == IterOutcome.STOP) {
+            state = BatchState.STOP;
+            return leftUpstream;
+          }
+
+          if (leftUpstream == IterOutcome.OUT_OF_MEMORY || rightUpstream == IterOutcome.OUT_OF_MEMORY) {
+            state = BatchState.OUT_OF_MEMORY;
+            return leftUpstream;
+          }
+        }
+
         hashJoinProbe.setupHashJoinProbe(context, hyperContainer, left, left.getRecordCount(), this, hashTable,
             hjHelper, joinType);
 
@@ -515,6 +541,19 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
     stats.setLongStat(Metric.NUM_ENTRIES, htStats.numEntries);
     stats.setLongStat(Metric.NUM_RESIZING, htStats.numResizing);
     stats.setLongStat(Metric.RESIZING_TIME, htStats.resizingTime);
+  }
+
+  /**
+   * Get the hash table iterator that is created for the build side of the hash join if
+   * this hash join was instantiated as a row-key join.
+   * @return hash table iterator or null if this hash join was not a row-key join or if it
+   * was a row-key join but the build has not yet completed.
+   */
+  public Pair<VectorContainer, Integer> nextBuildBatch() {
+    if (buildComplete) {
+      return hashTable.nextBatch();
+    }
+    return null;
   }
 
   @Override
