@@ -45,7 +45,7 @@ public abstract class SubsetTransformer<T extends RelNode, E extends Exception> 
 
   }
 
-  boolean go(T n, RelNode candidateSet) throws E {
+  public boolean go(T n, RelNode candidateSet) throws E {
     if ( !(candidateSet instanceof RelSubset) ) {
       return false;
     }

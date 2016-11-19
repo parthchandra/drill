@@ -37,9 +37,6 @@ import java.util.Set;
 public abstract class IndexDiscoverBase implements IndexDiscover {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexDiscoverBase.class);
 
-  //from ElasticSearchConstant
-  static final String ES_CONFIG_KEY_CLUSTER = "elasticsearch.config.cluster";
-
   private AbstractDbGroupScan scan; // group scan corresponding to the primary table
   private ScanPrel scanPrel;   // physical scan rel corresponding to the primary table
 
@@ -52,11 +49,9 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
     return scan;
   }
 
-
   public ScanPrel getOriginalScanPrel() {
     return scanPrel;
   }
-
 
   public IndexCollection getTableIndex(String tableName, String storageName, Collection<DrillIndexDefinition>  indexDefs ) {
     Set<DrillIndexDescriptor> idxSet = new HashSet<>();
