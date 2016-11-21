@@ -101,7 +101,7 @@ public class SystemTablePlugin extends AbstractStoragePlugin {
     public DrillTable getTable(String name) {
       for (SystemTable table : SystemTable.values()) {
         if (table.getTableName().equalsIgnoreCase(name)) {
-          return new StaticDrillTable(SystemTablePlugin.this.name, SystemTablePlugin.this, TableType.SYSTEM_TABLE,
+          return new StaticDrillTable(SystemTablePlugin.this.getName(), SystemTablePlugin.this, TableType.SYSTEM_TABLE,
             table, new PojoDataType(table.getPojoClass()));
         }
       }

@@ -17,6 +17,8 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.collect.Maps;
 import org.apache.calcite.rel.RelNode;
 
 import org.apache.calcite.rex.RexNode;
@@ -29,6 +31,7 @@ import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 
 public class DrillIndexDescriptor extends AbstractIndexDescriptor {
@@ -39,6 +42,8 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   private String storage;
 
   private DrillTable table;
+
+  private Map<String, Object> extraInfo = Maps.newHashMap();
 
   public DrillIndexDescriptor(List<SchemaPath> indexCols,
                                List<SchemaPath> nonIndexCols,
@@ -56,14 +61,8 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
 
   @Override
   public double getRows(RelNode scan, RexNode indexCondition) {
-
-    IndexGroupScan idxScan = getIndexGroupScan();
-
-    ScanPrel indexScanPrel = new ScanPrel(scan.getCluster(),
-        scan.getTraitSet(), idxScan, scan.getRowType());
-
-    IndexStatistics idxstat = getDrillTable().getIndexStatistic(indexScanPrel, indexCondition);
-    return idxstat.getRowCount();
+    //TODO: real implementation is to use Drill's stats implementation. for now return fake value 1.0
+    return 1.0;
   }
 
   @Override
@@ -108,6 +107,18 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
     return this.table;
   }
 
+
+  @JsonIgnore
+  @Override
+  public Object getExtraInfo(String key) {
+    return extraInfo.get(key);
+  }
+
+  @JsonIgnore
+  @Override
+  public void setExtraInfo(String key, Object info) {
+    extraInfo.put(key, info);
+  }
 
 
 }

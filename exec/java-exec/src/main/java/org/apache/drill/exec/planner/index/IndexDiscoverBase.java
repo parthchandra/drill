@@ -83,24 +83,12 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
     }catch (Exception e) {
       logger.error("No storage found {}. Exception thrown {}", storageName, e);
     }
-
     if(plugin == null) {
       logger.warn("No correspondent storage found {}", storageName);
       return null;
     }
-
-    //get table object for this index
-
-    SchemaFactory schemaFactory =
-        ((AbstractStoragePlugin) plugin).getSchemaFactory();
-    if (! ( schemaFactory instanceof IndexDiscoverable ) ) {
-      logger.warn("This Storage plugin does not support IndexDiscoverable interface: {}",
-          plugin.toString());
-      return null;
-    }
-    DrillTable foundTable = ((IndexDiscoverable) schemaFactory).findTable(this, hbaseIdx);
-    return foundTable;
-
+    //XX: get table object for this index, index storage plugin should provide interface to get the DrillTable object
+    return null;
   }
 
   /**

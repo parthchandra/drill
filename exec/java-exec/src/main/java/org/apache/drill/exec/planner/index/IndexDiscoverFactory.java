@@ -40,7 +40,7 @@ public class IndexDiscoverFactory {
     try {
       if (config != null ) {
         String discoverClassName = config.getValue(INDEX_DISCOVER_CLASS_KEY);
-        if(discoverClassName != "") {
+        if(discoverClassName!= null && discoverClassName != "") {
           discoverClass = Class.forName(discoverClassName);
         }
       }

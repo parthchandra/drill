@@ -40,4 +40,7 @@ public abstract class StoragePluginConfig{
   @Override
   public abstract int hashCode();
 
+  public String getValue(String key) {
+    return null;
+  }
 }

@@ -32,7 +32,7 @@ public abstract class AbstractIndexGroupScan extends AbstractGroupScan implement
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexGroupScan.class);
 
   protected Pair<RexNode, Long> conditionRowCountPair;
-  protected long maxRowCount = ScanStats.DEFAULT_ROW_COUNT;
+  protected long maxRowCount = ScanStats.TRIVIAL_TABLE.getRecordCount();
   public AbstractIndexGroupScan(String userName) {
     super(userName);
     conditionRowCountPair = new Pair<>((RexNode)null, (long)0);
