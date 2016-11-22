@@ -18,10 +18,11 @@
 package org.apache.drill.exec.planner.index;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.List;
+import java.util.Set;
 
 public class DrillIndexDefinition implements IndexDefinition {
   /**
@@ -74,12 +75,13 @@ public class DrillIndexDefinition implements IndexDefinition {
     return id;
   }
 
+
   @Override
   public boolean isCoveringIndex(List<SchemaPath> columns) {
-    List<SchemaPath> allColumns = Lists.newArrayList();
+    Set<SchemaPath> allColumns = Sets.newHashSet();
     allColumns.addAll(indexColumns);
     allColumns.addAll(nonIndexColumns);
-    return allColumns.contains(columns);
+    return allColumns.containsAll(columns);
   }
 
   @Override

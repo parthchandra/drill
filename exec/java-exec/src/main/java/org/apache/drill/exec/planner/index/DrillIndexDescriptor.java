@@ -55,7 +55,7 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   }
 
   public DrillIndexDescriptor(DrillIndexDefinition def) {
-    this(def.indexColumns, def.indexColumns, def.rowKeyColumns, def.indexName,
+    this(def.indexColumns, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
         def.getTableName(), def.getIndexType());
   }
 
