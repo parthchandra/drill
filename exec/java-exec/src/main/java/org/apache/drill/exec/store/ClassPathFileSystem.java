@@ -28,7 +28,9 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Progressable;
 
 import com.google.common.io.Resources;
@@ -101,6 +103,11 @@ public class ClassPathFileSystem extends FileSystem{
   @Override
   public FileStatus[] listStatus(Path arg0) throws IOException {
     throw new UnsupportedOperationException("ClassPathFileSystem doesn't currently support listing files.");
+  }
+
+  @Override
+  public void access(Path path, FsAction mode) throws AccessControlException {
+    throw new UnsupportedOperationException("ClassPathFileSystem doesn't currently support checking access of files.");
   }
 
   @Override
