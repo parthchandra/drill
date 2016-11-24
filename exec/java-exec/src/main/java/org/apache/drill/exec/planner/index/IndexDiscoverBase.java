@@ -73,7 +73,7 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
    * @param idxDesc
    * @return
    */
-  public DrillTable externalGetDrillTable(IndexDescriptor idxDesc) {
+  public DrillTable getExternalDrillTable(IndexDescriptor idxDesc) {
     DrillIndexDescriptor hbaseIdx = (DrillIndexDescriptor)idxDesc;
 
     StoragePlugin plugin = null;
@@ -108,10 +108,10 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
    */
   public DrillTable buildDrillTable(IndexDescriptor idxDesc) {
     if(idxDesc.getIndexType() == IndexDescriptor.IndexType.EXTERNAL_SECONDARY_INDEX) {
-      return externalGetDrillTable(idxDesc);
+      return getExternalDrillTable(idxDesc);
     }
     else {
-      return nativeGetDrillTable(idxDesc);
+      return getNativeDrillTable(idxDesc);
     }
   }
 
@@ -123,6 +123,6 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
    * @param idxDesc
    * @return
    */
-  public abstract DrillTable nativeGetDrillTable(IndexDescriptor idxDesc);
+  public abstract DrillTable getNativeDrillTable(IndexDescriptor idxDesc);
 
 }

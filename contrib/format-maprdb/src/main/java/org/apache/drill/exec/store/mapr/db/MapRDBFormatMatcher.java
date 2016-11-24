@@ -19,10 +19,19 @@ package org.apache.drill.exec.store.mapr.db;
 
 import java.io.IOException;
 
+import org.apache.drill.exec.planner.index.IndexDescriptor;
+import org.apache.drill.exec.planner.logical.DrillTable;
+import org.apache.drill.exec.planner.logical.DynamicDrillTable;
+import org.apache.drill.exec.store.dfs.DrillFileSystem;
+import org.apache.drill.exec.store.dfs.FileSelection;
+import org.apache.drill.exec.store.dfs.FileSystemPlugin;
+import org.apache.drill.exec.store.dfs.FormatSelection;
 import org.apache.drill.exec.store.mapr.TableFormatMatcher;
 import org.apache.drill.exec.store.mapr.TableFormatPlugin;
+import org.apache.hadoop.fs.FileStatus;
 
 import com.mapr.fs.MapRFileStatus;
+import com.mapr.fs.tables.IndexDesc;
 
 public class MapRDBFormatMatcher extends TableFormatMatcher {
 
@@ -37,6 +46,43 @@ public class MapRDBFormatMatcher extends TableFormatMatcher {
         .getTableProperties(status.getPath())
         .getAttr()
         .getIsMarlinTable();
+  }
+
+  /**
+   * Get an instance of DrillTable for a particular native secondary index
+   * @param fs
+   * @param selection
+   * @param fsPlugin
+   * @param storageEngineName
+   * @param userName
+   * @param secondaryIndexDesc
+   * @return
+   * @throws IOException
+   */
+  public DrillTable isReadableIndex(DrillFileSystem fs,
+      FileSelection selection, FileSystemPlugin fsPlugin,
+      String storageEngineName, String userName,
+      IndexDescriptor secondaryIndexDesc) throws IOException {
+    FileStatus status = selection.getFirstPath(fs);
+
+    if (!isFileReadable(fs, status)) {
+      return null;
+    }
+
+    MapRDBFormatPlugin fp = (MapRDBFormatPlugin) getFormatPlugin();
+    DrillTable dt = new DynamicDrillTable(fsPlugin,
+        storageEngineName,
+        userName,
+        new FormatSelection(fp.getConfig(),
+            selection));
+
+    // TODO:  Create groupScan using index descriptor
+//    dt.setGroupScan(fp.getGroupScan(userName,
+//        selection,
+//        null /* columns */,
+//        secondaryIndexDesc));
+
+    return dt;
   }
 
 }

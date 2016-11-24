@@ -54,11 +54,4 @@ public interface IndexDescriptor extends IndexDefinition {
    */
   public boolean supportsFullTextSearch();
 
-  /**
-   * set/get method set/get extra info of this index.
-   */
-  void setExtraInfo(String key, Object info);
-
-  Object getExtraInfo(String key);
-
 }

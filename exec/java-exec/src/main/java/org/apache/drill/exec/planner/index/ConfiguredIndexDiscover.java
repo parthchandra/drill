@@ -111,7 +111,7 @@ public class ConfiguredIndexDiscover extends IndexDiscoverBase {
   }
 
   @Override
-  public DrillTable nativeGetDrillTable(IndexDescriptor idxDesc) {
+  public DrillTable getNativeDrillTable(IndexDescriptor idxDesc) {
     //XXX to implement for maprdb
     return null;
   }

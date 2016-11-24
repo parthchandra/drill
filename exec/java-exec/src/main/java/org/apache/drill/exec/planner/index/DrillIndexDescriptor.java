@@ -107,18 +107,4 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
     return this.table;
   }
 
-
-  @JsonIgnore
-  @Override
-  public Object getExtraInfo(String key) {
-    return extraInfo.get(key);
-  }
-
-  @JsonIgnore
-  @Override
-  public void setExtraInfo(String key, Object info) {
-    extraInfo.put(key, info);
-  }
-
-
 }

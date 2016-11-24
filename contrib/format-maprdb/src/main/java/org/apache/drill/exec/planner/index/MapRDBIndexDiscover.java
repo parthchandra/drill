@@ -22,6 +22,7 @@ package org.apache.drill.exec.planner.index;
 import com.mapr.fs.MapRFileSystem;
 import com.mapr.fs.tables.IndexDesc;
 import com.mapr.fs.tables.IndexFieldDesc;
+
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
@@ -34,6 +35,7 @@ import org.apache.drill.exec.store.dfs.DrillFileSystem;
 import org.apache.drill.exec.store.dfs.FileSelection;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.dfs.FormatMatcher;
+import org.apache.drill.exec.store.mapr.db.MapRDBFormatMatcher;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
 import org.apache.hadoop.conf.Configuration;
@@ -115,8 +117,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
   }
 
   @Override
-  public DrillTable nativeGetDrillTable(IndexDescriptor idxDesc) {
-    //IndexDesc origDesc = (IndexDesc)idxDesc.getExtraInfo("desc");
+  public DrillTable getNativeDrillTable(IndexDescriptor idxDescriptor) {
 
     try {
       final AbstractDbGroupScan origScan = getOriginalScan();
@@ -127,10 +128,10 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       FileSystemPlugin fsPlugin = ((MapRDBGroupScan) origScan).getStoragePlugin();
 
       DrillFileSystem fs = new DrillFileSystem(fsPlugin.getFsConf());
-      FormatMatcher matcher = maprFormatPlugin.getMatcher();
-      FileSelection fsSelection = deriveFSSelection(fs, idxDesc);
-      return matcher.isReadable(fs, fsSelection, fsPlugin, fsPlugin.getName(),
-              UserGroupInformation.getCurrentUser().getUserName());
+      MapRDBFormatMatcher matcher = (MapRDBFormatMatcher)(maprFormatPlugin.getMatcher());
+      FileSelection fsSelection = deriveFSSelection(fs, idxDescriptor);
+      return matcher.isReadableIndex(fs, fsSelection, fsPlugin, fsPlugin.getName(),
+              UserGroupInformation.getCurrentUser().getUserName(), idxDescriptor);
 
     }
     catch(Exception e) {
