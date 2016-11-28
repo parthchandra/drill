@@ -222,4 +222,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     return scanSpec;
   }
 
+  @Override
+  public boolean supportsSecondaryIndex() {
+    return true;
+  }
+
 }
