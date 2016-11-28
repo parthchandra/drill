@@ -144,6 +144,9 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     if(fieldName.contains(":")) {
       return SchemaPath.getCompoundPath(fieldName.split(":"));
     }
+    else if(fieldName.contains(".")) {
+      return SchemaPath.getCompoundPath(fieldName.split("\\."));
+    }
     return SchemaPath.getSimplePath(fieldName);
   }
 
@@ -156,24 +159,24 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
   }
 
   private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc) {
-    List<SchemaPath> rowkey = new ArrayList<>();
-    rowkey.add(fieldName2SchemaPath("row_key"));
-    IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.EXTERNAL_SECONDARY_INDEX;
-
-    if (desc.getSystem().equalsIgnoreCase("maprdb")) {
-      idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
+    if( desc.isExternal() ) {
+      //XX: not support external index
+      return null;
     }
 
-    DrillIndexDescriptor idx = new DrillIndexDescriptor (
+    IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
+
+    DrillIndexDescriptor idx = new MapRDBIndexDescriptor (
         field2SchemaPath(desc.getIndexedFields()),
         field2SchemaPath(desc.getCoveredFields()),
-        rowkey,
+        null,
         desc.getIndexName(),
         tableName,
-        idxType);
+        idxType,
+        desc.getIndexFidMsg());
 
-    Map.Entry<String, StoragePlugin> idxEntry = getExternalIdxStorage(desc.getCluster());
-    materializeIndex(idxEntry.getKey(), idx);
+    String storageName = this.getOriginalScan().getStoragePlugin().getName();
+    materializeIndex(storageName, idx);
     return idx;
   }
 
