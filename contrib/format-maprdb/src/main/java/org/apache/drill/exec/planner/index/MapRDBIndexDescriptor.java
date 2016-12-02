@@ -23,23 +23,23 @@ import java.util.List;
 
 public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
 
-  protected Object fidMsg;
+  protected Object desc;
   public MapRDBIndexDescriptor(List<SchemaPath> indexCols,
                                List<SchemaPath> nonIndexCols,
                                List<SchemaPath> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type,
-                               Object fidMsg) {
+                               Object desc) {
     super(indexCols, nonIndexCols, rowKeyColumns, indexName, tableName, type);
-    fidMsg = fidMsg;
+    this.desc = desc;
   }
 
-  public Object getFidMsg(){
-    return fidMsg;
+  public Object getOriginalDesc(){
+    return desc;
   }
 
-  public void setFidMsg(Object msg) {
-    fidMsg = msg;
+  public void setOriginalDesc(Object desc) {
+    this.desc = desc;
   }
 }
