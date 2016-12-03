@@ -173,7 +173,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         desc.getIndexName(),
         tableName,
         idxType,
-        desc);
+        desc.getIndexFid());
 
     String storageName = this.getOriginalScan().getStoragePlugin().getName();
     materializeIndex(storageName, idx);
