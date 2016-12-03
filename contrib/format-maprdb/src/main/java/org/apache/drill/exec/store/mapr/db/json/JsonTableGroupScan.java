@@ -51,6 +51,8 @@ import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TabletInfo;
 import com.mapr.db.impl.TabletInfoImpl;
+import com.mapr.fs.tables.IndexDesc;
+import com.mapr.fs.tables.IndexFieldDesc;
 
 @JsonTypeName("maprdb-json-scan")
 public class JsonTableGroupScan extends MapRDBGroupScan {
@@ -104,25 +106,21 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     logger.debug("Getting tablet locations");
     try {
       Configuration conf = new Configuration();
-      Table t = MapRDB.getTable(scanSpec.getTableName());
+      Table t;
+      if (scanSpec.isSecondaryIndex()) {
+          t = MapRDB.getIndexTable(scanSpec.getPrimaryTablePath(),
+                                   scanSpec.getIndexFid(),
+                                   scanSpec.getIndexName());
+      } else {
+          t = MapRDB.getTable(scanSpec.getTableName());
+      }
       TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
-      boolean foundStartRegion = false;
       regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       for (TabletInfo tabletInfo : tabletInfos) {
         TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) tabletInfo;
-        if (!foundStartRegion
-            && !isNullOrEmpty(scanSpec.getStartRow())
-            && !tabletInfoImpl.containsRow(scanSpec.getStartRow())) {
-          continue;
-        }
-        foundStartRegion = true;
         regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), tabletInfo.getLocations()[0]);
-        if (!isNullOrEmpty(scanSpec.getStopRow())
-            && tabletInfoImpl.containsRow(scanSpec.getStopRow())) {
-          break;
-        }
       }
     } catch (Exception e) {
       throw new DrillRuntimeException("Error getting region info for table: " + scanSpec.getTableName(), e);
@@ -170,6 +168,14 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   @JsonIgnore
   public String getTableName() {
     return scanSpec.getTableName();
+  }
+
+  public IndexDesc getIndexDesc() {
+    return scanSpec.getIndexDesc();
+  }
+
+  public IndexFieldDesc[] getIndexedFields() {
+    return scanSpec.getIndexedFields();
   }
 
   public boolean isDisablePushdown() {
