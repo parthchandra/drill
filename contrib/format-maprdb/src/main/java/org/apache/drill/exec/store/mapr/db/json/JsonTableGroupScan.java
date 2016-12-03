@@ -50,6 +50,8 @@ import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TabletInfo;
 import com.mapr.db.impl.TabletInfoImpl;
+import com.mapr.fs.tables.IndexDesc;
+import com.mapr.fs.tables.IndexFieldDesc;
 
 @JsonTypeName("maprdb-json-scan")
 public class JsonTableGroupScan extends MapRDBGroupScan {
@@ -144,15 +146,21 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     try {
       Configuration conf = new Configuration();
 
-      // Fetch table and tabletInfo only once and cache.
-      table = MapRDB.getTable(scanSpec.getTableName());
-      tabletInfos = table.getTabletInfos(scanSpec.getCondition());
+      Table t;
+      if (scanSpec.isSecondaryIndex()) {
+          t = MapRDB.getIndexTable(scanSpec.getPrimaryTablePath(),
+                                   scanSpec.getIndexFid(),
+                                   scanSpec.getIndexName());
+      } else {
+          t = MapRDB.getTable(scanSpec.getTableName());
+      }
+      TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
+      tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
-      // Calculate totalRowCount for the table from tabletInfos estimatedRowCount.
-      // This will avoid calling expensive MapRDBTableStats API to get total rowCount, avoiding
-      // duplicate work and RPCs to MapR DB server.
+      regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       for (TabletInfo tabletInfo : tabletInfos) {
-        totalRowCount += tabletInfo.getEstimatedNumRows();
+        TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) tabletInfo;
+        regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), tabletInfo.getLocations()[0]);
       }
 
       computeRegionsToScan();
@@ -202,6 +210,14 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   @JsonIgnore
   public String getTableName() {
     return scanSpec.getTableName();
+  }
+
+  public IndexDesc getIndexDesc() {
+    return scanSpec.getIndexDesc();
+  }
+
+  public IndexFieldDesc[] getIndexedFields() {
+    return scanSpec.getIndexedFields();
   }
 
   public boolean isDisablePushdown() {

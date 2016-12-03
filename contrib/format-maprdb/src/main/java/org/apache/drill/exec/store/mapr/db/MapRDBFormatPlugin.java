@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
 import com.mapr.fs.tables.TableProperties;
+import com.mapr.fs.tables.IndexDesc;
 
 public class MapRDBFormatPlugin extends TableFormatPlugin {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBFormatPlugin.class);
@@ -70,21 +71,26 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
     return ImmutableSet.of(MapRDBPushFilterIntoScan.FILTER_ON_SCAN, MapRDBPushFilterIntoScan.FILTER_ON_PROJECT);
   }
 
-  @Override
   public AbstractGroupScan getGroupScan(String userName, FileSelection selection,
-      List<SchemaPath> columns) throws IOException {
+      List<SchemaPath> columns, IndexDesc indexDesc) throws IOException {
     List<String> files = selection.getFiles();
     assert (files.size() == 1);
     String tableName = files.get(0);
     TableProperties props = getMaprFS().getTableProperties(new Path(tableName));
 
     if (props.getAttr().getJson()) {
-      JsonScanSpec scanSpec = new JsonScanSpec(tableName, null/*condition*/);
+      JsonScanSpec scanSpec = new JsonScanSpec(tableName, indexDesc, null/*condition*/);
       return new JsonTableGroupScan(userName, getStoragePlugin(), this, scanSpec, columns);
     } else {
       HBaseScanSpec scanSpec = new HBaseScanSpec(tableName);
       return new BinaryTableGroupScan(userName, getStoragePlugin(), this, scanSpec, columns);
     }
+  }
+
+  @Override
+  public AbstractGroupScan getGroupScan(String userName, FileSelection selection,
+      List<SchemaPath> columns) throws IOException {
+    return getGroupScan(userName, selection, columns, null /* indexDesc */);
   }
 
   @JsonIgnore
