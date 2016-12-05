@@ -20,6 +20,7 @@ package org.apache.drill.exec.store.mapr.db;
 import java.io.IOException;
 
 import org.apache.drill.exec.planner.index.IndexDescriptor;
+import org.apache.drill.exec.planner.index.MapRDBIndexDescriptor;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.planner.logical.DynamicDrillTable;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
@@ -77,10 +78,10 @@ public class MapRDBFormatMatcher extends TableFormatMatcher {
             selection));
 
     // TODO:  Create groupScan using index descriptor
-//    dt.setGroupScan(fp.getGroupScan(userName,
-//        selection,
-//        null /* columns */,
-//        secondaryIndexDesc));
+    dt.setGroupScan(fp.getGroupScan(userName,
+        selection,
+        null /* columns */,
+        (IndexDesc)((MapRDBIndexDescriptor)secondaryIndexDesc).getOriginalDesc()) );
 
     return dt;
   }
