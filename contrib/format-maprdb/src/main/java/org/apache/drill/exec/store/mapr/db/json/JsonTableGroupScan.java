@@ -152,6 +152,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   public ScanStats getScanStats() {
     //TODO: look at stats for this.
     long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
+    //TODO: may need to take the condition here
+    if(this.getRowCount(null) > 0) {
+      rowCount = this.getRowCount(null);
+    }
     int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, avgColumnSize * numColumns * rowCount);
