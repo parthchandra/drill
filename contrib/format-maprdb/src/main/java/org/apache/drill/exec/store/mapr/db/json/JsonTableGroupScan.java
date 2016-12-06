@@ -193,7 +193,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   @Override
   public ScanStats getScanStats() {
     //TODO: look at stats for this.
-    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * totalRowCount);
+    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
+    //TODO: may need to take the condition here
+    if(this.getRowCount(null) > 0) {
+      rowCount = (long) (scanSpec.getSerializedFilter() != null ? .5 : 1) * this.getRowCount(null);
+    }
     int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, avgColumnSize * numColumns * rowCount);
@@ -243,4 +247,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     return true;
   }
 
+  @Override
+  @JsonIgnore
+  public boolean isIndexScan() {
+    return scanSpec != null && scanSpec.isSecondaryIndex();
+  }
 }

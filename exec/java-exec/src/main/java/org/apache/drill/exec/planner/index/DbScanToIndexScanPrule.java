@@ -92,8 +92,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         final ScanPrel scan = (ScanPrel) call.rel(2);
         GroupScan groupScan = scan.getGroupScan();
         if (groupScan instanceof DbGroupScan) {
-          DbGroupScan hbscan = ((DbGroupScan)groupScan);
-          return hbscan.supportsSecondaryIndex();
+          DbGroupScan dbscan = ((DbGroupScan)groupScan);
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan());
         }
         return false;
       }
@@ -124,8 +124,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         final ScanPrel scan = (ScanPrel) call.rel(1);
         GroupScan groupScan = scan.getGroupScan();
         if (groupScan instanceof DbGroupScan) {
-          DbGroupScan hbGroupScan = ((DbGroupScan)groupScan);
-          return hbGroupScan.supportsSecondaryIndex();
+          DbGroupScan dbscan = ((DbGroupScan)groupScan);
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan());
         }
         return false;
       }
@@ -269,6 +269,9 @@ public abstract class DbScanToIndexScanPrule extends Prule {
       for (IndexDescriptor indexDesc : coveringIndexes) {
         IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
+        //TODO: the actual rowcount should come from stats implementation, for now, let us set it to 1
+        idxScan.setRowCount(null, 20, 20);
+
         CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
             remainderCondition, builder);
         planGen.go(filter, convert(scan, scan.getTraitSet()));

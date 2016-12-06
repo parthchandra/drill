@@ -20,7 +20,10 @@ package org.apache.drill.exec.physical.base;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.physical.ScanPrel;
+
+import java.util.List;
 
 /**
  * An IndexGroupScan operator represents the scan associated with an Index.
@@ -51,4 +54,6 @@ public interface IndexGroupScan extends GroupScan {
   public long getRowCount(RexNode condition);
 
 
+  @JsonIgnore
+  void setColumns(List<SchemaPath> columns);
 }

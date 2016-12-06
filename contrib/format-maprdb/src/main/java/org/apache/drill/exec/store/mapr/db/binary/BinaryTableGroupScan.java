@@ -225,4 +225,9 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
     return hbaseScanSpec;
   }
 
+  @Override
+  @JsonIgnore
+  public boolean isIndexScan() {
+    return false;
+  }
 }

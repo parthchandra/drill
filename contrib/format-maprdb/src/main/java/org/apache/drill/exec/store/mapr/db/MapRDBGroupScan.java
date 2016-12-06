@@ -31,9 +31,11 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
+import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.index.IndexCollection;
 import org.apache.drill.exec.planner.index.IndexDiscover;
 import org.apache.drill.exec.planner.index.IndexDiscoverFactory;
@@ -51,7 +53,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
+public abstract class MapRDBGroupScan extends AbstractDbGroupScan implements IndexGroupScan {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBGroupScan.class);
 
   protected FileSystemPlugin storagePlugin;
@@ -69,6 +71,8 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
   protected double costFactor = 1.0;
 
   private boolean filterPushedDown = false;
+
+  long rowCount;
 
   private Stopwatch watch = Stopwatch.createUnstarted();
 
@@ -90,6 +94,7 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
     this.regionsToScan = that.regionsToScan;
     this.filterPushedDown = that.filterPushedDown;
     this.costFactor = that.costFactor;
+    this.rowCount = that.rowCount;
   }
 
   public MapRDBGroupScan(FileSystemPlugin storagePlugin,
@@ -302,4 +307,36 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
 
   @JsonIgnore
   public abstract String getTableName();
+
+  @JsonIgnore
+  public int getRowKeyOrdinal() {
+    return 0;
+  }
+
+  /**
+   *
+   * @param condition
+   * @param count
+   */
+  @JsonIgnore
+  public void setRowCount(RexNode condition, long count, long capRowCount) {
+    rowCount = count;
+  }
+
+  /**
+   *
+   * @param condition, with this condition to search the possible rowCount
+   * @return rowCount of records of certain condition
+   */
+  @JsonIgnore
+  public long getRowCount(RexNode condition) {
+    return rowCount;
+  }
+
+  @Override
+  @JsonIgnore
+  public void setColumns(List<SchemaPath> columns) {
+    this.columns = columns;
+  }
+
 }
