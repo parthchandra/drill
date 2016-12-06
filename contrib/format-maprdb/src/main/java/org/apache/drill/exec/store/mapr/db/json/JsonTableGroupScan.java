@@ -201,4 +201,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     return true;
   }
 
+  @Override
+  @JsonIgnore
+  public boolean isIndexScan() {
+    return scanSpec != null && scanSpec.isSecondaryIndex();
+  }
 }

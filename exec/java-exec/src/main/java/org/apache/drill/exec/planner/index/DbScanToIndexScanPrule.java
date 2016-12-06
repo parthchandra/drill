@@ -92,8 +92,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         final ScanPrel scan = (ScanPrel) call.rel(2);
         GroupScan groupScan = scan.getGroupScan();
         if (groupScan instanceof DbGroupScan) {
-          DbGroupScan hbscan = ((DbGroupScan)groupScan);
-          return hbscan.supportsSecondaryIndex();
+          DbGroupScan dbscan = ((DbGroupScan)groupScan);
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan());
         }
         return false;
       }
@@ -124,8 +124,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         final ScanPrel scan = (ScanPrel) call.rel(1);
         GroupScan groupScan = scan.getGroupScan();
         if (groupScan instanceof DbGroupScan) {
-          DbGroupScan hbGroupScan = ((DbGroupScan)groupScan);
-          return hbGroupScan.supportsSecondaryIndex();
+          DbGroupScan dbscan = ((DbGroupScan)groupScan);
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan());
         }
         return false;
       }

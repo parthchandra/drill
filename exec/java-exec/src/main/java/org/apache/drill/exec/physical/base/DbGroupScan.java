@@ -46,4 +46,6 @@ public interface DbGroupScan extends GroupScan {
 
   public void setCostFactor(double sel);
 
+  @JsonIgnore boolean isIndexScan();
+
 }
