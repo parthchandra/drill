@@ -333,5 +333,10 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan implements Ind
     return rowCount;
   }
 
+  @Override
+  @JsonIgnore
+  public void setColumns(List<SchemaPath> columns) {
+    this.columns = columns;
+  }
 
 }

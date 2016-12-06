@@ -18,6 +18,7 @@
 
 package org.apache.drill.exec.planner.index;
 
+import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
@@ -56,6 +57,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       logger.error("Null indexgroupScan in CoveringIndexPlanGenerator.convertChild");
       return null;
     }
+
+    indexGroupScan.setColumns(((DbGroupScan)origScan.getGroupScan()).getColumns());
 
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet(), indexGroupScan, origScan.getRowType() /* use the same row type as the original scan */);
