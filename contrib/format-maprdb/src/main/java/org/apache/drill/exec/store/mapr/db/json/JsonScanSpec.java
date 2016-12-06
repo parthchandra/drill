@@ -90,18 +90,22 @@ public class JsonScanSpec {
     return (this.indexDesc != null);
   }
 
+  @JsonIgnore
   public Path getPrimaryTablePath() {
-    return new Path(this.indexDesc.getPrimaryTablePath());
+    return (this.indexDesc == null) ? null : new Path(this.indexDesc.getPrimaryTablePath());
   }
 
+  @JsonIgnore
   public String getIndexName() {
-    return this.indexDesc.getIndexName();
+    return (this.indexDesc == null) ? null : this.indexDesc.getIndexName();
   }
 
+  @JsonIgnore
   public String getIndexFid() {
-    return this.indexDesc.getIndexFid();
+    return (this.indexDesc == null) ? null : this.indexDesc.getIndexFid();
   }
 
+  @JsonIgnore
   public IndexFieldDesc[] getIndexedFields() {
     if (this.indexDesc == null) {
       return null;
