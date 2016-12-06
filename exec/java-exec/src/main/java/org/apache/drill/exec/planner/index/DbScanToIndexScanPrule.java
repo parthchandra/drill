@@ -270,7 +270,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
         //TODO: the actual rowcount should come from stats implementation, for now, let us set it to 1
-        idxScan.setRowCount(null, 1, 1);
+        idxScan.setRowCount(null, 20, 20);
+
         CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
             remainderCondition, builder);
         planGen.go(filter, convert(scan, scan.getTraitSet()));
