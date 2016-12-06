@@ -103,17 +103,13 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
 
 
   FileSelection deriveFSSelection(DrillFileSystem fs, IndexDescriptor idxDesc) throws IOException {
-    //assume indexName = '_idx1', tableName is '/tmp/maprdb_index_test',
-    // and the index we are looking for is '/tmp/maprdb_index_test_idx1'
 
-    String idxName = idxDesc.getIndexName();
     String tableName = idxDesc.getTableName();
-    if(tableName.startsWith("/")) {
-      tableName = tableName.substring(1).concat(idxName);
-    }
-    String[] tablePath = tableName.split("/");
 
-    return FileSelection.create(fs, tableName, idxName);
+    String[] tablePath = tableName.split("/");
+    String tableParent = tableName.substring(0,tableName.lastIndexOf("/"));
+
+    return FileSelection.create(fs, tableParent, tablePath[tablePath.length-1]);
   }
 
   @Override
