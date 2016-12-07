@@ -140,7 +140,6 @@ public abstract class MapRDBPushFilterIntoScan extends StoragePluginOptimizerRul
     // clone the groupScan with the newScanSpec.
     final JsonTableGroupScan newGroupsScan = groupScan.clone(newScanSpec);
     newGroupsScan.setFilterPushedDown(true);
-    newGroupsScan.setRowCount(null, groupScan.getRowCount(null), groupScan.getRowCount(null));
 
     final ScanPrel newScanPrel = ScanPrel.create(scan, filter.getTraitSet(), newGroupsScan, scan.getRowType());
 

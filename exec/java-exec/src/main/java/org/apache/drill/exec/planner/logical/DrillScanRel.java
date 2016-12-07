@@ -159,7 +159,7 @@ public class DrillScanRel extends DrillScanRelBase implements DrillRel {
   public RelOptCost computeSelfCost(final RelOptPlanner planner, RelMetadataQuery mq) {
     final ScanStats stats = groupScan.getScanStats(settings);
     int columnCount = getRowType().getFieldCount();
-    double ioCost = 0;
+    double ioCost = stats.getDiskCost();
     boolean isStarQuery = Iterables.tryFind(getRowType().getFieldNames(), new Predicate<String>() {
       @Override
       public boolean apply(String input) {

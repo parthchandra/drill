@@ -38,13 +38,18 @@ public class JsonSubScanSpec extends MapRDBSubScanSpec {
 
   protected QueryCondition condition;
 
+  private String indexFid;
+
   @JsonCreator
   public JsonSubScanSpec(@JsonProperty("tableName") String tableName,
+                         @JsonProperty("indexFid") String indexFid,
                          @JsonProperty("regionServer") String regionServer,
                          @JsonProperty("startRow") byte[] startRow,
                          @JsonProperty("stopRow") byte[] stopRow,
                          @JsonProperty("cond") QueryCondition cond) {
     super(tableName, regionServer, null, null, null, null);
+
+    this.indexFid = indexFid;
 
     this.condition = MapRDB.newCondition().and();
 
@@ -109,4 +114,9 @@ public class JsonSubScanSpec extends MapRDBSubScanSpec {
 
     return null;
   }
+
+  public String getIndexFid() {
+    return indexFid;
+  }
+
 }

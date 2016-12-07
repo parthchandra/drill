@@ -44,6 +44,7 @@ import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.vector.BaseValueVector;
 import org.apache.drill.exec.vector.complex.impl.MapOrListWriterImpl;
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
+import org.apache.hadoop.fs.Path;
 import org.ojai.DocumentReader;
 import org.ojai.DocumentReader.EventType;
 import org.ojai.DocumentStream;
@@ -76,7 +77,8 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private QueryCondition condition;
   private FieldPath[] projectedFields;
 
-  private final String tableName;
+  private final Path tablePath;
+  private final String indexFid;
   private OperatorContext operatorContext;
   private VectorContainerWriter vectorWriter;
 
@@ -100,7 +102,8 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
       List<SchemaPath> projectedColumns, FragmentContext context) {
     buffer = context.getManagedBuffer();
     projectedFields = null;
-    tableName = Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName();
+    tablePath = new Path(Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName());
+    indexFid = ((JsonSubScanSpec) subScanSpec).getIndexFid();
     documentReaderIterators = null;
     includeId = false;
     idOnly    = false;
@@ -168,12 +171,13 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   }
 
   @Override
+  @SuppressWarnings("deprecation")
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
     this.vectorWriter = new VectorContainerWriter(output, unionEnabled);
     this.operatorContext = context;
 
     try {
-      table = MapRDB.getTable(tableName);
+      table = indexFid == null ? MapRDB.getTable(tablePath) : MapRDB.getIndexTable(tablePath, indexFid, "");
       table.setOption(TableOption.EXCLUDEID, !includeId);
       documentStream = table.find(condition, projectedFields);
       documentReaderIterators = documentStream.documentReaders().iterator();

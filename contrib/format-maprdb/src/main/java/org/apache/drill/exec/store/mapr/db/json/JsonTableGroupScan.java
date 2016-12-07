@@ -23,10 +23,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
@@ -54,7 +56,7 @@ import com.mapr.fs.tables.IndexDesc;
 import com.mapr.fs.tables.IndexFieldDesc;
 
 @JsonTypeName("maprdb-json-scan")
-public class JsonTableGroupScan extends MapRDBGroupScan {
+public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JsonTableGroupScan.class);
 
   public static final String TABLE_JSON = "json";
@@ -64,6 +66,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   private TabletInfo[] tabletInfos;
 
   private JsonScanSpec scanSpec;
+
+  long rowCount;
 
   @JsonCreator
   public JsonTableGroupScan(@JsonProperty("userName") final String userName,
@@ -175,6 +179,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     JsonScanSpec spec = scanSpec;
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
         spec.getTableName(),
+        spec.getIndexFid(),
         regionsToScan.get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
@@ -194,13 +199,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   public ScanStats getScanStats() {
     //TODO: look at stats for this.
     long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
-    //TODO: may need to take the condition here
-    if(this.getRowCount(null) > 0) {
-      rowCount = (long) (scanSpec.getSerializedFilter() != null ? .5 : 1) * this.getRowCount(null);
-    }
-    int avgColumnSize = 10;
+    final int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
-    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, avgColumnSize * numColumns * rowCount);
+    float diskCost = avgColumnSize * numColumns * rowCount * (isIndexScan() ?  (scanSpec.getSerializedFilter() != null ? 0.05f: 0.2f) : 1 );
+    logger.debug("JsonGroupScan:{} rowCount:{}, diskCost:{}", this, rowCount, diskCost);
+    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
   @Override
@@ -252,4 +255,33 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
   public boolean isIndexScan() {
     return scanSpec != null && scanSpec.isSecondaryIndex();
   }
+
+  /**
+   *
+   * @param condition
+   * @param count
+   */
+  @Override
+  @JsonIgnore
+  public void setRowCount(RexNode condition, long count, long capRowCount) {
+    rowCount = count;
+  }
+
+  /**
+   *
+   * @param condition, with this condition to search the possible rowCount
+   * @return rowCount of records of certain condition
+   */
+  @Override
+  @JsonIgnore
+  public long getRowCount(RexNode condition) {
+    return rowCount;
+  }
+
+  @Override
+  @JsonIgnore
+  public void setColumns(List<SchemaPath> columns) {
+    this.columns = columns;
+  }
+
 }

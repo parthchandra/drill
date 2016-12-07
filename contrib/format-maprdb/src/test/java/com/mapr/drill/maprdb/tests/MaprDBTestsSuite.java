@@ -38,9 +38,11 @@ import org.ojai.json.Json;
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
+import com.mapr.db.tests.utils.DBTests;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBFilterPushDown;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBSimple;
 import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
+import com.mapr.fs.utils.ssh.TestCluster;
 
 @RunWith(Suite.class)
 @SuiteClasses({
@@ -50,6 +52,8 @@ import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
 })
 public class MaprDBTestsSuite {
   private static final String TMP_BUSINESS_TABLE = "/tmp/business";
+
+  private static final String TMP_TABLE_WITH_INDEX = "/tmp/drill_test_table_with_index";
 
   private static final boolean IS_DEBUG = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
@@ -65,13 +69,16 @@ public class MaprDBTestsSuite {
         if (initCount.get() == 0) {
           HBaseTestsSuite.configure(false /*manageHBaseCluster*/, true /*createTables*/);
           HBaseTestsSuite.initCluster();
-          createJsonTables();
+
+          admin = MapRDB.newAdmin();
+          createTableWithIndex();
+          createBusinessTable();
 
           // Sleep to allow table data to be flushed to tables.
           // Without this, the row count stats to return 0,
           // causing the planner to reject optimized plans.
           System.out.println("Sleeping for 5 seconds to allow table flushes");
-          Thread.sleep(5000);
+          Thread.sleep(10000);
 
           conf = HBaseTestsSuite.getConf();
           initCount.incrementAndGet(); // must increment while inside the synchronized block
@@ -89,6 +96,7 @@ public class MaprDBTestsSuite {
       if (initCount.decrementAndGet() == 0) {
         HBaseTestsSuite.tearDownCluster();
         deleteJsonTables();
+        admin.close();
       }
     }
   }
@@ -145,8 +153,37 @@ public class MaprDBTestsSuite {
     return MaprDBTestsSuite.class.getClassLoader().getResourceAsStream(resourceName);
   }
 
-  public static void createJsonTables() throws IOException {
-    admin = MapRDB.newAdmin();
+  @SuppressWarnings("deprecation")
+  public static void createTableWithIndex() throws Exception {
+    if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
+      admin.deleteTable(TMP_TABLE_WITH_INDEX);
+    }
+    try (Table table = admin.createTable(TMP_TABLE_WITH_INDEX)) {
+
+      // create index
+      TestCluster.runCommand(
+          "maprcli table index add"
+          + " -path " + table.getPath()
+          + " -index testindex"
+          + " -indexedfields '\"name.last\":1'"
+          + " -nonindexedfields '\"age\":1'");
+      // FIXME: refresh the index schema, without this the puts are not getting propagated to indexes
+      DBTests.maprfs().getTableIndexes(table.getPath(), true);
+
+      // insert data
+      table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user001\", \"age\":43, \"name\": {\"first\":\"Sam\", \"last\":\"Harris\"}}"));
+      table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user002\", \"age\":12, \"name\": {\"first\":\"Leon\", \"last\":\"Russel\"}}"));
+      table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user003\", \"age\":87, \"name\": {\"first\":\"David\", \"last\":\"Bowie\"}}"));
+      table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user004\", \"age\":56, \"name\": {\"first\":\"Bob\", \"last\":\"Dylan\"}}"));
+      table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user005\", \"age\":54, \"name\": {\"first\":\"David\", \"last\":\"Ackert\"}}"));
+      table.flush();
+
+      DBTests.waitForIndexFlush(table.getPath());
+    }
+
+  }
+
+  public static void createBusinessTable() throws IOException {
     if (admin.tableExists(TMP_BUSINESS_TABLE)) {
       admin.deleteTable(TMP_BUSINESS_TABLE);
     }
@@ -166,7 +203,9 @@ public class MaprDBTestsSuite {
       if (admin.tableExists(TMP_BUSINESS_TABLE)) {
         admin.deleteTable(TMP_BUSINESS_TABLE);
       }
-      admin.close();
+      if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
+        admin.deleteTable(TMP_TABLE_WITH_INDEX);
+      }
     }
   }
 
