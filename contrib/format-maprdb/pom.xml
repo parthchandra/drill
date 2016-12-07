@@ -120,6 +120,24 @@
 
     <!-- Test dependencies -->
     <dependency>
+      <groupId>com.mapr.db</groupId>
+      <artifactId>maprdb</artifactId>
+      <version>${mapr.release.version}</version>
+      <classifier>tests</classifier>
+    </dependency>
+    <dependency>
+      <groupId>com.mapr.hadoop</groupId>
+      <artifactId>maprfs</artifactId>
+      <version>${mapr.release.version}</version>
+      <classifier>tests</classifier>
+    </dependency>
+    <dependency>
+      <groupId>com.jcraft</groupId>
+      <artifactId>jsch</artifactId>
+      <version>0.1.54</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>com.mapr</groupId>
       <artifactId>mapr-java-utils</artifactId>
       <version>${mapr.release.version}</version>

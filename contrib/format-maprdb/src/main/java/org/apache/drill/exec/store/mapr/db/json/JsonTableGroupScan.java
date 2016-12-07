@@ -102,6 +102,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     return newScan;
   }
 
+  @SuppressWarnings("deprecation")
   private void init() {
     logger.debug("Getting tablet locations");
     try {
@@ -132,6 +133,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan {
     JsonScanSpec spec = scanSpec;
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
         spec.getTableName(),
+        spec.getIndexFid(),
         regionsToScan.get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
