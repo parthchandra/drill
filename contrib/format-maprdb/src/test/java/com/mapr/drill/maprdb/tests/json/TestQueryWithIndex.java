@@ -17,6 +17,7 @@
  */
 package com.mapr.drill.maprdb.tests.json;
 
+import org.apache.drill.PlanTestBase;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -32,7 +33,13 @@ public class TestQueryWithIndex extends BaseJsonTest {
         + "FROM\n"
         + "  hbase.drill_test_table_with_index t\n"
         + "WHERE t.name.last = 'Harris'";
-    runSQLAndVerifyCount(sql, 5); //FIXME the actual count should be 1
+    runSQLAndVerifyCount(sql, 1);
+
+    // plan test
+    final String[] expectedPlan = {"indexFid=\\d+\\.\\d+\\.\\d+"};
+    final String[] excludedPlan = {};
+
+    PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
   }
 
 }

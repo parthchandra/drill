@@ -78,6 +78,18 @@
           </systemProperties>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <!-- do not package test configurations in the jar files as it can override
+                 the installed one -->
+            <exclude>**/core-site.xml</exclude>
+            <exclude>**/logback.xml</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 
