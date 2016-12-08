@@ -133,7 +133,7 @@ public class ScanPrel extends AbstractRelNode implements DrillScanPrel {
     // In the future we might consider alternative scans that go against projections or
     // different compression schemes etc that affect the amount of data read. Such alternatives
     // would affect both cpu and io cost.
-    double ioCost = 0;
+    double ioCost = stats.getDiskCost();
     DrillCostFactory costFactory = (DrillCostFactory)planner.getCostFactory();
     return costFactory.makeCost(rowCount, cpuCost, ioCost, 0);
   }

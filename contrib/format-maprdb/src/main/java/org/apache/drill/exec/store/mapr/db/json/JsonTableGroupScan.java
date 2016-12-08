@@ -160,7 +160,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
     final int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
-    float diskCost = avgColumnSize * numColumns * rowCount * (isIndexScan() ? 0.25f : 1);
+    float diskCost = avgColumnSize * numColumns * rowCount * (isIndexScan() ?  (scanSpec.getSerializedFilter() != null ? 0.05f: 0.2f) : 1 );
     logger.debug("JsonGroupScan:{} rowCount:{}, diskCost:{}", this, rowCount, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }

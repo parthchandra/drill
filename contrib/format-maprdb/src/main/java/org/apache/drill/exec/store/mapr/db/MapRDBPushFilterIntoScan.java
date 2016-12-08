@@ -143,7 +143,6 @@ public abstract class MapRDBPushFilterIntoScan extends StoragePluginOptimizerRul
                                                                     newScanSpec,
                                                                     groupScan.getColumns());
     newGroupsScan.setFilterPushedDown(true);
-    newGroupsScan.setRowCount(null, groupScan.getRowCount(null), groupScan.getRowCount(null));
 
     final ScanPrel newScanPrel = ScanPrel.create(scan, filter.getTraitSet(), newGroupsScan, scan.getRowType());
 
