@@ -517,6 +517,10 @@ public final class UserBitShared {
      * <code>PCAP_SUB_SCAN = 37;</code>
      */
     PCAP_SUB_SCAN(37, 37),
+    /**
+     * <code>MAPRDB_SUB_SCAN = 38;</code>
+     */
+    MAPRDB_SUB_SCAN(38, 38),
     ;
 
     /**
@@ -671,7 +675,10 @@ public final class UserBitShared {
      * <code>PCAP_SUB_SCAN = 37;</code>
      */
     public static final int PCAP_SUB_SCAN_VALUE = 37;
-
+    /**
+     * <code>MAPRDB_SUB_SCAN = 38;</code>
+     */
+    public static final int MAPRDB_SUB_SCAN_VALUE = 37;
 
     public final int getNumber() { return value; }
 
@@ -715,6 +722,7 @@ public final class UserBitShared {
         case 35: return NESTED_LOOP_JOIN;
         case 36: return AVRO_SUB_SCAN;
         case 37: return PCAP_SUB_SCAN;
+        case 38: return MAPRDB_SUB_SCAN;
         default: return null;
       }
     }
