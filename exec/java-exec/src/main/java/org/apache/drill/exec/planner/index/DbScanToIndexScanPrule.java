@@ -19,7 +19,9 @@
 package org.apache.drill.exec.planner.index;
 
 import java.util.BitSet;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
@@ -221,6 +223,13 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     return new IndexConditionInfo(null, null, indexedCol);
   }
 
+  static private boolean conditionIndexed(RelDataType rowType, RexNode indexCondition, IndexDescriptor indexDesc) {
+    RexUtils.FieldsMarker fieldsCollector = new RexUtils.FieldsMarker(rowType);
+    indexCondition.accept(fieldsCollector);
+    Collection<SchemaPath> conditionFields = fieldsCollector.getFieldAndPos().values();
+
+    return indexDesc.allColumnsIndexed(conditionFields);
+  }
   /**
    *
    */
@@ -257,11 +266,17 @@ public abstract class DbScanToIndexScanPrule extends Prule {
 
     // get the list of covering and non-covering indexes for this collection
     for (IndexDescriptor indexDesc : collection) {
-      if (isCoveringIndex(scan, indexDesc)) {
-        coveringIndexes.add(indexDesc);
-      } else {
-        nonCoveringIndexes.add(indexDesc);
+      if(conditionIndexed(scan.getRowType(), indexCondition, indexDesc)) {
+        if (isCoveringIndex(scan, indexDesc)) {
+          coveringIndexes.add(indexDesc);
+        } else {
+          nonCoveringIndexes.add(indexDesc);
+        }
       }
+    }
+
+    if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() == 0) {
+      return;
     }
 
     boolean createdCovering = false;
