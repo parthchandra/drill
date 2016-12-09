@@ -18,6 +18,7 @@
 
 package org.apache.drill.exec.planner.index;
 
+import com.google.common.collect.Lists;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.physical.FilterPrel;
@@ -29,6 +30,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+
+import java.util.List;
 
 /**
  * Generate a covering index plan that is equivalent to the original plan.
@@ -66,10 +69,11 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     FilterPrel indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
         indexScanPrel, indexCondition);
 
-    // new Project's rowtype is original Project's rowtype
-    final ProjectPrel indexProjectPrel = new ProjectPrel(origScan.getCluster(), origScan.getTraitSet(),
-        indexFilterPrel, origProject.getProjects(), origProject.getRowType());
-
+    ProjectPrel indexProjectPrel = null;
+    if (origProject != null) {
+      indexProjectPrel = new ProjectPrel(origScan.getCluster(), origScan.getTraitSet(),
+          indexFilterPrel, origProject.getProjects(), origProject.getRowType());
+    }
     final RelNode finalRel;
 
     if (remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
@@ -77,8 +81,11 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       FilterPrel remainderFilterPrel = new FilterPrel(origScan.getCluster(), indexProjectPrel.getTraitSet(),
           indexProjectPrel, remainderCondition);
       finalRel = Prule.convert(remainderFilterPrel, remainderFilterPrel.getTraitSet());
-    } else {
+    } else if (indexProjectPrel != null) {
       finalRel = Prule.convert(indexProjectPrel, indexProjectPrel.getTraitSet());
+    }
+    else {
+      finalRel = Prule.convert(indexFilterPrel, indexFilterPrel.getTraitSet());
     }
 
     return finalRel;

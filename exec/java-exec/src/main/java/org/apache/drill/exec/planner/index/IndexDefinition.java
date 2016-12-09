@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 
 import org.apache.drill.common.expression.SchemaPath;
 
+import java.util.Collection;
 import java.util.List;
 
 // Interface used to define an index,
@@ -27,7 +28,7 @@ public interface IndexDefinition {
   /**
    * Types of an index: PRIMARY_KEY_INDEX, NATIVE_SECONDARY_INDEX, EXTERNAL_SECONDARY_INDEX
    */
-  public static enum IndexType {
+  static enum IndexType {
     PRIMARY_KEY_INDEX,
     NATIVE_SECONDARY_INDEX,
     EXTERNAL_SECONDARY_INDEX
@@ -38,35 +39,42 @@ public interface IndexDefinition {
    * @param path The field path you want to compare to index column names.
    * @return Return ordinal of the indexed column if valid, otherwise return -1
    */
-  public int getIndexColumnOrdinal(SchemaPath path);
+  int getIndexColumnOrdinal(SchemaPath path);
 
   /**
    * Get the name of the index
    */
-  public String getIndexName();
+  String getIndexName();
 
   /**
    * Check if this index 'covers' all the columns specified in the supplied list of columns
    * @param columns
    * @return True for covering index, False for non-covering
    */
-  public boolean isCoveringIndex(List<SchemaPath> columns);
+  boolean isCoveringIndex(List<SchemaPath> columns);
+
+  /**
+   * Check if this index have all the columns specified in the supplied list of columns indexed
+   * @param columns
+   * @return True if all fields are indexed, False for some or all fields is not indexed
+   */
+  boolean allColumnsIndexed(Collection<SchemaPath> columns);
 
   /**
    * Get the list of columns (typically 1 column) that constitute the row key (primary key)
    * @return
    */
-  public List<SchemaPath> getRowKeyColumns();
+  List<SchemaPath> getRowKeyColumns();
 
   /**
    * Get the name of the table this index is associated with
    */
-  public String getTableName();
+  String getTableName();
 
   /**
    * Get the type of this index based on {@link IndexType}
    * @return one of the values in {@link IndexType}
    */
-  public IndexType getIndexType();
+  IndexType getIndexType();
 
 }

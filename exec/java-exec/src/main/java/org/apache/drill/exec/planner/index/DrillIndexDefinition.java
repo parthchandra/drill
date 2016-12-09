@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Sets;
 import org.apache.drill.common.expression.SchemaPath;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -82,6 +83,13 @@ public class DrillIndexDefinition implements IndexDefinition {
     allColumns.addAll(indexColumns);
     allColumns.addAll(nonIndexColumns);
     return allColumns.containsAll(columns);
+  }
+
+  @Override
+  public boolean allColumnsIndexed(Collection<SchemaPath> columns) {
+    Set<SchemaPath> indexCols = Sets.newHashSet();
+    indexCols.addAll(indexColumns);
+    return indexCols.containsAll(columns);
   }
 
   @Override
