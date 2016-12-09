@@ -25,6 +25,7 @@ import com.mapr.org.apache.hadoop.hbase.util.Bytes;
 public class MapRDBSubScanSpec {
 
   protected String tableName;
+  protected String indexFid;
   protected String regionServer;
   protected byte[] startRow;
   protected byte[] stopRow;
@@ -32,6 +33,7 @@ public class MapRDBSubScanSpec {
 
   @JsonCreator
   public MapRDBSubScanSpec(@JsonProperty("tableName") String tableName,
+                           @JsonProperty("indexFid") String indexFid,
                            @JsonProperty("regionServer") String regionServer,
                            @JsonProperty("startRow") byte[] startRow,
                            @JsonProperty("stopRow") byte[] stopRow,
@@ -41,6 +43,7 @@ public class MapRDBSubScanSpec {
       throw new IllegalArgumentException("The parameters 'serializedFilter' or 'filterString' cannot be specified at the same time.");
     }
     this.tableName = tableName;
+    this.indexFid = indexFid;
     this.regionServer = regionServer;
     this.startRow = startRow;
     this.stopRow = stopRow;
@@ -53,6 +56,10 @@ public class MapRDBSubScanSpec {
 
   public String getTableName() {
     return tableName;
+  }
+
+  public String getIndexFid() {
+    return indexFid;
   }
 
   public MapRDBSubScanSpec setTableName(String tableName) {

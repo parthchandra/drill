@@ -103,7 +103,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     buffer = context.getManagedBuffer();
     projectedFields = null;
     tablePath = new Path(Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName());
-    indexFid = ((JsonSubScanSpec) subScanSpec).getIndexFid();
+    indexFid = subScanSpec.getIndexFid();
     documentReaderIterators = null;
     includeId = false;
     idOnly    = false;
@@ -426,7 +426,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     } else {
       buffer = buffer.reallocIfNeeded(buf.remaining());
       buffer.setBytes(0, buf, buf.position(), buf.remaining());
-      writer.binary(fieldName).writeVarBinary(0, buf.remaining(), buffer);
+      writer.varBinary(fieldName).writeVarBinary(0, buf.remaining(), buffer);
     }
   }
 

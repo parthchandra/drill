@@ -17,26 +17,25 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
-import org.apache.hadoop.hbase.HConstants;
+import java.util.List;
+
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HConstants;
 import org.ojai.store.QueryCondition;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapr.fs.tables.IndexDesc;
-import com.mapr.fs.tables.IndexFieldDesc;
-import com.mapr.fs.proto.Common.FidMsg;
 import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
-
-import java.util.List;
+import com.mapr.fs.tables.IndexDesc;
+import com.mapr.fs.tables.IndexFieldDesc;
 
 public class JsonScanSpec {
 	protected String tableName;
   protected IndexDesc indexDesc;
 	protected QueryCondition condition;
-	
+
 	@JsonCreator
 	public JsonScanSpec(@JsonProperty("tableName") String tableName,
                       @JsonProperty("indexDesc") IndexDesc indexDesc,
@@ -65,7 +64,7 @@ public class JsonScanSpec {
     if (condition == null) {
       return HConstants.EMPTY_END_ROW;
     }
-    
+
     return ((ConditionImpl)this.condition).getRowkeyRanges().get(0).getStopRow();
   }
 
@@ -123,8 +122,8 @@ public class JsonScanSpec {
     return a;
   }
 
+  @SuppressWarnings("deprecation")
   public void mergeScanSpec(String functionName, JsonScanSpec scanSpec) {
-
     if (this.condition != null && scanSpec.getCondition() != null) {
       QueryCondition newCond = ((ConditionImpl)MapRDB.newCondition())
           .setPartitionKeys(((ConditionImpl)this.condition).getPartitionKeys());
@@ -149,7 +148,7 @@ public class JsonScanSpec {
       this.condition = scanSpec.getCondition();
     }
   }
-  
+
   @Override
   public String toString() {
     String fidInfo = (getIndexFid() != null)? ", indexFid=" + getIndexFid() : "";

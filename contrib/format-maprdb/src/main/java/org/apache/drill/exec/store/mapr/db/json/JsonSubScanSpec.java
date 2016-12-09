@@ -27,29 +27,23 @@ import org.ojai.Value;
 import org.ojai.store.QueryCondition;
 import org.ojai.store.QueryCondition.Op;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.IdCodec;
 
+/**
+ * This class is a helper extension of {@link MapRDBSubScanSpec} class and does not
+ * get serialized or deserialized.
+ */
 public class JsonSubScanSpec extends MapRDBSubScanSpec {
 
   protected QueryCondition condition;
 
-  private String indexFid;
-
-  @JsonCreator
-  public JsonSubScanSpec(@JsonProperty("tableName") String tableName,
-                         @JsonProperty("indexFid") String indexFid,
-                         @JsonProperty("regionServer") String regionServer,
-                         @JsonProperty("startRow") byte[] startRow,
-                         @JsonProperty("stopRow") byte[] stopRow,
-                         @JsonProperty("cond") QueryCondition cond) {
-    super(tableName, regionServer, null, null, null, null);
-
-    this.indexFid = indexFid;
+  @SuppressWarnings("deprecation")
+  public JsonSubScanSpec(String tableName, String indexFid, String regionServer,
+                         byte[] startRow, byte[] stopRow, QueryCondition cond) {
+    super(tableName, indexFid, regionServer, null, null, null, null);
 
     this.condition = MapRDB.newCondition().and();
 
@@ -113,10 +107,6 @@ public class JsonSubScanSpec extends MapRDBSubScanSpec {
     }
 
     return null;
-  }
-
-  public String getIndexFid() {
-    return indexFid;
   }
 
 }

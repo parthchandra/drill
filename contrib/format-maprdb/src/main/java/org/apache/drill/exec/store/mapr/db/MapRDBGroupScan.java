@@ -31,11 +31,9 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
-import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.index.IndexCollection;
 import org.apache.drill.exec.planner.index.IndexDiscover;
 import org.apache.drill.exec.planner.index.IndexDiscoverFactory;

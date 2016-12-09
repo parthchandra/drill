@@ -36,12 +36,12 @@ import org.joda.time.LocalTime;
 import org.ojai.Value;
 import org.ojai.types.ODate;
 import org.ojai.types.OTime;
-import org.ojai.types.OTimestamp;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.mapr.db.rowcol.KeyValueBuilder;
 
+@SuppressWarnings("deprecation")
 class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpression, RuntimeException> {
 
   private String functionName;
