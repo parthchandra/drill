@@ -50,7 +50,7 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
     JsonScanSpec parsedSpec = le.accept(this, null);
     if (parsedSpec != null) {
       parsedSpec.mergeScanSpec("booleanAnd", this.groupScan.getScanSpec());
-      QueryCondition c = parsedSpec.getCondition();
+      // QueryCondition c = parsedSpec.getCondition();
       // TODO(Garik): Implement checkAndPrune()
       /*
       if (c != null)
@@ -164,6 +164,7 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
     }
   }
 
+  @SuppressWarnings("deprecation")
   private JsonScanSpec createJsonScanSpec(FunctionCall call,
       CompareFunctionsProcessor processor) {
     String functionName = processor.getFunctionName();

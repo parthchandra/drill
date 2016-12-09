@@ -154,6 +154,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
     HBaseScanSpec spec = hbaseScanSpec;
     MapRDBSubScanSpec subScanSpec = new MapRDBSubScanSpec(
         spec.getTableName(),
+        null /* indexFid */,
         regionsToScan.get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),

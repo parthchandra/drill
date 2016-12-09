@@ -38,7 +38,6 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.ops.OperatorStats;
 import org.apache.drill.exec.physical.impl.OutputMutator;
-import org.apache.drill.exec.proto.UserBitShared.DrillPBError.ErrorType;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
@@ -427,7 +426,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     } else {
       buffer = buffer.reallocIfNeeded(buf.remaining());
       buffer.setBytes(0, buf, buf.position(), buf.remaining());
-      writer.binary(fieldName).writeVarBinary(0, buf.remaining(), buffer);
+      writer.varBinary(fieldName).writeVarBinary(0, buf.remaining(), buffer);
     }
   }
 
