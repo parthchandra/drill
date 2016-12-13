@@ -224,11 +224,10 @@ public abstract class DbScanToIndexScanPrule extends Prule {
   }
 
   static private boolean conditionIndexed(RelDataType rowType, RexNode indexCondition, IndexDescriptor indexDesc) {
-    RexUtils.FieldsMarker fieldsCollector = new RexUtils.FieldsMarker(rowType);
-    indexCondition.accept(fieldsCollector);
-    Collection<SchemaPath> conditionFields = fieldsCollector.getFieldAndPos().values();
-
-    return indexDesc.allColumnsIndexed(conditionFields);
+    List<RexNode> conditions = Lists.newArrayList();
+    conditions.add(indexCondition);
+    PrelUtil.ProjectPushInfo info = PrelUtil.getColumns(rowType, conditions);
+    return indexDesc.allColumnsIndexed(info.columns);
   }
   /**
    *
