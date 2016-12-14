@@ -60,7 +60,7 @@ public class OperatorWrapper {
     return String.format("operator-%d-%d", major, ops.get(0).getLeft().getOperatorId());
   }
 
-  public static final String [] OPERATOR_COLUMNS = {"Minor Fragment", "Setup Time", "Process Time", "Wait Time",
+  public static final String [] OPERATOR_COLUMNS = {"Minor Fragment", "Setup Time", "Process Time", "ProcessCPUTime", "Wait Time",
     "Max Batches", "Max Records", "Peak Memory"};
 
   public String getContent() {
@@ -74,6 +74,7 @@ public class OperatorWrapper {
       builder.appendCell(path, null);
       builder.appendNanos(op.getSetupNanos(), null);
       builder.appendNanos(op.getProcessNanos(), null);
+      builder.appendNanos(op.getProcessCPUNanos(), null);
       builder.appendNanos(op.getWaitNanos(), null);
 
       long maxBatches = Long.MIN_VALUE;
@@ -91,7 +92,8 @@ public class OperatorWrapper {
   }
 
   public static final String[] OPERATORS_OVERVIEW_COLUMNS = {"Operator ID", "Type", "Min Setup Time", "Avg Setup Time",
-    "Max Setup Time", "Min Process Time", "Avg Process Time", "Max Process Time", "Min Wait Time", "Avg Wait Time",
+    "Max Setup Time", "Min Process Time", "Avg Process Time", "Max Process Time",
+    "Min Process CPU Time", "Avg Process CPU Time", "Max Process CPU Time", "Min Wait Time", "Avg Wait Time",
     "Max Wait Time", "Avg Peak Memory", "Max Peak Memory"};
 
   public void addSummary(TableBuilder tb) {
@@ -102,12 +104,14 @@ public class OperatorWrapper {
 
     double setupSum = 0.0;
     double processSum = 0.0;
+    double processCPUSum = 0.0;
     double waitSum = 0.0;
     double memSum = 0.0;
     for (ImmutablePair<OperatorProfile, Integer> ip : ops) {
       OperatorProfile profile = ip.getLeft();
       setupSum += profile.getSetupNanos();
       processSum += profile.getProcessNanos();
+      processCPUSum += profile.getProcessCPUNanos();
       waitSum += profile.getWaitNanos();
       memSum += profile.getPeakLocalMemoryAllocated();
     }
@@ -123,6 +127,12 @@ public class OperatorWrapper {
     tb.appendNanos(shortProcess.getLeft().getProcessNanos(), String.format(format, shortProcess.getRight()));
     tb.appendNanos(Math.round(processSum / size), null);
     tb.appendNanos(longProcess.getLeft().getProcessNanos(), String.format(format, longProcess.getRight()));
+
+    final ImmutablePair<OperatorProfile, Integer> shortProcessCPU = Collections.min(ops, Comparators.processCPUTime);
+    final ImmutablePair<OperatorProfile, Integer> longProcessCPU = Collections.max(ops, Comparators.processCPUTime);
+    tb.appendNanos(shortProcessCPU.getLeft().getProcessCPUNanos(), String.format(format, shortProcessCPU.getRight()));
+    tb.appendNanos(Math.round(processCPUSum / size), null);
+    tb.appendNanos(longProcessCPU.getLeft().getProcessCPUNanos(), String.format(format, longProcessCPU.getRight()));
 
     final ImmutablePair<OperatorProfile, Integer> shortWait = Collections.min(ops, Comparators.waitTime);
     final ImmutablePair<OperatorProfile, Integer> longWait = Collections.max(ops, Comparators.waitTime);

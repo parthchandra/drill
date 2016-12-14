@@ -96,6 +96,12 @@ interface Comparators {
     }
   };
 
+  final static Comparator<Pair<OperatorProfile, Integer>> processCPUTime = new Comparator<Pair<OperatorProfile, Integer>>() {
+    public int compare(final Pair<OperatorProfile, Integer> o1, final Pair<OperatorProfile, Integer> o2) {
+      return Long.compare(o1.getLeft().getProcessCPUNanos(), o2.getLeft().getProcessCPUNanos());
+    }
+  };
+
   final static Comparator<Pair<OperatorProfile, Integer>> waitTime = new Comparator<Pair<OperatorProfile, Integer>>() {
     public int compare(final Pair<OperatorProfile, Integer> o1, final Pair<OperatorProfile, Integer> o2) {
       return Long.compare(o1.getLeft().getWaitNanos(), o2.getLeft().getWaitNanos());

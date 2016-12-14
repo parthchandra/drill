@@ -48,6 +48,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.schema.PrimitiveType;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -123,12 +124,9 @@ class PageReader {
       inputStream  = fs.open(path);
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       columnChunkMetaData.getTotalUncompressedSize();
-      useBufferedReader  = parentColumnReader.parentReader.getFragmentContext().getOptions()
-          .getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
-      scanBufferSize = parentColumnReader.parentReader.getFragmentContext().getOptions()
-          .getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
-      useFadvise = parentColumnReader.parentReader.getFragmentContext().getOptions()
-          .getOption(ExecConstants.PARQUET_PAGEREADER_USE_FADVISE).bool_val;
+      useBufferedReader  = parentColumnReader.parentReader.useBufferedReader;
+      scanBufferSize = parentColumnReader.parentReader.bufferedReadSize;
+      useFadvise = parentColumnReader.parentReader.useFadvise;
       if (useBufferedReader) {
         this.dataReader = new BufferedDirectBufInputStream(inputStream, allocator, path.getName(),
             columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), scanBufferSize,
@@ -155,9 +153,12 @@ class PageReader {
       dataReader.skip(columnChunkMetaData.getDictionaryPageOffset() - dataReader.getPos());
       long start=dataReader.getPos();
       timer.start();
+      long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       final PageHeader pageHeader = Util.readPageHeader(f);
       long timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       long pageHeaderBytes=dataReader.getPos()-start;
+      this.stats.cpuTimeDictPageLoads.addAndGet(cpuStop-cpuStart);
       this.updateStats(pageHeader, "Page Header", start, timeToRead, pageHeaderBytes, pageHeaderBytes);
       assert pageHeader.type == PageType.DICTIONARY_PAGE;
       readDictionaryPage(pageHeader, parentStatus);
@@ -188,34 +189,56 @@ class PageReader {
     long start=dataReader.getPos();
     if (parentColumnReader.columnChunkMetaData.getCodec() == CompressionCodecName.UNCOMPRESSED) {
       timer.start();
+      long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       pageDataBuf = dataReader.getNext(compressedSize);
       if (logger.isTraceEnabled()) {
         logger.trace("PageReaderTask==> Col: {}  readPos: {}  Uncompressed_size: {}  pageData: {}",
             parentColumnReader.columnChunkMetaData.toString(), dataReader.getPos(),
             pageHeader.getUncompressed_page_size(), ByteBufUtil.hexDump(pageData));
       }
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
+      if(pageHeader.getType() == PageType.DICTIONARY_PAGE){
+        this.stats.cpuTimeDictPageLoads.addAndGet(cpuStop-cpuStart);
+      } else {
+        this.stats.cpuTimeDataPageLoads.addAndGet(cpuStop-cpuStart);
+      }
       this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, uncompressedSize);
     } else {
       DrillBuf compressedData = null;
       pageDataBuf=allocateTemporaryBuffer(uncompressedSize);
 
       try {
-      timer.start();
-      compressedData = dataReader.getNext(compressedSize);
-      timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
-      timer.reset();
-      this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, compressedSize);
-      start=dataReader.getPos();
-      timer.start();
-      codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData
-          .getCodec()).decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
-          pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
+        timer.start();
+        long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+        compressedData = dataReader.getNext(compressedSize);
+        timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
+        long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+
+        timer.reset();
+        this.updateStats(pageHeader, "Page Read", start, timeToRead, compressedSize, compressedSize);
+        if(pageHeader.getType() == PageType.DICTIONARY_PAGE){
+          this.stats.cpuTimeDictPageLoads.addAndGet(cpuStop-cpuStart);
+        } else {
+          this.stats.cpuTimeDataPageLoads.addAndGet(cpuStop-cpuStart);
+        }
+        start = dataReader.getPos();
+        timer.start();
+        cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+        codecFactory.getDecompressor(parentColumnReader.columnChunkMetaData.getCodec())
+            .decompress(compressedData.nioBuffer(0, compressedSize), compressedSize,
+                pageDataBuf.nioBuffer(0, uncompressedSize), uncompressedSize);
         pageDataBuf.writerIndex(uncompressedSize);
+        cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
         timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
         this.updateStats(pageHeader, "Decompress", start, timeToRead, compressedSize, uncompressedSize);
+        if(pageHeader.getType() == PageType.DICTIONARY_PAGE){
+          this.stats.cpuTimeDictPagesDecompressed.addAndGet(cpuStop-cpuStart);
+        } else {
+          this.stats.cpuTimeDataPagesDecompressed.addAndGet(cpuStop-cpuStart);
+        }
       } finally {
-        if(compressedData != null) {
+        if (compressedData != null) {
           compressedData.release();
         }
       }
@@ -239,7 +262,9 @@ class PageReader {
     do {
       long start=dataReader.getPos();
       timer.start();
+      long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       pageHeader = Util.readPageHeader(dataReader);
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       long timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
       long pageHeaderBytes=dataReader.getPos()-start;
       this.updateStats(pageHeader, "Page Header", start, timeToRead, pageHeaderBytes, pageHeaderBytes);
@@ -248,7 +273,10 @@ class PageReader {
           this.parentColumnReader.columnDescriptor.toString(), start, 0, 0, timeToRead);
       timer.reset();
       if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
+        this.stats.cpuTimeDictPageLoads.addAndGet(cpuStop - cpuStart);
         readDictionaryPage(pageHeader, parentColumnReader);
+      } else {
+        this.stats.cpuTimeDataPageLoads.addAndGet(cpuStop - cpuStart);
       }
     } while (pageHeader.getType() == PageType.DICTIONARY_PAGE);
 
@@ -279,6 +307,7 @@ class PageReader {
 
     nextInternal();
 
+    long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     timer.start();
     currentPageCount = pageHeader.data_page_header.num_values;
 
@@ -332,6 +361,8 @@ class PageReader {
     // fit one record at a time, such as for variable length data. Both operations must start in the same location after the
     // definition and repetition level data which is stored alongside the page data itself
     readyToReadPosInBytes = readPosInBytes;
+    long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+    this.stats.cpuTimeDataPageDecode.addAndGet(cpuStop-cpuStart);
     long timeDecode = timer.elapsed(TimeUnit.NANOSECONDS);
     stats.numDataPagesDecoded.incrementAndGet();
     stats.timeDataPageDecode.addAndGet(timeDecode);

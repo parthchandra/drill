@@ -18480,6 +18480,16 @@ public final class UserBitShared {
      * <code>optional int64 wait_nanos = 9;</code>
      */
     long getWaitNanos();
+
+    // optional int64 process_CPU_nanos = 10;
+    /**
+     * <code>optional int64 process_CPU_nanos = 10;</code>
+     */
+    boolean hasProcessCPUNanos();
+    /**
+     * <code>optional int64 process_CPU_nanos = 10;</code>
+     */
+    long getProcessCPUNanos();
   }
   /**
    * Protobuf type {@code exec.shared.OperatorProfile}
@@ -18576,6 +18586,11 @@ public final class UserBitShared {
             case 72: {
               bitField0_ |= 0x00000020;
               waitNanos_ = input.readInt64();
+              break;
+            }
+            case 80: {
+              bitField0_ |= 0x00000040;
+              processCPUNanos_ = input.readInt64();
               break;
             }
           }
@@ -18792,6 +18807,22 @@ public final class UserBitShared {
       return waitNanos_;
     }
 
+    // optional int64 process_CPU_nanos = 10;
+    public static final int PROCESS_CPU_NANOS_FIELD_NUMBER = 10;
+    private long processCPUNanos_;
+    /**
+     * <code>optional int64 process_CPU_nanos = 10;</code>
+     */
+    public boolean hasProcessCPUNanos() {
+      return ((bitField0_ & 0x00000040) == 0x00000040);
+    }
+    /**
+     * <code>optional int64 process_CPU_nanos = 10;</code>
+     */
+    public long getProcessCPUNanos() {
+      return processCPUNanos_;
+    }
+
     private void initFields() {
       inputProfile_ = java.util.Collections.emptyList();
       operatorId_ = 0;
@@ -18801,6 +18832,7 @@ public final class UserBitShared {
       peakLocalMemoryAllocated_ = 0L;
       metric_ = java.util.Collections.emptyList();
       waitNanos_ = 0L;
+      processCPUNanos_ = 0L;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -18837,6 +18869,9 @@ public final class UserBitShared {
       }
       if (((bitField0_ & 0x00000020) == 0x00000020)) {
         output.writeInt64(9, waitNanos_);
+      }
+      if (((bitField0_ & 0x00000040) == 0x00000040)) {
+        output.writeInt64(10, processCPUNanos_);
       }
       getUnknownFields().writeTo(output);
     }
@@ -18878,6 +18913,10 @@ public final class UserBitShared {
       if (((bitField0_ & 0x00000020) == 0x00000020)) {
         size += com.google.protobuf.CodedOutputStream
           .computeInt64Size(9, waitNanos_);
+      }
+      if (((bitField0_ & 0x00000040) == 0x00000040)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt64Size(10, processCPUNanos_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -19021,6 +19060,8 @@ public final class UserBitShared {
         }
         waitNanos_ = 0L;
         bitField0_ = (bitField0_ & ~0x00000080);
+        processCPUNanos_ = 0L;
+        bitField0_ = (bitField0_ & ~0x00000100);
         return this;
       }
 
@@ -19091,6 +19132,10 @@ public final class UserBitShared {
           to_bitField0_ |= 0x00000020;
         }
         result.waitNanos_ = waitNanos_;
+        if (((from_bitField0_ & 0x00000100) == 0x00000100)) {
+          to_bitField0_ |= 0x00000040;
+        }
+        result.processCPUNanos_ = processCPUNanos_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -19176,6 +19221,9 @@ public final class UserBitShared {
         }
         if (other.hasWaitNanos()) {
           setWaitNanos(other.getWaitNanos());
+        }
+        if (other.hasProcessCPUNanos()) {
+          setProcessCPUNanos(other.getProcessCPUNanos());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -19878,6 +19926,39 @@ public final class UserBitShared {
       public Builder clearWaitNanos() {
         bitField0_ = (bitField0_ & ~0x00000080);
         waitNanos_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      // optional int64 process_CPU_nanos = 10;
+      private long processCPUNanos_ ;
+      /**
+       * <code>optional int64 process_CPU_nanos = 10;</code>
+       */
+      public boolean hasProcessCPUNanos() {
+        return ((bitField0_ & 0x00000100) == 0x00000100);
+      }
+      /**
+       * <code>optional int64 process_CPU_nanos = 10;</code>
+       */
+      public long getProcessCPUNanos() {
+        return processCPUNanos_;
+      }
+      /**
+       * <code>optional int64 process_CPU_nanos = 10;</code>
+       */
+      public Builder setProcessCPUNanos(long value) {
+        bitField0_ |= 0x00000100;
+        processCPUNanos_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional int64 process_CPU_nanos = 10;</code>
+       */
+      public Builder clearProcessCPUNanos() {
+        bitField0_ = (bitField0_ & ~0x00000100);
+        processCPUNanos_ = 0L;
         onChanged();
         return this;
       }
@@ -22559,46 +22640,46 @@ public final class UserBitShared {
       "memory_used\030\007 \001(\003\022\027\n\017max_memory_used\030\010 \001" +
       "(\003\022(\n\010endpoint\030\t \001(\0132\026.exec.DrillbitEndp" +
       "oint\022\023\n\013last_update\030\n \001(\003\022\025\n\rlast_progre" +
-      "ss\030\013 \001(\003\"\377\001\n\017OperatorProfile\0221\n\rinput_pr" +
+      "ss\030\013 \001(\003\"\232\002\n\017OperatorProfile\0221\n\rinput_pr" +
       "ofile\030\001 \003(\0132\032.exec.shared.StreamProfile\022" +
       "\023\n\013operator_id\030\003 \001(\005\022\025\n\roperator_type\030\004 " +
       "\001(\005\022\023\n\013setup_nanos\030\005 \001(\003\022\025\n\rprocess_nano",
       "s\030\006 \001(\003\022#\n\033peak_local_memory_allocated\030\007" +
       " \001(\003\022(\n\006metric\030\010 \003(\0132\030.exec.shared.Metri" +
-      "cValue\022\022\n\nwait_nanos\030\t \001(\003\"B\n\rStreamProf" +
-      "ile\022\017\n\007records\030\001 \001(\003\022\017\n\007batches\030\002 \001(\003\022\017\n" +
-      "\007schemas\030\003 \001(\003\"J\n\013MetricValue\022\021\n\tmetric_" +
-      "id\030\001 \001(\005\022\022\n\nlong_value\030\002 \001(\003\022\024\n\014double_v" +
-      "alue\030\003 \001(\001\")\n\010Registry\022\035\n\003jar\030\001 \003(\0132\020.ex" +
-      "ec.shared.Jar\"/\n\003Jar\022\014\n\004name\030\001 \001(\t\022\032\n\022fu" +
-      "nction_signature\030\002 \003(\t*5\n\nRpcChannel\022\017\n\013" +
-      "BIT_CONTROL\020\000\022\014\n\010BIT_DATA\020\001\022\010\n\004USER\020\002*V\n",
-      "\tQueryType\022\007\n\003SQL\020\001\022\013\n\007LOGICAL\020\002\022\014\n\010PHYS" +
-      "ICAL\020\003\022\r\n\tEXECUTION\020\004\022\026\n\022PREPARED_STATEM" +
-      "ENT\020\005*\207\001\n\rFragmentState\022\013\n\007SENDING\020\000\022\027\n\023" +
-      "AWAITING_ALLOCATION\020\001\022\013\n\007RUNNING\020\002\022\014\n\010FI" +
-      "NISHED\020\003\022\r\n\tCANCELLED\020\004\022\n\n\006FAILED\020\005\022\032\n\026C" +
-      "ANCELLATION_REQUESTED\020\006*\335\005\n\020CoreOperator" +
-      "Type\022\021\n\rSINGLE_SENDER\020\000\022\024\n\020BROADCAST_SEN" +
-      "DER\020\001\022\n\n\006FILTER\020\002\022\022\n\016HASH_AGGREGATE\020\003\022\r\n" +
-      "\tHASH_JOIN\020\004\022\016\n\nMERGE_JOIN\020\005\022\031\n\025HASH_PAR" +
-      "TITION_SENDER\020\006\022\t\n\005LIMIT\020\007\022\024\n\020MERGING_RE",
-      "CEIVER\020\010\022\034\n\030ORDERED_PARTITION_SENDER\020\t\022\013" +
-      "\n\007PROJECT\020\n\022\026\n\022UNORDERED_RECEIVER\020\013\022\020\n\014R" +
-      "ANGE_SENDER\020\014\022\n\n\006SCREEN\020\r\022\034\n\030SELECTION_V" +
-      "ECTOR_REMOVER\020\016\022\027\n\023STREAMING_AGGREGATE\020\017" +
-      "\022\016\n\nTOP_N_SORT\020\020\022\021\n\rEXTERNAL_SORT\020\021\022\t\n\005T" +
-      "RACE\020\022\022\t\n\005UNION\020\023\022\014\n\010OLD_SORT\020\024\022\032\n\026PARQU" +
-      "ET_ROW_GROUP_SCAN\020\025\022\021\n\rHIVE_SUB_SCAN\020\026\022\025" +
-      "\n\021SYSTEM_TABLE_SCAN\020\027\022\021\n\rMOCK_SUB_SCAN\020\030" +
-      "\022\022\n\016PARQUET_WRITER\020\031\022\023\n\017DIRECT_SUB_SCAN\020" +
-      "\032\022\017\n\013TEXT_WRITER\020\033\022\021\n\rTEXT_SUB_SCAN\020\034\022\021\n",
-      "\rJSON_SUB_SCAN\020\035\022\030\n\024INFO_SCHEMA_SUB_SCAN" +
-      "\020\036\022\023\n\017COMPLEX_TO_JSON\020\037\022\025\n\021PRODUCER_CONS" +
-      "UMER\020 \022\022\n\016HBASE_SUB_SCAN\020!\022\n\n\006WINDOW\020\"\022\024" +
-      "\n\020NESTED_LOOP_JOIN\020#\022\021\n\rAVRO_SUB_SCAN\020$B" +
-      ".\n\033org.apache.drill.exec.protoB\rUserBitS" +
-      "haredH\001"
+      "cValue\022\022\n\nwait_nanos\030\t \001(\003\022\031\n\021process_CP" +
+      "U_nanos\030\n \001(\003\"B\n\rStreamProfile\022\017\n\007record" +
+      "s\030\001 \001(\003\022\017\n\007batches\030\002 \001(\003\022\017\n\007schemas\030\003 \001(" +
+      "\003\"J\n\013MetricValue\022\021\n\tmetric_id\030\001 \001(\005\022\022\n\nl" +
+      "ong_value\030\002 \001(\003\022\024\n\014double_value\030\003 \001(\001\")\n" +
+      "\010Registry\022\035\n\003jar\030\001 \003(\0132\020.exec.shared.Jar" +
+      "\"/\n\003Jar\022\014\n\004name\030\001 \001(\t\022\032\n\022function_signat" +
+      "ure\030\002 \003(\t*5\n\nRpcChannel\022\017\n\013BIT_CONTROL\020\000",
+      "\022\014\n\010BIT_DATA\020\001\022\010\n\004USER\020\002*V\n\tQueryType\022\007\n" +
+      "\003SQL\020\001\022\013\n\007LOGICAL\020\002\022\014\n\010PHYSICAL\020\003\022\r\n\tEXE" +
+      "CUTION\020\004\022\026\n\022PREPARED_STATEMENT\020\005*\207\001\n\rFra" +
+      "gmentState\022\013\n\007SENDING\020\000\022\027\n\023AWAITING_ALLO" +
+      "CATION\020\001\022\013\n\007RUNNING\020\002\022\014\n\010FINISHED\020\003\022\r\n\tC" +
+      "ANCELLED\020\004\022\n\n\006FAILED\020\005\022\032\n\026CANCELLATION_R" +
+      "EQUESTED\020\006*\335\005\n\020CoreOperatorType\022\021\n\rSINGL" +
+      "E_SENDER\020\000\022\024\n\020BROADCAST_SENDER\020\001\022\n\n\006FILT" +
+      "ER\020\002\022\022\n\016HASH_AGGREGATE\020\003\022\r\n\tHASH_JOIN\020\004\022" +
+      "\016\n\nMERGE_JOIN\020\005\022\031\n\025HASH_PARTITION_SENDER",
+      "\020\006\022\t\n\005LIMIT\020\007\022\024\n\020MERGING_RECEIVER\020\010\022\034\n\030O" +
+      "RDERED_PARTITION_SENDER\020\t\022\013\n\007PROJECT\020\n\022\026" +
+      "\n\022UNORDERED_RECEIVER\020\013\022\020\n\014RANGE_SENDER\020\014" +
+      "\022\n\n\006SCREEN\020\r\022\034\n\030SELECTION_VECTOR_REMOVER" +
+      "\020\016\022\027\n\023STREAMING_AGGREGATE\020\017\022\016\n\nTOP_N_SOR" +
+      "T\020\020\022\021\n\rEXTERNAL_SORT\020\021\022\t\n\005TRACE\020\022\022\t\n\005UNI" +
+      "ON\020\023\022\014\n\010OLD_SORT\020\024\022\032\n\026PARQUET_ROW_GROUP_" +
+      "SCAN\020\025\022\021\n\rHIVE_SUB_SCAN\020\026\022\025\n\021SYSTEM_TABL" +
+      "E_SCAN\020\027\022\021\n\rMOCK_SUB_SCAN\020\030\022\022\n\016PARQUET_W" +
+      "RITER\020\031\022\023\n\017DIRECT_SUB_SCAN\020\032\022\017\n\013TEXT_WRI",
+      "TER\020\033\022\021\n\rTEXT_SUB_SCAN\020\034\022\021\n\rJSON_SUB_SCA" +
+      "N\020\035\022\030\n\024INFO_SCHEMA_SUB_SCAN\020\036\022\023\n\017COMPLEX" +
+      "_TO_JSON\020\037\022\025\n\021PRODUCER_CONSUMER\020 \022\022\n\016HBA" +
+      "SE_SUB_SCAN\020!\022\n\n\006WINDOW\020\"\022\024\n\020NESTED_LOOP" +
+      "_JOIN\020#\022\021\n\rAVRO_SUB_SCAN\020$B.\n\033org.apache" +
+      ".drill.exec.protoB\rUserBitSharedH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -22706,7 +22787,7 @@ public final class UserBitShared {
           internal_static_exec_shared_OperatorProfile_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exec_shared_OperatorProfile_descriptor,
-              new java.lang.String[] { "InputProfile", "OperatorId", "OperatorType", "SetupNanos", "ProcessNanos", "PeakLocalMemoryAllocated", "Metric", "WaitNanos", });
+              new java.lang.String[] { "InputProfile", "OperatorId", "OperatorType", "SetupNanos", "ProcessNanos", "PeakLocalMemoryAllocated", "Metric", "WaitNanos", "ProcessCPUNanos", });
           internal_static_exec_shared_StreamProfile_descriptor =
             getDescriptor().getMessageTypes().get(17);
           internal_static_exec_shared_StreamProfile_fieldAccessorTable = new
