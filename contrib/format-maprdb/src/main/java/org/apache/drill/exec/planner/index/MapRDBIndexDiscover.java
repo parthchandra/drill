@@ -18,46 +18,36 @@
 
 package org.apache.drill.exec.planner.index;
 
-
-import com.mapr.fs.MapRFileSystem;
-import com.mapr.fs.tables.IndexDesc;
-import com.mapr.fs.tables.IndexFieldDesc;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.planner.physical.ScanPrel;
-import org.apache.drill.exec.store.AbstractStoragePlugin;
-import org.apache.drill.exec.store.StoragePlugin;
-import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
 import org.apache.drill.exec.store.dfs.FileSelection;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
-import org.apache.drill.exec.store.dfs.FormatMatcher;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatMatcher;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.List;
-import java.util.Set;
+import com.mapr.fs.MapRFileSystem;
+import com.mapr.fs.tables.IndexDesc;
+import com.mapr.fs.tables.IndexFieldDesc;
 
 public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDiscover {
 
   public MapRDBIndexDiscover(GroupScan inScan, ScanPrel prel) {
     super((AbstractDbGroupScan) inScan, prel);
   }
-
 
   @Override
   public IndexCollection getTableIndex(String tableName) {
@@ -77,39 +67,30 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       Collection<IndexDesc> indexes = mfs.getTableIndexes(new Path(tableName));
       for (IndexDesc idx : indexes) {
         DrillIndexDescriptor hbaseIdx = buildIndexDescriptor(tableName, idx);
-        if ( hbaseIdx == null ) {
+        if (hbaseIdx == null) {
           //not able to build a valid index based on the index info from MFS
           logger.error("Not able to build index for {}", idx.toString());
           continue;
         }
         idxSet.add(hbaseIdx);
       }
-      if(idxSet.size() == 0) {
+      if (idxSet.size() == 0) {
         logger.error("No index found for table {}.", tableName);
         return null;
       }
       return new DrillIndexCollection(getOriginalScanPrel(), idxSet);
-    }
-    catch(IOException ex) {
+    } catch (IOException ex) {
       logger.error("Could not get table index from File system. {}", ex.getMessage());
     }
     return null;
   }
 
-  private Map.Entry<String, StoragePlugin>
-  getExternalIdxStorage(String cluster) {
-    return null;
-  }
-
-
   FileSelection deriveFSSelection(DrillFileSystem fs, IndexDescriptor idxDesc) throws IOException {
-
     String tableName = idxDesc.getTableName();
-
     String[] tablePath = tableName.split("/");
-    String tableParent = tableName.substring(0,tableName.lastIndexOf("/"));
+    String tableParent = tableName.substring(0, tableName.lastIndexOf("/"));
 
-    return FileSelection.create(fs, tableParent, tablePath[tablePath.length-1]);
+    return FileSelection.create(fs, tableParent, tablePath[tablePath.length - 1]);
   }
 
   @Override
@@ -124,23 +105,21 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       FileSystemPlugin fsPlugin = ((MapRDBGroupScan) origScan).getStoragePlugin();
 
       DrillFileSystem fs = new DrillFileSystem(fsPlugin.getFsConf());
-      MapRDBFormatMatcher matcher = (MapRDBFormatMatcher)(maprFormatPlugin.getMatcher());
+      MapRDBFormatMatcher matcher = (MapRDBFormatMatcher) (maprFormatPlugin.getMatcher());
       FileSelection fsSelection = deriveFSSelection(fs, idxDescriptor);
       return matcher.isReadableIndex(fs, fsSelection, fsPlugin, fsPlugin.getName(),
-              UserGroupInformation.getCurrentUser().getUserName(), idxDescriptor);
+          UserGroupInformation.getCurrentUser().getUserName(), idxDescriptor);
 
-    }
-    catch(Exception e) {
+    } catch (Exception e) {
       logger.error("Failed to get native DrillTable.", e);
     }
     return null;
   }
 
   private SchemaPath fieldName2SchemaPath(String fieldName) {
-    if(fieldName.contains(":")) {
+    if (fieldName.contains(":")) {
       return SchemaPath.getCompoundPath(fieldName.split(":"));
-    }
-    else if(fieldName.contains(".")) {
+    } else if (fieldName.contains(".")) {
       return SchemaPath.getCompoundPath(fieldName.split("\\."));
     }
     return SchemaPath.getSimplePath(fieldName);
@@ -148,23 +127,25 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
 
   private List<SchemaPath> field2SchemaPath(Collection<IndexFieldDesc> descCollection) {
     List<SchemaPath> listSchema = new ArrayList<>();
-    for (IndexFieldDesc field: descCollection) {
+    for (IndexFieldDesc field : descCollection) {
       listSchema.add(fieldName2SchemaPath(field.getFieldName()));
     }
     return listSchema;
   }
 
   private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc) {
-    if( desc.isExternal() ) {
+    if (desc.isExternal()) {
       //XX: not support external index
       return null;
     }
 
     IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
-
+    List<SchemaPath> indexFields = field2SchemaPath(desc.getIndexedFields());
+    List<SchemaPath> coveringFields = field2SchemaPath(desc.getCoveredFields());
+    coveringFields.add(SchemaPath.getSimplePath("_id"));
     DrillIndexDescriptor idx = new MapRDBIndexDescriptor (
-        field2SchemaPath(desc.getIndexedFields()),
-        field2SchemaPath(desc.getCoveredFields()),
+        indexFields,
+        coveringFields,
         null,
         desc.getIndexName(),
         tableName,
@@ -177,25 +158,8 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
   }
 
   private MapRFileSystem getMaprFS() {
-    try {
-      Configuration conf;
-      if (getOriginalScan() instanceof MapRDBGroupScan) {
-        //if we can get FsConf from storage plugin(MapRDBPlugin case), use it.
-        conf = ((MapRDBGroupScan) getOriginalScan()).getStoragePlugin().getFsConf();
-      }
-      else {
-        conf = new Configuration();
-        conf.set("fs.defaultFS", "maprfs:///");
-        conf.set("fs.mapr.disable.namecache", "true");
-      }
-
-      MapRFileSystem fs = new MapRFileSystem();
-      URI fsuri = new URI(conf.get("fs.defaultFS"));
-      fs.initialize(fsuri, conf);
-      return fs;
-    } catch (Exception e) {
-      logger.error("No MaprFS loaded {}", e);
-      return null;
-    }
+    assert getOriginalScan() instanceof MapRDBGroupScan;
+    return ((MapRDBGroupScan) getOriginalScan()).getFormatPlugin().getMaprFS();
   }
+
 }

@@ -29,10 +29,10 @@ public class TestQueryWithIndex extends BaseJsonTest {
   @Test
   public void testSelectWithIndex() throws Exception {
     final String sql = "SELECT\n"
-        + "  t.name.last\n"
+        + "  _id, t.user_id\n"
         + "FROM\n"
-        + "  hbase.drill_test_table_with_index t\n"
-        + "WHERE t.name.last = 'Harris'";
+        + "  hbase.root.`/tables/review` t\n"
+        + "WHERE t.user_id = 'Mb0psF4WQF7gZSuZafVr-g'";
     runSQLAndVerifyCount(sql, 1);
 
     // plan test
