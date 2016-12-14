@@ -26,6 +26,7 @@ import org.apache.drill.exec.ExecConstants;
 import org.apache.hadoop.io.compress.Decompressor;
 import org.apache.hadoop.io.compress.DirectDecompressor;
 import org.apache.hadoop.io.compress.GzipCodec;
+import org.apache.hadoop.util.StopWatch;
 import org.apache.parquet.hadoop.CodecFactory;
 import org.apache.parquet.hadoop.codec.SnappyCodec;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
@@ -37,15 +38,18 @@ import org.apache.parquet.format.PageHeader;
 import org.apache.parquet.format.PageType;
 import org.apache.parquet.format.Util;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.velocity.runtime.directive.Stop;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.parquet.column.Encoding.valueOf;
@@ -233,6 +237,12 @@ class AsyncPageReader extends PageReader {
     try {
       Stopwatch timer = Stopwatch.createStarted();
       parentColumnReader.parentReader.getOperatorContext().getStats().startWait();
+      logger.trace("PERF - Operator [{}] Stop Processing.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
+      logger.trace("PERF - Operator [{}] Start Disk Wait.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
       asyncPageRead.poll().get(); // get the result of execution
       synchronized(pageQueue) {
         boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
@@ -250,6 +260,13 @@ class AsyncPageReader extends PageReader {
       parentColumnReader.parentReader.getOperatorContext().getStats().stopWait();
       stats.timeDiskScanWait.addAndGet(timeBlocked);
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
+      logger.trace("PERF - Operator [{}] Stop Disk Wait. Waited {} ms.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId(),
+          ((double) timeBlocked) / 1000000);
+      logger.trace("PERF - Operator [{}] Start Processing.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
       if (readStatus.isDictionaryPage) {
         stats.numDictPageLoads.incrementAndGet();
         stats.timeDictPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
@@ -266,7 +283,7 @@ class AsyncPageReader extends PageReader {
         if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
           readDictionaryPageData(readStatus, parentColumnReader);
           asyncPageRead.poll().get(); // get the result of execution
-          synchronized (pageQueue) {
+          synchronized(pageQueue) {
             boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
             readStatus = pageQueue.take(); // get the data if no exception has been thrown
             if (readStatus.pageData == null || readStatus == ReadStatus.EMPTY) {
@@ -394,20 +411,43 @@ class AsyncPageReader extends PageReader {
     private final AsyncPageReader parent = AsyncPageReader.this;
     private final LinkedBlockingQueue<ReadStatus> queue;
     private final String name;
+    private final Stopwatch timer;
+    private final ThreadPoolExecutor threadPool;
+    private final long nPendingTasksAtCreation;
+    private final long nActiveTasksAtCreation;
+    private long nPendingTasksAtStart;
+    private long nActiveTasksAtStart;
 
     public AsyncPageReaderTask(String name, LinkedBlockingQueue<ReadStatus> queue) {
       this.name = name;
       this.queue = queue;
+      this.timer = Stopwatch.createStarted();
+      this.threadPool = (ThreadPoolExecutor)parent.threadPool;
+      BlockingQueue<Runnable> q = ((ThreadPoolExecutor) parent.threadPool).getQueue();
+      this.nPendingTasksAtCreation = q.size();
+      this.nActiveTasksAtCreation = threadPool.getActiveCount();
     }
 
     @Override
     public Void call() throws IOException {
+      final long timeToStart = timer.elapsed(TimeUnit.MICROSECONDS);
+      BlockingQueue<Runnable> q = ((ThreadPoolExecutor) parent.threadPool).getQueue();
+      this.nPendingTasksAtStart = q.size();
+      this.nActiveTasksAtStart = threadPool.getActiveCount();
+
+      logger.trace(
+          "PERF - Operator [{}] [{}] Disk Read Task : Time To Start = {} ms, Pending Tasks at Creation = {}, Active Tasks at Creation = {},  Pending Tasks at Start = {}, Active Tasks at Start {}",
+          parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name,
+          timeToStart / 1000, nPendingTasksAtCreation, nActiveTasksAtCreation, nPendingTasksAtStart,
+          nActiveTasksAtStart);
+
       ReadStatus readStatus = new ReadStatus();
 
       long bytesRead = 0;
       long valuesRead = 0;
       final long totalValuesRead = parent.totalPageValuesRead;
-      Stopwatch timer = Stopwatch.createStarted();
+      timer.reset();
 
       final long totalValuesCount = parent.parentColumnReader.columnChunkMetaData.getValueCount();
 
@@ -427,13 +467,20 @@ class AsyncPageReader extends PageReader {
       timer.reset();
       try {
         long s = parent.dataReader.getPos();
+        logger.trace("PERF - Operator [{}] [{}] Disk read start (Page Header). Offset {}",
+            parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+                + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s);
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
-        //long e = parent.dataReader.getPos();
+        long e = parent.dataReader.getPos();
         //if (logger.isTraceEnabled()) {
         //  logger.trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} ", name, s, e - s);
         //}
         int compressedSize = pageHeader.getCompressed_page_size();
         s = parent.dataReader.getPos();
+        logger.trace("PERF - Operator [{}] [{}] Disk read start. Offset {}, Length {} .",
+            parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+                + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s,
+            compressedSize);
         pageData = parent.dataReader.getNext(compressedSize);
         bytesRead = compressedSize;
         //e = parent.dataReader.getPos();
@@ -460,7 +507,10 @@ class AsyncPageReader extends PageReader {
           readStatus.setBytesRead(bytesRead);
           readStatus.setValuesRead(valuesRead);
           readStatus.setDiskScanTime(timeToRead);
-          assert (totalValuesRead <= totalValuesCount);
+          logger.trace("PERF - Operator [{}] [{}] Disk read stop. Offset {}, Length {}, Time {} ms .",
+              parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+                  + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s,
+              compressedSize, ((double) timeToRead) / 1000000);
         }
         synchronized (queue) {
           queue.put(readStatus);

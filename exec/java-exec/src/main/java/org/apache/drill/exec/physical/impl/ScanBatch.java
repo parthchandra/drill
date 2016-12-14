@@ -17,12 +17,14 @@
  */
 package org.apache.drill.exec.physical.impl;
 
+import com.google.common.base.Stopwatch;
 import io.netty.buffer.DrillBuf;
 
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
@@ -165,7 +167,10 @@ public class ScanBatch implements CloseableRecordBatch {
     if (done) {
       return IterOutcome.NONE;
     }
+    Stopwatch timer  = Stopwatch.createStarted();
     oContext.getStats().startProcessing();
+    logger.trace("PERF - Operator [{}] Start Processing.",
+        context.getFragIdString() + ":" + oContext.getStats().getId());
     try {
       try {
         injector.injectChecked(context.getExecutionControls(), "next-allocate", OutOfMemoryException.class);
@@ -255,6 +260,8 @@ public class ScanBatch implements CloseableRecordBatch {
       return IterOutcome.STOP;
     } finally {
       oContext.getStats().stopProcessing();
+      logger.trace("PERF - Operator [{}] Stop Processing. Time {} ms",
+          context.getFragIdString() + ":" + oContext.getStats().getId(), ((double)timer.elapsed(TimeUnit.MICROSECONDS)/1000));
     }
   }
 

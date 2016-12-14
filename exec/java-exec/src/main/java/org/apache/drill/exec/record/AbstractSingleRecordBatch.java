@@ -17,12 +17,15 @@
  */
 package org.apache.drill.exec.record;
 
+import com.google.common.base.Stopwatch;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.vector.SchemaChangeCallBack;
+
+import java.util.concurrent.TimeUnit;
 
 public abstract class AbstractSingleRecordBatch<T extends PhysicalOperator> extends AbstractRecordBatch<T> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(new Object() {}.getClass().getEnclosingClass());
@@ -90,7 +93,15 @@ public abstract class AbstractSingleRecordBatch<T extends PhysicalOperator> exte
     case OK:
       assert state != BatchState.FIRST : "First batch should be OK_NEW_SCHEMA";
       container.zeroVectors();
+
+      Stopwatch timer = Stopwatch.createStarted();
+      logger.trace("PERF - Operator [{}] Start Processing.",
+          context.getFragIdString() + ":" + oContext.getStats().getId());
+
       IterOutcome out = doWork();
+
+      logger.trace("PERF - Operator [{}] Stop Processing. Time {} ms",
+          context.getFragIdString() + ":" + oContext.getStats().getId(), ((double)timer.elapsed(TimeUnit.MICROSECONDS)/1000));
 
       // since doWork method does not know if there is a new schema, it will always return IterOutcome.OK if it was successful.
       // But if upstream is IterOutcome.OK_NEW_SCHEMA, we should return that

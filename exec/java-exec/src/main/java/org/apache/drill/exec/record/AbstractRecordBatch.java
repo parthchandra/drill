@@ -18,7 +18,9 @@
 package org.apache.drill.exec.record;
 
 import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Stopwatch;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
@@ -135,8 +137,13 @@ public abstract class AbstractRecordBatch<T extends PhysicalOperator> implements
 
   @Override
   public final IterOutcome next() {
+    Stopwatch timer = Stopwatch.createStarted();
     try {
       stats.startProcessing();
+      if (!(this instanceof AbstractSingleRecordBatch)) {
+        logger.trace("PERF - Operator [{}] Start Processing.",
+            context.getFragIdString() + ":" + oContext.getStats().getId());
+      }
       switch (state) {
         case BUILD_SCHEMA: {
           buildSchema();
@@ -159,12 +166,28 @@ public abstract class AbstractRecordBatch<T extends PhysicalOperator> implements
           return IterOutcome.NONE;
         }
         default:
-          return innerNext();
+          if (!(this instanceof AbstractSingleRecordBatch)) {
+            logger.trace("PERF - Operator [{}] Stop Processing. Time {} ms",
+                context.getFragIdString() + ":" + oContext.getStats().getId(), ((double)timer.elapsed(
+                    TimeUnit.MICROSECONDS)/1000));
+          }
+          IterOutcome iter = innerNext();
+          if (!(this instanceof AbstractSingleRecordBatch)) {
+            timer.reset();
+            logger.trace("PERF - Operator [{}] Start Processing.",
+                context.getFragIdString() + ":" + oContext.getStats().getId());
+          }
+          return iter;
       }
     } catch (final SchemaChangeException e) {
       throw new DrillRuntimeException(e);
     } finally {
       stats.stopProcessing();
+      if (!(this instanceof AbstractSingleRecordBatch)) {
+        logger.trace("PERF - Operator [{}] Stop Processing. Time {} ms",
+            context.getFragIdString() + ":" + oContext.getStats().getId(), ((double)timer.elapsed(
+                TimeUnit.MICROSECONDS)/1000));
+      }
     }
   }
 
