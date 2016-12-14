@@ -41,6 +41,25 @@ public class ParquetReaderStats {
 
   public AtomicLong timeDiskScanWait = new AtomicLong();
   public AtomicLong timeDiskScan = new AtomicLong();
+  public AtomicLong timeFixedColumnRead = new AtomicLong();
+  public AtomicLong timeVarColumnRead = new AtomicLong();
+  public AtomicLong timeProcess = new AtomicLong();
+  public AtomicLong timeStats = new AtomicLong();
+  public AtomicLong timeInit = new AtomicLong();
+
+  public AtomicLong cpuTimeDictPageLoads = new AtomicLong();
+  public AtomicLong cpuTimeDataPageLoads = new AtomicLong();
+  public AtomicLong cpuTimeDataPageDecode = new AtomicLong();
+  public AtomicLong cpuTimeDictPageDecode = new AtomicLong();
+  public AtomicLong cpuTimeDictPagesDecompressed = new AtomicLong();
+  public AtomicLong cpuTimeDataPagesDecompressed = new AtomicLong();
+
+  public AtomicLong cpuTimeDiskScan = new AtomicLong();
+  public AtomicLong cpuTimeFixedColumnRead = new AtomicLong();
+  public AtomicLong cpuTimeVarColumnRead = new AtomicLong();
+  public AtomicLong cpuTimeProcess = new AtomicLong();
+  public AtomicLong cpuTimeStats = new AtomicLong();
+  public AtomicLong cpuTimeInit = new AtomicLong();
 
   public ParquetReaderStats() {
   }

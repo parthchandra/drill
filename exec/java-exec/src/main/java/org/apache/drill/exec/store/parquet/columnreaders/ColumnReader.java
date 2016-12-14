@@ -90,8 +90,7 @@ public abstract class ColumnReader<V extends ValueVector> {
     this.isFixedLength = fixedLength;
     this.schemaElement = schemaElement;
     this.valueVec =  v;
-    boolean useAsyncPageReader  = parentReader.getFragmentContext().getOptions()
-        .getOption(ExecConstants.PARQUET_PAGEREADER_ASYNC).bool_val;
+    boolean useAsyncPageReader = parentReader.useAsyncPageReader;
     if (useAsyncPageReader) {
       this.pageReader =
           new AsyncPageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),

@@ -18,6 +18,7 @@
 package org.apache.drill.exec.store.parquet.columnreaders;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -25,7 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -119,6 +122,13 @@ public class ParquetRecordReader extends AbstractRecordReader {
   private final FragmentContext fragmentContext;
   ParquetReaderUtility.DateCorruptionStatus dateCorruptionStatus;
 
+  public boolean useAsyncColReader;
+  public boolean useAsyncPageReader;
+  public boolean useBufferedReader;
+  public int bufferedReadSize;
+  public boolean useFadvise;
+
+
   public ParquetReaderStats parquetReaderStats = new ParquetReaderStats();
 
   public enum Metric implements MetricDef {
@@ -138,7 +148,25 @@ public class ParquetRecordReader extends AbstractRecordReader {
     TIME_DICT_PAGES_DECOMPRESSED,  // Time in nanos in decompressing dictionary pages
     TIME_DATA_PAGES_DECOMPRESSED,  // Time in nanos in decompressing data pages
     TIME_DISK_SCAN_WAIT,           // Time in nanos spent in waiting for an async disk read to complete
-    TIME_DISK_SCAN;                // Time in nanos spent in reading data from disk.
+    TIME_DISK_SCAN,                // Time in nanos spent in reading data from disk.
+    TIME_FIXEDCOLUMN_READ,         // Time in nanos spent in converting fixed width data to value vectors
+    TIME_VARCOLUMN_READ,           // Time in nanos spent in converting varwidth data to value vectors
+    TIME_PROCESS,                  // Time in nanos spent in processing
+    TIME_STATS,                    // Time in nanos spent in processing stats
+    TIME_INIT,                     // Time in nanos spent in initializing
+    CPU_TIME_DICT_PAGE_LOADS,          // CPU time in nanos in reading dictionary pages from disk
+    CPU_TIME_DATA_PAGE_LOADS,          // CPU time in nanos in reading data pages from disk
+    CPU_TIME_DATA_PAGE_DECODE,         // CPU time in nanos in decoding data pages
+    CPU_TIME_DICT_PAGE_DECODE,         // CPU time in nanos in decoding dictionary pages
+    CPU_TIME_DICT_PAGES_DECOMPRESSED,  // CPU time in nanos in decompressing dictionary pages
+    CPU_TIME_DATA_PAGES_DECOMPRESSED,  // CPU time in nanos in decompressing data pages
+    CPU_TIME_DISK_SCAN,                // CPU time in nanos spent in reading data from disk.
+    CPU_TIME_FIXEDCOLUMN_READ,         // CPU time in nanos spent in converting fixed width data to value vectors
+    CPU_TIME_VARCOLUMN_READ,           // CPU time in nanos spent in converting varwidth data to value vectors
+    CPU_TIME_PROCESS,                  // CPU time in nanos spent in processing
+    CPU_TIME_STATS,                    // CPU time in nanos spent in processing stats
+    CPU_TIME_INIT;                     // CPU time in nanos spent in initializing
+
 
     @Override public int metricId() {
       return ordinal();
@@ -197,6 +225,17 @@ public class ParquetRecordReader extends AbstractRecordReader {
       assert (numRecordsToRead >= 0);
       this.numRecordsToRead = Math.min(numRecordsToRead, footer.getBlocks().get(rowGroupIndex).getRowCount());
     }
+    useAsyncColReader =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_COLUMNREADER_ASYNC).bool_val;
+    useAsyncPageReader =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_ASYNC).bool_val;
+    useBufferedReader =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_USE_BUFFERED_READ).bool_val;
+    bufferedReadSize =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
+    useFadvise =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_USE_FADVISE).bool_val;
+
     setColumns(columns);
   }
 
@@ -304,6 +343,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
 
   @Override
   public void setup(OperatorContext operatorContext, OutputMutator output) throws ExecutionSetupException {
+    Stopwatch timer = Stopwatch.createStarted();
+    long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     this.operatorContext = operatorContext;
     if (!isStarQuery()) {
       columnsFound = new boolean[getColumns().size()];
@@ -426,6 +467,10 @@ public class ParquetRecordReader extends AbstractRecordReader {
       }
     } catch (Exception e) {
       handleAndRaise("Failure in setting up reader", e);
+    } finally {
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+      parquetReaderStats.timeInit.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+      parquetReaderStats.cpuTimeInit.addAndGet(cpuStop - cpuStart);
     }
   }
 
@@ -471,13 +516,16 @@ public class ParquetRecordReader extends AbstractRecordReader {
   }
 
  public void readAllFixedFields(long recordsToRead) throws IOException {
-   boolean useAsyncColReader =
-       fragmentContext.getOptions().getOption(ExecConstants.PARQUET_COLUMNREADER_ASYNC).bool_val;
+   Stopwatch timer = Stopwatch.createStarted();
+   long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
    if(useAsyncColReader){
-    readAllFixedFieldsParallel(recordsToRead) ;
+     readAllFixedFieldsParallel(recordsToRead) ;
    } else {
-     readAllFixedFieldsSerial(recordsToRead); ;
+     readAllFixedFieldsSerial(recordsToRead);
    }
+   long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+   parquetReaderStats.timeFixedColumnRead.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+   parquetReaderStats.cpuTimeFixedColumnRead.addAndGet(cpuStop-cpuStart);
  }
 
   public void readAllFixedFieldsSerial(long recordsToRead) throws IOException {
@@ -514,6 +562,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
   public int next() {
     resetBatch();
     long recordsToRead = 0;
+    Stopwatch timer = Stopwatch.createStarted();
+    long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     try {
       ColumnReader<?> firstColumnStatus;
       if (columnStatuses.size() > 0) {
@@ -530,6 +580,9 @@ public class ParquetRecordReader extends AbstractRecordReader {
       // No columns found in the file were selected, simply return a full batch of null records for each column requested
       if (firstColumnStatus == null) {
         if (mockRecordsRead == footer.getBlocks().get(rowGroupIndex).getRowCount()) {
+          long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+          parquetReaderStats.timeProcess.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+          parquetReaderStats.cpuTimeProcess.addAndGet(cpuStop-cpuStart);
           updateStats();
           return 0;
         }
@@ -544,6 +597,9 @@ public class ParquetRecordReader extends AbstractRecordReader {
         mockRecordsRead += recordsToRead;
         totalRecordsRead += recordsToRead;
         numRecordsToRead -= recordsToRead;
+        long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+        parquetReaderStats.timeProcess.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+        parquetReaderStats.cpuTimeProcess.addAndGet(cpuStop-cpuStart);
         updateStats();
         return (int) recordsToRead;
       }
@@ -576,6 +632,10 @@ public class ParquetRecordReader extends AbstractRecordReader {
 //      logger.debug("So far read {} records out of row group({}) in file '{}'", totalRecordsRead, rowGroupIndex, hadoopPath.toUri().getPath());
       totalRecordsRead += firstColumnStatus.getRecordsReadInCurrentPass();
       numRecordsToRead -= firstColumnStatus.getRecordsReadInCurrentPass();
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+      parquetReaderStats.timeProcess.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+      parquetReaderStats.cpuTimeProcess.addAndGet(cpuStop-cpuStart);
+
       updateStats();
       return firstColumnStatus.getRecordsReadInCurrentPass();
     } catch (Exception e) {
@@ -618,7 +678,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
 
 
     if(parquetReaderStats != null) {
-      logger.trace("ParquetTrace,Summary,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+      logger.trace(
+          "ParquetTrace,Summary,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
           hadoopPath,
           parquetReaderStats.numDictPageLoads,
           parquetReaderStats.numDataPageLoads,
@@ -636,7 +697,18 @@ public class ParquetRecordReader extends AbstractRecordReader {
           parquetReaderStats.timeDictPagesDecompressed,
           parquetReaderStats.timeDataPagesDecompressed,
           parquetReaderStats.timeDiskScanWait,
-          parquetReaderStats.timeDiskScan
+          parquetReaderStats.timeDiskScan,
+          parquetReaderStats.timeFixedColumnRead,
+          parquetReaderStats.timeVarColumnRead,
+          parquetReaderStats.cpuTimeDictPageLoads,
+          parquetReaderStats.cpuTimeDataPageLoads,
+          parquetReaderStats.cpuTimeDataPageDecode,
+          parquetReaderStats.cpuTimeDictPageDecode,
+          parquetReaderStats.cpuTimeDictPagesDecompressed,
+          parquetReaderStats.cpuTimeDataPagesDecompressed,
+          parquetReaderStats.cpuTimeDiskScan,
+          parquetReaderStats.cpuTimeFixedColumnRead,
+          parquetReaderStats.cpuTimeVarColumnRead
       );
       parquetReaderStats=null;
     }
@@ -645,6 +717,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
 
   private void updateStats(){
 
+    Stopwatch timer = Stopwatch.createStarted();
+    long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     operatorContext.getStats().setLongStat(Metric.NUM_DICT_PAGE_LOADS,
         parquetReaderStats.numDictPageLoads.longValue());
     operatorContext.getStats().setLongStat(Metric.NUM_DATA_PAGE_lOADS, parquetReaderStats.numDataPageLoads.longValue());
@@ -676,7 +750,36 @@ public class ParquetRecordReader extends AbstractRecordReader {
     operatorContext.getStats().setLongStat(Metric.TIME_DISK_SCAN_WAIT,
         parquetReaderStats.timeDiskScanWait.longValue());
     operatorContext.getStats().setLongStat(Metric.TIME_DISK_SCAN, parquetReaderStats.timeDiskScan.longValue());
+    operatorContext.getStats().setLongStat(Metric.TIME_FIXEDCOLUMN_READ, parquetReaderStats.timeFixedColumnRead.longValue());
+    operatorContext.getStats().setLongStat(Metric.TIME_VARCOLUMN_READ, parquetReaderStats.timeVarColumnRead.longValue());
 
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DICT_PAGE_LOADS,
+        parquetReaderStats.cpuTimeDictPageLoads.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DATA_PAGE_LOADS,
+        parquetReaderStats.cpuTimeDataPageLoads.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DATA_PAGE_DECODE,
+        parquetReaderStats.cpuTimeDataPageDecode.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DICT_PAGE_DECODE,
+        parquetReaderStats.cpuTimeDictPageDecode.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DICT_PAGES_DECOMPRESSED,
+        parquetReaderStats.cpuTimeDictPagesDecompressed.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DATA_PAGES_DECOMPRESSED,
+        parquetReaderStats.cpuTimeDataPagesDecompressed.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DISK_SCAN, parquetReaderStats.cpuTimeDiskScan.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_FIXEDCOLUMN_READ, parquetReaderStats.cpuTimeFixedColumnRead.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_VARCOLUMN_READ, parquetReaderStats.cpuTimeVarColumnRead.longValue());
+
+    operatorContext.getStats().setLongStat(Metric.TIME_PROCESS, parquetReaderStats.timeProcess.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_PROCESS, parquetReaderStats.cpuTimeProcess.longValue());
+
+    operatorContext.getStats().setLongStat(Metric.TIME_INIT, parquetReaderStats.timeInit.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_INIT, parquetReaderStats.cpuTimeInit.longValue());
+
+    long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+    parquetReaderStats.timeStats.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+    parquetReaderStats.cpuTimeStats.addAndGet(cpuStop-cpuStart);
+    operatorContext.getStats().setLongStat(Metric.TIME_STATS, parquetReaderStats.cpuTimeStats.longValue());
+    operatorContext.getStats().setLongStat(Metric.CPU_TIME_STATS, parquetReaderStats.timeStats.longValue());
   }
 
   @Override

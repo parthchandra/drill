@@ -17,15 +17,18 @@
  */
 package org.apache.drill.exec.store.parquet.columnreaders;
 
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.vector.ValueVector;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class VarLenBinaryReader {
 
@@ -36,8 +39,7 @@ public class VarLenBinaryReader {
   public VarLenBinaryReader(ParquetRecordReader parentReader, List<VarLengthColumn<? extends ValueVector>> columns) {
     this.parentReader = parentReader;
     this.columns = columns;
-    useAsyncTasks = parentReader.getFragmentContext().getOptions()
-        .getOption(ExecConstants.PARQUET_COLUMNREADER_ASYNC).bool_val;
+    useAsyncTasks = parentReader.useAsyncColReader;
   }
 
   /**
@@ -56,6 +58,8 @@ public class VarLenBinaryReader {
     for (VarLengthColumn<?> columnReader : columns) {
       columnReader.reset();
     }
+    Stopwatch timer = Stopwatch.createStarted();
+    long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
 
     recordsReadInCurrentPass = determineSizesSerial(recordsToReadInThisPass);
     if(useAsyncTasks){
@@ -63,6 +67,11 @@ public class VarLenBinaryReader {
     }else{
       readRecordsSerial(recordsReadInCurrentPass);
     }
+    long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
+
+    parentReader.parquetReaderStats.timeVarColumnRead.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
+    parentReader.parquetReaderStats.cpuTimeVarColumnRead.addAndGet(cpuStop-cpuStart);
+
     return recordsReadInCurrentPass;
   }
 

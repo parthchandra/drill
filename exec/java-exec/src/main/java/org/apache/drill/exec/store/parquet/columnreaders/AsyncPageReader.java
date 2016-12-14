@@ -39,6 +39,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -119,6 +120,7 @@ class AsyncPageReader extends PageReader {
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
       stats.numDictPageLoads.incrementAndGet();
       stats.timeDictPageLoads.addAndGet(timeBlocked+readStatus.getDiskScanTime());
+      stats.cpuTimeDiskScan.addAndGet(readStatus.getDiskScanCpuTime());
       readDictionaryPageData(readStatus, parentStatus);
     } catch (Exception e) {
       handleAndThrowException(e, "Error reading dictionary page.");
@@ -133,13 +135,16 @@ class AsyncPageReader extends PageReader {
       int uncompressedSize = pageHeader.getUncompressed_page_size();
       final DrillBuf dictionaryData = getDecompressedPageData(readStatus);
       Stopwatch timer = Stopwatch.createStarted();
+      long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       allocatedDictionaryBuffers.add(dictionaryData);
       DictionaryPage page = new DictionaryPage(asBytesInput(dictionaryData, 0, uncompressedSize),
           pageHeader.uncompressed_page_size, pageHeader.dictionary_page_header.num_values,
           valueOf(pageHeader.dictionary_page_header.encoding.name()));
       this.dictionary = page.getEncoding().initDictionary(parentStatus.columnDescriptor, page);
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       long timeToDecode = timer.elapsed(TimeUnit.NANOSECONDS);
       stats.timeDictPageDecode.addAndGet(timeToDecode);
+      stats.cpuTimeDictPageDecode.addAndGet(cpuStop - cpuStart);
     } catch (Exception e) {
       handleAndThrowException(e, "Error decoding dictionary page.");
     }
@@ -162,13 +167,20 @@ class AsyncPageReader extends PageReader {
     pageDataBuf = allocateTemporaryBuffer(uncompressedSize);
     try {
       timer.start();
+      long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       CompressionCodecName codecName = parentColumnReader.columnChunkMetaData.getCodec();
       ByteBuffer input = compressedData.nioBuffer(0, compressedSize);
       ByteBuffer output = pageDataBuf.nioBuffer(0, uncompressedSize);
       DecompressionHelper decompressionHelper = new DecompressionHelper(codecName);
       decompressionHelper.decompress(input, compressedSize, output, uncompressedSize);
       pageDataBuf.writerIndex(uncompressedSize);
+      long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
       timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
+      if ( pageHeader.getType() == PageType.DICTIONARY_PAGE) {
+        this.stats.cpuTimeDictPagesDecompressed.addAndGet(cpuStop - cpuStart);
+      } else {
+        this.stats.cpuTimeDataPagesDecompressed.addAndGet(cpuStop - cpuStart);
+      }
       this.updateStats(pageHeader, "Decompress", 0, timeToRead, compressedSize, uncompressedSize);
     } catch (IOException e) {
       handleAndThrowException(e, "Error decompressing data.");
@@ -180,10 +192,13 @@ class AsyncPageReader extends PageReader {
     ReadStatus readStatus = null;
     try {
       Stopwatch timer = Stopwatch.createStarted();
+      parentColumnReader.parentReader.getOperatorContext().getStats().stopProcessing();
       readStatus = asyncPageRead.get();
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
+      parentColumnReader.parentReader.getOperatorContext().getStats().startProcessing();
       stats.timeDiskScanWait.addAndGet(timeBlocked);
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
+      stats.cpuTimeDiskScan.addAndGet(readStatus.getDiskScanCpuTime());
       if (readStatus.isDictionaryPage) {
         stats.numDictPageLoads.incrementAndGet();
         stats.timeDictPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
@@ -241,6 +256,7 @@ class AsyncPageReader extends PageReader {
     private long bytesRead = 0;
     private long valuesRead = 0;
     private long diskScanTime = 0;
+    private long diskScanCpuTime = 0;
 
     public synchronized PageHeader getPageHeader() {
       return pageHeader;
@@ -282,12 +298,20 @@ class AsyncPageReader extends PageReader {
       this.valuesRead = valuesRead;
     }
 
-    public long getDiskScanTime() {
+    public synchronized long getDiskScanTime() {
       return diskScanTime;
     }
 
-    public void setDiskScanTime(long diskScanTime) {
+    public synchronized void setDiskScanTime(long diskScanTime) {
       this.diskScanTime = diskScanTime;
+    }
+
+    public synchronized long getDiskScanCpuTime() {
+      return diskScanCpuTime;
+    }
+
+    public synchronized void setDiskScanCpuTime(long diskScanCpuTime) {
+      this.diskScanCpuTime = diskScanCpuTime;
     }
   }
 
@@ -309,6 +333,7 @@ class AsyncPageReader extends PageReader {
       long bytesRead = 0;
       long valuesRead = 0;
       Stopwatch timer = Stopwatch.createStarted();
+      long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
 
       DrillBuf pageData = null;
       try {
@@ -341,12 +366,14 @@ class AsyncPageReader extends PageReader {
           } else {
             valuesRead += pageHeader.getData_page_header().getNum_values();
           }
+          long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
           long timeToRead = timer.elapsed(TimeUnit.NANOSECONDS);
           readStatus.setPageHeader(pageHeader);
           readStatus.setPageData(pageData);
           readStatus.setBytesRead(bytesRead);
           readStatus.setValuesRead(valuesRead);
           readStatus.setDiskScanTime(timeToRead);
+          readStatus.setDiskScanCpuTime(cpuStop - cpuStart);
         }
 
       } catch (Exception e) {

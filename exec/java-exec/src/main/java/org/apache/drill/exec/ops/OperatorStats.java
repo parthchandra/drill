@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.ops;
 
+import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 
 import org.apache.drill.exec.memory.BufferAllocator;
@@ -52,10 +53,12 @@ public class OperatorStats {
   private boolean inWait = false;
 
   protected long processingNanos;
+  protected long processingCPUNanos;
   protected long setupNanos;
   protected long waitNanos;
 
   private long processingMark;
+  private long processingCPUMark;
   private long setupMark;
   private long waitMark;
 
@@ -133,6 +136,7 @@ public class OperatorStats {
    */
   public synchronized void clear() {
     processingNanos = 0l;
+    processingCPUNanos = 0l;
     setupNanos = 0l;
     waitNanos = 0l;
     longMetrics.clear();
@@ -156,12 +160,14 @@ public class OperatorStats {
   public synchronized void startProcessing() {
     assert !inProcessing : assertionError("starting processing");
     processingMark = System.nanoTime();
+    processingCPUMark = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     inProcessing = true;
   }
 
   public synchronized void stopProcessing() {
     assert inProcessing : assertionError("stopping processing");
     processingNanos += System.nanoTime() - processingMark;
+    processingCPUNanos += ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime() - processingCPUMark;
     inProcessing = false;
   }
 
@@ -194,6 +200,7 @@ public class OperatorStats {
         .setOperatorId(operatorId) //
         .setSetupNanos(setupNanos) //
         .setProcessNanos(processingNanos)
+        .setProcessCPUNanos(processingCPUNanos)
         .setWaitNanos(waitNanos);
 
     if(allocator != null){
