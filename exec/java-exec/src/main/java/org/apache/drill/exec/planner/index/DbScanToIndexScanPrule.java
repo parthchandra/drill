@@ -95,7 +95,9 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         GroupScan groupScan = scan.getGroupScan();
         if (groupScan instanceof DbGroupScan) {
           DbGroupScan dbscan = ((DbGroupScan)groupScan);
-          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan());
+          //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
+          //no more trying index convert rule
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.getRestricted());
         }
         return false;
       }
@@ -117,8 +119,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
 
       @Override
       public IndexCollection getIndexCollection(PlannerSettings settings, ScanPrel scan) {
-        DbGroupScan hbGroupScan = (DbGroupScan)scan.getGroupScan();
-        return hbGroupScan.getSecondaryIndexCollection(scan);
+        DbGroupScan dbGroupScan = (DbGroupScan)scan.getGroupScan();
+        return dbGroupScan.getSecondaryIndexCollection(scan);
       }
 
       @Override
@@ -127,7 +129,9 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         GroupScan groupScan = scan.getGroupScan();
         if (groupScan instanceof DbGroupScan) {
           DbGroupScan dbscan = ((DbGroupScan)groupScan);
-          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan());
+          //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
+          //no more trying index convert rule
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.getRestricted());
         }
         return false;
       }

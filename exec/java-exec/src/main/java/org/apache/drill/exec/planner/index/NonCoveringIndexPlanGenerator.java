@@ -20,10 +20,15 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 
+import com.google.common.collect.Sets;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
+import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -32,6 +37,7 @@ import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
 import org.apache.drill.exec.planner.physical.Prel;
+import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
@@ -89,6 +95,63 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     super(call, origProject, origScan, indexGroupScan, indexCondition, remainderCondition, builder);
   }
 
+  /**
+   * For IndexScan in non-covering case, rowType to return contains only row_key('_id') of primary table.
+   * so the rowType for IndexScan should be converted from [Primary_table.row_key, primary_table.indexed_col]
+   * to [indexTable.row_key(primary_table.indexed_col), indexTable.<primary_key.row_key> (Primary_table.row_key)]
+   * This will impact the columns of scan, the rowType of ScanRel
+   *
+   * @param primaryRowType
+   * @param typeFactory
+   * @return
+   */
+  private RelDataType convertRowTypeForIndexScan(RelDataType primaryRowType, RelDataTypeFactory typeFactory) {
+    List<RelDataTypeField> fields = new ArrayList<>();
+    //TODO: we are not handling the case where row_key of index is composited from 2 or more columns of primary table
+
+    //row_key in the rowType of scan on primary table
+    RelDataTypeField rowkey_primary;
+
+    RelRecordType newRowType = null;
+
+      //first add row_key of primary table,
+      rowkey_primary = new RelDataTypeFieldImpl(
+          ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), fields.size(),
+          typeFactory.createSqlType(SqlTypeName.ANY));
+      fields.add(rowkey_primary);
+      //then add indexed cols
+    List<RexNode> conditions = Lists.newArrayList();
+    conditions.add(indexCondition);
+    PrelUtil.ProjectPushInfo info = PrelUtil.getColumns(origScan.getRowType(), conditions);
+
+    for (SchemaPath indexedPath: info.columns) {
+      fields.add(new RelDataTypeFieldImpl(
+          indexedPath.getAsUnescapedPath(), fields.size(),
+          typeFactory.createSqlType(SqlTypeName.ANY)));
+    }
+
+    //update columns of groupscan accordingly
+    Set<RelDataTypeField> rowfields = Sets.newLinkedHashSet();
+    final List<SchemaPath> columns = Lists.newArrayList();
+    for (RelDataTypeField f : fields) {
+      SchemaPath path;
+      String pathSeg = f.getName().replaceAll("`", "");
+      final String[] segs = pathSeg.split("\\.");
+      path = SchemaPath.getCompoundPath(segs);
+      rowfields.add(new RelDataTypeFieldImpl(
+          pathSeg, rowfields.size(),
+          typeFactory.createMapType(typeFactory.createSqlType(SqlTypeName.VARCHAR),
+              typeFactory.createSqlType(SqlTypeName.ANY))
+      ));
+      columns.add(path);
+    }
+    indexGroupScan.setColumns(columns);
+
+    //rowtype does not take the whole path, but only the rootSegment of the SchemaPath
+    newRowType = new RelRecordType(Lists.newArrayList(rowfields));
+    return newRowType;
+  }
+
   @Override
   public RelNode convertChild(final FilterPrel filter, final RelNode input) throws InvalidRelException {
 
@@ -97,11 +160,10 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       return null;
     }
 
-    RelDataType hbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
-
+    RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
+    RelDataType indexScanRowType = convertRowTypeForIndexScan(origScan.getRowType(), origScan.getCluster().getTypeFactory());
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet(), indexGroupScan, hbscanRowType /* use the same row type as the hbase scan */);
-
+        origScan.getTraitSet(), indexGroupScan, indexScanRowType);
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
     FilterPrel rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
@@ -136,13 +198,14 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     DbGroupScan origHbGroupScan = (DbGroupScan)origScan.getGroupScan();
     List<SchemaPath> cols = new ArrayList<SchemaPath>(origHbGroupScan.getColumns());
     if (!checkRowKey(cols)) {
-      cols.add(AbstractDbGroupScan.ROW_KEY_PATH);
+      cols.add(origHbGroupScan.getRowKeyPath());
     }
 
-    DbGroupScan newHbGroupScan  = (DbGroupScan)origHbGroupScan.clone(cols);
-    newHbGroupScan.setCostFactor(0.00001);
+    DbGroupScan newDbGroupScan  = (DbGroupScan)origHbGroupScan.clone(cols);
+    //newDbGroupScan.setCostFactor(0.00001);
+    newDbGroupScan.setRestricted(true);
     ScanPrel hbaseScan = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet(), newHbGroupScan, hbscanRowType);
+        origScan.getTraitSet(), newDbGroupScan, dbscanRowType);
 
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();
@@ -189,7 +252,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     HashJoinPrel hjPrel = new HashJoinPrel(filter.getCluster(), leftTraits, convertedLeft,
         convertedRight, joinCondition, JoinRelType.INNER, false,
-        newHbGroupScan /* useful for join-restricted scans */);
+        newDbGroupScan /* useful for join-restricted scans */);
 
     RelNode newRel = hjPrel;
 
@@ -225,7 +288,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
 
-
+    logger.trace("DbScanToIndexScanPrule got finalRel {} from origScan {}",
+        finalRel.toString(), origScan.toString());
     return finalRel;
   }
 }

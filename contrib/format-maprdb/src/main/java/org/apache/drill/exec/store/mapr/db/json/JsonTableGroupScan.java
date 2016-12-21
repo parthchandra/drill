@@ -198,12 +198,36 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @Override
   public ScanStats getScanStats() {
     //TODO: look at stats for this.
+    if (isIndexScan()) {
+      return indexScanStats();
+    }
+    else if (getRestricted()) {
+      return restrictedDBScanStats();
+    }
+
     long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
     final int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
-    float diskCost = avgColumnSize * numColumns * rowCount * (isIndexScan() ?  (scanSpec.getSerializedFilter() != null ? 0.05f: 0.2f) : 1 );
+    float diskCost = avgColumnSize * numColumns * rowCount;
     logger.debug("JsonGroupScan:{} rowCount:{}, diskCost:{}", this, rowCount, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
+  }
+
+  private ScanStats indexScanStats() {
+    int totalColNum = 100;
+    boolean filterPushed = (scanSpec.getSerializedFilter() != null);
+    if(scanSpec != null && scanSpec.getIndexDesc() != null) {
+      totalColNum = scanSpec.getIndexDesc().getCoveredFields().size() + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
+    }
+    int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
+    long rowCount = (long) ((filterPushed ? 0.001f : 0.01f) * tableStats.getNumRows());
+    final int avgColumnSize = 10;
+    float diskCost = avgColumnSize * numColumns * rowCount;
+    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
+  }
+
+  private ScanStats restrictedDBScanStats() {
+    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
   }
 
   @Override

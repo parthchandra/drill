@@ -48,4 +48,13 @@ public interface DbGroupScan extends GroupScan {
 
   @JsonIgnore boolean isIndexScan();
 
+  void setRestricted(boolean flag);
+
+  boolean getRestricted();
+
+  @JsonIgnore
+  String getRowKeyName();
+
+  @JsonIgnore
+  SchemaPath getRowKeyPath();
 }

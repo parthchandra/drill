@@ -26,6 +26,7 @@ import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
+import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
@@ -70,7 +71,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
     List<String> fieldNames = rowType.getFieldNames();
     int idx = 0;
     for (String field : fieldNames) {
-      if (field.equalsIgnoreCase(AbstractDbGroupScan.ROW_KEY)) {
+      if (field.equalsIgnoreCase(((DbGroupScan)origScan.getGroupScan()).getRowKeyName())) {
         return idx;
       }
       idx++;
@@ -86,14 +87,14 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
 
     fields.addAll(origRowType.getFieldList());
     fields.add(new RelDataTypeFieldImpl(
-        AbstractDbGroupScan.ROW_KEY, 0,
+        ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), 0,
             typeFactory.createSqlType(SqlTypeName.ANY)));
     return new RelRecordType(fields);
   }
 
   protected boolean checkRowKey(List<SchemaPath> columns) {
     for (SchemaPath s : columns) {
-      if (s.equals(AbstractDbGroupScan.ROW_KEY_PATH)) {
+      if (s.equals(((DbGroupScan)origScan.getGroupScan()).getRowKeyPath())) {
         return true;
       }
     }

@@ -26,15 +26,17 @@ import org.apache.drill.exec.store.AbstractStoragePlugin;
 public abstract class AbstractDbGroupScan extends AbstractGroupScan implements DbGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractDbGroupScan.class);
 
-  public static final String ROW_KEY = "row_key";
-  public static final SchemaPath ROW_KEY_PATH = SchemaPath.getSimplePath(ROW_KEY);
+  private static final String ROW_KEY = "_id";
+  private static final SchemaPath ROW_KEY_PATH = SchemaPath.getSimplePath(ROW_KEY);
 
+  protected boolean restricted = false;
   public AbstractDbGroupScan(String userName) {
     super(userName);
   }
 
   public AbstractDbGroupScan(AbstractDbGroupScan that) {
     super(that);
+    setRestricted(that.getRestricted());
   }
 
   public abstract AbstractStoragePlugin getStoragePlugin();
@@ -51,4 +53,23 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
     return null;
   }
 
+  @Override
+  public  void setRestricted(boolean flag) {
+    restricted = flag;
+  }
+
+  @Override
+  public boolean getRestricted() {
+    return restricted;
+  }
+
+  @Override
+  public String getRowKeyName() {
+    return ROW_KEY;
+  }
+
+  @Override
+  public SchemaPath getRowKeyPath() {
+    return ROW_KEY_PATH;
+  }
 }
