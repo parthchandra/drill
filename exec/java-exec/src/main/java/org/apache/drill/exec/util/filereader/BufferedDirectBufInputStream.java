@@ -18,6 +18,7 @@
 package org.apache.drill.exec.util.filereader;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.parquet.hadoop.util.CompatibilityUtil;
@@ -26,6 +27,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <code>BufferedDirectBufInputStream</code>  reads from the
@@ -118,12 +120,14 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   @Override public void init() throws UnsupportedOperationException, IOException {
     super.init();
+    Stopwatch timer = Stopwatch.createStarted();
     this.internalBuffer = this.allocator.buffer(this.bufSize);
     this.tempBuffer = this.allocator.buffer(DEFAULT_TEMP_BUFFER_SIZE);
-    int bytesRead = getNextBlock();
-    if (bytesRead <= 0) {
-      throw new IOException("End of stream reached while initializing buffered reader.");
-    }
+    logger.debug("SETUP, INIT (ALLOC), {}, {}", streamId, timer.elapsed(TimeUnit.NANOSECONDS));
+    //int bytesRead = getNextBlock();
+    //if (bytesRead <= 0) {
+    //  throw new IOException("End of stream reached while initializing buffered reader.");
+    //}
   }
 
   private DrillBuf reallocBuffer(int newSize ){

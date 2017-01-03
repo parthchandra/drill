@@ -17,12 +17,14 @@
  */
 package org.apache.drill.exec.store.parquet.columnreaders;
 
+import com.google.common.base.Stopwatch;
 import io.netty.buffer.DrillBuf;
 
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
@@ -84,6 +86,7 @@ public abstract class ColumnReader<V extends ValueVector> {
 
   protected ColumnReader(ParquetRecordReader parentReader, int allocateSize, ColumnDescriptor descriptor,
       ColumnChunkMetaData columnChunkMetaData, boolean fixedLength, V v, SchemaElement schemaElement) throws ExecutionSetupException {
+    Stopwatch timer = Stopwatch.createStarted();
     this.parentReader = parentReader;
     this.columnDescriptor = descriptor;
     this.columnChunkMetaData = columnChunkMetaData;
@@ -91,6 +94,7 @@ public abstract class ColumnReader<V extends ValueVector> {
     this.schemaElement = schemaElement;
     this.valueVec =  v;
     boolean useAsyncPageReader = parentReader.useAsyncPageReader;
+    logger.debug("SETUP, 5.2.2.1, {}", timer.elapsed(TimeUnit.NANOSECONDS));
     if (useAsyncPageReader) {
       this.pageReader =
           new AsyncPageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),
@@ -100,6 +104,7 @@ public abstract class ColumnReader<V extends ValueVector> {
           new PageReader(this, parentReader.getFileSystem(), parentReader.getHadoopPath(),
               columnChunkMetaData);
     }
+    logger.debug("SETUP, 5.2.2.2, {}", timer.elapsed(TimeUnit.NANOSECONDS));
 
     if (columnDescriptor.getType() != PrimitiveType.PrimitiveTypeName.BINARY) {
       if (columnDescriptor.getType() == PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY) {
@@ -108,9 +113,11 @@ public abstract class ColumnReader<V extends ValueVector> {
         dataTypeLengthInBits = ParquetRecordReader.getTypeLengthInBits(columnDescriptor.getType());
       }
     }
+    logger.debug("SETUP, 5.2.2.3, {}", timer.elapsed(TimeUnit.NANOSECONDS));
     if(threadPool == null) {
       threadPool = parentReader.getOperatorContext().getScanDecodeExecutor();
     }
+    logger.debug("SETUP, 5.2.2.4, {}", timer.elapsed(TimeUnit.NANOSECONDS));
   }
 
   public int getRecordsReadInCurrentPass() {

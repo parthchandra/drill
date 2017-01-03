@@ -128,6 +128,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
   public int bufferedReadSize;
   public boolean useFadvise;
 
+  private String name;
+
 
   public ParquetReaderStats parquetReaderStats = new ParquetReaderStats();
 
@@ -210,6 +212,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
       ParquetMetadata footer,
       List<SchemaPath> columns,
       ParquetReaderUtility.DateCorruptionStatus dateCorruptionStatus) throws ExecutionSetupException {
+    this.name = path;
     this.hadoopPath = new Path(path);
     this.fileSystem = fs;
     this.codecFactory = codecFactory;
@@ -359,6 +362,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
     int columnsToScan = 0;
     mockRecordsRead = 0;
 
+    logger.debug("SETUP: 1: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
+
     MaterializedField field;
 //    ParquetMetadataConverter metaConverter = new ParquetMetadataConverter();
     FileMetaData fileMetaData;
@@ -372,6 +377,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
     Map<String, SchemaElement> schemaElements = ParquetReaderUtility.getColNameToSchemaElementMapping(footer);
 
     // loop to add up the length of the fixed width columns and build the schema
+    logger.debug("SETUP: 2: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
     for (int i = 0; i < columns.size(); ++i) {
       column = columns.get(i);
       SchemaElement se = schemaElements.get(column.getPath()[0]);
@@ -391,6 +397,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
       }
 //    rowGroupOffset = footer.getBlocks().get(rowGroupIndex).getColumns().get(0).getFirstDataPageOffset();
 
+    logger.debug("SETUP: 3: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
     if (columnsToScan != 0  && allFieldsFixedLength) {
       recordsPerBatch = (int) Math.min(Math.min(batchSize / bitWidthAllFixedFields,
           footer.getBlocks().get(0).getColumns().get(0).getValueCount()), 65535);
@@ -399,6 +406,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
       recordsPerBatch = DEFAULT_RECORDS_TO_READ_IF_NOT_FIXED_WIDTH;
     }
 
+    logger.debug("SETUP: 4: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
     try {
       ValueVector vector;
       SchemaElement schemaElement;
@@ -416,7 +424,9 @@ public class ParquetRecordReader extends AbstractRecordReader {
         columnChunkMetadataPositionsInList.put(Arrays.toString(colChunk.getPath().toArray()), colChunkIndex);
         colChunkIndex++;
       }
+      logger.debug("SETUP: 5: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
       for (int i = 0; i < columns.size(); ++i) {
+        logger.debug("SETUP: 5.1: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
         column = columns.get(i);
         columnChunkMetaData = rowGroupMetadata.getColumns().get(columnChunkMetadataPositionsInList.get(Arrays.toString(column.getPath())));
         schemaElement = schemaElements.get(column.getPath()[0]);
@@ -428,6 +438,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
           continue;
         }
 
+        logger.debug("SETUP: 5.2: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
         fieldFixedLength = column.getType() != PrimitiveType.PrimitiveTypeName.BINARY;
         vector = output.addField(field, (Class<? extends ValueVector>) TypeHelper.getValueVectorClass(type.getMinorType(), type.getMode()));
         if (column.getType() != PrimitiveType.PrimitiveTypeName.BINARY) {
@@ -440,15 +451,21 @@ public class ParquetRecordReader extends AbstractRecordReader {
                 getTypeLengthInBits(column.getType()), -1, column, columnChunkMetaData, false, repeatedVector, schemaElement));
           }
           else {
-            columnStatuses.add(ColumnReaderFactory.createFixedColumnReader(this, fieldFixedLength,
+
+            logger.debug("SETUP, 5.2.1, {},{},{}", name, schemaElement, timer.elapsed(TimeUnit.NANOSECONDS));
+           ColumnReader<?> cr = ColumnReaderFactory.createFixedColumnReader(this, fieldFixedLength,
                 column, columnChunkMetaData, recordsPerBatch, vector,
-                schemaElement));
+                schemaElement) ;
+            logger.debug("SETUP, 5.2.3, {},{},{}", name, schemaElement, timer.elapsed(TimeUnit.NANOSECONDS));
+            columnStatuses.add(cr);
           }
         } else {
           // create a reader and add it to the appropriate list
           varLengthColumns.add(ColumnReaderFactory.getReader(this, -1, column, columnChunkMetaData, false, vector, schemaElement));
         }
+        logger.debug("SETUP: 5.3: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
       }
+      logger.debug("SETUP: 6: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
       varLengthReader = new VarLenBinaryReader(this, varLengthColumns);
 
       if (!isStarQuery()) {
@@ -465,6 +482,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
           }
         }
       }
+      logger.debug("SETUP: 7: {} : {}", name, timer.elapsed(TimeUnit.NANOSECONDS));
     } catch (Exception e) {
       handleAndRaise("Failure in setting up reader", e);
     } finally {
@@ -583,7 +601,6 @@ public class ParquetRecordReader extends AbstractRecordReader {
           long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
           parquetReaderStats.timeProcess.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
           parquetReaderStats.cpuTimeProcess.addAndGet(cpuStop-cpuStart);
-          updateStats();
           return 0;
         }
         recordsToRead = Math.min(DEFAULT_RECORDS_TO_READ_IF_NOT_FIXED_WIDTH, footer.getBlocks().get(rowGroupIndex).getRowCount() - mockRecordsRead);
@@ -600,7 +617,6 @@ public class ParquetRecordReader extends AbstractRecordReader {
         long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
         parquetReaderStats.timeProcess.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
         parquetReaderStats.cpuTimeProcess.addAndGet(cpuStop-cpuStart);
-        updateStats();
         return (int) recordsToRead;
       }
 
@@ -636,7 +652,6 @@ public class ParquetRecordReader extends AbstractRecordReader {
       parquetReaderStats.timeProcess.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
       parquetReaderStats.cpuTimeProcess.addAndGet(cpuStop-cpuStart);
 
-      updateStats();
       return firstColumnStatus.getRecordsReadInCurrentPass();
     } catch (Exception e) {
       handleAndRaise("\nHadoop path: " + hadoopPath.toUri().getPath() +
@@ -678,6 +693,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
 
 
     if(parquetReaderStats != null) {
+      updateStats();
       logger.trace(
           "ParquetTrace,Summary,{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
           hadoopPath,
@@ -719,67 +735,67 @@ public class ParquetRecordReader extends AbstractRecordReader {
 
     Stopwatch timer = Stopwatch.createStarted();
     long cpuStart = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
-    operatorContext.getStats().setLongStat(Metric.NUM_DICT_PAGE_LOADS,
+    operatorContext.getStats().addLongStat(Metric.NUM_DICT_PAGE_LOADS,
         parquetReaderStats.numDictPageLoads.longValue());
-    operatorContext.getStats().setLongStat(Metric.NUM_DATA_PAGE_lOADS, parquetReaderStats.numDataPageLoads.longValue());
-    operatorContext.getStats().setLongStat(Metric.NUM_DATA_PAGES_DECODED, parquetReaderStats.numDataPagesDecoded.longValue());
-    operatorContext.getStats().setLongStat(Metric.NUM_DICT_PAGES_DECOMPRESSED,
+    operatorContext.getStats().addLongStat(Metric.NUM_DATA_PAGE_lOADS, parquetReaderStats.numDataPageLoads.longValue());
+    operatorContext.getStats().addLongStat(Metric.NUM_DATA_PAGES_DECODED, parquetReaderStats.numDataPagesDecoded.longValue());
+    operatorContext.getStats().addLongStat(Metric.NUM_DICT_PAGES_DECOMPRESSED,
         parquetReaderStats.numDictPagesDecompressed.longValue());
-    operatorContext.getStats().setLongStat(Metric.NUM_DATA_PAGES_DECOMPRESSED,
+    operatorContext.getStats().addLongStat(Metric.NUM_DATA_PAGES_DECOMPRESSED,
         parquetReaderStats.numDataPagesDecompressed.longValue());
-    operatorContext.getStats().setLongStat(Metric.TOTAL_DICT_PAGE_READ_BYTES,
+    operatorContext.getStats().addLongStat(Metric.TOTAL_DICT_PAGE_READ_BYTES,
         parquetReaderStats.totalDictPageReadBytes.longValue());
-    operatorContext.getStats().setLongStat(Metric.TOTAL_DATA_PAGE_READ_BYTES,
+    operatorContext.getStats().addLongStat(Metric.TOTAL_DATA_PAGE_READ_BYTES,
         parquetReaderStats.totalDataPageReadBytes.longValue());
-    operatorContext.getStats().setLongStat(Metric.TOTAL_DICT_DECOMPRESSED_BYTES,
+    operatorContext.getStats().addLongStat(Metric.TOTAL_DICT_DECOMPRESSED_BYTES,
         parquetReaderStats.totalDictDecompressedBytes.longValue());
-    operatorContext.getStats().setLongStat(Metric.TOTAL_DATA_DECOMPRESSED_BYTES,
+    operatorContext.getStats().addLongStat(Metric.TOTAL_DATA_DECOMPRESSED_BYTES,
         parquetReaderStats.totalDataDecompressedBytes.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DICT_PAGE_LOADS,
+    operatorContext.getStats().addLongStat(Metric.TIME_DICT_PAGE_LOADS,
         parquetReaderStats.timeDictPageLoads.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DATA_PAGE_LOADS,
+    operatorContext.getStats().addLongStat(Metric.TIME_DATA_PAGE_LOADS,
         parquetReaderStats.timeDataPageLoads.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DATA_PAGE_DECODE,
+    operatorContext.getStats().addLongStat(Metric.TIME_DATA_PAGE_DECODE,
         parquetReaderStats.timeDataPageDecode.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DICT_PAGE_DECODE,
+    operatorContext.getStats().addLongStat(Metric.TIME_DICT_PAGE_DECODE,
         parquetReaderStats.timeDictPageDecode.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DICT_PAGES_DECOMPRESSED,
+    operatorContext.getStats().addLongStat(Metric.TIME_DICT_PAGES_DECOMPRESSED,
         parquetReaderStats.timeDictPagesDecompressed.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DATA_PAGES_DECOMPRESSED,
+    operatorContext.getStats().addLongStat(Metric.TIME_DATA_PAGES_DECOMPRESSED,
         parquetReaderStats.timeDataPagesDecompressed.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DISK_SCAN_WAIT,
+    operatorContext.getStats().addLongStat(Metric.TIME_DISK_SCAN_WAIT,
         parquetReaderStats.timeDiskScanWait.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_DISK_SCAN, parquetReaderStats.timeDiskScan.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_FIXEDCOLUMN_READ, parquetReaderStats.timeFixedColumnRead.longValue());
-    operatorContext.getStats().setLongStat(Metric.TIME_VARCOLUMN_READ, parquetReaderStats.timeVarColumnRead.longValue());
+    operatorContext.getStats().addLongStat(Metric.TIME_DISK_SCAN, parquetReaderStats.timeDiskScan.longValue());
+    operatorContext.getStats().addLongStat(Metric.TIME_FIXEDCOLUMN_READ, parquetReaderStats.timeFixedColumnRead.longValue());
+    operatorContext.getStats().addLongStat(Metric.TIME_VARCOLUMN_READ, parquetReaderStats.timeVarColumnRead.longValue());
 
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DICT_PAGE_LOADS,
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DICT_PAGE_LOADS,
         parquetReaderStats.cpuTimeDictPageLoads.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DATA_PAGE_LOADS,
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DATA_PAGE_LOADS,
         parquetReaderStats.cpuTimeDataPageLoads.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DATA_PAGE_DECODE,
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DATA_PAGE_DECODE,
         parquetReaderStats.cpuTimeDataPageDecode.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DICT_PAGE_DECODE,
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DICT_PAGE_DECODE,
         parquetReaderStats.cpuTimeDictPageDecode.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DICT_PAGES_DECOMPRESSED,
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DICT_PAGES_DECOMPRESSED,
         parquetReaderStats.cpuTimeDictPagesDecompressed.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DATA_PAGES_DECOMPRESSED,
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DATA_PAGES_DECOMPRESSED,
         parquetReaderStats.cpuTimeDataPagesDecompressed.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_DISK_SCAN, parquetReaderStats.cpuTimeDiskScan.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_FIXEDCOLUMN_READ, parquetReaderStats.cpuTimeFixedColumnRead.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_VARCOLUMN_READ, parquetReaderStats.cpuTimeVarColumnRead.longValue());
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_DISK_SCAN, parquetReaderStats.cpuTimeDiskScan.longValue());
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_FIXEDCOLUMN_READ, parquetReaderStats.cpuTimeFixedColumnRead.longValue());
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_VARCOLUMN_READ, parquetReaderStats.cpuTimeVarColumnRead.longValue());
 
-    operatorContext.getStats().setLongStat(Metric.TIME_PROCESS, parquetReaderStats.timeProcess.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_PROCESS, parquetReaderStats.cpuTimeProcess.longValue());
+    operatorContext.getStats().addLongStat(Metric.TIME_PROCESS, parquetReaderStats.timeProcess.longValue());
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_PROCESS, parquetReaderStats.cpuTimeProcess.longValue());
 
-    operatorContext.getStats().setLongStat(Metric.TIME_INIT, parquetReaderStats.timeInit.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_INIT, parquetReaderStats.cpuTimeInit.longValue());
+    operatorContext.getStats().addLongStat(Metric.TIME_INIT, parquetReaderStats.timeInit.longValue());
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_INIT, parquetReaderStats.cpuTimeInit.longValue());
 
     long cpuStop = ManagementFactory.getThreadMXBean().getCurrentThreadCpuTime();
     parquetReaderStats.timeStats.addAndGet(timer.elapsed(TimeUnit.NANOSECONDS));
     parquetReaderStats.cpuTimeStats.addAndGet(cpuStop-cpuStart);
-    operatorContext.getStats().setLongStat(Metric.TIME_STATS, parquetReaderStats.cpuTimeStats.longValue());
-    operatorContext.getStats().setLongStat(Metric.CPU_TIME_STATS, parquetReaderStats.timeStats.longValue());
+    operatorContext.getStats().addLongStat(Metric.TIME_STATS, parquetReaderStats.cpuTimeStats.longValue());
+    operatorContext.getStats().addLongStat(Metric.CPU_TIME_STATS, parquetReaderStats.timeStats.longValue());
   }
 
   @Override

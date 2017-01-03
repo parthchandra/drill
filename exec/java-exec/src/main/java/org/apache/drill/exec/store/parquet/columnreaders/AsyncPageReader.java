@@ -192,10 +192,10 @@ class AsyncPageReader extends PageReader {
     ReadStatus readStatus = null;
     try {
       Stopwatch timer = Stopwatch.createStarted();
-      parentColumnReader.parentReader.getOperatorContext().getStats().stopProcessing();
+      parentColumnReader.parentReader.getOperatorContext().getStats().startWait();
       readStatus = asyncPageRead.get();
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
-      parentColumnReader.parentReader.getOperatorContext().getStats().startProcessing();
+      parentColumnReader.parentReader.getOperatorContext().getStats().stopWait();
       stats.timeDiskScanWait.addAndGet(timeBlocked);
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
       stats.cpuTimeDiskScan.addAndGet(readStatus.getDiskScanCpuTime());
