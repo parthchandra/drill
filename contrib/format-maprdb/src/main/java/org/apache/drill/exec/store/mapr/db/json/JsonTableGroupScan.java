@@ -62,11 +62,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   public static final String TABLE_JSON = "json";
 
-  private MapRDBTableStats tableStats;
+  protected MapRDBTableStats tableStats;
 
-  private JsonScanSpec scanSpec;
+  protected JsonScanSpec scanSpec;
 
-  long rowCount;
+  protected long rowCount;
 
   @JsonCreator
   public JsonTableGroupScan(@JsonProperty("userName") final String userName,
@@ -92,7 +92,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    * Private constructor, used for cloning.
    * @param that The HBaseGroupScan to clone
    */
-  private JsonTableGroupScan(JsonTableGroupScan that) {
+  protected JsonTableGroupScan(JsonTableGroupScan that) {
     super(that);
     this.scanSpec = that.scanSpec;
     this.endpointFragmentMapping = that.endpointFragmentMapping;
@@ -160,9 +160,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     if (isIndexScan()) {
       return indexScanStats();
     }
-    else if (getRestricted()) {
-      return restrictedDBScanStats();
-    }
 
     long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
     final int avgColumnSize = 10;
@@ -183,10 +180,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     final int avgColumnSize = 10;
     float diskCost = avgColumnSize * numColumns * rowCount;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
-  }
-
-  private ScanStats restrictedDBScanStats() {
-    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
   }
 
   @Override
@@ -239,6 +232,23 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     return scanSpec != null && scanSpec.isSecondaryIndex();
   }
 
+  @Override
+  public boolean supportsRestrictedScan() {
+    return true;  
+  }
+  
+  @Override
+  public RestrictedJsonTableGroupScan getRestrictedScan(List<SchemaPath> columns) {
+    RestrictedJsonTableGroupScan newScan = 
+        new RestrictedJsonTableGroupScan(this.getUserName(),
+            this.getStoragePlugin(),
+            this.getFormatPlugin(),
+            this.getScanSpec(),
+            this.getColumns());
+    newScan.columns = columns;
+    return newScan;    
+  }
+  
   /**
    *
    * @param condition

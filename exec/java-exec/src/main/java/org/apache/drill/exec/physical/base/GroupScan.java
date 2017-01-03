@@ -135,6 +135,4 @@ public interface GroupScan extends Scan, HasAffinity{
    */
   public Collection<String> getFiles();
 
-  public void addJoinForRestrictedScan(HashJoinBatch batch, int minorFragmentId);
-
 }

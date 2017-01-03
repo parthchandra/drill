@@ -23,10 +23,9 @@ import java.util.List;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
-import org.apache.drill.exec.physical.base.AbstractBase;
+import org.apache.drill.exec.physical.base.AbstractDbSubScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.PhysicalVisitor;
-import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -41,7 +40,7 @@ import com.google.common.collect.ImmutableSet;
 
 // Class containing information for reading a single HBase region
 @JsonTypeName("maprdb-sub-scan")
-public class MapRDBSubScan extends AbstractBase implements SubScan {
+public class MapRDBSubScan extends AbstractDbSubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBSubScan.class);
 
   @JsonProperty

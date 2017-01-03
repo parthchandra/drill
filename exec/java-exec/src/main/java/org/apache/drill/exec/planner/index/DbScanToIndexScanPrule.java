@@ -97,7 +97,7 @@ public abstract class DbScanToIndexScanPrule extends Prule {
           DbGroupScan dbscan = ((DbGroupScan)groupScan);
           //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
           //no more trying index convert rule
-          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.getRestricted());
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.isRestrictedScan());
         }
         return false;
       }
@@ -131,7 +131,7 @@ public abstract class DbScanToIndexScanPrule extends Prule {
           DbGroupScan dbscan = ((DbGroupScan)groupScan);
           //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
           //no more trying index convert rule
-          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.getRestricted());
+          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.isRestrictedScan());
         }
         return false;
       }
@@ -300,6 +300,31 @@ public abstract class DbScanToIndexScanPrule extends Prule {
 
     if (createdCovering) {
       return;
+    }
+
+    // Create non-covering index plans. First, check if the primary table scan supports creating a
+    // restricted scan
+    GroupScan primaryTableScan = scan.getGroupScan();
+    if (primaryTableScan instanceof DbGroupScan &&
+        (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
+      boolean createdNonCovering = false;
+      try {
+        for (IndexDescriptor indexDesc : nonCoveringIndexes) {
+          IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
+          logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
+
+          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
+              remainderCondition, builder);
+          planGen.go(filter, convert(scan, scan.getTraitSet()));
+          createdNonCovering = true;
+        }
+      } catch (Exception e) {
+        logger.warn("Exception while trying to generate non-covering index access plan", e);
+        return;
+      }
+      if (createdNonCovering) {
+        return;
+      }
     }
 
     try {

@@ -26,7 +26,6 @@ import com.google.common.collect.Lists;
 
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.EndpointAffinity;
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 
@@ -167,11 +166,6 @@ public abstract class AbstractGroupScan extends AbstractBase implements GroupSca
   @Override
   public DistributionAffinity getDistributionAffinity() {
     return DistributionAffinity.SOFT;
-  }
-
-  @Override
-  public void addJoinForRestrictedScan(HashJoinBatch batch, int minorFragmentId) {
-    throw new UnsupportedOperationException();
   }
 
 }

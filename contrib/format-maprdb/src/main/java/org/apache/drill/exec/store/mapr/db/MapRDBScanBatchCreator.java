@@ -29,6 +29,7 @@ import org.apache.drill.exec.store.hbase.HBaseRecordReader;
 import org.apache.drill.exec.store.hbase.HBaseSubScan.HBaseSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.binary.BinaryTableGroupScan;
 import org.apache.drill.exec.store.mapr.db.json.MaprDBJsonRecordReader;
+import org.apache.drill.exec.store.mapr.db.json.RestrictedJsonRecordReader;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -46,7 +47,11 @@ public class MapRDBScanBatchCreator implements BatchCreator<MapRDBSubScan>{
           readers.add(new HBaseRecordReader(subScan.getFormatPlugin().getConnection(),
               getHBaseSubScanSpec(scanSpec), subScan.getColumns(), context));
         } else {
-          readers.add(new MaprDBJsonRecordReader(scanSpec, subScan.getFormatPluginConfig(), subScan.getColumns(), context));
+          if (subScan.isRestrictedSubScan()) {
+            readers.add(new RestrictedJsonRecordReader(scanSpec, subScan.getFormatPluginConfig(), subScan.getColumns(), context));
+          } else {
+            readers.add(new MaprDBJsonRecordReader(scanSpec, subScan.getFormatPluginConfig(), subScan.getColumns(), context));
+          }
         }
       } catch (Exception e1) {
         throw new ExecutionSetupException(e1);

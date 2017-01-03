@@ -80,7 +80,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private final Path tablePath;
   private final String indexFid;
   private OperatorContext operatorContext;
-  private VectorContainerWriter vectorWriter;
+  protected VectorContainerWriter vectorWriter;
 
   private DrillBuf buffer;
 
