@@ -48,13 +48,16 @@ public class DirectBufInputStream extends FilterInputStream {
    */
   protected final long totalByteSize;
 
+  // if true, the input stream willreturn EOF if we have read upto totalByteSize bytes
+  protected final boolean enforceTotalByteSize;
+
   /**
    * The offset in the underlying stream to start reading from
    */
   protected final long startOffset;
 
   public DirectBufInputStream(InputStream in, BufferAllocator allocator, String id, long startOffset,
-      long totalByteSize, boolean enableHints) {
+      long totalByteSize, boolean enforceTotalByteSize, boolean enableHints) {
     super(in);
     Preconditions.checkArgument(startOffset >= 0);
     Preconditions.checkArgument(totalByteSize >= 0);
@@ -62,6 +65,7 @@ public class DirectBufInputStream extends FilterInputStream {
     this.allocator = allocator;
     this.startOffset = startOffset;
     this.totalByteSize = totalByteSize;
+    this.enforceTotalByteSize = enforceTotalByteSize;
     this.enableHints = enableHints;
   }
 

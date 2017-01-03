@@ -43,6 +43,7 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -57,7 +58,7 @@ class AsyncPageReader extends PageReader {
   private ExecutorService threadPool;
   private long queueSize;
   private LinkedBlockingQueue<ReadStatus> pageQueue;
-  private Future<Boolean> asyncPageRead;
+  private ConcurrentLinkedQueue<Future<Boolean>> asyncPageRead;
   private long totalPageValuesRead = 0;
 
   AsyncPageReader(ColumnReader<?> parentStatus, FileSystem fs, Path path,
@@ -65,10 +66,10 @@ class AsyncPageReader extends PageReader {
     super(parentStatus, fs, path, columnChunkMetaData);
     if (threadPool == null & asyncPageRead == null) {
       threadPool = parentColumnReader.parentReader.getOperatorContext().getScanExecutor();
-      queueSize  = parentColumnReader.parentReader.getFragmentContext().getOptions()
-          .getOption(ExecConstants.PARQUET_PAGEREADER_QUEUE_SIZE).num_val;
-      pageQueue = new LinkedBlockingQueue<ReadStatus>((int)queueSize);
-      asyncPageRead = threadPool.submit(new AsyncPageReaderTask(pageQueue));
+      queueSize  = parentColumnReader.parentReader.readQueueSize;
+      pageQueue = new LinkedBlockingQueue<>((int)queueSize);
+      asyncPageRead = new ConcurrentLinkedQueue<>();
+      asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(pageQueue)));
     }
   }
 
@@ -88,7 +89,8 @@ class AsyncPageReader extends PageReader {
         queueSize  = parentColumnReader.parentReader.getFragmentContext().getOptions()
             .getOption(ExecConstants.PARQUET_PAGEREADER_QUEUE_SIZE).num_val;
         pageQueue = new LinkedBlockingQueue<ReadStatus>((int)queueSize);
-        asyncPageRead = threadPool.submit(new AsyncPageReaderTask(pageQueue));
+        asyncPageRead = new ConcurrentLinkedQueue<>();
+        asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(pageQueue)));
       }
     }
   }
@@ -129,7 +131,7 @@ class AsyncPageReader extends PageReader {
         //Thread.yield();
         try {
           logger.trace("[{}]: POLL ({}) returned NULL", name, System.identityHashCode(pageQueue));
-          Thread.sleep(10); // at 100 MiB/sec reading 1 MiB takes 10 ms
+          Thread.sleep(1);
         } catch (InterruptedException e) {
           //TODO: Handle InterruptedException
         }
@@ -223,7 +225,7 @@ class AsyncPageReader extends PageReader {
           this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
               + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
       while (true) {
-        readStatus = pageQueue.take();
+        readStatus = pageQueue.poll();
         if (readStatus != null && readStatus.pageData != null) {
           break;
         }
@@ -297,9 +299,10 @@ class AsyncPageReader extends PageReader {
 
 
   @Override public void clear() {
-    if (asyncPageRead != null) {
+    while (asyncPageRead != null && !asyncPageRead.isEmpty()) {
       try {
-        Boolean b = asyncPageRead.get();
+        Future<Boolean> f = asyncPageRead.poll();
+        Boolean b = f.get();
       } catch (Exception e) {
         // Do nothing.
       }
@@ -424,7 +427,7 @@ class AsyncPageReader extends PageReader {
       // if the queue is full, we will block on the queue.put and lock up this thread
       // so return immediately and schedule another task.
       if(queue.remainingCapacity() == 0){
-        parent.asyncPageRead = parent.threadPool.submit(new AsyncPageReaderTask(queue));
+        parent.asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(queue)));
         Thread.currentThread().setName(oldname);
         return false;
       }
@@ -511,7 +514,7 @@ class AsyncPageReader extends PageReader {
       //  }
       //  throw e;
       //}
-      asyncPageRead = parent.threadPool.submit(new AsyncPageReaderTask(queue));
+      asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(queue)));
       Thread.currentThread().setName(oldname);
       return true;
     }

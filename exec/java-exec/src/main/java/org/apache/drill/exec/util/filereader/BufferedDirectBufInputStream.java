@@ -91,8 +91,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    * with the default (8 MiB) buffer size.
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
-      long startOffset, long totalByteSize, boolean enableHints) {
-    this(in, allocator, id, startOffset, totalByteSize, DEFAULT_BUFFER_SIZE, enableHints);
+      long startOffset, long totalByteSize, boolean enforceTotalByteSize, boolean enableHints) {
+    this(in, allocator, id, startOffset, totalByteSize, DEFAULT_BUFFER_SIZE, enforceTotalByteSize, enableHints);
   }
 
   /**
@@ -100,8 +100,8 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
    * with the specified buffer size.
    */
   public BufferedDirectBufInputStream(InputStream in, BufferAllocator allocator, String id,
-      long startOffset, long totalByteSize, int bufSize, boolean enableHints) {
-    super(in, allocator, id, startOffset, totalByteSize, enableHints);
+      long startOffset, long totalByteSize, int bufSize, boolean enforceTotalByteSize, boolean enableHints) {
+    super(in, allocator, id, startOffset, totalByteSize, enforceTotalByteSize, enableHints);
     Preconditions.checkArgument(bufSize >= 0);
     // We make the buffer size the smaller of the buffer Size parameter or the total Byte Size
     // rounded to next highest pwoer of two
@@ -157,16 +157,23 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
             + "CurPosInStream: {}, CurPosInBuffer: {}", this.streamId, this.startOffset, this.totalByteSize,
         this.bufSize, this.count, this.curPosInStream, this.curPosInBuffer);
     Stopwatch timer = Stopwatch.createStarted();
+    int bytesToRead = 0;
     // We *cannot* rely on the totalByteSize being correct because
     // metadata for Parquet files is incorrect (sometimes). So we read
     // beyond the totalByteSize parameter. However, to prevent ourselves from reading too
     // much data, we reduce the size of the buffer, down to 64KiB.
-    if (buffer.capacity() >= (totalByteSize + startOffset - curPosInStream)) {
-      if (buffer.capacity() > SMALL_BUFFER_SIZE) {
-        buffer = this.reallocBuffer(SMALL_BUFFER_SIZE);
+    if(enforceTotalByteSize) {
+      bytesToRead = (buffer.capacity() >= (totalByteSize + startOffset - curPosInStream)) ?
+          (int) (totalByteSize + startOffset - curPosInStream ):
+          buffer.capacity();
+    } else {
+      if (buffer.capacity() >= (totalByteSize + startOffset - curPosInStream)) {
+        if (buffer.capacity() > SMALL_BUFFER_SIZE) {
+          buffer = this.reallocBuffer(SMALL_BUFFER_SIZE);
+        }
       }
+      bytesToRead = buffer.capacity();
     }
-    int bytesToRead = buffer.capacity();
 
     ByteBuffer directBuffer = buffer.nioBuffer(curPosInBuffer, bytesToRead);
     // The DFS can return *more* bytes than requested if the capacity of the buffer is greater.
