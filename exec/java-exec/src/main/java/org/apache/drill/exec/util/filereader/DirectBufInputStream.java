@@ -18,6 +18,7 @@
 package org.apache.drill.exec.util.filereader;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import io.netty.buffer.DrillBuf;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -30,6 +31,7 @@ import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeUnit;
 
 public class DirectBufInputStream extends FilterInputStream {
 
@@ -68,7 +70,10 @@ public class DirectBufInputStream extends FilterInputStream {
     if (enableHints) {
       fadviseIfAvailable(getInputStream(), this.startOffset, this.totalByteSize);
     }
+    Stopwatch timer = Stopwatch.createStarted();
     getInputStream().seek(this.startOffset);
+
+    logger.debug("SETUP, INIT (FSEEK), {}, {}", streamId, timer.elapsed(TimeUnit.NANOSECONDS));
     return;
   }
 

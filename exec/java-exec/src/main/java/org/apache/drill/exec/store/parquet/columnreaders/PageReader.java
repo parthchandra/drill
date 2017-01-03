@@ -115,13 +115,17 @@ class PageReader {
 
   PageReader(org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentStatus, FileSystem fs, Path path, ColumnChunkMetaData columnChunkMetaData)
     throws ExecutionSetupException {
+    Stopwatch timer = Stopwatch.createStarted();
     this.parentColumnReader = parentStatus;
     allocatedDictionaryBuffers = new ArrayList<ByteBuf>();
+    logger.debug("SETUP, 5.2.2.1.1, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
     codecFactory = parentColumnReader.parentReader.getCodecFactory();
     this.stats = parentColumnReader.parentReader.parquetReaderStats;
     this.fileName = path.toString();
+    logger.debug("SETUP, 5.2.2.1.2, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
     try {
       inputStream  = fs.open(path);
+      logger.debug("SETUP, 5.2.2.1.3, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       columnChunkMetaData.getTotalUncompressedSize();
       useBufferedReader  = parentColumnReader.parentReader.useBufferedReader;
@@ -135,9 +139,12 @@ class PageReader {
         this.dataReader = new DirectBufInputStream(inputStream, allocator, path.getName(),
             columnChunkMetaData.getStartingPos(), columnChunkMetaData.getTotalSize(), useFadvise);
       }
+      logger.debug("SETUP, 5.2.2.1.4, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
       dataReader.init();
+      logger.debug("SETUP, 5.2.2.1.5, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
 
       loadDictionaryIfExists(parentStatus, columnChunkMetaData, dataReader);
+      logger.debug("SETUP, 5.2.2.1.6, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
 
     } catch (IOException e) {
       throw new ExecutionSetupException("Error opening or reading metadata for parquet file at location: "
