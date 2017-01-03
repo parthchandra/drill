@@ -127,6 +127,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
   public boolean useBufferedReader;
   public int bufferedReadSize;
   public boolean useFadvise;
+  public boolean enforceTotalSize;
+  public long readQueueSize;
 
   private String name;
 
@@ -238,6 +240,10 @@ public class ParquetRecordReader extends AbstractRecordReader {
         fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_BUFFER_SIZE).num_val.intValue();
     useFadvise =
         fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_USE_FADVISE).bool_val;
+    readQueueSize =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_QUEUE_SIZE).num_val;
+    enforceTotalSize =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_ENFORCETOTALSIZE).bool_val;
 
     setColumns(columns);
   }
