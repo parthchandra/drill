@@ -17,8 +17,11 @@
  */
 package org.apache.drill.exec.physical.base;
 
+import java.util.List;
+
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
+import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.planner.index.IndexCollection;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
@@ -29,14 +32,12 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
   private static final String ROW_KEY = "_id";
   private static final SchemaPath ROW_KEY_PATH = SchemaPath.getSimplePath(ROW_KEY);
 
-  protected boolean restricted = false;
   public AbstractDbGroupScan(String userName) {
     super(userName);
   }
 
   public AbstractDbGroupScan(AbstractDbGroupScan that) {
     super(that);
-    setRestricted(that.getRestricted());
   }
 
   public abstract AbstractStoragePlugin getStoragePlugin();
@@ -54,13 +55,18 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
   }
 
   @Override
-  public  void setRestricted(boolean flag) {
-    restricted = flag;
+  public boolean supportsRestrictedScan() {
+    return false;
   }
 
   @Override
-  public boolean getRestricted() {
-    return restricted;
+  public boolean isRestrictedScan() {
+    return false;
+  }
+
+  @Override
+  public DbGroupScan getRestrictedScan(List<SchemaPath> columns) {
+    return null;
   }
 
   @Override
@@ -72,4 +78,10 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
   public SchemaPath getRowKeyPath() {
     return ROW_KEY_PATH;
   }
+
+  @Override
+  public void addJoinForRestrictedScan(HashJoinBatch batch, int minorFragmentId) {
+    throw new UnsupportedOperationException();
+  }
+
 }

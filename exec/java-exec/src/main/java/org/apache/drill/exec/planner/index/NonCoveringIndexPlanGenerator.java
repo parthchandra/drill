@@ -30,7 +30,6 @@ import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
@@ -57,10 +56,9 @@ import com.google.common.collect.Lists;
 
 
 /**
- * Generate a non-covering index plan that is equivalent to the original plan. The non-covering plan
- *
- * The right child of hash join consists of the index group scan followed by filter containing the index condition.
- * Left child of hash join consists of the table scan followed by the same filter containing the index condition.
+ * Generate a non-covering index plan that is equivalent to the original plan. The non-covering plan consists
+ * of a join-back between an index lookup and the primary table. This join-back is performed using a hash join.
+ * For the primary table, we use a restricted scan that allows doing skip-scan instead of sequential scan.
  *
  * Original Plan:
  *               Filter
@@ -68,18 +66,17 @@ import com.google.common.collect.Lists;
  *            DBGroupScan
  *
  * New Plan:
- *            Filter (Original filter minus filters on index columns)
- *               |
- *            HashJoin
- *          /          \
- *   DbGroupScan   Exchange (e.g BroadcastExchange)
- *                      |
- *              Filter (with index columns only)
- *                      |
+ *
+ *            HashJoin (on rowkey)
+ *          /         \
+ * Remainder Filter  Exchange
+ *         |            |
+ *   Restricted    Filter (with index columns only)
+ *   DBGroupScan        |
  *                  IndexGroupScan
  *
  * This plan will be further optimized by the filter pushdown rule of the Index plugin which should
- * push this filter into the index scan.
+ * push the index column filters into the index scan.
  */
 public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
@@ -107,7 +104,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
    */
   private RelDataType convertRowTypeForIndexScan(RelDataType primaryRowType, RelDataTypeFactory typeFactory) {
     List<RelDataTypeField> fields = new ArrayList<>();
-    //TODO: we are not handling the case where row_key of index is composited from 2 or more columns of primary table
+    //TODO: we are not handling the case where row_key of index is composed of 2 or more columns of primary table
 
     //row_key in the rowType of scan on primary table
     RelDataTypeField rowkey_primary;
@@ -195,24 +192,28 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     // left (probe) side of the hash join
 
-    DbGroupScan origHbGroupScan = (DbGroupScan)origScan.getGroupScan();
-    List<SchemaPath> cols = new ArrayList<SchemaPath>(origHbGroupScan.getColumns());
+    DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
+    List<SchemaPath> cols = new ArrayList<SchemaPath>(origDbGroupScan.getColumns());
     if (!checkRowKey(cols)) {
-      cols.add(origHbGroupScan.getRowKeyPath());
+      cols.add(origDbGroupScan.getRowKeyPath());
     }
 
-    DbGroupScan newDbGroupScan  = (DbGroupScan)origHbGroupScan.clone(cols);
-    //newDbGroupScan.setCostFactor(0.00001);
-    newDbGroupScan.setRestricted(true);
-    ScanPrel hbaseScan = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet(), newDbGroupScan, dbscanRowType);
+    // Create a restricted groupscan from the primary table's groupscan
+    DbGroupScan restrictedGroupScan  = (DbGroupScan)origDbGroupScan.getRestrictedScan(cols);
+    if (restrictedGroupScan == null) {
+      logger.error("Null restricted groupscan in NonCoveringIndexPlanGenerator.convertChild");
+      return null;
+    }
+
+    ScanPrel dbScan = new ScanPrel(origScan.getCluster(),
+        origScan.getTraitSet(), restrictedGroupScan, dbscanRowType);
 
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();
-    int leftRowKeyIndex = getRowKeyIndex(hbaseScan.getRowType());
-    final RelDataTypeField leftRowKeyField = hbaseScan.getRowType().getFieldList().get(leftRowKeyIndex);
+    int leftRowKeyIndex = getRowKeyIndex(dbScan.getRowType());
+    final RelDataTypeField leftRowKeyField = dbScan.getRowType().getFieldList().get(leftRowKeyIndex);
     final RelDataTypeFactory.FieldInfoBuilder leftFieldTypeBuilder =
-        hbaseScan.getCluster().getTypeFactory().builder();
+        dbScan.getCluster().getTypeFactory().builder();
 
     // new Project's rowtype is original Project's rowtype [plus rowkey if rowkey is not in original rowtype]
     List<RelDataTypeField> origProjFields = origProject.getRowType().getFieldList();
@@ -222,17 +223,17 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     // add the rowkey IFF rowkey is not in orig scan
     if( getRowKeyIndex(origProject.getRowType()) < 0 ) {
       leftFieldTypeBuilder.add(leftRowKeyField);
-      leftProjectExprs.add(RexInputRef.of(leftRowKeyIndex, hbaseScan.getRowType()));
+      leftProjectExprs.add(RexInputRef.of(leftRowKeyIndex, dbScan.getRowType()));
     }
 
     final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
-    final ProjectPrel leftIndexProjectPrel = new ProjectPrel(hbaseScan.getCluster(), hbaseScan.getTraitSet(),
-        hbaseScan, leftProjectExprs, leftProjectRowType);
+    final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+        dbScan, leftProjectExprs, leftProjectRowType);
 
-    FilterPrel leftIndexFilterPrel = new FilterPrel(hbaseScan.getCluster(), hbaseScan.getTraitSet(),
+    FilterPrel leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
         leftIndexProjectPrel, filter.getCondition());
 
-    final RelTraitSet leftTraits = hbaseScan.getTraitSet().plus(Prel.DRILL_PHYSICAL);
+    final RelTraitSet leftTraits = dbScan.getTraitSet().plus(Prel.DRILL_PHYSICAL);
     // final RelNode convertedLeft = convert(leftIndexProjectPrel, leftTraits);
     final RelNode convertedLeft = Prule.convert(leftIndexFilterPrel, leftTraits);
 
@@ -252,19 +253,9 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     HashJoinPrel hjPrel = new HashJoinPrel(filter.getCluster(), leftTraits, convertedLeft,
         convertedRight, joinCondition, JoinRelType.INNER, false,
-        newDbGroupScan /* useful for join-restricted scans */);
+        restrictedGroupScan /* useful for join-restricted scans */);
 
     RelNode newRel = hjPrel;
-
-/*  don't need to evaluate remainder since filter is already pushed to left side of hash join
-    if (remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
-      // create a Filter corresponding to the remainder condition
-      FilterPrel remainderFilterPrel = new FilterPrel(hjPrel.getCluster(), hjPrel.getTraitSet(),
-          hjPrel, remainderCondition);
-
-      newRel = remainderFilterPrel;
-    }
-*/
 
     final RelDataTypeFactory.FieldInfoBuilder finalFieldTypeBuilder =
         origScan.getCluster().getTypeFactory().builder();

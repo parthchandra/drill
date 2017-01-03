@@ -18,9 +18,11 @@
 package org.apache.drill.exec.physical.base;
 
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.planner.index.IndexCollection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.List;
@@ -37,7 +39,6 @@ public interface DbGroupScan extends GroupScan {
 
   /**
    * Get the index collection associated with this table if any
-   *
    */
   @JsonIgnore
   public IndexCollection getSecondaryIndexCollection(ScanPrel scan);
@@ -46,15 +47,45 @@ public interface DbGroupScan extends GroupScan {
 
   public void setCostFactor(double sel);
 
-  @JsonIgnore boolean isIndexScan();
+  @JsonIgnore
+  boolean isIndexScan();
 
-  void setRestricted(boolean flag);
+  /**
+   * Whether this DbGroupScan supports creating a restricted (skip) scan
+   * @return true if restricted scan is supported, false otherwise
+   */
+  @JsonIgnore
+  boolean supportsRestrictedScan();
 
-  boolean getRestricted();
+  /**
+   * Whether this DbGroupScan is itself a restricted scan
+   * @return true if this DbGroupScan is itself a restricted scan, false otherwise
+   */
+  @JsonIgnore
+  boolean isRestrictedScan();
+
+  /**
+   * If this DbGroupScan supports restricted scan, create a restricted scan from this DbGroupScan.
+   * @param columns
+   * @return a non-null DbGroupScan if restricted scan is supported, null otherwise
+   */
+  @JsonIgnore
+  DbGroupScan getRestrictedScan(List<SchemaPath> columns);
 
   @JsonIgnore
   String getRowKeyName();
 
   @JsonIgnore
   SchemaPath getRowKeyPath();
+
+  /**
+   * For a restricted scan, this method allows associating a (hash)join instance.  A subscan within a minor
+   * fragment must have a corresponding (hash)join batch instance from which it will retrieve its set of
+   * rowkeys to perform the restricted scan.
+   * @param batch
+   * @param minorFragmentId
+   */
+  @JsonIgnore
+  void addJoinForRestrictedScan(HashJoinBatch batch, int minorFragmentId);
+
 }

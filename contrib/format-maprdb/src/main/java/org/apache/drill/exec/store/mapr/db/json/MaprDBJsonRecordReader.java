@@ -80,7 +80,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private final Path tablePath;
   private final String indexFid;
   private OperatorContext operatorContext;
-  private VectorContainerWriter vectorWriter;
+  protected VectorContainerWriter vectorWriter;
 
   private DrillBuf buffer;
 
@@ -97,12 +97,15 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private final boolean ignoreSchemaChange;
   private final boolean disableCountOptimization;
 
+  protected final MapRDBSubScanSpec subScanSpec;
+
   public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec,
       MapRDBFormatPluginConfig formatPluginConfig,
       List<SchemaPath> projectedColumns, FragmentContext context) {
     buffer = context.getManagedBuffer();
     projectedFields = null;
     tablePath = new Path(Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName());
+    this.subScanSpec = subScanSpec;
     indexFid = subScanSpec.getIndexFid();
     documentReaderIterators = null;
     includeId = false;

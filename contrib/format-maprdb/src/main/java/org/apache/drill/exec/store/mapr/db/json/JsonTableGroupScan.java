@@ -39,6 +39,8 @@ import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
+import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
+import org.apache.drill.exec.store.mapr.db.MapRDBTableStats;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
 import org.apache.hadoop.conf.Configuration;
 import org.codehaus.jackson.annotate.JsonCreator;
@@ -61,13 +63,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   public static final String TABLE_JSON = "json";
 
-  private long totalRowCount;
-  private Table table;
-  private TabletInfo[] tabletInfos;
-
-  private JsonScanSpec scanSpec;
-
-  long rowCount;
+  protected MapRDBTableStats stats;
+  protected JsonScanSpec scanSpec;
+  protected long rowCount;
 
   @JsonCreator
   public JsonTableGroupScan(@JsonProperty("userName") final String userName,
@@ -93,16 +91,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    * Private constructor, used for cloning.
    * @param that The HBaseGroupScan to clone
    */
-  private JsonTableGroupScan(JsonTableGroupScan that) {
+  protected JsonTableGroupScan(JsonTableGroupScan that) {
     super(that);
     this.scanSpec = that.scanSpec;
     this.endpointFragmentMapping = that.endpointFragmentMapping;
-
-    // Reusing the table handle, tabletInfos and totalRowCount saves expensive
-    // calls to MapR DB client to get them again.
-    this.table = that.table;
-    this.tabletInfos = that.tabletInfos;
-    this.totalRowCount = that.totalRowCount;
+    this.stats = that.stats;
   }
 
   @Override
@@ -159,7 +152,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
           t = MapRDB.getTable(scanSpec.getTableName());
       }
       TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
-      tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
+      stats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
       regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       for (TabletInfo tabletInfo : tabletInfos) {
@@ -174,7 +167,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     }
   }
 
-  protected JsonSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
+  protected MapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
     // XXX/TODO check filter/Condition
     JsonScanSpec spec = scanSpec;
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
@@ -201,11 +194,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     if (isIndexScan()) {
       return indexScanStats();
     }
-    else if (getRestricted()) {
-      return restrictedDBScanStats();
-    }
 
-    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
+    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * stats.getNumRows());
     final int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
     float diskCost = avgColumnSize * numColumns * rowCount;
@@ -220,14 +210,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       totalColNum = scanSpec.getIndexDesc().getCoveredFields().size() + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
     }
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
-    long rowCount = (long) ((filterPushed ? 0.001f : 0.01f) * tableStats.getNumRows());
+    long rowCount = (long) ((filterPushed ? 0.001f : 0.01f) * stats.getNumRows());
     final int avgColumnSize = 10;
     float diskCost = avgColumnSize * numColumns * rowCount;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
-  }
-
-  private ScanStats restrictedDBScanStats() {
-    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
   }
 
   @Override
@@ -278,6 +264,23 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @JsonIgnore
   public boolean isIndexScan() {
     return scanSpec != null && scanSpec.isSecondaryIndex();
+  }
+
+  @Override
+  public boolean supportsRestrictedScan() {
+    return true;
+  }
+
+  @Override
+  public RestrictedJsonTableGroupScan getRestrictedScan(List<SchemaPath> columns) {
+    RestrictedJsonTableGroupScan newScan =
+        new RestrictedJsonTableGroupScan(this.getUserName(),
+            this.getStoragePlugin(),
+            this.getFormatPlugin(),
+            this.getScanSpec(),
+            this.getColumns());
+    newScan.columns = columns;
+    return newScan;
   }
 
   /**
