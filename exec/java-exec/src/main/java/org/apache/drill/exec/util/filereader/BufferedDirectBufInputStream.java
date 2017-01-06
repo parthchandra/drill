@@ -152,6 +152,11 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
     buffer.clear();
     this.count = this.curPosInBuffer = 0;
 
+    logger.trace(
+        "PERF: Disk read start. {}, StartOffset: {}, TotalByteSize: {}, BufferSize: {}, Count: {}, "
+            + "CurPosInStream: {}, CurPosInBuffer: {}", this.streamId, this.startOffset, this.totalByteSize,
+        this.bufSize, this.count, this.curPosInStream, this.curPosInBuffer);
+    Stopwatch timer = Stopwatch.createStarted();
     // We *cannot* rely on the totalByteSize being correct because
     // metadata for Parquet files is incorrect (sometimes). So we read
     // beyond the totalByteSize parameter. However, to prevent ourselves from reading too
@@ -183,10 +188,10 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
         this.curPosInStream = getInputStream().getPos();
         bytesRead = nBytes;
         logger.trace(
-            "Stream: {}, StartOffset: {}, TotalByteSize: {}, BufferSize: {}, BytesRead: {}, Count: {}, "
-                + "CurPosInStream: {}, CurPosInBuffer: {}", this.streamId, this.startOffset,
+            "PERF: Disk read complete. {}, StartOffset: {}, TotalByteSize: {}, BufferSize: {}, BytesRead: {}, Count: {}, "
+                + "CurPosInStream: {}, CurPosInBuffer: {}, Time: {} ms", this.streamId, this.startOffset,
             this.totalByteSize, this.bufSize, bytesRead, this.count, this.curPosInStream,
-            this.curPosInBuffer);
+            this.curPosInBuffer, ((double)timer.elapsed(TimeUnit.MICROSECONDS))/1000);
       }
     }
     return this.count - this.curPosInBuffer;
