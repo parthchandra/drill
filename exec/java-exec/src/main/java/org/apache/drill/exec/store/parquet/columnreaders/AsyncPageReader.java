@@ -193,12 +193,25 @@ class AsyncPageReader extends PageReader {
     try {
       Stopwatch timer = Stopwatch.createStarted();
       parentColumnReader.parentReader.getOperatorContext().getStats().startWait();
+      logger.trace("PERF - Operator [{}] Stop Processing.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
+      logger.trace("PERF - Operator [{}] Start Disk Wait.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
       readStatus = asyncPageRead.get();
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
       parentColumnReader.parentReader.getOperatorContext().getStats().stopWait();
       stats.timeDiskScanWait.addAndGet(timeBlocked);
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
       stats.cpuTimeDiskScan.addAndGet(readStatus.getDiskScanCpuTime());
+      logger.trace("PERF - Operator [{}] Stop Disk Wait. Waited {} ms.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId(),
+          ((double) timeBlocked) / 1000000);
+      logger.trace("PERF - Operator [{}] Start Processing.",
+          this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+              + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
       if (readStatus.isDictionaryPage) {
         stats.numDictPageLoads.incrementAndGet();
         stats.timeDictPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
@@ -326,9 +339,9 @@ class AsyncPageReader extends PageReader {
     @Override public ReadStatus call() throws IOException {
       ReadStatus readStatus = new ReadStatus();
 
-      String oldname = Thread.currentThread().getName();
+      //String oldname = Thread.currentThread().getName();
       String name = parent.parentColumnReader.columnChunkMetaData.toString();
-      Thread.currentThread().setName(name);
+      //Thread.currentThread().setName(name);
 
       long bytesRead = 0;
       long valuesRead = 0;
@@ -338,26 +351,32 @@ class AsyncPageReader extends PageReader {
       DrillBuf pageData = null;
       try {
         long s = parent.dataReader.getPos();
+        logger.trace("PERF - Operator [{}] [{}] Disk read start (Page Header). Offset {}",
+            parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+                + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s);
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
         long e = parent.dataReader.getPos();
-        if (logger.isTraceEnabled()) {
-          logger.trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} ", name, s, e - s);
-        }
+        //if (logger.isTraceEnabled()) {
+        //  logger.trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} ", name, s, e - s);
+        //}
         int compressedSize = pageHeader.getCompressed_page_size();
         s = parent.dataReader.getPos();
+        logger.trace("PERF - Operator [{}] [{}] Disk read start. Offset {}, Length {} .",
+            parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+                + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s,
+            compressedSize);
         pageData = parent.dataReader.getNext(compressedSize);
         e = parent.dataReader.getPos();
         bytesRead = compressedSize;
 
-        if (logger.isTraceEnabled()) {
-          DrillBuf bufStart = pageData.slice(0, compressedSize>100?100:compressedSize);
-          int endOffset = compressedSize>100?compressedSize-100:0;
-          DrillBuf bufEnd = pageData.slice(endOffset, compressedSize-endOffset);
-          logger
-              .trace("[{}]: Read Page Data : ReadPos = {} : Bytes Read = {} : Buf Start = {} : Buf End = {} ",
-                  name, s, e - s, ByteBufUtil.hexDump(bufStart), ByteBufUtil.hexDump(bufEnd));
-
-        }
+        //if (logger.isTraceEnabled()) {
+        //  DrillBuf bufStart = pageData.slice(0, compressedSize>100?100:compressedSize);
+        //  int endOffset = compressedSize>100?compressedSize-100:0;
+        //  DrillBuf bufEnd = pageData.slice(endOffset, compressedSize-endOffset);
+        //  logger
+        //      .trace("[{}]: Read Page Data : ReadPos = {} : Bytes Read = {} : Buf Start = {} : Buf End = {} ",
+        //          name, s, e - s, ByteBufUtil.hexDump(bufStart), ByteBufUtil.hexDump(bufEnd));
+        //}
 
         synchronized (parent) {
           if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
@@ -374,15 +393,20 @@ class AsyncPageReader extends PageReader {
           readStatus.setValuesRead(valuesRead);
           readStatus.setDiskScanTime(timeToRead);
           readStatus.setDiskScanCpuTime(cpuStop - cpuStart);
+          logger.trace("PERF - Operator [{}] [{}] Disk read stop. Offset {}, Length {}, Time {} ms .",
+              parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
+                  + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s,
+              compressedSize, ((double) timeToRead) / 1000000);
         }
-
       } catch (Exception e) {
         if (pageData != null) {
           pageData.release();
         }
         throw e;
       }
-      Thread.currentThread().setName(oldname);
+      finally {
+        //Thread.currentThread().setName(oldname);
+      }
       return readStatus;
     }
 

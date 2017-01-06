@@ -21,6 +21,7 @@ import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.proto.UserBitShared;
 import org.apache.drill.exec.proto.UserBitShared.MetricValue;
 import org.apache.drill.exec.proto.UserBitShared.OperatorProfile;
 import org.apache.drill.exec.proto.UserBitShared.OperatorProfile.Builder;
@@ -191,6 +192,16 @@ public class OperatorStats {
     if(newSchema){
       schemaCountByInput[inputIndex]++;
     }
+  }
+
+  public String getId() {
+    StringBuilder s = new StringBuilder();
+    return s.append(this.operatorId)
+        .append(":")
+        .append("[")
+        .append(UserBitShared.CoreOperatorType.valueOf(operatorType))
+        .append("]")
+        .toString();
   }
 
   public OperatorProfile getProfile() {
