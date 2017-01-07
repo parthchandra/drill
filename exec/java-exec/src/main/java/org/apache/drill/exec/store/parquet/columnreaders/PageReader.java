@@ -114,6 +114,8 @@ class PageReader {
   private final boolean useFadvise;
   private final boolean enforceTotalSize;
 
+  protected final String debugName;
+
   PageReader(org.apache.drill.exec.store.parquet.columnreaders.ColumnReader<?> parentStatus, FileSystem fs, Path path, ColumnChunkMetaData columnChunkMetaData)
     throws ExecutionSetupException {
     Stopwatch timer = Stopwatch.createStarted();
@@ -123,6 +125,12 @@ class PageReader {
     codecFactory = parentColumnReader.parentReader.getCodecFactory();
     this.stats = parentColumnReader.parentReader.parquetReaderStats;
     this.fileName = path.toString();
+    debugName = new StringBuilder()
+       .append(this.parentColumnReader.parentReader.getFragmentContext().getFragIdString())
+       .append(":")
+       .append(this.parentColumnReader.parentReader.getOperatorContext().getStats().getId() )
+       .append(this.parentColumnReader.columnChunkMetaData.toString() )
+       .toString();
     logger.debug("SETUP, 5.2.2.1.2, {}, {}", path.getName(), timer.elapsed(TimeUnit.NANOSECONDS));
     try {
       inputStream  = fs.open(path);

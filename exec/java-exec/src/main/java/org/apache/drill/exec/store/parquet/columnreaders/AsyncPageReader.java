@@ -20,6 +20,7 @@ package org.apache.drill.exec.store.parquet.columnreaders;
 import com.google.common.base.Stopwatch;
 import io.netty.buffer.DrillBuf;
 import io.netty.buffer.ByteBufUtil;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.ExecConstants;
@@ -69,7 +70,7 @@ class AsyncPageReader extends PageReader {
       queueSize  = parentColumnReader.parentReader.readQueueSize;
       pageQueue = new LinkedBlockingQueue<>((int)queueSize);
       asyncPageRead = new ConcurrentLinkedQueue<>();
-      asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(pageQueue)));
+      asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(debugName, pageQueue)));
     }
   }
 
@@ -90,7 +91,7 @@ class AsyncPageReader extends PageReader {
             .getOption(ExecConstants.PARQUET_PAGEREADER_QUEUE_SIZE).num_val;
         pageQueue = new LinkedBlockingQueue<ReadStatus>((int)queueSize);
         asyncPageRead = new ConcurrentLinkedQueue<>();
-        asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(pageQueue)));
+        asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(debugName, pageQueue)));
       }
     }
   }
@@ -126,25 +127,17 @@ class AsyncPageReader extends PageReader {
     try {
       Stopwatch timer = Stopwatch.createStarted();
       ReadStatus readStatus = null;
-      String name = parentColumnReader.columnChunkMetaData.toString();
-      while((readStatus = pageQueue.poll()) == null){
-        //Thread.yield();
-        try {
-          logger.trace("[{}]: POLL ({}) returned NULL", name, System.identityHashCode(pageQueue));
-          Thread.sleep(1);
-        } catch (InterruptedException e) {
-          //TODO: Handle InterruptedException
-        }
-      }
-      logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(readStatus));
-      assert(readStatus.pageData != null);
+      readStatus = pageQueue.take();
+      assert (readStatus.pageData != null);
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
       stats.timeDiskScanWait.addAndGet(timeBlocked);
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
       stats.numDictPageLoads.incrementAndGet();
-      stats.timeDictPageLoads.addAndGet(timeBlocked+readStatus.getDiskScanTime());
+      stats.timeDictPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
       stats.cpuTimeDiskScan.addAndGet(readStatus.getDiskScanCpuTime());
       readDictionaryPageData(readStatus, parentStatus);
+    } catch (InterruptedException e) {
+      //TODO: handle interrupted exception
     } catch (Exception e) {
       handleAndThrowException(e, "Error reading dictionary page.");
     }
@@ -224,21 +217,10 @@ class AsyncPageReader extends PageReader {
       logger.trace("PERF - Operator [{}] Start Disk Wait.",
           this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
               + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
-      while (true) {
-        readStatus = pageQueue.poll();
-        if (readStatus != null && readStatus.pageData != null) {
-          break;
-        }
-        //Thread.yield();
-        try {
-          logger.trace("[{}]: POLL ({}) returned NULL (in nextInternal)", name,
-              System.identityHashCode(pageQueue));
-          Thread.sleep(1); // at 1000 MiB/sec reading 1 MiB takes 1 ms
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
+      readStatus = pageQueue.take();
+      if(readStatus.pageData == null && readStatus == ReadStatus.EMPTY){
+        throw new DrillRuntimeException("Unexpected end of data");
       }
-      assert(readStatus.pageData != null);
       logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(readStatus));
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
       parentColumnReader.parentReader.getOperatorContext().getStats().stopWait();
@@ -262,6 +244,8 @@ class AsyncPageReader extends PageReader {
       pageHeader = readStatus.getPageHeader();
       // reset this. At the time of calling close, if this is not null then a pending asyncPageRead needs to be consumed
       //asyncPageRead = null;
+    } catch (InterruptedException e) {
+      //TODO: handle interrupted exception
     } catch (Exception e) {
       handleAndThrowException(e, "Error reading page data.");
     }
@@ -269,22 +253,22 @@ class AsyncPageReader extends PageReader {
     // TODO - figure out if we need multiple dictionary pages, I believe it may be limited to one
     // I think we are clobbering parts of the dictionary if there can be multiple pages of dictionary
 
-    do {
-      if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
-        readDictionaryPageData(readStatus, parentColumnReader);
-        while ((readStatus = pageQueue.poll()) == null) {
-          //Thread.yield();
-          try {
-            logger.trace("[{}]: POLL ({}) returned null", name, System.identityHashCode(pageQueue));
-            Thread.sleep(10); // at 100 MiB/sec reading 1 MiB takes 10 ms
-          } catch (InterruptedException e) {
+    try {
+      do {
+        if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
+          readDictionaryPageData(readStatus, parentColumnReader);
+          readStatus = pageQueue.take();
+          if(readStatus.pageData == null || readStatus == ReadStatus.EMPTY) {
+            break;
           }
+          assert (readStatus.pageData != null);
+          logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(readStatus));
+          pageHeader = readStatus.getPageHeader();
         }
-        assert (readStatus.pageData != null);
-        logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(readStatus));
-        pageHeader = readStatus.getPageHeader();
-      }
-    } while (pageHeader.getType() == PageType.DICTIONARY_PAGE);
+      } while (pageHeader.getType() == PageType.DICTIONARY_PAGE);
+    } catch (InterruptedException e) {
+      //TODO: handle interrupted exception
+    }
 
     //if (parentColumnReader.totalValuesRead + readStatus.getValuesRead()
     //    < parentColumnReader.columnChunkMetaData.getValueCount()) {
@@ -310,13 +294,9 @@ class AsyncPageReader extends PageReader {
 
     //Empty the page queue
     String name = parentColumnReader.columnChunkMetaData.toString();
-    while (true) {
-      //try {
-        ReadStatus r = pageQueue.poll();
-      if(r == null){
-        logger.trace("[{}]: POLL ({}) returned null", name, System.identityHashCode(pageQueue));
-        break;
-      }
+    while (!pageQueue.isEmpty()) {
+      try {
+        ReadStatus r = pageQueue.take();
         if (r == ReadStatus.EMPTY) {
           logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(r));
           break;
@@ -324,8 +304,9 @@ class AsyncPageReader extends PageReader {
         if (r.pageData != null) {
           r.pageData.release();
         }
-      //} catch (InterruptedException e) {
-      //}
+      } catch (InterruptedException e) {
+        //TODO: handle InterruptedException. Release any memory
+      }
     }
 
     super.clear();
@@ -403,8 +384,10 @@ class AsyncPageReader extends PageReader {
 
     private final AsyncPageReader parent = AsyncPageReader.this;
     private final LinkedBlockingQueue<ReadStatus> queue;
+    private final String name;
 
-    public AsyncPageReaderTask(LinkedBlockingQueue<ReadStatus> queue) {
+    public AsyncPageReaderTask(String name, LinkedBlockingQueue<ReadStatus> queue) {
+      this.name = name;
       this.queue = queue;
     }
 
@@ -412,8 +395,10 @@ class AsyncPageReader extends PageReader {
     public Boolean call() throws IOException {
       ReadStatus readStatus = new ReadStatus();
 
+      //TODO: Handle error.
+
       //String oldname = Thread.currentThread().getName();
-      String name = parent.parentColumnReader.columnChunkMetaData.toString();
+      //String name = parent.parentColumnReader.columnChunkMetaData.toString();
       //Thread.currentThread().setName(name);
 
       long bytesRead = 0;
@@ -426,11 +411,11 @@ class AsyncPageReader extends PageReader {
 
       // if the queue is full, we will block on the queue.put and lock up this thread
       // so return immediately and schedule another task.
-      if(queue.remainingCapacity() == 0){
-        parent.asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(queue)));
-        Thread.currentThread().setName(oldname);
-        return false;
-      }
+      //if(queue.remainingCapacity() == 0){
+      //  parent.asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
+        //Thread.currentThread().setName(oldname);
+      //  return false;
+      //}
 
       // if we are done, just put a marker object in the queue and we are done.
       logger.trace("[{}]: Total Values COUNT {}  Total Values READ {} ", name, totalValuesCount, totalValuesRead);
@@ -442,7 +427,7 @@ class AsyncPageReader extends PageReader {
           logger.trace("[{}]: PUT INTERRUPTED! ({}) Empty Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(ReadStatus.EMPTY));
           throw new RuntimeException(e); // rethrow
         }
-        Thread.currentThread().setName(oldname);
+        //Thread.currentThread().setName(oldname);
         return true;
       }
 
@@ -451,8 +436,7 @@ class AsyncPageReader extends PageReader {
       //try {
         long s = parent.dataReader.getPos();
         logger.trace("PERF - Operator [{}] [{}] Disk read start (Page Header). Offset {}",
-            parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
-                + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s);
+            name, s);
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
         long e = parent.dataReader.getPos();
         //if (logger.isTraceEnabled()) {
@@ -493,6 +477,7 @@ class AsyncPageReader extends PageReader {
           readStatus.setValuesRead(valuesRead);
           readStatus.setDiskScanTime(timeToRead);
           readStatus.setDiskScanCpuTime(cpuStop - cpuStart);
+          logger.trace("[{}]: PUT ({}) valuesRead {} totalValuesRead {} totalValues {} ", name, System.identityHashCode(queue), valuesRead, totalValuesRead, totalValuesCount );
           logger.trace("PERF - Operator [{}] [{}] Disk read stop. Offset {}, Length {}, Time {} ms .",
               parent.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
                   + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s,
@@ -514,8 +499,8 @@ class AsyncPageReader extends PageReader {
       //  }
       //  throw e;
       //}
-      asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(queue)));
-      Thread.currentThread().setName(oldname);
+      asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
+      //Thread.currentThread().setName(oldname);
       return true;
     }
 
