@@ -160,7 +160,7 @@ public interface ExecConstants {
   OptionValidator PARQUET_PAGEREADER_QUEUE_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_QUEUE_SIZE, 1024);
 
   String PARQUET_PAGEREADER_ENFORCETOTALSIZE = "store.parquet.reader.pagereader.enforceTotalSize";
-  OptionValidator PARQUET_PAGEREADER_ENFORCETOTALSIZE_VALIDATOR = new BooleanValidator(PARQUET_PAGEREADER_ENFORCETOTALSIZE, true);
+  OptionValidator PARQUET_PAGEREADER_ENFORCETOTALSIZE_VALIDATOR = new BooleanValidator(PARQUET_PAGEREADER_ENFORCETOTALSIZE, false);
 
   String PARQUET_COLUMNREADER_ASYNC = "store.parquet.reader.columnreader.async";
   OptionValidator PARQUET_COLUMNREADER_ASYNC_VALIDATOR = new BooleanValidator(PARQUET_COLUMNREADER_ASYNC, false);
@@ -169,7 +169,7 @@ public interface ExecConstants {
   String PARQUET_PAGEREADER_USE_BUFFERED_READ = "store.parquet.reader.pagereader.bufferedread";
   OptionValidator PARQUET_PAGEREADER_USE_BUFFERED_READ_VALIDATOR = new  BooleanValidator(PARQUET_PAGEREADER_USE_BUFFERED_READ, true);
 
-  // Size in MiB of the buffer the Parquet page reader will use to read from disk. Default is 8 MiB
+  // Size in MiB of the buffer the Parquet page reader will use to read from disk. Default is 4 MiB
   String PARQUET_PAGEREADER_BUFFER_SIZE = "store.parquet.reader.pagereader.buffersize";
   OptionValidator PARQUET_PAGEREADER_BUFFER_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_BUFFER_SIZE, 4*1024*1024);
 

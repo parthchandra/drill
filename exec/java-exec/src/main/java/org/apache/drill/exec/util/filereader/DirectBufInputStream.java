@@ -90,7 +90,15 @@ public class DirectBufInputStream extends FilterInputStream {
     ByteBuffer directBuffer = buf.nioBuffer(0, len);
     int lengthLeftToRead = len;
     while (lengthLeftToRead > 0) {
-      lengthLeftToRead -= CompatibilityUtil.getBuf(getInputStream(), directBuffer, lengthLeftToRead);
+      logger.trace("PERF: Disk read start. {}, StartOffset: {}, TotalByteSize: {}", this.streamId,
+          this.startOffset, this.totalByteSize);
+      Stopwatch timer = Stopwatch.createStarted();
+      int bytesRead = CompatibilityUtil.getBuf(getInputStream(), directBuffer, lengthLeftToRead);
+      lengthLeftToRead = bytesRead;
+      logger.trace(
+          "PERF: Disk read complete. {}, StartOffset: {}, TotalByteSize: {}, BytesRead: {}, Time: {} ms",
+          this.streamId, this.startOffset, this.totalByteSize, bytesRead,
+          ((double) timer.elapsed(TimeUnit.MICROSECONDS)) / 1000);
     }
     buf.writerIndex(len);
     return len;

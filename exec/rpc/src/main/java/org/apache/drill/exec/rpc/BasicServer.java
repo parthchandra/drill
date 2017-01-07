@@ -86,10 +86,10 @@ public abstract class BasicServer<T extends EnumLite, C extends RemoteConnection
             pipe.addLast("protocol-encoder", new RpcEncoder("s-" + rpcConfig.getName()));
             pipe.addLast("handshake-handler", getHandshakeHandler(connection));
 
-            if (rpcMapping.hasTimeout()) {
-              pipe.addLast(TIMEOUT_HANDLER,
-                  new LogggingReadTimeoutHandler(connection, rpcMapping.getTimeout()));
-            }
+            //if (rpcMapping.hasTimeout()) {
+            //  pipe.addLast(TIMEOUT_HANDLER,
+            //      new LogggingReadTimeoutHandler(connection, rpcMapping.getTimeout()));
+            //}
 
             pipe.addLast("message-handler", new InboundHandler(connection));
             pipe.addLast("exception-handler", new RpcExceptionHandler<C>(connection));

@@ -45,7 +45,7 @@ public class BufferedDirectBufInputStream extends DirectBufInputStream implement
 
   private static final int DEFAULT_BUFFER_SIZE = 8192 * 1024; // 8 MiB
   private static final int DEFAULT_TEMP_BUFFER_SIZE = 8192; // 8 KiB
-  private static final int SMALL_BUFFER_SIZE = 64 * 1024; // 64 KiB
+  private static final int SMALL_BUFFER_SIZE = 256 * 1024; // 64 KiB
 
   /**
    * The internal buffer to keep data read from the underlying inputStream.
