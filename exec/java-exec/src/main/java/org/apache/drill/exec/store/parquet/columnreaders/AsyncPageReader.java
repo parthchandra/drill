@@ -433,7 +433,7 @@ class AsyncPageReader extends PageReader {
 
       DrillBuf pageData = null;
       timer.reset();
-      //try {
+      try {
         long s = parent.dataReader.getPos();
         logger.trace("PERF - Operator [{}] [{}] Disk read start (Page Header). Offset {}",
             name, s);
@@ -493,12 +493,15 @@ class AsyncPageReader extends PageReader {
           throw new RuntimeException(ie); // rethrow
         }
 
-      //} catch (Exception e) {
-      //  if (pageData != null) {
-      //    pageData.release();
-      //  }
-      //  throw e;
-      //}
+      } catch (Exception e) {
+          if (pageData != null) {
+            pageData.release();
+          }
+          //TODO: HANDLE EXCEPTION HERE
+        logger.error("Exception while reading page data: {}", e.toString());
+      } finally {
+
+      }
       asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
       //Thread.currentThread().setName(oldname);
       return true;
