@@ -94,7 +94,7 @@ public class DirectBufInputStream extends FilterInputStream {
           this.startOffset, this.totalByteSize);
       Stopwatch timer = Stopwatch.createStarted();
       int bytesRead = CompatibilityUtil.getBuf(getInputStream(), directBuffer, lengthLeftToRead);
-      lengthLeftToRead = bytesRead;
+      lengthLeftToRead -= bytesRead;
       logger.trace(
           "PERF: Disk read complete. {}, StartOffset: {}, TotalByteSize: {}, BytesRead: {}, Time: {} ms",
           this.streamId, this.startOffset, this.totalByteSize, bytesRead,
