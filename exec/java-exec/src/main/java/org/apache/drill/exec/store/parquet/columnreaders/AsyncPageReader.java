@@ -127,8 +127,15 @@ class AsyncPageReader extends PageReader {
     try {
       Stopwatch timer = Stopwatch.createStarted();
       ReadStatus readStatus = null;
-      readStatus = pageQueue.take();
-      assert (readStatus.pageData != null);
+      synchronized(pageQueue) {
+        boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
+        readStatus = pageQueue.take();
+        assert (readStatus.pageData != null);
+        if (pageQueueFull) {
+          asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(debugName, pageQueue)));
+          logger.trace("[{}]: PUT ({}) QUEUED Read Page ", debugName, System.identityHashCode(pageQueue));
+        }
+      }
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
       stats.timeDiskScanWait.addAndGet(timeBlocked);
       stats.timeDiskScan.addAndGet(readStatus.getDiskScanTime());
@@ -217,9 +224,19 @@ class AsyncPageReader extends PageReader {
       logger.trace("PERF - Operator [{}] Start Disk Wait.",
           this.parentColumnReader.parentReader.getFragmentContext().getFragIdString() + ":"
               + this.parentColumnReader.parentReader.getOperatorContext().getStats().getId());
-      readStatus = pageQueue.take();
-      if(readStatus.pageData == null && readStatus == ReadStatus.EMPTY){
-        throw new DrillRuntimeException("Unexpected end of data");
+      while(pageQueue.isEmpty()){
+        Thread.yield();
+      }
+      synchronized(pageQueue) {
+        boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
+        readStatus = pageQueue.take();
+        if (readStatus.pageData == null && readStatus == ReadStatus.EMPTY) {
+          throw new DrillRuntimeException("Unexpected end of data");
+        }
+        if (pageQueueFull) {
+          asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(debugName, pageQueue)));
+          logger.trace("[{}]: PUT ({}) QUEUED Read Page ", debugName, System.identityHashCode(pageQueue));
+        }
       }
       logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(readStatus));
       long timeBlocked = timer.elapsed(TimeUnit.NANOSECONDS);
@@ -257,9 +274,19 @@ class AsyncPageReader extends PageReader {
       do {
         if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
           readDictionaryPageData(readStatus, parentColumnReader);
-          readStatus = pageQueue.take();
-          if(readStatus.pageData == null || readStatus == ReadStatus.EMPTY) {
-            break;
+          while(pageQueue.isEmpty()){
+            Thread.yield();
+          }
+          synchronized(pageQueue) {
+            boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
+            readStatus = pageQueue.take();
+            if (readStatus.pageData == null || readStatus == ReadStatus.EMPTY) {
+              break;
+            }
+            if (pageQueueFull) {
+              asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(debugName, pageQueue)));
+              logger.trace("[{}]: PUT ({}) QUEUED Read Page ", debugName, System.identityHashCode(pageQueue));
+            }
           }
           assert (readStatus.pageData != null);
           logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(readStatus));
@@ -286,7 +313,11 @@ class AsyncPageReader extends PageReader {
     while (asyncPageRead != null && !asyncPageRead.isEmpty()) {
       try {
         Future<Boolean> f = asyncPageRead.poll();
-        Boolean b = f.get();
+        if(!f.isDone() && !f.isCancelled()){
+          f.cancel(true);
+        } else {
+          Boolean b = f.get(1, TimeUnit.MILLISECONDS);
+        }
       } catch (Exception e) {
         // Do nothing.
       }
@@ -486,7 +517,16 @@ class AsyncPageReader extends PageReader {
         }
 
         try {
-          queue.put(readStatus);
+          while(queue.remainingCapacity() == 0){
+            Thread.yield();
+          }
+          synchronized(queue) {
+            queue.put(readStatus);
+            if (queue.remainingCapacity() > 0) {
+              asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
+              logger.trace("[{}]: PUT ({}) QUEUED Read Page ", debugName, System.identityHashCode(pageQueue));
+            }
+          }
           logger.trace("[{}]: PUT ({}) Read Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(readStatus));
         } catch (InterruptedException ie) {
           logger.trace("[{}]: PUT INTERRUPTED! ({}) Read Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(readStatus));
@@ -502,7 +542,6 @@ class AsyncPageReader extends PageReader {
       } finally {
 
       }
-      asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
       //Thread.currentThread().setName(oldname);
       return true;
     }
