@@ -144,7 +144,7 @@ class AsyncPageReader extends PageReader {
       stats.cpuTimeDiskScan.addAndGet(readStatus.getDiskScanCpuTime());
       readDictionaryPageData(readStatus, parentStatus);
     } catch (InterruptedException e) {
-      //TODO: handle interrupted exception
+      Thread.currentThread().interrupt();
     } catch (Exception e) {
       handleAndThrowException(e, "Error reading dictionary page.");
     }
@@ -259,18 +259,10 @@ class AsyncPageReader extends PageReader {
         stats.timeDataPageLoads.addAndGet(timeBlocked + readStatus.getDiskScanTime());
       }
       pageHeader = readStatus.getPageHeader();
-      // reset this. At the time of calling close, if this is not null then a pending asyncPageRead needs to be consumed
-      //asyncPageRead = null;
-    } catch (InterruptedException e) {
-      //TODO: handle interrupted exception
-    } catch (Exception e) {
-      handleAndThrowException(e, "Error reading page data.");
-    }
 
     // TODO - figure out if we need multiple dictionary pages, I believe it may be limited to one
     // I think we are clobbering parts of the dictionary if there can be multiple pages of dictionary
 
-    try {
       do {
         if (pageHeader.getType() == PageType.DICTIONARY_PAGE) {
           readDictionaryPageData(readStatus, parentColumnReader);
@@ -293,9 +285,6 @@ class AsyncPageReader extends PageReader {
           pageHeader = readStatus.getPageHeader();
         }
       } while (pageHeader.getType() == PageType.DICTIONARY_PAGE);
-    } catch (InterruptedException e) {
-      //TODO: handle interrupted exception
-    }
 
     //if (parentColumnReader.totalValuesRead + readStatus.getValuesRead()
     //    < parentColumnReader.columnChunkMetaData.getValueCount()) {
@@ -305,6 +294,11 @@ class AsyncPageReader extends PageReader {
     pageHeader = readStatus.getPageHeader();
     pageData = getDecompressedPageData(readStatus);
     assert(pageData != null);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (Exception e){
+      handleAndThrowException(e, "Error reading page data");
+    }
 
   }
 
@@ -325,18 +319,21 @@ class AsyncPageReader extends PageReader {
 
     //Empty the page queue
     String name = parentColumnReader.columnChunkMetaData.toString();
+    ReadStatus r;
     while (!pageQueue.isEmpty()) {
+      r = null;
       try {
-        ReadStatus r = pageQueue.take();
+        r = pageQueue.take();
         if (r == ReadStatus.EMPTY) {
           logger.trace("[{}]: POLL ({}) returned {}", name, System.identityHashCode(pageQueue), System.identityHashCode(r));
           break;
         }
-        if (r.pageData != null) {
-          r.pageData.release();
-        }
       } catch (InterruptedException e) {
         //TODO: handle InterruptedException. Release any memory
+      } finally {
+        if (r != null && r.pageData != null) {
+          r.pageData.release();
+        }
       }
     }
 
@@ -409,6 +406,15 @@ class AsyncPageReader extends PageReader {
     public synchronized void setDiskScanCpuTime(long diskScanCpuTime) {
       this.diskScanCpuTime = diskScanCpuTime;
     }
+  }
+
+
+  /**
+   * Holds the Future object as well as the corresponding ReadStatus result.
+   */
+  public static class AsyncTaskHolder {
+    public Future<Boolean> readTask;
+    public ReadStatus readStatus;
   }
 
   private class AsyncPageReaderTask implements Callable<Boolean> {
@@ -516,33 +522,29 @@ class AsyncPageReader extends PageReader {
           assert (totalValuesRead <= totalValuesCount);
         }
 
-        try {
-          while(queue.remainingCapacity() == 0){
-            Thread.yield();
-          }
-          synchronized(queue) {
-            queue.put(readStatus);
-            if (queue.remainingCapacity() > 0) {
-              asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
-              logger.trace("[{}]: PUT ({}) QUEUED Read Page ", debugName, System.identityHashCode(pageQueue));
-            }
-          }
-          logger.trace("[{}]: PUT ({}) Read Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(readStatus));
-        } catch (InterruptedException ie) {
-          logger.trace("[{}]: PUT INTERRUPTED! ({}) Read Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(readStatus));
-          throw new RuntimeException(ie); // rethrow
+        while (queue.remainingCapacity() == 0) {
+          Thread.yield();
         }
-
-      } catch (Exception e) {
-          if (pageData != null) {
-            pageData.release();
+        synchronized (queue) {
+          queue.put(readStatus);
+          if (queue.remainingCapacity() > 0) {
+            asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
+            logger.trace("[{}]: PUT ({}) QUEUED Read Page ", debugName, System.identityHashCode(pageQueue));
           }
-          //TODO: HANDLE EXCEPTION HERE
-        logger.error("Exception while reading page data: {}", e.toString());
-      } finally {
+        }
+        logger.trace("[{}]: PUT ({}) Read Page Header {} ", name, System.identityHashCode(queue),
+            System.identityHashCode(readStatus));
 
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        // Do nothing.
+      } catch (Exception e) {
+        parent.handleAndThrowException(e, "Scan interrupted during execution.");
+      } finally {
+        if (pageData != null) {
+          pageData.release();
+        }
       }
-      //Thread.currentThread().setName(oldname);
       return true;
     }
 
