@@ -129,7 +129,8 @@ class AsyncPageReader extends PageReader {
       ReadStatus readStatus = null;
       synchronized(pageQueue) {
         boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
-        readStatus = pageQueue.take();
+        asyncPageRead.poll().get(); // get the result of execution
+        readStatus = pageQueue.take(); // get the data if no exception has been thrown
         assert (readStatus.pageData != null);
         if (pageQueueFull) {
           asyncPageRead.offer(threadPool.submit(new AsyncPageReaderTask(debugName, pageQueue)));
@@ -229,7 +230,8 @@ class AsyncPageReader extends PageReader {
       }
       synchronized(pageQueue) {
         boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
-        readStatus = pageQueue.take();
+        asyncPageRead.poll().get(); // get the result of execution
+        readStatus = pageQueue.take(); // get the data if no exception has been thrown
         if (readStatus.pageData == null && readStatus == ReadStatus.EMPTY) {
           throw new DrillRuntimeException("Unexpected end of data");
         }
@@ -271,7 +273,8 @@ class AsyncPageReader extends PageReader {
           }
           synchronized(pageQueue) {
             boolean pageQueueFull = pageQueue.remainingCapacity() == 0;
-            readStatus = pageQueue.take();
+            asyncPageRead.poll().get(); // get the result of execution
+            readStatus = pageQueue.take(); // get the data if no exception has been thrown
             if (readStatus.pageData == null || readStatus == ReadStatus.EMPTY) {
               break;
             }
@@ -286,11 +289,6 @@ class AsyncPageReader extends PageReader {
         }
       } while (pageHeader.getType() == PageType.DICTIONARY_PAGE);
 
-    //if (parentColumnReader.totalValuesRead + readStatus.getValuesRead()
-    //    < parentColumnReader.columnChunkMetaData.getValueCount()) {
-    //  asyncPageRead = threadPool.submit(new AsyncPageReaderTask());
-    //}
-
     pageHeader = readStatus.getPageHeader();
     pageData = getDecompressedPageData(readStatus);
     assert(pageData != null);
@@ -301,7 +299,6 @@ class AsyncPageReader extends PageReader {
     }
 
   }
-
 
   @Override public void clear() {
     while (asyncPageRead != null && !asyncPageRead.isEmpty()) {
@@ -329,14 +326,13 @@ class AsyncPageReader extends PageReader {
           break;
         }
       } catch (InterruptedException e) {
-        //TODO: handle InterruptedException. Release any memory
+        Thread.currentThread().interrupt();
       } finally {
         if (r != null && r.pageData != null) {
           r.pageData.release();
         }
       }
     }
-
     super.clear();
   }
 
@@ -408,15 +404,6 @@ class AsyncPageReader extends PageReader {
     }
   }
 
-
-  /**
-   * Holds the Future object as well as the corresponding ReadStatus result.
-   */
-  public static class AsyncTaskHolder {
-    public Future<Boolean> readTask;
-    public ReadStatus readStatus;
-  }
-
   private class AsyncPageReaderTask implements Callable<Boolean> {
 
     private final AsyncPageReader parent = AsyncPageReader.this;
@@ -432,12 +419,6 @@ class AsyncPageReader extends PageReader {
     public Boolean call() throws IOException {
       ReadStatus readStatus = new ReadStatus();
 
-      //TODO: Handle error.
-
-      //String oldname = Thread.currentThread().getName();
-      //String name = parent.parentColumnReader.columnChunkMetaData.toString();
-      //Thread.currentThread().setName(name);
-
       long bytesRead = 0;
       long valuesRead = 0;
       final long totalValuesRead = parent.totalPageValuesRead;
@@ -446,14 +427,6 @@ class AsyncPageReader extends PageReader {
 
       final long totalValuesCount = parent.parentColumnReader.columnChunkMetaData.getValueCount();
 
-      // if the queue is full, we will block on the queue.put and lock up this thread
-      // so return immediately and schedule another task.
-      //if(queue.remainingCapacity() == 0){
-      //  parent.asyncPageRead.offer(parent.threadPool.submit(new AsyncPageReaderTask(debugName, queue)));
-        //Thread.currentThread().setName(oldname);
-      //  return false;
-      //}
-
       // if we are done, just put a marker object in the queue and we are done.
       logger.trace("[{}]: Total Values COUNT {}  Total Values READ {} ", name, totalValuesCount, totalValuesRead);
       if (totalValuesRead >= totalValuesCount) {
@@ -461,10 +434,9 @@ class AsyncPageReader extends PageReader {
           queue.put(ReadStatus.EMPTY);
           logger.trace("[{}]: PUT ({}) Empty Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(ReadStatus.EMPTY));
         } catch (InterruptedException e) {
-          logger.trace("[{}]: PUT INTERRUPTED! ({}) Empty Page Header {} ", name, System.identityHashCode(queue), System.identityHashCode(ReadStatus.EMPTY));
-          throw new RuntimeException(e); // rethrow
+          Thread.currentThread().interrupt();
+          // Do nothing.
         }
-        //Thread.currentThread().setName(oldname);
         return true;
       }
 
@@ -475,7 +447,7 @@ class AsyncPageReader extends PageReader {
         logger.trace("PERF - Operator [{}] [{}] Disk read start (Page Header). Offset {}",
             name, s);
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
-        long e = parent.dataReader.getPos();
+        //long e = parent.dataReader.getPos();
         //if (logger.isTraceEnabled()) {
         //  logger.trace("[{}]: Read Page Header : ReadPos = {} : Bytes Read = {} ", name, s, e - s);
         //}
@@ -486,9 +458,8 @@ class AsyncPageReader extends PageReader {
                 + parent.parentColumnReader.parentReader.getOperatorContext().getStats().getId(), name, s,
             compressedSize);
         pageData = parent.dataReader.getNext(compressedSize);
-        e = parent.dataReader.getPos();
         bytesRead = compressedSize;
-
+        //e = parent.dataReader.getPos();
         //if (logger.isTraceEnabled()) {
         //  DrillBuf bufStart = pageData.slice(0, compressedSize>100?100:compressedSize);
         //  int endOffset = compressedSize>100?compressedSize-100:0;
@@ -534,7 +505,6 @@ class AsyncPageReader extends PageReader {
         }
         logger.trace("[{}]: PUT ({}) Read Page Header {} ", name, System.identityHashCode(queue),
             System.identityHashCode(readStatus));
-
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         // Do nothing.
@@ -547,7 +517,6 @@ class AsyncPageReader extends PageReader {
       }
       return true;
     }
-
   }
 
   private class DecompressionHelper {
