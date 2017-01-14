@@ -47,6 +47,7 @@ import org.apache.drill.exec.util.VectorUtil;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.VarCharVector;
 import org.joda.time.DateTime;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
