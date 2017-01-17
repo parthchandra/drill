@@ -162,7 +162,7 @@ public interface ExecConstants {
 
   // Number of pages the Async Parquet page reader will read before blocking
   String PARQUET_PAGEREADER_QUEUE_SIZE = "store.parquet.reader.pagereader.queuesize";
-  OptionValidator PARQUET_PAGEREADER_QUEUE_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_QUEUE_SIZE, 2);
+  OptionValidator PARQUET_PAGEREADER_QUEUE_SIZE_VALIDATOR = new  LongValidator(PARQUET_PAGEREADER_QUEUE_SIZE, 4);
 
   String PARQUET_PAGEREADER_ENFORCETOTALSIZE = "store.parquet.reader.pagereader.enforceTotalSize";
   OptionValidator PARQUET_PAGEREADER_ENFORCETOTALSIZE_VALIDATOR = new BooleanValidator(PARQUET_PAGEREADER_ENFORCETOTALSIZE, false);
