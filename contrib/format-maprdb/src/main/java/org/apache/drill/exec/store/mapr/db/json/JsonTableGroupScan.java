@@ -39,6 +39,7 @@ import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
+import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.MapRDBTableStats;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
 import org.apache.hadoop.conf.Configuration;
@@ -132,7 +133,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     }
   }
 
-  protected JsonSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
+  protected MapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
     // XXX/TODO check filter/Condition
     JsonScanSpec spec = scanSpec;
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
@@ -234,21 +235,21 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   @Override
   public boolean supportsRestrictedScan() {
-    return true;  
+    return true;
   }
-  
+
   @Override
   public RestrictedJsonTableGroupScan getRestrictedScan(List<SchemaPath> columns) {
-    RestrictedJsonTableGroupScan newScan = 
+    RestrictedJsonTableGroupScan newScan =
         new RestrictedJsonTableGroupScan(this.getUserName(),
             this.getStoragePlugin(),
             this.getFormatPlugin(),
             this.getScanSpec(),
             this.getColumns());
     newScan.columns = columns;
-    return newScan;    
+    return newScan;
   }
-  
+
   /**
    *
    * @param condition

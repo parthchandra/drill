@@ -24,6 +24,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
+import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
 import org.apache.drill.exec.vector.BaseValueVector;
 
 import com.google.common.base.Stopwatch;
@@ -42,24 +43,28 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   public int next() {
     Stopwatch watch = Stopwatch.createUnstarted();
     watch.start();
+    RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec)this.subScanSpec);
 
     vectorWriter.allocate();
     vectorWriter.reset();
 
     int recordCount = 0;
-    
+
     DBDocumentReaderBase reader = null;
 
     while(recordCount < BaseValueVector.INITIAL_VALUE_ALLOCATION) {
-      // TODO: new reader logic that iterates over the row keys from the build side of hash join for
-      // this subscan (for this, we need to propagate the reference to the HashJoinBatch that is maintained
-      // by RestrictedMapRDBSubScan
-      
+      // TODO: new reader logic that iterates over the row keys retrieved from the corresponding
+      // restricted subscanspec.  Example implementation:
+      while (rss.hasRowKey()) {
+        byte[] rowkey = rss.nextRowKey();
+        // processing ...
+      }
     }
 
     vectorWriter.setValueCount(recordCount);
     logger.debug("Took {} ms to get {} records", watch.elapsed(TimeUnit.MILLISECONDS), recordCount);
     return recordCount;
   }
+
 
 }

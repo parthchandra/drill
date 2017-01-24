@@ -29,25 +29,37 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScan;
+import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
+import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
 
 import com.google.common.collect.Maps;
 
 /**
  * A RestrictedJsonTableGroupScan encapsulates (along with a subscan) the functionality
  * for doing restricted (i.e skip) scan rather than sequential scan.  The skipping is based
- * on a supplied set of row keys (primary keys) from a join operator. 
+ * on a supplied set of row keys (primary keys) from a join operator.
  */
 public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
 
   // A map of minor fragment id to the corresponding subscan instance
-  private Map<Integer, RestrictedMapRDBSubScan> fidSubscanMap = Maps.newHashMap();
-  
+  private Map<Integer, RestrictedMapRDBSubScan> fragmentSubscanMap = Maps.newHashMap();
+
   protected RestrictedJsonTableGroupScan(String userName,
                             FileSystemPlugin storagePlugin,
                             MapRDBFormatPlugin formatPlugin,
-                            JsonScanSpec scanSpec,
+                            JsonScanSpec scanSpec, /* scan spec of the original table */
                             List<SchemaPath> columns) {
     super(userName, storagePlugin, formatPlugin, scanSpec, columns);
+  }
+
+  // TODO:  this method needs to be fully implemented
+  protected RestrictedMapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
+    JsonScanSpec spec = scanSpec;
+    RestrictedMapRDBSubScanSpec subScanSpec =
+        new RestrictedMapRDBSubScanSpec(
+        spec.getTableName(),
+        regionsToScan.get(tfi));
+    return subScanSpec;
   }
 
   @Override
@@ -55,12 +67,13 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     assert minorFragmentId < endpointFragmentMapping.size() : String.format(
         "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.", endpointFragmentMapping.size(),
         minorFragmentId);
-    RestrictedMapRDBSubScan subscan = 
+    RestrictedMapRDBSubScan subscan =
         new RestrictedMapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(), getStoragePlugin().getConfig(),
         endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
-    
+
     // Remember that this minor fragment corresponds to a specific subscan. This will be used
-    fidSubscanMap.put(minorFragmentId, subscan);
+    // later for associating the subscan with a join instance from where to get the rowkeys
+    fragmentSubscanMap.put(minorFragmentId, subscan);
     return subscan;
   }
 
@@ -70,7 +83,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
    */
   private RestrictedJsonTableGroupScan(RestrictedJsonTableGroupScan that) {
     super(that);
-    this.fidSubscanMap = that.fidSubscanMap;
+    this.fragmentSubscanMap = that.fragmentSubscanMap;
   }
 
   @Override
@@ -79,7 +92,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     newScan.columns = columns;
     return newScan;
   }
-  
+
   @Override
   public ScanStats getScanStats() {
     //TODO: model the cost for restricted scan
@@ -88,17 +101,17 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
 
   @Override
   public void addJoinForRestrictedScan(HashJoinBatch joinBatch, int minorFragmentId) {
-    RestrictedMapRDBSubScan subscan = fidSubscanMap.get(minorFragmentId);
+    RestrictedMapRDBSubScan subscan = fragmentSubscanMap.get(minorFragmentId);
     if (subscan != null) {
       subscan.setJoinForSubScan(joinBatch);
     }
   }
 
   @Override
-  public boolean isRestrictedScan() { 
+  public boolean isRestrictedScan() {
     return true;
   }
-  
+
   @Override
   public String toString() {
     return "RestrictedJsonTableGroupScan [ScanSpec=" + scanSpec + ", columns=" + columns + "]";

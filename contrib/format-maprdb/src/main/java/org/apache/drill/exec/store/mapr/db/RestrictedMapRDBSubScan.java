@@ -24,33 +24,31 @@ import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
-// A RestrictedMapRDBSubScan is intended for skip-scan (as opposed to sequential scan) operations
-// where the set of rowkeys is obtained from a corresponding HashJoinBatch instance 
+/**
+ * A RestrictedMapRDBSubScan is intended for skip-scan (as opposed to sequential scan) operations
+ * where the set of rowkeys is obtained from a corresponding HashJoinBatch instance
+*/
 public class RestrictedMapRDBSubScan extends MapRDBSubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RestrictedMapRDBSubScan.class);
 
-  // The HashJoin instance which will supply this subscan with the set of rowkeys 
-  // TODO: should this be here or part of a separate RestrictedSubScanSpec class ? 
-  private HashJoinBatch hjbatch = null;
-  
-  public RestrictedMapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig, 
+  public RestrictedMapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig,
       FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
       List<MapRDBSubScanSpec> maprDbSubScanSpecs, List<SchemaPath> columns, String tableType) {
-    super(userName, formatPluginConfig, storagePlugin, storageConfig, 
+    super(userName, formatPluginConfig, storagePlugin, storageConfig,
         maprDbSubScanSpecs, columns, tableType);
   }
-  
-  public void setJoinForSubScan(HashJoinBatch hjBatch) {
-    this.hjbatch = hjBatch;
+
+  public void setJoinForSubScan(HashJoinBatch hjbatch) {
+    // currently, all subscan specs are sharing the same join batch instance
+    for (MapRDBSubScanSpec s : getRegionScanSpecList()) {
+      assert (s instanceof RestrictedMapRDBSubScanSpec);
+      ((RestrictedMapRDBSubScanSpec)s).setJoinForSubScan(hjbatch);
+    }
   }
 
-  public HashJoinBatch getJoinForSubScan() {
-    return hjbatch;
-  }
-  
   @Override
   public boolean isRestrictedSubScan() {
     return true;
   }
-  
+
 }
