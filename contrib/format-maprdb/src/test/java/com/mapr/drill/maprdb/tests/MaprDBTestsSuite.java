@@ -78,7 +78,7 @@ public class MaprDBTestsSuite {
           // Without this, the row count stats to return 0,
           // causing the planner to reject optimized plans.
           System.out.println("Sleeping for 5 seconds to allow table flushes");
-          Thread.sleep(10000);
+          Thread.sleep(5000);
 
           conf = HBaseTestsSuite.getConf();
           initCount.incrementAndGet(); // must increment while inside the synchronized block
@@ -90,7 +90,25 @@ public class MaprDBTestsSuite {
     return;
   }
 
-  @AfterClass
+  public static void setupCluster() throws Exception {
+    if (initCount.get() == 0) {
+      synchronized (MaprDBTestsSuite.class) {
+        if (initCount.get() == 0) {
+          HBaseTestsSuite.configure(false /*manageHBaseCluster*/, true /*createTables*/);
+          HBaseTestsSuite.initCluster();
+
+          admin = MapRDB.newAdmin();
+          conf = HBaseTestsSuite.getConf();
+          initCount.incrementAndGet(); // must increment while inside the synchronized block
+          return;
+        }
+      }
+    }
+    initCount.incrementAndGet();
+    return;
+  }
+
+    @AfterClass
   public static void cleanupTests() throws Exception {
     synchronized (MaprDBTestsSuite.class) {
       if (initCount.decrementAndGet() == 0) {
@@ -149,6 +167,10 @@ public class MaprDBTestsSuite {
     return IS_DEBUG;
   }
 
+  public static Admin getAdmin() {
+    return admin;
+  }
+
   public static InputStream getJsonStream(String resourceName) {
     return MaprDBTestsSuite.class.getClassLoader().getResourceAsStream(resourceName);
   }
@@ -204,7 +226,7 @@ public class MaprDBTestsSuite {
         admin.deleteTable(TMP_BUSINESS_TABLE);
       }
       if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
-        admin.deleteTable(TMP_TABLE_WITH_INDEX);
+   //     admin.deleteTable(TMP_TABLE_WITH_INDEX);
       }
     }
   }
