@@ -53,6 +53,9 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
   public RestrictedMapRDBSubScanSpec(String tableName, String regionServer) {
     super(tableName, null, regionServer, null, null, null, null);
   }
+  /* package */ RestrictedMapRDBSubScanSpec() {
+    // empty constructor, to be used with builder pattern;
+  }
 
   public void setJoinForSubScan(HashJoinBatch hjbatch) {
     this.hjbatch = hjbatch;
@@ -105,7 +108,7 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
    * @return the next row key in the iteration or null if no more row keys
    */
   @JsonIgnore
-  public byte[] nextRowKey() {
+  public String nextRowKey() {
     if (hasRowKey()) {
       // get the entry at the current index within this batch
       Object o = rowKeyVector.getAccessor().getObject(currentIndex++);
@@ -118,10 +121,12 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
       // TODO: we should try to abstract this out
       if (currentIndex > maxOccupiedIndex) {
         Pair<VectorContainer, Integer> currentBatch = hjbatch.nextBuildBatch();
-        init(currentBatch);
+        if (currentBatch != null) {
+          init(currentBatch);
+        }
       }
 
-      return o.toString().getBytes();
+      return o.toString();
     }
     return null;
   }

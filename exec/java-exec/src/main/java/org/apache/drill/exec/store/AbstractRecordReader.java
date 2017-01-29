@@ -91,6 +91,7 @@ public abstract class AbstractRecordReader implements RecordReader {
     return isStarQuery;
   }
 
+
   /**
    * Returns true if reader should skip all of the columns, reporting number of records only. Handling of a skip query
    * is storage plugin-specific.
@@ -113,6 +114,11 @@ public abstract class AbstractRecordReader implements RecordReader {
     for (final ValueVector v : vectorMap.values()) {
       v.allocateNew();
     }
+  }
+
+  @Override
+  public boolean hasNext() {
+    return false;
   }
 
   protected List<SchemaPath> getDefaultColumnsToRead() {

@@ -157,9 +157,6 @@ public class LargeTableGenBase {
       randomized[idx1] = randomized[idx2];
       randomized[idx2] = temp;
     }
-    for(i=0; i<10; ++i) {
-      System.out.print(String.format("%d ", randomized[i]));
-    }
   }
 
 }

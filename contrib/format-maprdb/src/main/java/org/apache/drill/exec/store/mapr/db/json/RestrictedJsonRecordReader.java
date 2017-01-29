@@ -20,8 +20,13 @@ package org.apache.drill.exec.store.mapr.db.json;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import com.mapr.db.MapRDB;
+import com.mapr.db.impl.IdCodec;
+import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
@@ -29,6 +34,11 @@ import org.apache.drill.exec.vector.BaseValueVector;
 
 import com.google.common.base.Stopwatch;
 import com.mapr.db.ojai.DBDocumentReaderBase;
+import com.mapr.db.Table;
+import org.apache.drill.exec.vector.complex.impl.MapOrListWriterImpl;
+import org.ojai.DocumentReader;
+
+
 
 public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RestrictedJsonRecordReader.class);
@@ -43,7 +53,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   public int next() {
     Stopwatch watch = Stopwatch.createUnstarted();
     watch.start();
-    RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec)this.subScanSpec);
+    RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec) this.subScanSpec);
 
     vectorWriter.allocate();
     vectorWriter.reset();
@@ -52,19 +62,58 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
 
     DBDocumentReaderBase reader = null;
 
-    while(recordCount < BaseValueVector.INITIAL_VALUE_ALLOCATION) {
+    while (recordCount < BaseValueVector.INITIAL_VALUE_ALLOCATION && rss.hasRowKey()) {
       // TODO: new reader logic that iterates over the row keys retrieved from the corresponding
       // restricted subscanspec.  Example implementation:
       while (rss.hasRowKey()) {
-        byte[] rowkey = rss.nextRowKey();
-        // processing ...
+
+        try {
+          String strRowkey = rss.nextRowKey();
+          Table table = MapRDB.getTable(subScanSpec.getTableName());
+          reader = (DBDocumentReaderBase) table.findById(strRowkey).asReader();
+          MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
+          if (getIdOnly()) {
+            writeId(writer, reader.getId());
+          } else {
+            if (reader.next() != DocumentReader.EventType.START_MAP) {
+              throw dataReadError("The document did not start with START_MAP!");
+            }
+          }
+          writeToListOrMap(writer, reader);
+          recordCount++;
+        } catch (UserException e) {
+          throw UserException.unsupportedError(e)
+              .addContext(String.format("Table: %s, document id: '%s'",
+                  getTable().getPath(),
+                  reader == null ? null : IdCodec.asString(reader.getId())))
+              .build(logger);
+        } catch (SchemaChangeException e) {
+          if (getIgnoreSchemaChange()) {
+            logger.warn("{}. Dropping the row from result.", e.getMessage());
+            logger.debug("Stack trace:", e);
+          } else {
+            throw dataReadError(e);
+          }
+        }
       }
     }
-
     vectorWriter.setValueCount(recordCount);
     logger.debug("Took {} ms to get {} records", watch.elapsed(TimeUnit.MILLISECONDS), recordCount);
     return recordCount;
   }
 
-
+  @Override
+  public boolean hasNext() {
+    //TODO: need to consider and test the case when there are multiple batches of rowkeys
+    RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec) this.subScanSpec);
+    AbstractRecordBatch.BatchState state = rss.getJoinForSubScan().getState();
+    if ( state == AbstractRecordBatch.BatchState.BUILD_SCHEMA ) {
+      return true;
+    }
+     if( state == AbstractRecordBatch.BatchState.FIRST) {
+       rss.getJoinForSubScan().setState(AbstractRecordBatch.BatchState.NOT_FIRST);
+      return true;
+    }
+    return false;
+  }
 }

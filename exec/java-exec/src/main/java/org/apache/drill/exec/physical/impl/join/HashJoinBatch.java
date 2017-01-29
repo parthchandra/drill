@@ -179,8 +179,8 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
 
   @Override
   protected void buildSchema() throws SchemaChangeException {
-    leftUpstream = next(left);
     rightUpstream = next(right);
+    leftUpstream = next(left);
 
     if (leftUpstream == IterOutcome.STOP || rightUpstream == IterOutcome.STOP) {
       state = BatchState.STOP;
@@ -524,7 +524,9 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
     this.right = right;
     joinType = popConfig.getJoinType();
     conditions = popConfig.getConditions();
-
+    if (popConfig.getScanForRowKeyJoin() != null) {
+      this.isRowKeyJoin = true;
+    }
     comparators = Lists.newArrayListWithExpectedSize(conditions.size());
     for (int i=0; i<conditions.size(); i++) {
       JoinCondition cond = conditions.get(i);
@@ -552,6 +554,12 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
   public Pair<VectorContainer, Integer> nextBuildBatch() {
     if (buildComplete) {
       return hashTable.nextBatch();
+    }
+    else if(hashTable == null && firstOutputBatch == true) { //if there is data coming to right(build) side in build Schema stage, use it.
+      firstOutputBatch = false;
+      if ( right.getRecordCount() > 0 ) {
+        return Pair.of(right.getOutgoingContainer(), right.getRecordCount()-1);
+      }
     }
     return null;
   }

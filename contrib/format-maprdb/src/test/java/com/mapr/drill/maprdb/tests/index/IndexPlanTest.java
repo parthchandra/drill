@@ -76,7 +76,7 @@ public class IndexPlanTest extends BaseJsonTest {
     Admin admin = MaprDBTestsSuite.getAdmin();
     if (admin != null) {
       if (admin.tableExists(PRIMARY_TABLE_NAME)) {
-   //     admin.deleteTable(PRIMARY_TABLE_NAME);
+        admin.deleteTable(PRIMARY_TABLE_NAME);
       }
     }
   }
@@ -99,13 +99,12 @@ public class IndexPlanTest extends BaseJsonTest {
     );
 
     System.out.println("Non-Covering Plan Verified!");
-/* TODO: uncomment when restricted DB scan is ready
+
     testBuilder()
         .sqlQuery(query)
         .ordered()
-        .baselineColumns("phone").baselineValues("6500005471")
+        .baselineColumns("fname").baselineValues("KfFzK")
         .go();
-*/
     return;
 
   }

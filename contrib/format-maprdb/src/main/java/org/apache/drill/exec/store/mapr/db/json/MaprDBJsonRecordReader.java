@@ -173,6 +173,18 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     return transformed;
   }
 
+  protected boolean getIdOnly() {
+    return idOnly;
+  }
+
+  protected Table getTable() {
+    return table;
+  }
+
+  protected boolean getIgnoreSchemaChange() {
+    return ignoreSchemaChange;
+  }
+
   @Override
   @SuppressWarnings("deprecation")
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
@@ -241,7 +253,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     return recordCount;
   }
 
-  private void writeId(MapOrListWriterImpl writer, Value id) throws SchemaChangeException {
+  protected void writeId(MapOrListWriterImpl writer, Value id) throws SchemaChangeException {
     try {
       switch(id.getType()) {
       case STRING:
@@ -259,7 +271,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     }
   }
 
-  private void writeToListOrMap(MapOrListWriterImpl writer, DBDocumentReaderBase reader) throws SchemaChangeException {
+  protected void writeToListOrMap(MapOrListWriterImpl writer, DBDocumentReaderBase reader) throws SchemaChangeException {
     String fieldName = null;
     writer.start();
     outside: while (true) {
@@ -440,31 +452,31 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     writer.varChar(fieldName).writeVarChar(0, strBytes.length, buffer);
   }
 
-  private UserException unsupportedError(String format, Object... args) {
+  protected UserException unsupportedError(String format, Object... args) {
     return UserException.unsupportedError()
         .message(String.format(format, args))
         .build(logger);
   }
 
-  private UserException dataReadError(Throwable t) {
+  protected UserException dataReadError(Throwable t) {
     return dataReadError(t, null);
   }
 
-  private UserException dataReadError(String format, Object... args) {
+  protected UserException dataReadError(String format, Object... args) {
     return dataReadError(null, format, args);
   }
 
-  private UserException dataReadError(Throwable t, String format, Object... args) {
+  protected UserException dataReadError(Throwable t, String format, Object... args) {
     return UserException.dataReadError(t)
         .message(format == null ? null : String.format(format, args))
         .build(logger);
   }
 
-  private SchemaChangeException schemaChangeException(Throwable t, String format, Object... args) {
+  protected SchemaChangeException schemaChangeException(Throwable t, String format, Object... args) {
     return new SchemaChangeException(format, t, args);
   }
 
-  private DBDocumentReaderBase nextDocumentReader() {
+  protected DBDocumentReaderBase nextDocumentReader() {
     final OperatorStats operatorStats = operatorContext == null ? null : operatorContext.getStats();
     try {
       if (operatorStats != null) {

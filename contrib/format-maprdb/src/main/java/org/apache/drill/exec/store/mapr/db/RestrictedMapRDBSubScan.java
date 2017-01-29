@@ -19,17 +19,37 @@ package org.apache.drill.exec.store.mapr.db;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JacksonInject;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeName;
+import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
 /**
  * A RestrictedMapRDBSubScan is intended for skip-scan (as opposed to sequential scan) operations
  * where the set of rowkeys is obtained from a corresponding HashJoinBatch instance
 */
+@JsonTypeName("maprdb-restricted-subscan")
 public class RestrictedMapRDBSubScan extends MapRDBSubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RestrictedMapRDBSubScan.class);
+
+  @JsonCreator
+  public RestrictedMapRDBSubScan(@JacksonInject StoragePluginRegistry registry,
+                       @JsonProperty("userName") String userName,
+                       @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
+                       @JsonProperty("storageConfig") StoragePluginConfig storage,
+                       @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
+                       @JsonProperty("columns") List<SchemaPath> columns,
+                       @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
+    this(userName, formatPluginConfig,
+        (FileSystemPlugin) registry.getPlugin(storage),
+        storage, regionScanSpecList, columns, tableType);
+  }
 
   public RestrictedMapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig,
       FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,

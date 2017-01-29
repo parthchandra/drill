@@ -136,7 +136,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       final String[] segs = pathSeg.split("\\.");
       path = SchemaPath.getCompoundPath(segs);
       rowfields.add(new RelDataTypeFieldImpl(
-          pathSeg, rowfields.size(),
+          segs[0], rowfields.size(),
           typeFactory.createMapType(typeFactory.createSqlType(SqlTypeName.VARCHAR),
               typeFactory.createSqlType(SqlTypeName.ANY))
       ));
@@ -163,9 +163,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         origScan.getTraitSet(), indexGroupScan, indexScanRowType);
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
-    FilterPrel rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
-        indexScanPrel, indexCondition);
-
+    FilterPrel  rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
+          indexScanPrel, indexCondition);
     // project the rowkey column from the index scan
     List<RexNode> rightProjectExprs = Lists.newArrayList();
     int rightRowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType());//indexGroupScan.getRowKeyOrdinal();
@@ -230,12 +229,15 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet(),
         dbScan, leftProjectExprs, leftProjectRowType);
 
-    FilterPrel leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
-        leftIndexProjectPrel, filter.getCondition());
+    FilterPrel leftIndexFilterPrel = null;
+    if(remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
+      leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+          leftIndexProjectPrel, remainderCondition);
+    }
 
     final RelTraitSet leftTraits = dbScan.getTraitSet().plus(Prel.DRILL_PHYSICAL);
     // final RelNode convertedLeft = convert(leftIndexProjectPrel, leftTraits);
-    final RelNode convertedLeft = Prule.convert(leftIndexFilterPrel, leftTraits);
+    final RelNode convertedLeft = Prule.convert(leftIndexFilterPrel==null?leftIndexProjectPrel:leftIndexFilterPrel, leftTraits);
 
     // find the rowkey column on the left side of join
     // TODO: is there a shortcut way to do this ?
