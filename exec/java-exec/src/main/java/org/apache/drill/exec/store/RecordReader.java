@@ -44,6 +44,14 @@ public interface RecordReader extends AutoCloseable {
   void allocate(Map<String, ValueVector> vectorMap) throws OutOfMemoryException;
 
   /**
+   *
+   * @return return true if there could be more read. This method is called at the time when correspondent ScanBatch gets
+   * no more records and is going to close the reader. However, for restricted scan, whether it is done is not decided by
+   * itself, but decided by who demand restricted scan to read and what records to read(e.g. Index Scan).
+   * So this method will allow ScanBatch to check with the reader before closing it.
+   */
+  boolean hasNext();
+  /**
    * Increments this record reader forward, writing via the provided output
    * mutator into the output batch.
    *

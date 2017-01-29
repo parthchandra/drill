@@ -181,8 +181,15 @@ public class ScanBatch implements CloseableRecordBatch {
         try {
           if (!readers.hasNext()) {
             // We're on the last reader, and it has no (more) rows.
+
+            //ask the reader if we should continue or not even there is no more record found
+            if(currentReader.hasNext()) {
+              break;
+            }
+
             currentReader.close();
             releaseAssets();
+
             done = true;  // have any future call to next() return NONE
 
             if (mutator.isNewSchema()) {

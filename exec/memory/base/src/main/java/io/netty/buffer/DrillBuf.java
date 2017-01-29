@@ -440,7 +440,9 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
 
   @Override
   public String toString() {
-    return String.format("DrillBuf[%d], udle: [%d %d..%d]", id, udle.id, offset, offset + capacity());
+    return String.format("DrillBuf[%d], udle: [%d %d..%d]: %s hex=%s", id, udle.id, offset, offset + capacity(),
+        toString(readerIndex, readableBytes()>16?16:readableBytes(), Charset.defaultCharset()),
+        toHexString(readerIndex, readableBytes()>16?16:readableBytes()));
   }
 
   @Override

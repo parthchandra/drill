@@ -148,4 +148,16 @@ public class DrillIndexDefinition implements IndexDefinition {
     return this.rowKeyColumns;
   }
 
+  @Override
+  @JsonProperty
+  public List<SchemaPath> getIndexColumns() {
+    return this.indexColumns;
+  }
+
+  @Override
+  @JsonProperty
+  public List<SchemaPath> getNonIndexColumns() {
+    return this.nonIndexColumns;
+  }
+
 }

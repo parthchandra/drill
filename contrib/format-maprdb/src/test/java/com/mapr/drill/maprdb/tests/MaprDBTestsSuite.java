@@ -226,7 +226,7 @@ public class MaprDBTestsSuite {
         admin.deleteTable(TMP_BUSINESS_TABLE);
       }
       if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
-   //     admin.deleteTable(TMP_TABLE_WITH_INDEX);
+        admin.deleteTable(TMP_TABLE_WITH_INDEX);
       }
     }
   }

@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.Maps;
 import org.apache.calcite.rel.RelNode;
 
@@ -27,7 +26,6 @@ import org.apache.drill.exec.physical.base.AbstractIndexGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillTable;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.io.IOException;
 import java.util.List;

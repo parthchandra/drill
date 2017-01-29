@@ -228,13 +228,16 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
     return false;
   }
 
+  protected boolean inputRefToPush(RexInputRef inputRef) {
+    return dirs.get(inputRef.getIndex());
+  }
+
   public Void visitInputRef(RexInputRef inputRef) {
-    if(dirs.get(inputRef.getIndex())){
+    if (inputRefToPush(inputRef)) {
       pushStatusStack.add(PushDirFilter.PUSH);
       addResult(inputRef);
       referencedDirs.set(inputRef.getIndex());
-
-    }else{
+    } else {
       pushStatusStack.add(PushDirFilter.NO_PUSH);
     }
     return null;

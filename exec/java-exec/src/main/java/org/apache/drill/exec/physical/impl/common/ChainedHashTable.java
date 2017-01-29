@@ -172,7 +172,8 @@ public class ChainedHashTable {
     if (isProbe) {
       i = 0;
       for (NamedExpression ne : htConfig.getKeyExprsProbe()) {
-        final LogicalExpression expr = ExpressionTreeMaterializer.materialize(ne.getExpr(), incomingProbe, collector, context.getFunctionRegistry());
+        final LogicalExpression expr = ExpressionTreeMaterializer.materialize(ne.getExpr(), incomingProbe,
+            collector, context.getFunctionRegistry());
         if (collector.hasErrors()) {
           throw new SchemaChangeException("Failure while materializing expression. " + collector.toErrorString());
         }
@@ -182,7 +183,7 @@ public class ChainedHashTable {
         keyExprsProbe[i] = expr;
         i++;
       }
-      JoinUtils.addLeastRestrictiveCasts(keyExprsProbe, incomingProbe, keyExprsBuild, incomingBuild, context);
+     JoinUtils.addLeastRestrictiveCasts(keyExprsProbe, incomingProbe, keyExprsBuild, incomingBuild, context);
     }
 
     i = 0;

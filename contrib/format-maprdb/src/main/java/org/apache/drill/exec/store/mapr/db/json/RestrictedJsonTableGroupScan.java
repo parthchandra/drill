@@ -20,8 +20,11 @@ package org.apache.drill.exec.store.mapr.db.json;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
@@ -91,6 +94,13 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     RestrictedJsonTableGroupScan newScan = new RestrictedJsonTableGroupScan(this);
     newScan.columns = columns;
     return newScan;
+  }
+
+  @Override
+  @JsonIgnore
+  public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
+    Preconditions.checkArgument(children.isEmpty());
+    return new RestrictedJsonTableGroupScan(this);
   }
 
   @Override

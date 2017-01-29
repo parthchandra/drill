@@ -18,6 +18,7 @@
 
 package org.apache.drill.exec.planner.index;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.Collection;
@@ -77,4 +78,8 @@ public interface IndexDefinition {
    */
   IndexType getIndexType();
 
+
+  List<SchemaPath> getIndexColumns();
+
+  List<SchemaPath> getNonIndexColumns();
 }

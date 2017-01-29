@@ -42,6 +42,7 @@ import java.util.List;
 public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(CoveringIndexPlanGenerator.class);
+  final protected IndexGroupScan indexGroupScan;
 
   public CoveringIndexPlanGenerator(RelOptRuleCall call,
       ProjectPrel origProject,
@@ -50,7 +51,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       RexNode indexCondition,
       RexNode remainderCondition,
       RexBuilder builder) {
-    super(call, origProject, origScan, indexGroupScan, indexCondition, remainderCondition, builder);
+    super(call, origProject, origScan, indexCondition, remainderCondition, builder);
+    this.indexGroupScan = indexGroupScan;
   }
 
   @Override
@@ -88,6 +90,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       finalRel = Prule.convert(indexFilterPrel, indexFilterPrel.getTraitSet());
     }
 
+    logger.trace("CoveringIndexPlanGenerator got finalRel {} from origScan {}",
+        finalRel.toString(), origScan.toString());
     return finalRel;
   }
 }

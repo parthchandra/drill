@@ -117,6 +117,18 @@ public class LargeTableGenBase {
     return getFirstName(i) + getLastName(i) + "@" + "gmail.com";
   }
 
+  protected String getAge(int i) {
+    return String.format("%d",randomized[i%randomized.length] % 60 + 10);
+  }
+
+  protected String getIncome(int i) {//unit should be $10k
+    return String.format("%d",randomized[i%randomized.length] % 47 + 1);
+  }
+
+  protected String getBirthday(int i) {
+    return String.format("%d",randomized[i%randomized.length]);
+  }
+
   protected String getField(String field, int i) {
     if(field.equals("ssn")) {
       return getSSN(i);
@@ -156,9 +168,6 @@ public class LargeTableGenBase {
       int temp = randomized[idx1];
       randomized[idx1] = randomized[idx2];
       randomized[idx2] = temp;
-    }
-    for(i=0; i<10; ++i) {
-      System.out.print(String.format("%d ", randomized[i]));
     }
   }
 
