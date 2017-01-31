@@ -20,9 +20,11 @@ package org.apache.drill.exec.physical.impl.partitionsender;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Named;
 
+import com.google.common.base.Stopwatch;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.compile.sig.RuntimeOverridden;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -52,7 +54,8 @@ import org.apache.drill.exec.vector.ValueVector;
 import com.google.common.collect.Lists;
 
 public abstract class PartitionerTemplate implements Partitioner {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PartitionerTemplate.class);
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PartitionerPerfLogger.class);
+
 
   // Always keep the recordCount as (2^x) - 1 to better utilize the memory allocation in ValueVectors
   private static final int DEFAULT_RECORD_BATCH_SIZE = (1 << 10) - 1;
@@ -306,7 +309,7 @@ public abstract class PartitionerTemplate implements Partitioner {
       final FragmentHandle handle = context.getHandle();
 
       // We need to send the last batch when
-      //   1. we are actually done processing the incoming RecordBatches and no more input available
+      //   1 we are actually done processing the incoming RecordBatches and no more input available
       //   2. receiver wants to terminate (possible in case of queries involving limit clause). Even when receiver wants
       //      to terminate we need to send at least one batch with "isLastBatch" set to true, so that receiver knows
       //      sender has acknowledged the terminate request. After sending the last batch, all further batches are
@@ -336,7 +339,39 @@ public abstract class PartitionerTemplate implements Partitioner {
       updateStats(writableBatch);
       stats.startWait();
       try {
+        String partitionerId = new StringBuilder()
+            .append(start)
+            .append(":")
+            .append(end)
+            .toString()
+            ;
+        String thatFragment = new StringBuilder()
+            .append(tunnel.getTunnel().getManager().getEndpoint().getAddress())
+            .append(":")
+            .append(operator.getOppositeMajorFragmentId() )
+            .append(":")
+            .append(oppositeMinorFragmentId)
+            .append(":")
+            .append("X")
+            .toString()
+            ;
+        String thisFragment = this.context.getFragIdString();
+        Stopwatch timer = Stopwatch.createStarted();
+        logger.trace("PERF - {} Sending record batch from {} to {}. Size = {} bytes",
+            stats.getId(),
+            thisFragment,
+            thatFragment,
+            writableBatch.getByteCount()
+        );
         tunnel.sendRecordBatch(writableBatch);
+
+        logger.trace("PERF - {} Sent record batch from {} to {}. Size = {} bytes, Time = {} ms",
+            stats.getId(),
+            thisFragment,
+            thatFragment,
+            writableBatch.getByteCount(),
+            timer.elapsed(TimeUnit.MICROSECONDS)/1000.0
+        );
       } finally {
         stats.stopWait();
       }
