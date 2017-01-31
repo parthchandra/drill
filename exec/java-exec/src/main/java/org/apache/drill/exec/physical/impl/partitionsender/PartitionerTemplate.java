@@ -54,7 +54,8 @@ import org.apache.drill.exec.vector.ValueVector;
 import com.google.common.collect.Lists;
 
 public abstract class PartitionerTemplate implements Partitioner {
-  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PartitionerTemplate.class);
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PartitionerPerfLogger.class);
+
 
   // Always keep the recordCount as (2^x) - 1 to better utilize the memory allocation in ValueVectors
   private static final int DEFAULT_RECORD_BATCH_SIZE = (1 << 10) - 1;
@@ -348,21 +349,20 @@ public abstract class PartitionerTemplate implements Partitioner {
             .toString()
         ;
         String thatFragment = new StringBuilder()
-            .append(tunnel.getTunnel().getManager().getEndpoint())
+            .append(tunnel.getTunnel().getManager().getEndpoint().getAddress())
             .append(":")
             .append(operator.getOppositeMajorFragmentId() )
             .append(":")
             .append(oppositeMinorFragmentId)
             .append(":")
-            .append("???")
+            .append("X")
             .toString()
             ;
 
-        String thisFragment = this.context.getHandle().toString();
+        String thisFragment = this.context.getFragIdString();
 
-        logger.trace("PERF - {} Partitioner {} Sending record batch from {} to {}. Time = {} ms",
+        logger.trace("PERF - {} Sending record batch from {} to {}. Time = {} ms",
             stats.getId(),
-            partitionerId,
             thisFragment,
             thatFragment,
             timer.elapsed(TimeUnit.MICROSECONDS)/1000.0
