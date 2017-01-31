@@ -17,9 +17,11 @@
  */
 package org.apache.drill.exec.rpc.data;
 
+import com.google.common.base.Stopwatch;
 import io.netty.buffer.ByteBuf;
 
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.proto.BitData.RpcType;
@@ -82,7 +84,9 @@ public class DataTunnel {
         testInjector.injectInterruptiblePause(testControls, "data-tunnel-send-batch-wait-for-interrupt", testLogger);
       }
 
+      Stopwatch timer = Stopwatch.createStarted();
       sendingSemaphore.acquire();
+      logger.trace("PERF - DataTunnel. Wait for sending semaphore  = {} ms.", timer.elapsed(TimeUnit.MICROSECONDS)/1000.0);
       manager.runCommand(b);
     }catch(final InterruptedException e){
       // Release the buffers first before informing the listener about the interrupt.

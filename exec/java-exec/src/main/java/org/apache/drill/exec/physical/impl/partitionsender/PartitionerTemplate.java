@@ -339,15 +339,12 @@ public abstract class PartitionerTemplate implements Partitioner {
       updateStats(writableBatch);
       stats.startWait();
       try {
-        Stopwatch timer = Stopwatch.createStarted();
-        tunnel.sendRecordBatch(writableBatch);
-
         String partitionerId = new StringBuilder()
             .append(start)
             .append(":")
             .append(end)
             .toString()
-        ;
+            ;
         String thatFragment = new StringBuilder()
             .append(tunnel.getTunnel().getManager().getEndpoint().getAddress())
             .append(":")
@@ -358,13 +355,21 @@ public abstract class PartitionerTemplate implements Partitioner {
             .append("X")
             .toString()
             ;
-
         String thisFragment = this.context.getFragIdString();
-
-        logger.trace("PERF - {} Sending record batch from {} to {}. Time = {} ms",
+        Stopwatch timer = Stopwatch.createStarted();
+        logger.trace("PERF - {} Sending record batch from {} to {}. Size = {} bytes",
             stats.getId(),
             thisFragment,
             thatFragment,
+            writableBatch.getByteCount()
+        );
+        tunnel.sendRecordBatch(writableBatch);
+
+        logger.trace("PERF - {} Sent record batch from {} to {}. Size = {} bytes, Time = {} ms",
+            stats.getId(),
+            thisFragment,
+            thatFragment,
+            writableBatch.getByteCount(),
             timer.elapsed(TimeUnit.MICROSECONDS)/1000.0
         );
       } finally {
