@@ -40,6 +40,7 @@ public class DataTunnel {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DataTunnel.class);
 
   private final DataConnectionManager manager;
+
   private final Semaphore sendingSemaphore = new Semaphore(3);
 
   // Needed for injecting a test pause
@@ -112,6 +113,12 @@ public class DataTunnel {
     }
     return b.getFuture();
   }
+
+  public DataConnectionManager getManager() {
+    return manager;
+  }
+
+
 
 
   private class ThrottlingOutcomeListener implements RpcOutcomeListener<Ack>{

@@ -47,4 +47,9 @@ public class DataConnectionManager extends ReconnectingConnection<DataClientConn
     return new DataClient(endpoint, context, new CloseHandlerCreator());
   }
 
+  public DrillbitEndpoint getEndpoint() {
+    return endpoint;
+  }
+
+
 }

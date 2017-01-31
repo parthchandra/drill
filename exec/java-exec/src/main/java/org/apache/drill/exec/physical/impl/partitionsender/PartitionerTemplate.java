@@ -20,9 +20,11 @@ package org.apache.drill.exec.physical.impl.partitionsender;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import javax.inject.Named;
 
+import com.google.common.base.Stopwatch;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.compile.sig.RuntimeOverridden;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -306,7 +308,7 @@ public abstract class PartitionerTemplate implements Partitioner {
       final FragmentHandle handle = context.getHandle();
 
       // We need to send the last batch when
-      //   1. we are actually done processing the incoming RecordBatches and no more input available
+      //   1 we are actually done processing the incoming RecordBatches and no more input available
       //   2. receiver wants to terminate (possible in case of queries involving limit clause). Even when receiver wants
       //      to terminate we need to send at least one batch with "isLastBatch" set to true, so that receiver knows
       //      sender has acknowledged the terminate request. After sending the last batch, all further batches are
@@ -336,7 +338,35 @@ public abstract class PartitionerTemplate implements Partitioner {
       updateStats(writableBatch);
       stats.startWait();
       try {
+        Stopwatch timer = Stopwatch.createStarted();
         tunnel.sendRecordBatch(writableBatch);
+
+        String partitionerId = new StringBuilder()
+            .append(start)
+            .append(":")
+            .append(end)
+            .toString()
+        ;
+        String thatFragment = new StringBuilder()
+            .append(tunnel.getTunnel().getManager().getEndpoint())
+            .append(":")
+            .append(operator.getOppositeMajorFragmentId() )
+            .append(":")
+            .append(oppositeMinorFragmentId)
+            .append(":")
+            .append("???")
+            .toString()
+            ;
+
+        String thisFragment = this.context.getHandle().toString();
+
+        logger.trace("PERF - {} Partitioner {} Sending record batch from {} to {}. Time = {} ms",
+            stats.getId(),
+            partitionerId,
+            thisFragment,
+            thatFragment,
+            timer.elapsed(TimeUnit.MICROSECONDS)/1000.0
+        );
       } finally {
         stats.stopWait();
       }

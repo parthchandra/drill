@@ -53,4 +53,9 @@ public class AccountingDataTunnel {
       final ExecutionControls testControls, final org.slf4j.Logger testLogger) {
     tunnel.setTestInjectionControls(testInjector, testControls, testLogger);
   }
+
+  public DataTunnel getTunnel() {
+    return tunnel;
+  }
+
 }
