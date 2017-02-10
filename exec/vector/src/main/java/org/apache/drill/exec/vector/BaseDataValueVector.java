@@ -26,7 +26,7 @@ public abstract class BaseDataValueVector extends BaseValueVector {
 
   protected final static byte[] emptyByteArray = new byte[]{}; // Nullable vectors use this
 
-  protected DrillBuf data;
+  public DrillBuf data;
 
   public BaseDataValueVector(MaterializedField field, BufferAllocator allocator) {
     super(field, allocator);

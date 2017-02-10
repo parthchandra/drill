@@ -548,6 +548,11 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
     return this;
   }
 
+  public ByteBuf setIntDirect(int index, int value) {
+    PlatformDependent.putInt(addr(index), value);
+    return this;
+  }
+
   @Override
   public ByteBuf setLong(int index, long value) {
     chk(index, 8);
@@ -643,8 +648,17 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
     return this;
   }
 
+  public ByteBuf setByteDirect(int index, int value) {
+    PlatformDependent.putByte(addr(index), (byte) value);
+    return this;
+  }
+
   public void setByte(int index, byte b) {
     chk(index, 1);
+    PlatformDependent.putByte(addr(index), b);
+  }
+
+  public void setByteDirect(int index, byte b) {
     PlatformDependent.putByte(addr(index), b);
   }
 
@@ -726,6 +740,13 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
   @Override
   public ByteBuf setBytes(int index, ByteBuf src, int srcIndex, int length) {
     udle.setBytes(index + offset, src, srcIndex, length);
+    return this;
+  }
+
+  public ByteBuf setBytesDirect(int index, ByteBuffer src, int srcIndex, int length) {
+      assert(src.isDirect());
+      PlatformDependent.copyMemory(PlatformDependent.directBufferAddress(src) + srcIndex, this.memoryAddress() + index,
+          length);
     return this;
   }
 

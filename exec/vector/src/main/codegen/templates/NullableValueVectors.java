@@ -51,8 +51,8 @@ public final class ${className} extends BaseDataValueVector implements <#if type
   private final FieldReader reader = new Nullable${minor.class}ReaderImpl(Nullable${minor.class}Vector.this);
 
   private final MaterializedField bitsField = MaterializedField.create("$bits$", Types.required(MinorType.UINT1));
-  private final UInt1Vector bits = new UInt1Vector(bitsField, allocator);
-  private final ${valuesName} values = new ${minor.class}Vector(field, allocator);
+  public final UInt1Vector bits = new UInt1Vector(bitsField, allocator);
+  public final ${valuesName} values = new ${minor.class}Vector(field, allocator);
 
   private final Mutator mutator = new Mutator();
   private final Accessor accessor = new Accessor();
