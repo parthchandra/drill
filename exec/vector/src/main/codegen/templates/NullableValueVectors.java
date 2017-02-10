@@ -453,7 +453,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
       final UInt1Vector.Mutator bitsMutator = bits.getMutator();
       <#if type.major == "VarLen">
       for (int i = lastSet + 1; i < index; i++) {
-        valuesMutator.set (i+1, 0, 1, allocator.getEmpty());
+        valuesMutator.set(i, emptyByteArray);
       }
       </#if>
       bitsMutator.set(index, 1);
@@ -466,7 +466,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     private void fillEmpties(int index){
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       for (int i = lastSet; i < index; i++) {
-        valuesMutator.set (i+1, 0, 1, allocator.getEmpty());
+        valuesMutator.setSafe(i + 1, emptyByteArray);
       }
       while(index > bits.getValueCapacity()) {
         bits.reAlloc();
@@ -524,7 +524,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
       for (int i = lastSet + 1; i < index; i++) {
-        valuesMutator.set (i+1, 0, 1, allocator.getEmpty());
+        valuesMutator.set(i, emptyByteArray);
       }
       </#if>
       bits.getMutator().set(index, holder.isSet);
@@ -536,7 +536,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
       for (int i = lastSet + 1; i < index; i++) {
-        valuesMutator.set (i+1, 0, 1, allocator.getEmpty());
+        valuesMutator.set(i, emptyByteArray);
       }
       </#if>
       bits.getMutator().set(index, 1);
@@ -553,7 +553,7 @@ public final class ${className} extends BaseDataValueVector implements <#if type
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
       for (int i = lastSet + 1; i < index; i++) {
-        valuesMutator.set (i+1, 0, 1, allocator.getEmpty());
+        valuesMutator.set(i, emptyByteArray);
       }
       </#if>
       bits.getMutator().set(index, isSet);

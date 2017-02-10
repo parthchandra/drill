@@ -18,22 +18,13 @@
 package org.apache.drill.exec.vector;
 
 import io.netty.buffer.DrillBuf;
-import io.netty.buffer.UnsafeDirectLittleEndian;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.record.MaterializedField;
-
-import java.nio.ByteBuffer;
 
 
 public abstract class BaseDataValueVector extends BaseValueVector {
 
-  //protected final static byte[] emptyByteArray = new byte[]{}; // Nullable vectors use this
-  //protected final static ByteBuffer emptyByteArray = ByteBuffer.allocateDirect(0);
-  //protected final DrillBuf emptyByteArray;
-
-  static {
-
-  }
+  protected final static byte[] emptyByteArray = new byte[]{}; // Nullable vectors use this
 
   protected DrillBuf data;
 
