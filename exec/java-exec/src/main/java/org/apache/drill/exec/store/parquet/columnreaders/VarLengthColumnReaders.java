@@ -302,10 +302,11 @@ public class VarLengthColumnReaders {
         mutator.setSafe(index, buf, buf.position(), currDictValToWrite.length());
       } else {
         //mutator.setSafe(index, 1, start, start + length, value);
-        ByteBuffer buf = value.nioBuffer();
-        nullableVarBinaryVector.bits.data.setByteDirect(index, 1);
+        //mutator.setSafe(index, 1, start, start + length, value);
+        ByteBuffer buf = value.nioBuffer(index, length);
+        nullableVarBinaryVector.bits.data.setByte(index, 1);
         int valueIndex = nullableVarBinaryVector.values.offsetVector.data.getInt(index * 4);
-        nullableVarBinaryVector.values.offsetVector.data.setIntDirect((index+1)*4, valueIndex+length);
+        nullableVarBinaryVector.values.offsetVector.data.setInt((index+1)*4, valueIndex+length);
         nullableVarBinaryVector.values.data.setBytesDirect(valueIndex, buf, start, length);
 
       }
