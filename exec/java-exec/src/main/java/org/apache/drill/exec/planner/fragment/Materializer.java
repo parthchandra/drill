@@ -29,6 +29,7 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.Store;
 import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.physical.config.HashJoinPOP;
+import org.apache.drill.exec.physical.config.RangePartitionSender;
 import org.apache.drill.exec.work.foreman.ForemanException;
 
 import com.google.common.collect.Lists;
@@ -51,6 +52,12 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
       PhysicalOperator materializedSender = exchange.getSender(iNode.getMinorFragmentId(), child);
       materializedSender.setOperatorId(0);
       materializedSender.setCost(exchange.getCost());
+
+      // range partition sender needs access to the subscan for internal use
+      if (materializedSender instanceof RangePartitionSender) {
+        ((RangePartitionSender)materializedSender).setSubScan(iNode.getSubScan());
+      }
+
 //      logger.debug("Visit sending exchange, materialized {} with child {}.", materializedSender, child);
       return materializedSender;
 

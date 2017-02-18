@@ -32,7 +32,7 @@ import org.apache.drill.exec.physical.config.NestedLoopJoinPOP;
 import org.apache.drill.exec.physical.config.OrderedPartitionSender;
 import org.apache.drill.exec.physical.config.ProducerConsumer;
 import org.apache.drill.exec.physical.config.Project;
-import org.apache.drill.exec.physical.config.RangeSender;
+import org.apache.drill.exec.physical.config.RangePartitionSender;
 import org.apache.drill.exec.physical.config.Screen;
 import org.apache.drill.exec.physical.config.SingleSender;
 import org.apache.drill.exec.physical.config.Sort;
@@ -181,7 +181,7 @@ public abstract class AbstractPhysicalVisitor<T, X, E extends Throwable> impleme
   }
 
   @Override
-  public T visitRangeSender(RangeSender op, X value) throws E {
+  public T visitRangePartitionSender(RangePartitionSender op, X value) throws E {
     return visitSender(op, value);
   }
 

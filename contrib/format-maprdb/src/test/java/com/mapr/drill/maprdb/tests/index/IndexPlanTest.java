@@ -27,6 +27,7 @@ import org.apache.drill.PlanTestBase;
 import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -297,4 +298,34 @@ public class IndexPlanTest extends BaseJsonTest {
         .go();
     return;
   }
+
+  @Ignore  // ignored until table is created with multiple regions (this is needed for the parallel plan)
+  @Test
+  public void TestNonCoveringRangePartition_1() throws Exception {
+
+    String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
+        " where t.personal.age = 53";
+    String[] expectedPlan = new String[] {"HashJoin(.*[\n\r])+.*" +
+        "RestrictedJsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
+        "RangePartitionExchange(.*[\n\r])+.*" +
+    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="};
+
+    PlanTestBase.testPlanMatchingPatterns(query,
+        expectedPlan, new String[]{});
+
+    try {
+      testBuilder()
+      .sqlQuery(query)
+      .unOrdered()
+      .optionSettingQueriesForTestQuery("alter session set `planner.slice_target` = 1")
+      .baselineColumns("lname").baselineValues("UZwNk")
+      .baselineColumns("lname").baselineValues("foNwtze")
+      .baselineColumns("lname").baselineValues("qGZVfY")
+      .go();
+    } finally {
+      test("alter session reset `planner.slice_target`");
+    }
+    return;
+  }
+
 }

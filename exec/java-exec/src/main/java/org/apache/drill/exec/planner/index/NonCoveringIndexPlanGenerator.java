@@ -22,13 +22,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
@@ -41,6 +42,7 @@ import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait.DistributionField;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
@@ -161,6 +163,27 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     return remap.rewrite(idxCondition);
   }
 
+  // Range distribute the right side of the join, on row keys using a range partitioning function
+  private RelNode createRangeDistRight(final ProjectPrel rightIndexProjectPrel,
+      final RelDataTypeField rightRowKeyField,
+      final DbGroupScan origDbGroupScan) {
+
+    List<DistributionField> rangeDistFields =
+        Lists.newArrayList(new DistributionField(0 /* rowkey ordinal on the right side */));
+
+    FieldReference rangeDistRef = FieldReference.getWithQuotedRef(rightRowKeyField.getName());
+    List<FieldReference> rangeDistRefList = Lists.newArrayList();
+    rangeDistRefList.add(rangeDistRef);
+
+    final DrillDistributionTrait distRangeRight = new DrillDistributionTrait(DrillDistributionTrait.DistributionType.RANGE_DISTRIBUTED,
+        ImmutableList.copyOf(rangeDistFields), origDbGroupScan.getRangePartitionFunction(rangeDistRefList));
+
+    RelTraitSet rightTraits = newTraitSet(distRangeRight).plus(Prel.DRILL_PHYSICAL);
+    RelNode convertedRight = Prule.convert(rightIndexProjectPrel, rightTraits);
+
+    return convertedRight;
+  }
+
   @Override
   public RelNode convertChild(final FilterPrel filter, final RelNode input) throws InvalidRelException {
 
@@ -174,6 +197,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         origScan, indexCondition, indexGroupScan);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet(), indexGroupScan, indexScanRowType);
+    DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
     RexNode convertedIndexCondition = convertConditionForIndexScan(indexCondition, indexScanRowType);
@@ -199,13 +223,17 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final ProjectPrel rightIndexProjectPrel = new ProjectPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
         rightIndexFilterPrel, rightProjectExprs, rightProjectRowType);
 
-    final DrillDistributionTrait distBroadcastRight = new DrillDistributionTrait(DrillDistributionTrait.DistributionType.BROADCAST_DISTRIBUTED);
-    RelTraitSet rightTraits = newTraitSet(distBroadcastRight).plus(Prel.DRILL_PHYSICAL);
-    RelNode convertedRight = Prule.convert(rightIndexProjectPrel, rightTraits);
+    // create a RANGE PARTITION on the right side (this could be removed later during ExcessiveExchangeIdentifier phase
+    // if the estimated row count is smaller than slice_target
+    final RelNode rangeDistRight = createRangeDistRight(rightIndexProjectPrel, rightRowKeyField, origDbGroupScan);
+
+    // the range partitioning adds an extra column for the partition id but in the final plan we already have a
+    // renaming Project for the _id field inserted as part of the JoinPrelRenameVisitor. Thus, we are not inserting
+    // a separate Project here.
+    final RelNode convertedRight = rangeDistRight;
 
     // left (probe) side of the hash join
 
-    DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
     List<SchemaPath> cols = new ArrayList<SchemaPath>(origDbGroupScan.getColumns());
     if (!checkRowKey(cols)) {
       cols.add(origDbGroupScan.getRowKeyPath());
@@ -303,4 +331,5 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         finalRel.toString(), origScan.toString());
     return finalRel;
   }
+
 }
