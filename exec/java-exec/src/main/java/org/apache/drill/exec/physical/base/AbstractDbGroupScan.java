@@ -19,9 +19,11 @@ package org.apache.drill.exec.physical.base;
 
 import java.util.List;
 
+import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.planner.index.IndexCollection;
+import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
 
@@ -76,6 +78,11 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
   @Override
   public SchemaPath getRowKeyPath() {
     return ROW_KEY_PATH;
+  }
+
+  @Override
+  public PartitionFunction getRangePartitionFunction(List<FieldReference> refList) {
+    throw new UnsupportedOperationException();
   }
 
 }

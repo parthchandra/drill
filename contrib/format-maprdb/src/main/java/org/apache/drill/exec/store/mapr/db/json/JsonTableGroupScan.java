@@ -26,12 +26,15 @@ import java.util.TreeMap;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
+import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait.DistributionField;
+import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -276,6 +279,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @JsonIgnore
   public void setColumns(List<SchemaPath> columns) {
     this.columns = columns;
+  }
+
+  @Override
+  @JsonIgnore
+  public PartitionFunction getRangePartitionFunction(List<FieldReference> refList) {
+    return new JsonTableRangePartitionFunction(refList, scanSpec.getTableName());
   }
 
 }

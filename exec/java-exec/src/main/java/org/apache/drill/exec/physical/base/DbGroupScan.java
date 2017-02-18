@@ -17,11 +17,14 @@
  */
 package org.apache.drill.exec.physical.base;
 
+import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.index.IndexCollection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait.DistributionField;
+import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.List;
@@ -76,5 +79,13 @@ public interface DbGroupScan extends GroupScan {
 
   @JsonIgnore
   SchemaPath getRowKeyPath();
+
+/**
+ * Get a partition function instance for range based partitioning
+ * @param refList a list of FieldReference exprs that are participating in the range partitioning
+ * @return instance of a partitioning function
+ */
+  @JsonIgnore
+  PartitionFunction getRangePartitionFunction(List<FieldReference> refList);
 
 }
