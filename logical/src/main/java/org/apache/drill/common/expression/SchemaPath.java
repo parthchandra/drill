@@ -38,6 +38,8 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Iterators;
 
 public class SchemaPath extends LogicalExpressionBase {
@@ -248,19 +250,24 @@ public class SchemaPath extends LogicalExpressionBase {
     return sb.toString();
   }
 
-  public static class De extends StdDeserializer<SchemaPath> {
+  /**
+   * Internal cache which stores recently parsed {@link FieldPath}
+   * objects in an LRU map.
+   */
+  private static Cache<String, SchemaPath> schemaPathCache =
+      CacheBuilder.newBuilder().maximumSize(1000).build();
 
-    public De() {
-      super(LogicalExpression.class);
+  public static SchemaPath parseFrom(String expr) {
+    if (expr == null || expr.isEmpty()) {
+      return null;
     }
 
-    @Override
-    public SchemaPath deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
-      String expr = jp.getText();
-
-      if (expr == null || expr.isEmpty()) {
-        return null;
-      }
+    SchemaPath sp = null;
+    if ((sp = schemaPathCache.getIfPresent(expr)) == null) {
+      /*
+       * Not protecting it through locks to avoid any contention.
+       * In worst case, the schema path could be parsed twice.
+       */
       try {
         // logger.debug("Parsing expression string '{}'", expr);
         ExprLexer lexer = new ExprLexer(new ANTLRStringStream(expr));
@@ -273,13 +280,28 @@ public class SchemaPath extends LogicalExpressionBase {
 
         // ret.e.resolveAndValidate(expr, errorCollector);
         if (ret.e instanceof SchemaPath) {
-          return (SchemaPath) ret.e;
+          sp = (SchemaPath) ret.e;
+          schemaPathCache.put(expr, sp);
         } else {
           throw new IllegalStateException("Schema path is not a valid format.");
         }
       } catch (RecognitionException e) {
         throw new RuntimeException(e);
       }
+    }
+    return sp;
+  }
+
+  public static class De extends StdDeserializer<SchemaPath> {
+
+    public De() {
+      super(LogicalExpression.class);
+    }
+
+    @Override
+    public SchemaPath deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException {
+      String expr = jp.getText();
+      return parseFrom(expr);
     }
 
   }
