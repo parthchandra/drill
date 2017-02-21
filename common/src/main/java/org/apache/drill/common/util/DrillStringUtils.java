@@ -19,10 +19,15 @@ package org.apache.drill.common.util;
 
 import io.netty.buffer.ByteBuf;
 
+import java.io.UnsupportedEncodingException;
+
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 
 public class DrillStringUtils {
+
+  private static final String UTF_8 = "utf-8";
 
   /**
    * Converts the long number into more human readable string.
@@ -198,6 +203,36 @@ public class DrillStringUtils {
 
   private static boolean isHexDigit(byte c) {
     return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || (c >= '0' && c <= '9');
+  }
+
+  /*
+   * Performance of various methods of encoding a Java String to UTF-8 keeps changing
+   * between releases, hence we'll encapsulate the actual methods within these functions
+   * and use them everywhere in Drill
+   */
+
+  public static byte[] encodeUTF(String input) {
+    try {
+      return input.getBytes(UTF_8);
+    } catch (UnsupportedEncodingException e) {
+      throw new DrillRuntimeException(e); // should never come to this
+    }
+  }
+
+  public static String decodeUTF(byte[] input) {
+    try {
+      return new String(input, UTF_8);
+    } catch (UnsupportedEncodingException e) {
+      throw new DrillRuntimeException(e); // should never come to this
+    }
+  }
+
+  public static String decodeUTF(byte[] input, int offset, int length) {
+    try {
+      return new String(input, offset, length, UTF_8);
+    } catch (UnsupportedEncodingException e) {
+      throw new DrillRuntimeException(e); // should never come to this
+    }
   }
 
 }
