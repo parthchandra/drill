@@ -21,19 +21,25 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
+
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
+import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
+import org.codehaus.jackson.annotate.JsonCreator;
 
 import com.google.common.collect.Maps;
 
@@ -42,16 +48,18 @@ import com.google.common.collect.Maps;
  * for doing restricted (i.e skip) scan rather than sequential scan.  The skipping is based
  * on a supplied set of row keys (primary keys) from a join operator.
  */
+@JsonTypeName("restricted-json-scan")
 public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
 
   // A map of minor fragment id to the corresponding subscan instance
   private Map<Integer, RestrictedMapRDBSubScan> fragmentSubscanMap = Maps.newHashMap();
 
-  protected RestrictedJsonTableGroupScan(String userName,
-                            FileSystemPlugin storagePlugin,
-                            MapRDBFormatPlugin formatPlugin,
-                            JsonScanSpec scanSpec, /* scan spec of the original table */
-                            List<SchemaPath> columns) {
+  @JsonCreator
+  public RestrictedJsonTableGroupScan(@JsonProperty("userName") String userName,
+                            @JsonProperty("storage") FileSystemPlugin storagePlugin,
+                            @JsonProperty("format") MapRDBFormatPlugin formatPlugin,
+                            @JsonProperty("scanSpec") JsonScanSpec scanSpec, /* scan spec of the original table */
+                            @JsonProperty("columns") List<SchemaPath> columns) {
     super(userName, storagePlugin, formatPlugin, scanSpec, columns);
   }
 
