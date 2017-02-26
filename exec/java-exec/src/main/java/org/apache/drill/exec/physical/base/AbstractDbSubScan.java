@@ -17,6 +17,8 @@
  */
 package org.apache.drill.exec.physical.base;
 
+import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+
 public abstract class AbstractDbSubScan extends AbstractSubScan implements DbSubScan {
 
   public AbstractDbSubScan(String userName) {
@@ -25,6 +27,11 @@ public abstract class AbstractDbSubScan extends AbstractSubScan implements DbSub
 
   public boolean isRestrictedSubScan() {
     return false;
+  }
+
+  @Override
+  public void addJoinForRestrictedSubScan(HashJoinBatch batch) {
+    throw new UnsupportedOperationException();
   }
 
 }

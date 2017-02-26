@@ -17,12 +17,14 @@
  */
 package org.apache.drill.exec.store.mapr.db;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
@@ -43,7 +45,7 @@ public class RestrictedMapRDBSubScan extends MapRDBSubScan {
                        @JsonProperty("userName") String userName,
                        @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
                        @JsonProperty("storageConfig") StoragePluginConfig storage,
-                       @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
+                       @JsonProperty("regionScanSpecList") List<RestrictedMapRDBSubScanSpec> regionScanSpecList,
                        @JsonProperty("columns") List<SchemaPath> columns,
                        @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
     this(userName, formatPluginConfig,
@@ -53,12 +55,18 @@ public class RestrictedMapRDBSubScan extends MapRDBSubScan {
 
   public RestrictedMapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig,
       FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
-      List<MapRDBSubScanSpec> maprDbSubScanSpecs, List<SchemaPath> columns, String tableType) {
+      List<RestrictedMapRDBSubScanSpec> maprDbSubScanSpecs, List<SchemaPath> columns, String tableType) {
     super(userName, formatPluginConfig, storagePlugin, storageConfig,
-        maprDbSubScanSpecs, columns, tableType);
+        new ArrayList<MapRDBSubScanSpec>(), columns, tableType);
+
+    for(RestrictedMapRDBSubScanSpec restrictedSpec : maprDbSubScanSpecs) {
+      getRegionScanSpecList().add(restrictedSpec);
+    }
+
   }
 
-  public void setJoinForSubScan(HashJoinBatch hjbatch) {
+  @Override
+  public void addJoinForRestrictedSubScan(HashJoinBatch hjbatch) {
     // currently, all subscan specs are sharing the same join batch instance
     for (MapRDBSubScanSpec s : getRegionScanSpecList()) {
       assert (s instanceof RestrictedMapRDBSubScanSpec);

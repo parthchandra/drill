@@ -23,9 +23,9 @@ import java.util.List;
 
 import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.exec.physical.base.AbstractBase;
-import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.PhysicalVisitor;
+import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
 import org.apache.calcite.rel.core.JoinRelType;
 
@@ -45,7 +45,10 @@ public class HashJoinPOP extends AbstractBase {
     private final PhysicalOperator right;
     private final List<JoinCondition> conditions;
     private final JoinRelType joinType;
-    private final GroupScan scanForRowKeyJoin;
+    private final boolean isRowKeyJoin;
+
+    @JsonProperty("subScanForRowKeyJoin")
+    private SubScan subScanForRowKeyJoin;
 
     public HashJoinPOP(
             PhysicalOperator left,
@@ -53,7 +56,7 @@ public class HashJoinPOP extends AbstractBase {
             List<JoinCondition> conditions,
             JoinRelType joinType
     ) {
-        this(left, right, conditions, joinType, null);
+        this(left, right, conditions, joinType, false);
     }
 
     @JsonCreator
@@ -62,14 +65,15 @@ public class HashJoinPOP extends AbstractBase {
             @JsonProperty("right") PhysicalOperator right,
             @JsonProperty("conditions") List<JoinCondition> conditions,
             @JsonProperty("joinType") JoinRelType joinType,
-            @JsonProperty("scanForRowKeyJoin") GroupScan scanForRowKeyJoin
+            @JsonProperty("isRowKeyJoin") boolean isRowKeyJoin
     ) {
         this.left = left;
         this.right = right;
         this.conditions = conditions;
         Preconditions.checkArgument(joinType != null, "Join type is missing!");
         this.joinType = joinType;
-        this.scanForRowKeyJoin = scanForRowKeyJoin;
+        this.isRowKeyJoin = isRowKeyJoin;
+        this.subScanForRowKeyJoin = null;
     }
 
     @Override
@@ -80,7 +84,9 @@ public class HashJoinPOP extends AbstractBase {
     @Override
     public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
         Preconditions.checkArgument(children.size() == 2);
-        return new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, scanForRowKeyJoin);
+        HashJoinPOP hj = new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, isRowKeyJoin);
+        hj.setSubScanForRowKeyJoin(this.getSubScanForRowKeyJoin());
+        return hj;
     }
 
     @Override
@@ -104,8 +110,18 @@ public class HashJoinPOP extends AbstractBase {
         return conditions;
     }
 
-    public GroupScan getScanForRowKeyJoin() {
-      return scanForRowKeyJoin;
+    @JsonProperty("isRowKeyJoin")
+    public boolean isRowKeyJoin() {
+      return isRowKeyJoin;
+    }
+
+    @JsonProperty("subScanForRowKeyJoin")
+    public SubScan getSubScanForRowKeyJoin() {
+      return subScanForRowKeyJoin;
+    }
+
+    public void setSubScanForRowKeyJoin(SubScan subScan) {
+      this.subScanForRowKeyJoin = subScan;
     }
 
     public HashJoinPOP flipIfRight(){
@@ -114,7 +130,7 @@ public class HashJoinPOP extends AbstractBase {
             for(JoinCondition c : conditions){
                 flippedConditions.add(c.flip());
             }
-            return new HashJoinPOP(right, left, flippedConditions, JoinRelType.LEFT, scanForRowKeyJoin);
+            return new HashJoinPOP(right, left, flippedConditions, JoinRelType.LEFT, isRowKeyJoin);
         }else{
             return this;
         }

@@ -18,7 +18,6 @@
 package org.apache.drill.exec.physical.base;
 
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.planner.index.IndexCollection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -77,15 +76,5 @@ public interface DbGroupScan extends GroupScan {
 
   @JsonIgnore
   SchemaPath getRowKeyPath();
-
-  /**
-   * For a restricted scan, this method allows associating a (hash)join instance.  A subscan within a minor
-   * fragment must have a corresponding (hash)join batch instance from which it will retrieve its set of
-   * rowkeys to perform the restricted scan.
-   * @param batch
-   * @param minorFragmentId
-   */
-  @JsonIgnore
-  void addJoinForRestrictedScan(HashJoinBatch batch, int minorFragmentId);
 
 }

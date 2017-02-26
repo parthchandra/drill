@@ -272,7 +272,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     HashJoinPrel hjPrel = new HashJoinPrel(filter.getCluster(), leftTraits, convertedLeft,
         convertedRight, joinCondition, JoinRelType.INNER, false,
-        restrictedGroupScan /* useful for join-restricted scans */);
+        true /* useful for join-restricted scans */);
 
     RelNode newRel = hjPrel;
 

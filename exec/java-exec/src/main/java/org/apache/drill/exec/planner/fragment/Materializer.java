@@ -28,6 +28,7 @@ import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.Store;
 import org.apache.drill.exec.physical.base.SubScan;
+import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.work.foreman.ForemanException;
 
 import com.google.common.collect.Lists;
@@ -65,14 +66,18 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
 
   @Override
   public PhysicalOperator visitGroupScan(GroupScan groupScan, IndexedFragmentNode iNode) throws ExecutionSetupException {
-    PhysicalOperator child = groupScan.getSpecificScan(iNode.getMinorFragmentId());
+    SubScan child = groupScan.getSpecificScan(iNode.getMinorFragmentId());
     child.setOperatorId(Short.MAX_VALUE & groupScan.getOperatorId());
+    // remember the subscan for future use
+    iNode.addSubScan(child);
     return child;
   }
 
   @Override
   public PhysicalOperator visitSubScan(SubScan subScan, IndexedFragmentNode value) throws ExecutionSetupException {
     value.addAllocation(subScan);
+    // remember the subscan for future use
+    value.addSubScan(subScan);
     // TODO - implement this
     return super.visitOp(subScan, value);
   }
@@ -107,9 +112,34 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
     return newOp;
   }
 
+  @Override
+  public PhysicalOperator visitHashJoin(HashJoinPOP op, IndexedFragmentNode iNode) throws ExecutionSetupException {
+    iNode.addAllocation(op);
+    List<PhysicalOperator> children = Lists.newArrayList();
+
+    children.add(op.getLeft().accept(this, iNode));
+
+    // keep track of the subscan in left input before visiting the right input such that subsequently we can
+    // use it for the rowkey join
+    SubScan subScanInLeftInput = iNode.getSubScan();
+
+    children.add(op.getRight().accept(this, iNode));
+
+    PhysicalOperator newOp = op.getNewWithChildren(children);
+    newOp.setCost(op.getCost());
+    newOp.setOperatorId(Short.MAX_VALUE & op.getOperatorId());
+
+    if (op.isRowKeyJoin()) { // for rowkey joins, set the sub-scan
+      ((HashJoinPOP)newOp).setSubScanForRowKeyJoin(subScanInLeftInput);
+    }
+
+    return newOp;
+  }
+
   public static class IndexedFragmentNode{
     final Wrapper info;
     final int minorFragmentId;
+    SubScan subScan = null;
 
     public IndexedFragmentNode(int minorFragmentId, Wrapper info) {
       super();
@@ -131,6 +161,14 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
 
     public void addAllocation(PhysicalOperator pop) {
       info.addAllocation(pop);
+    }
+
+    public void addSubScan(SubScan subScan) {
+      this.subScan = subScan;
+    }
+
+    public SubScan getSubScan() {
+      return this.subScan;
     }
 
   }

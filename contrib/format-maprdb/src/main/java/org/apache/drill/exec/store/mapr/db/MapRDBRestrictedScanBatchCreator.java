@@ -38,7 +38,7 @@ public class MapRDBRestrictedScanBatchCreator implements BatchCreator<Restricted
     List<RecordReader> readers = Lists.newArrayList();
     for(MapRDBSubScanSpec scanSpec : subScan.getRegionScanSpecList()){
       try {
-        readers.add(new RestrictedJsonRecordReader(scanSpec, subScan.getFormatPluginConfig(), subScan.getColumns(), context));
+        readers.add(new RestrictedJsonRecordReader((RestrictedMapRDBSubScanSpec)scanSpec, subScan.getFormatPluginConfig(), subScan.getColumns(), context));
       } catch (Exception e1) {
         throw new ExecutionSetupException(e1);
       }

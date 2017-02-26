@@ -440,9 +440,9 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
 
   @Override
   public String toString() {
-    return String.format("DrillBuf[%d], udle: [%d %d..%d]: %s hex=%s", id, udle.id, offset, offset + capacity(),
-        toString(readerIndex, readableBytes()>16?16:readableBytes(), Charset.defaultCharset()),
-        toHexString(readerIndex, readableBytes()>16?16:readableBytes()));
+    return String.format("DrillBuf[%d], udle: [%d %d..%d]: %s, %s", id, udle.id, offset, offset + capacity(),
+        toString(readerIndex, readableBytes()>8?8:readableBytes(), Charset.defaultCharset()),
+        toHexStringOneRow(readerIndex, readableBytes()>8?8:readableBytes()));
   }
 
   @Override
@@ -856,6 +856,20 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
     return sb.toString();
   }
 
+  public String toHexStringOneRow(final int start, final int length) {
+    final StringBuilder sb = new StringBuilder("");
+    int index = start;
+    int maxbytes = Math.min(LOG_BYTES_PER_ROW, length - start);
+    for (int i = 0; i < maxbytes; ++i) {
+      try {
+        final byte b = getByte(index++);
+        sb.append(String.format(" 0x%02x", b));
+      } catch (IndexOutOfBoundsException ioob) {
+        sb.append(" <ioob>");
+      }
+    }
+    return sb.toString();
+  }
   /**
    * Get the integer id assigned to this DrillBuf for debugging purposes.
    *

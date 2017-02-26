@@ -44,25 +44,25 @@ import com.google.common.collect.Lists;
 public class HashJoinPrel  extends JoinPrel {
 
   private boolean swapped = false;
-  protected GroupScan scanForRowKeyJoin = null;
+  protected boolean isRowKeyJoin = false;
 
   public HashJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
                       JoinRelType joinType) throws InvalidRelException {
-    this(cluster, traits, left, right, condition, joinType, false, null);
+    this(cluster, traits, left, right, condition, joinType, false, false);
   }
 
   public HashJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
-      JoinRelType joinType, boolean swapped, GroupScan scanForRowKeyJoin) throws InvalidRelException {
+      JoinRelType joinType, boolean swapped, boolean isRowKeyJoin) throws InvalidRelException {
     super(cluster, traits, left, right, condition, joinType);
     this.swapped = swapped;
-    this.scanForRowKeyJoin = scanForRowKeyJoin;
+    this.isRowKeyJoin = isRowKeyJoin;
     joincategory = JoinUtils.getJoinCategory(left, right, condition, leftKeys, rightKeys, filterNulls);
   }
 
   @Override
   public Join copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     try {
-      return new HashJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType, this.swapped, scanForRowKeyJoin);
+      return new HashJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType, this.swapped, this.isRowKeyJoin);
     }catch (InvalidRelException e) {
       throw new AssertionError(e);
     }
@@ -84,9 +84,9 @@ public class HashJoinPrel  extends JoinPrel {
     // Depending on whether the left/right is swapped for hash inner join, pass in different
     // combinations of parameters.
     if (! swapped) {
-      return getHashJoinPop(creator, left, right, leftKeys, rightKeys, scanForRowKeyJoin);
+      return getHashJoinPop(creator, left, right, leftKeys, rightKeys, isRowKeyJoin);
     } else {
-      return getHashJoinPop(creator, right, left, rightKeys, leftKeys, scanForRowKeyJoin);
+      return getHashJoinPop(creator, right, left, rightKeys, leftKeys, isRowKeyJoin);
     }
   }
 
@@ -102,7 +102,7 @@ public class HashJoinPrel  extends JoinPrel {
 
   private PhysicalOperator getHashJoinPop(PhysicalPlanCreator creator, RelNode left, RelNode right,
                                           List<Integer> leftKeys, List<Integer> rightKeys,
-                                          GroupScan scanForRowKeyJoin) throws IOException{
+                                          boolean isRowKeyJoin) throws IOException{
     final List<String> fields = getRowType().getFieldNames();
     assert isUnique(fields);
 
@@ -118,7 +118,7 @@ public class HashJoinPrel  extends JoinPrel {
 
     buildJoinConditions(conditions, leftFields, rightFields, leftKeys, rightKeys);
 
-    HashJoinPOP hjoin = new HashJoinPOP(leftPop, rightPop, conditions, jtype, scanForRowKeyJoin);
+    HashJoinPOP hjoin = new HashJoinPOP(leftPop, rightPop, conditions, jtype, isRowKeyJoin);
     return creator.addMetadata(this, hjoin);
   }
 
@@ -131,7 +131,7 @@ public class HashJoinPrel  extends JoinPrel {
   }
 
   public boolean isRowKeyJoin() {
-    return scanForRowKeyJoin != null;
+    return this.isRowKeyJoin;
   }
 
 }

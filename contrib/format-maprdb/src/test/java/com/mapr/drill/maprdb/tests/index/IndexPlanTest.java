@@ -22,6 +22,7 @@ import com.mapr.db.Admin;
 import com.mapr.drill.maprdb.tests.MaprDBTestsSuite;
 import com.mapr.drill.maprdb.tests.json.BaseJsonTest;
 import com.mapr.tests.annotations.ClusterTest;
+
 import org.apache.drill.PlanTestBase;
 import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
