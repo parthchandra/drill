@@ -18,8 +18,6 @@
 
 package org.apache.drill.exec.planner.index;
 
-import java.util.BitSet;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -31,27 +29,17 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
-import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
 import org.apache.drill.exec.planner.logical.partition.RewriteAsBinaryOperators;
-import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
-import org.apache.drill.exec.planner.physical.SubsetTransformer;
-import org.apache.calcite.rel.InvalidRelException;
-import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.rex.RexUtil;
-import org.apache.commons.lang3.tuple.Pair;
 
 import com.google.common.collect.Lists;
 
@@ -175,64 +163,21 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     }
   }
 
-  private IndexConditionInfo getIndexConditionInfo(
-      RexNode condition,
-      IndexCollection collection,
-      RexBuilder builder,
-      ScanPrel scan
-      ) {
-    DbGroupScan dbScan = (DbGroupScan)scan.getGroupScan();
 
-    List<SchemaPath> listPath = dbScan.getColumns();
-    List<String> fieldNames = scan.getRowType().getFieldNames();
-    BitSet columnBitSet = new BitSet();
-
-    int relColIndex = 0; // index into the rowtype for the indexed columns
-    boolean indexedCol = false;
-    for (SchemaPath path : listPath) {
-      if (collection.isColumnIndexed(path)) {
-        for (int i = 0; i < fieldNames.size(); ++i) {
-          if (fieldNames.get(i).equals(path.getRootSegment().getPath())) {
-            columnBitSet.set(i);
-            indexedCol = true;
-            break;
-          }
-        }
-      }
-      relColIndex++;
-    }
-
-    if (indexedCol) {
-      // Use the same filter analyzer that is used for partitioning columns
-      FindPartitionConditions c = new FindPartitionConditions(columnBitSet, builder);
-      c.analyze(condition);
-      RexNode indexCondition = c.getFinalCondition();
-
-      if (indexCondition != null) {
-        List<RexNode> conjuncts = RelOptUtil.conjunctions(condition);
-        List<RexNode> indexConjuncts = RelOptUtil.conjunctions(indexCondition);
-        conjuncts.removeAll(indexConjuncts);
-        RexNode remainderCondition = RexUtil.composeConjunction(builder, conjuncts, false);
-
-        RewriteCombineBinaryOperators reverseVisitor =
-            new RewriteCombineBinaryOperators(true, builder);
-
-        condition = condition.accept(reverseVisitor);
-        indexCondition = indexCondition.accept(reverseVisitor);
-
-        return new IndexConditionInfo(indexCondition, remainderCondition, true);
-      }
-    }
-
-    return new IndexConditionInfo(null, null, indexedCol);
-  }
-
+  /**
+   *
+   * @param rowType
+   * @param indexCondition
+   * @param indexDesc
+   * @return If all fields involved in this condition are in the indexed fields of the single IndexDescriptor, return true
+   */
   static private boolean conditionIndexed(RelDataType rowType, RexNode indexCondition, IndexDescriptor indexDesc) {
     List<RexNode> conditions = Lists.newArrayList();
     conditions.add(indexCondition);
     PrelUtil.ProjectPushInfo info = PrelUtil.getColumns(rowType, conditions);
     return indexDesc.allColumnsIndexed(info.columns);
   }
+
   /**
    *
    */
@@ -248,8 +193,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     if (! (scan.getGroupScan() instanceof DbGroupScan) ) {
       return;
     }
-
-    IndexConditionInfo cInfo = getIndexConditionInfo(condition, collection, builder, scan);
+    IndexConditionInfo.Builder infoBuilder = IndexConditionInfo.newBuilder(condition, collection, builder, scan);
+    IndexConditionInfo cInfo = infoBuilder.getCollectiveInfo();
 
     if (!cInfo.hasIndexCol) {
       logger.debug("No index columns are projected from the scan..continue.");
@@ -278,8 +223,57 @@ public abstract class DbScanToIndexScanPrule extends Prule {
       }
     }
 
+    if (logger.isDebugEnabled()) {
+      StringBuffer strBuf = new StringBuffer();
+      strBuf.append("Split  indexes:");
+      if (coveringIndexes.size() > 0) {
+        for (IndexDescriptor coveringIdx : coveringIndexes) {
+          strBuf.append(coveringIdx.getIndexName()).append(",");
+        }
+      }
+      if(nonCoveringIndexes.size() > 0) {
+        strBuf.append("non-covering indexes:");
+        for (IndexDescriptor coveringIdx : nonCoveringIndexes) {
+          strBuf.append(coveringIdx.getIndexName()).append(",");
+        }
+      }
+      logger.debug(strBuf.toString());
+    }
+    //Not a single covering index plan or non-covering index plan is sufficient.
+    // either 1) there is no usable index at all, 2) or the chop of original condition to
+    // indexCondition + remainderCondition is not working for any single index.
     if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() == 0) {
-      return;
+      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = infoBuilder.getIndexConditionMap();
+
+      //no usable index
+      if (indexInfoMap == null || indexInfoMap.size() == 0) {
+        return;
+      }
+
+      //if there is only one index found, no need to o intersect, but just a regular non-covering plan
+      //some part of filter condition needs to apply on primary table.
+      if(indexInfoMap.size() == 1) {
+        IndexDescriptor idx = indexInfoMap.keySet().iterator().next();
+        nonCoveringIndexes.add(idx);
+        indexCondition = indexInfoMap.get(idx).indexCondition;
+        remainderCondition = indexInfoMap.get(idx).remainderCondition;
+      }
+      else {
+      /*
+      //multiple indexes, let us try to intersect results from multiple index tables
+      IndexScanIntersectGenerator planGen = new IndexScanIntersectGenerator(
+          call, project, scan, indexInfoMap, builder);
+      try {
+        planGen.go(filter, convert(scan, scan.getTraitSet()));
+      } catch (Exception e) {
+        logger.warn("Exception while trying to generate intersect index plan", e);
+        return;
+      }
+      //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
+      */
+        return;
+      }
+
     }
 
     boolean createdCovering = false;
@@ -294,7 +288,7 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         createdCovering = true;
       }
     } catch (Exception e) {
-      logger.warn("Exception while trying to generate covering index access plan", e);
+      logger.warn("Exception while trying to generate covering index plan", e);
       return;
     }
 
@@ -307,52 +301,19 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     GroupScan primaryTableScan = scan.getGroupScan();
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
-      boolean createdNonCovering = false;
       try {
-        for (IndexDescriptor indexDesc : nonCoveringIndexes) {
-          IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
+        if (nonCoveringIndexes.size() == 1) {
+          IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
 
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
               remainderCondition, builder);
           planGen.go(filter, convert(scan, scan.getTraitSet()));
-          createdNonCovering = true;
         }
       } catch (Exception e) {
         logger.warn("Exception while trying to generate non-covering index access plan", e);
         return;
       }
-      if (createdNonCovering) {
-        return;
-      }
-    }
-
-    try {
-      if (collection.supportsRowCountStats()) {
-
-        double origRowCount = scan.getRows();
-        IndexGroupScan idxScan = collection.getGroupScan();
-        double indexRows = collection.getRows(indexCondition);
-
-        // set the estimated row count for the index scan
-        idxScan.setRowCount(indexCondition, Math.round(indexRows), Math.round(origRowCount));
-
-        // get the selectivity of the predicates on the index columns
-        double selectivity = indexRows/origRowCount;
-
-        if (selectivity < INDEX_SELECTIVITY_THRESHOLD &&
-            indexRows < settings.getBroadcastThreshold()) {
-          logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
-              remainderCondition, builder);
-          planGen.go(filter, convert(scan, scan.getTraitSet()));
-        }
-        else {
-          logger.debug("Index plan was not chosen since selectivity {} was higher than threshold", selectivity);
-        }
-      }
-    } catch (Exception e) {
-      logger.warn("Exception while trying to generate non-covering index access plan", e);
     }
 
   }
@@ -366,7 +327,7 @@ public abstract class DbScanToIndexScanPrule extends Prule {
       FilterPrel filter,
       ScanPrel scan) {
 
-    IndexConditionInfo cInfo = getIndexConditionInfo(condition, collection, builder, scan);
+    IndexConditionInfo cInfo = IndexConditionInfo.newBuilder(condition, collection, builder, scan).getCollectiveInfo();
 
   }
 

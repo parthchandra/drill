@@ -26,6 +26,7 @@ import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
@@ -49,6 +50,40 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     super(subScanSpec, formatPluginConfig, projectedColumns, context);
    }
 
+  public void readToInitSchema() {
+    DBDocumentReaderBase reader = null;
+    vectorWriter.setPosition(0);
+    try {
+      reader = (DBDocumentReaderBase) table.find().iterator().next().asReader();
+      MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
+      if (getIdOnly()) {
+        writeId(writer, reader.getId());
+      } else {
+        if (reader.next() != DocumentReader.EventType.START_MAP) {
+          throw dataReadError("The document did not start with START_MAP!");
+        }
+      }
+      writeToListOrMap(writer, reader);
+    }
+    catch(UserException e) {
+      throw UserException.unsupportedError(e)
+          .addContext(String.format("Table: %s, document id: '%s'",
+              getTable().getPath(),
+              reader == null ? null : IdCodec.asString(reader.getId())))
+          .build(logger);
+    } catch (SchemaChangeException e) {
+      if (getIgnoreSchemaChange()) {
+        logger.warn("{}. Dropping the row from result.", e.getMessage());
+        logger.debug("Stack trace:", e);
+      } else {
+        throw dataReadError(e);
+      }
+    }
+    finally {
+      vectorWriter.setPosition(0);
+    }
+  }
+
   @Override
   public int next() {
     Stopwatch watch = Stopwatch.createUnstarted();
@@ -62,14 +97,21 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
 
     DBDocumentReaderBase reader = null;
 
+    if(!rss.readyToGetRowKey()) {
+      //not ready to get rowkey, so we just load a record to initialize schema
+      readToInitSchema();
+      return 0;
+    }
+    Stopwatch timer1 = Stopwatch.createUnstarted();
+    Stopwatch timer2 = Stopwatch.createUnstarted();
     while (recordCount < BaseValueVector.INITIAL_VALUE_ALLOCATION && rss.hasRowKey()) {
-      // TODO: new reader logic that iterates over the row keys retrieved from the corresponding
-      // restricted subscanspec.  Example implementation:
       while (rss.hasRowKey()) {
-
         try {
+          timer1.start();
           String strRowkey = rss.nextRowKey();
-          Table table = MapRDB.getTable(subScanSpec.getTableName());
+          timer1.stop();
+          timer2.start();
+          vectorWriter.setPosition(recordCount);
           reader = (DBDocumentReaderBase) table.findById(strRowkey).asReader();
           MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
           if (getIdOnly()) {
@@ -81,6 +123,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
           }
           writeToListOrMap(writer, reader);
           recordCount++;
+          timer2.stop();
         } catch (UserException e) {
           throw UserException.unsupportedError(e)
               .addContext(String.format("Table: %s, document id: '%s'",
@@ -98,7 +141,9 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
       }
     }
     vectorWriter.setValueCount(recordCount);
-    logger.debug("Took {} ms to get {} records", watch.elapsed(TimeUnit.MILLISECONDS), recordCount);
+    logger.debug("Took {} ms to get {} records, getrowkey {}, getDoc {}",
+        watch.elapsed(TimeUnit.MILLISECONDS), recordCount,
+        timer1.elapsed(TimeUnit.MILLISECONDS), timer2.elapsed(TimeUnit.MILLISECONDS));
     return recordCount;
   }
 
@@ -106,6 +151,11 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   public boolean hasNext() {
     //TODO: need to consider and test the case when there are multiple batches of rowkeys
     RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec) this.subScanSpec);
+
+    HashJoinBatch hjBatch = rss.getJoinForSubScan();
+    if (hjBatch == null) {
+      return false;
+    }
     AbstractRecordBatch.BatchState state = rss.getJoinForSubScan().getState();
     if ( state == AbstractRecordBatch.BatchState.BUILD_SCHEMA ) {
       return true;

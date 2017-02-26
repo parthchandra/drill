@@ -78,7 +78,8 @@ public class LargeTableGen extends LargeTableGenBase {
           + " -path " + table.getPath()
           + " -index testindex_%d"
           + " -indexedfields '%s'"
-          + " -nonindexedfields '%s'", i, indexDefInCommand(indexDef[2 * i]), indexDefInCommand(indexDef[2 * i + 1]));
+          + ((indexDef[2 * i + 1].length()==0)?"":" -nonindexedfields '%s'"),
+          i, indexDefInCommand(indexDef[2 * i]), indexDefInCommand(indexDef[2 * i + 1]));
       TestCluster.runCommand(indexCmd);
       DBTests.maprfs().getTableIndexes(table.getPath(), true);
     }
@@ -118,9 +119,12 @@ public class LargeTableGen extends LargeTableGenBase {
         StringBuffer strBuf = new StringBuffer();
         for (i = batch; i < batchStop; ++i) {
           strBuf.append(String.format("{\"rowid\": \"%d\", \"id\": {\"ssn\": \"%s\"}, \"contact\": {\"phone\": \"%s\", \"email\": \"%s\"}," +
-                  "\"address\": {\"city\": \"%s\", \"state\": \"%s\"}, \"name\": { \"fname\": \"%s\", \"lname\": \"%s\" } }\n",
+                  "\"address\": {\"city\": \"%s\", \"state\": \"%s\"}, \"name\": { \"fname\": \"%s\", \"lname\": \"%s\" }," +
+                  "\"personal\": {\"age\" : %s, \"income\": %s}," +
+                  "\"driverlicense\": \"%s\" } \n",
               i + 1, getSSN(i), getPhone(i), getEmail(i),
-              getAddress(i)[2], getAddress(i)[1], getFirstName(i), getLastName(i)));
+              getAddress(i)[2], getAddress(i)[1], getFirstName(i), getLastName(i),
+              getAge(i), getIncome(i), getSSN(i)));
         }
         try (InputStream in = new StringBufferInputStream(strBuf.toString());
              DocumentStream stream = Json.newDocumentStream(in)) {

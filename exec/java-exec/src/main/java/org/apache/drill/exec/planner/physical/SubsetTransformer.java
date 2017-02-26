@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.planner.physical;
 
+import com.google.common.collect.Sets;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.plan.ConventionTraitDef;
 import org.apache.calcite.plan.RelOptRule;
@@ -24,6 +25,8 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.volcano.RelSubset;
+
+import java.util.Set;
 
 public abstract class SubsetTransformer<T extends RelNode, E extends Exception> {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SubsetTransformer.class);
@@ -51,9 +54,14 @@ public abstract class SubsetTransformer<T extends RelNode, E extends Exception> 
     }
 
     boolean transform = false;
+    Set<RelNode> transformedRels = Sets.newHashSet();
     for (RelNode rel : ((RelSubset)candidateSet).getRelList()) {
       if (isPhysical(rel)) {
         RelNode newRel = RelOptRule.convert(candidateSet, rel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
+        if(transformedRels.contains(newRel)) {
+          continue;
+        }
+        transformedRels.add(newRel);
         RelNode out = convertChild(n, newRel);
         if (out != null) {
           call.transformTo(out);

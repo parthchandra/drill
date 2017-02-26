@@ -564,6 +564,10 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
     return null;
   }
 
+  public boolean hashTableBuilt() {
+    return buildComplete;
+  }
+
   @Override
   public void killIncoming(boolean sendUpstream) {
     left.kill(sendUpstream);

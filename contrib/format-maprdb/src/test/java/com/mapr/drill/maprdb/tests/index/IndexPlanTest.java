@@ -40,8 +40,9 @@ public class IndexPlanTest extends BaseJsonTest {
 
   /**
    *  A sample row of this 10K table:
-   *    1012 | {"city":"pfrrs","state":"pc"}  | {"email":"KfFzKUZwNk@gmail.com","phone":"6500005471"}
-   * | {"ssn":"100007423"} | {"fname":"KfFzK","lname":"UZwNk"}
+   ------------------+-----------------------------+--------+
+   | 1012  | {"city":"pfrrs","state":"pc"}  | {"email":"KfFzKUZwNk@gmail.com","phone":"6500005471"}  |
+   {"ssn":"100007423"}  | {"fname":"KfFzK","lname":"UZwNk"}  | {"age":53.0,"income":45.0}  | 1012   |
    *
    * This test suite generate random content to fill all the rows, since the random function always start from
    * the same seed for different runs, when the row count is not changed, the data in table will always be the same,
@@ -65,10 +66,13 @@ public class IndexPlanTest extends BaseJsonTest {
      * indexDef[2*i] defines i-th index's indexed field, index[2*i+1] defines i-th index's non-indexed fields
      */
     final String[] indexDef = //null;
-        {"id.ssn", "contact.phone", "address.state,address.city", "name.fname,name.lname"};
+        {"id.ssn", "contact.phone",
+            "address.state,address.city", "name.fname,name.lname",//mainly for composite key test
+            "personal.age", "",
+            "personal.income", "",
+            "driverlicense", ""
+        };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
-
-
   }
 
   @AfterClass
@@ -76,7 +80,7 @@ public class IndexPlanTest extends BaseJsonTest {
     Admin admin = MaprDBTestsSuite.getAdmin();
     if (admin != null) {
       if (admin.tableExists(PRIMARY_TABLE_NAME)) {
-        admin.deleteTable(PRIMARY_TABLE_NAME);
+   //     admin.deleteTable(PRIMARY_TABLE_NAME);
       }
     }
   }
@@ -89,28 +93,7 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
-  public void OneIndexNonCoveringPlan() throws Exception {
-
-    String query = "SELECT t.`name`.`fname` AS `fname` FROM hbase.`index_test_primary` as t " +
-        " where t.id.ssn = '100007423'";
-    PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"HashJoin", ".*JsonTableGroupScan.*tableName=.*index_test_primary,", ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
-        new String[]{}
-    );
-
-    System.out.println("Non-Covering Plan Verified!");
-
-    testBuilder()
-        .sqlQuery(query)
-        .ordered()
-        .baselineColumns("fname").baselineValues("KfFzK")
-        .go();
-    return;
-
-  }
-
-  @Test
-  public void OneIndexCoveringNonCoveringIndex() throws Exception {
+  public void CoveringPlanWithNonIndexedField() throws Exception {
 
     String query = "SELECT t.`contact`.`phone` AS `phone` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
@@ -120,19 +103,18 @@ public class IndexPlanTest extends BaseJsonTest {
     );
 
     System.out.println("Covering Plan Verified!");
-/* TODO: uncomment when DB side support nonindex fields
+
     testBuilder()
         .sqlQuery(query)
         .ordered()
         .baselineColumns("phone").baselineValues("6500005471")
         .go();
-*/
     return;
 
   }
 
   @Test
-  public void OneIndexCoveringIndexedField() throws Exception {
+  public void CoveringPlanWithOnlyIndexedField() throws Exception {
 
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
@@ -150,7 +132,6 @@ public class IndexPlanTest extends BaseJsonTest {
         .go();
 
     return;
-
   }
 
   @Test
@@ -176,14 +157,115 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
+  public void NonCoveringPlan() throws Exception {
+
+    String query = "SELECT t.`name`.`fname` AS `fname` FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn = '100007423'";
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin", ".*JsonTableGroupScan.*tableName=.*index_test_primary,", ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
+        new String[]{}
+    );
+
+    System.out.println("Non-Covering Plan Verified!");
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("fname").baselineValues("KfFzK")
+        .go();
+
+    return;
+  }
+  @Test
+  public void CoveringWithSimpleFieldsOnly() throws Exception {
+
+    String query = "SELECT t._id AS `rowid` FROM hbase.`index_test_primary` as t " +
+        " where t.driverlicense = '100007423'";
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
+        new String[]{"HashJoin"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("rowid").baselineValues("1012")
+        .go();
+
+    return;
+  }
+
+  @Test
+  public void NonCoveringWithSimpleFieldsOnly() throws Exception {
+
+    String query = "SELECT t.rowid AS `rowid` FROM hbase.`index_test_primary` as t " +
+        " where t.driverlicense = '100007423'";
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin(.*[\n\r])+.*" +
+            "JsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
+            "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
+        new String[]{}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("rowid").baselineValues("1012")
+        .go();
+
+    return;
+  }
+
+  @Test
+  public void NonCoveringWithExtraConditonOnPrimary() throws Exception {
+
+    String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
+        " where t.personal.age = 53 AND t.name.fname='KfFzK'";
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin", ".*RestrictedJsonTableGroupScan",
+            ".*JsonTableGroupScan.*indexFid=",},
+        new String[]{}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("lname").baselineValues("UZwNk")
+        .go();
+
+    return;
+  }
+/* Enable intersect test when intersect plan code is checked in
+  @Test
+  public void Intersect2indexesPlan() throws Exception {
+
+    String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
+        " where t.personal.age = 53 AND t.personal.income=45";
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexFid=(.*[\n\r])+.*JsonTableGroupScan.*indexFid="},
+        new String[]{}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .unOrdered()
+        .baselineColumns("lname").baselineValues("UZwNk")
+        .baselineColumns("lname").baselineValues("foNwtze")
+        .baselineColumns("lname").baselineValues("qGZVfY")
+        .go();
+
+    return;
+  }
+*/
+  @Test
   public void CompositeIndexNonCoveringPlan() throws Exception {
 
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
-    /* TODO: not working yet when restricted DB Scan is ready
+
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary"},
-        new String[]{"HashJoin", "indexFid="}
+        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexFid="},
+        null
     );
 
     testBuilder()
@@ -192,7 +274,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("ssn").baselineValues("100007423")
         .baselineColumns("ssn").baselineValues("100008861")
         .go();
-*/
+
     return;
   }
 
@@ -202,17 +284,16 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`address`.`city` AS `city` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary, condition=.*address.state.*address.city.*indexFid="},
+        new String[] {".*JsonTableGroupScan.*indexFid="},
         new String[]{"HashJoin", "Filter"}
     );
-/*TODO: uncomment once DB side is ready per Narendra
+
     testBuilder()
         .sqlQuery(query)
         .unOrdered()
         .baselineColumns("city").baselineValues("pfrrs")
         .baselineColumns("city").baselineValues("pfrrs")
         .go();
-*/
     return;
   }
 }

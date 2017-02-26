@@ -46,7 +46,6 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
 
   final protected ProjectPrel origProject;
   final protected ScanPrel origScan;
-  final protected IndexGroupScan indexGroupScan;
   final protected RexNode indexCondition;
   final protected RexNode remainderCondition;
   final protected RexBuilder builder;
@@ -54,20 +53,18 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
   public AbstractIndexPlanGenerator(RelOptRuleCall call,
       ProjectPrel origProject,
       ScanPrel origScan,
-      IndexGroupScan indexGroupScan,
       RexNode indexCondition,
       RexNode remainderCondition,
       RexBuilder builder) {
     super(call);
     this.origProject = origProject;
     this.origScan = origScan;
-    this.indexGroupScan = indexGroupScan;
     this.indexCondition = indexCondition;
     this.remainderCondition = remainderCondition;
     this.builder = builder;
   }
 
-  protected int getRowKeyIndex(RelDataType rowType) {
+  public static int getRowKeyIndex(RelDataType rowType, ScanPrel origScan) {
     List<String> fieldNames = rowType.getFieldNames();
     int idx = 0;
     for (String field : fieldNames) {
@@ -80,7 +77,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
   }
 
   protected RelDataType convertRowType(RelDataType origRowType, RelDataTypeFactory typeFactory) {
-    if ( getRowKeyIndex(origRowType)>=0 ) { // row key already present
+    if ( getRowKeyIndex(origRowType, origScan)>=0 ) { // row key already present
       return origRowType;
     }
     List<RelDataTypeField> fields = new ArrayList<>();

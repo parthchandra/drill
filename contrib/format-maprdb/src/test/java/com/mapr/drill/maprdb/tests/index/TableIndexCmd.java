@@ -82,13 +82,12 @@ public class TableIndexCmd {
 
   public static void main(String[] args) {
     GuavaPatcher.patch();
-    pressEnterKeyToContinue();
 
-    TestBigTable tbt = new TestBigTable();
     String inHost = new String("localhost");
     String inPort = new String("5181");
     String inTable = new String("/tmp/population");
     String dictPath = "hbase";
+    boolean waitKeyPress = true;
     long inSize = 10000;
     Map<String, String> params = parseParameter(args);
     if(args.length >= 2) {
@@ -107,8 +106,16 @@ public class TableIndexCmd {
       if(params.get("dict") != null) {
         dictPath = params.get("dict");
       }
+      if(params.get("wait") != null) {
+        String answer = params.get("wait");
+        waitKeyPress = answer.startsWith("y") || answer.startsWith("t")? true : false;
+      }
+    }
+    if(waitKeyPress == true) {
+      pressEnterKeyToContinue();
     }
     try {
+      TestBigTable tbt = new TestBigTable();
       tbt.init(inHost, inPort);
       tbt.gen.generateTableWithIndex(inTable, (int)(inSize & 0xFFFFFFFFL), null);
     }

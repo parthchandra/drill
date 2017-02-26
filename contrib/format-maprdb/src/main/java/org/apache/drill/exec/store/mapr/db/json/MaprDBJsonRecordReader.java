@@ -73,7 +73,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   public static final SchemaPath ID_PATH = SchemaPath.getSimplePath(ID_KEY);
   private final long MILLISECONDS_IN_A_DAY  = (long)1000 * 60 * 60 * 24;
 
-  private Table table;
+  protected Table table;
   private QueryCondition condition;
   private FieldPath[] projectedFields;
 

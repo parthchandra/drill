@@ -79,6 +79,13 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
   }
 
   /**
+   *
+   */
+  @JsonIgnore
+  public boolean readyToGetRowKey() {
+    return hjbatch != null && hjbatch.hashTableBuilt();
+  }
+  /**
    * Returns {@code true} if the iteration has more row keys.
    * (In other words, returns {@code true} if {@link #nextRowKey} would
    * return a non-null row key)

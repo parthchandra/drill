@@ -81,6 +81,7 @@ import com.google.common.collect.Lists;
 public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NonCoveringIndexPlanGenerator.class);
+  final protected IndexGroupScan indexGroupScan;
 
   public NonCoveringIndexPlanGenerator(RelOptRuleCall call,
       ProjectPrel origProject,
@@ -89,7 +90,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       RexNode indexCondition,
       RexNode remainderCondition,
       RexBuilder builder) {
-    super(call, origProject, origScan, indexGroupScan, indexCondition, remainderCondition, builder);
+    super(call, origProject, origScan, indexCondition, remainderCondition, builder);
+    this.indexGroupScan = indexGroupScan;
   }
 
   /**
@@ -98,13 +100,16 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
    * to [indexTable.row_key(primary_table.indexed_col), indexTable.<primary_key.row_key> (Primary_table.row_key)]
    * This will impact the columns of scan, the rowType of ScanRel
    *
-   * @param primaryRowType
-   * @param typeFactory
+   * @param origScan
+   * @param indexCondition
+   * @param idxScan
    * @return
    */
-  private RelDataType convertRowTypeForIndexScan(RelDataType primaryRowType, RelDataTypeFactory typeFactory) {
+  public static RelDataType convertRowTypeForIndexScan(ScanPrel origScan,
+                                                RexNode indexCondition,
+                                                IndexGroupScan idxScan) {
+    RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
     List<RelDataTypeField> fields = new ArrayList<>();
-    //TODO: we are not handling the case where row_key of index is composed of 2 or more columns of primary table
 
     //row_key in the rowType of scan on primary table
     RelDataTypeField rowkey_primary;
@@ -142,11 +147,17 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       ));
       columns.add(path);
     }
-    indexGroupScan.setColumns(columns);
+    idxScan.setColumns(columns);
 
     //rowtype does not take the whole path, but only the rootSegment of the SchemaPath
     newRowType = new RelRecordType(Lists.newArrayList(rowfields));
     return newRowType;
+  }
+
+  protected RexNode convertConditionForIndexScan(RexNode idxCondition, RelDataType idxRowType) {
+
+    SimpleRexRemap remap = new SimpleRexRemap(origScan.getRowType(), idxRowType, builder);
+    return remap.rewrite(idxCondition);
   }
 
   @Override
@@ -158,16 +169,18 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
-    RelDataType indexScanRowType = convertRowTypeForIndexScan(origScan.getRowType(), origScan.getCluster().getTypeFactory());
+    RelDataType indexScanRowType = convertRowTypeForIndexScan(
+        origScan, indexCondition, indexGroupScan);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet(), indexGroupScan, indexScanRowType);
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
+    RexNode convertedIndexCondition = convertConditionForIndexScan(indexCondition, indexScanRowType);
     FilterPrel  rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
-          indexScanPrel, indexCondition);
+          indexScanPrel, convertedIndexCondition);
     // project the rowkey column from the index scan
     List<RexNode> rightProjectExprs = Lists.newArrayList();
-    int rightRowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType());//indexGroupScan.getRowKeyOrdinal();
+    int rightRowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType(), origScan);//indexGroupScan.getRowKeyOrdinal();
     assert rightRowKeyIndex >= 0;
 
     rightProjectExprs.add(RexInputRef.of(rightRowKeyIndex, indexScanPrel.getRowType()));
@@ -206,42 +219,46 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     ScanPrel dbScan = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet(), restrictedGroupScan, dbscanRowType);
-
+    RelNode lastLeft = dbScan;
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();
-    int leftRowKeyIndex = getRowKeyIndex(dbScan.getRowType());
+    int leftRowKeyIndex = getRowKeyIndex(dbScan.getRowType(), origScan);
     final RelDataTypeField leftRowKeyField = dbScan.getRowType().getFieldList().get(leftRowKeyIndex);
     final RelDataTypeFactory.FieldInfoBuilder leftFieldTypeBuilder =
         dbScan.getCluster().getTypeFactory().builder();
 
-    // new Project's rowtype is original Project's rowtype [plus rowkey if rowkey is not in original rowtype]
-    List<RelDataTypeField> origProjFields = origProject.getRowType().getFieldList();
-    leftFieldTypeBuilder.addAll(origProjFields);
-    // get the exprs from the original Project
-    leftProjectExprs.addAll(origProject.getProjects());
-    // add the rowkey IFF rowkey is not in orig scan
-    if( getRowKeyIndex(origProject.getRowType()) < 0 ) {
-      leftFieldTypeBuilder.add(leftRowKeyField);
-      leftProjectExprs.add(RexInputRef.of(leftRowKeyIndex, dbScan.getRowType()));
-    }
-
-    final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
-    final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet(),
-        dbScan, leftProjectExprs, leftProjectRowType);
-
     FilterPrel leftIndexFilterPrel = null;
     if(remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
       leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
-          leftIndexProjectPrel, remainderCondition);
+          dbScan, remainderCondition);
+      lastLeft = leftIndexFilterPrel;
     }
+    RelDataType origRowType = origProject == null ? origScan.getRowType() : origProject.getRowType();
+    if (origProject != null) {// then we also  don't need a project
+      // new Project's rowtype is original Project's rowtype [plus rowkey if rowkey is not in original rowtype]
+      List<RelDataTypeField> origProjFields = origRowType.getFieldList();
+      leftFieldTypeBuilder.addAll(origProjFields);
+      // get the exprs from the original Project
 
+      leftProjectExprs.addAll(origProject.getProjects());
+      // add the rowkey IFF rowkey is not in orig scan
+      if (getRowKeyIndex(origRowType, origScan) < 0) {
+        leftFieldTypeBuilder.add(leftRowKeyField);
+        leftProjectExprs.add(RexInputRef.of(leftRowKeyIndex, dbScan.getRowType()));
+      }
+
+      final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
+      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+          leftIndexFilterPrel == null ? dbScan : leftIndexFilterPrel, leftProjectExprs, leftProjectRowType);
+      lastLeft = leftIndexProjectPrel;
+    }
     final RelTraitSet leftTraits = dbScan.getTraitSet().plus(Prel.DRILL_PHYSICAL);
     // final RelNode convertedLeft = convert(leftIndexProjectPrel, leftTraits);
-    final RelNode convertedLeft = Prule.convert(leftIndexFilterPrel==null?leftIndexProjectPrel:leftIndexFilterPrel, leftTraits);
+    final RelNode convertedLeft = Prule.convert(lastLeft, leftTraits);
 
     // find the rowkey column on the left side of join
     // TODO: is there a shortcut way to do this ?
-    final int leftRowKeyIdx = getRowKeyIndex(convertedLeft.getRowType());
+    final int leftRowKeyIdx = getRowKeyIndex(convertedLeft.getRowType(), origScan);
     final int rightRowKeyIdx = 0; // only rowkey field is being projected from right side
 
     assert leftRowKeyIdx >= 0;
@@ -264,7 +281,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     List<RelDataTypeField> hjRowFields = newRel.getRowType().getFieldList();
     int toRemoveRowKeyCount = 1;
-    if (getRowKeyIndex(origProject.getRowType())  < 0 ) {
+    if (getRowKeyIndex(origRowType, origScan)  < 0 ) {
       toRemoveRowKeyCount = 2;
     }
     finalFieldTypeBuilder.addAll(hjRowFields.subList(0, hjRowFields.size()-toRemoveRowKeyCount));
@@ -281,7 +298,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
 
-    logger.trace("DbScanToIndexScanPrule got finalRel {} from origScan {}",
+    logger.trace("NonCoveringIndexPlanGenerator got finalRel {} from origScan {}",
         finalRel.toString(), origScan.toString());
     return finalRel;
   }
