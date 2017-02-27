@@ -20,6 +20,7 @@ package org.apache.drill.exec.store.mapr.db.json;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
@@ -31,15 +32,12 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
-import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
-import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
-import org.codehaus.jackson.annotate.JsonCreator;
 
 import com.google.common.collect.Maps;
 
