@@ -28,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
+import com.mapr.db.impl.ConditionNode.RowkeyRange;
 import com.mapr.fs.tables.IndexDesc;
 import com.mapr.fs.tables.IndexFieldDesc;
 
@@ -57,15 +58,22 @@ public class JsonScanSpec {
     if (condition == null) {
       return HConstants.EMPTY_START_ROW;
     }
-    return ((ConditionImpl)this.condition).getRowkeyRanges().get(0).getStartRow();
+    List<RowkeyRange> rkRanges = ((ConditionImpl)this.condition).getRowkeyRanges();
+    if (rkRanges.size() > 0) {
+      return rkRanges.get(0).getStartRow();
+    }
+    return HConstants.EMPTY_START_ROW;
   }
 
   public byte[] getStopRow() {
     if (condition == null) {
       return HConstants.EMPTY_END_ROW;
     }
-
-    return ((ConditionImpl)this.condition).getRowkeyRanges().get(0).getStopRow();
+    List<RowkeyRange> rkRanges = ((ConditionImpl)this.condition).getRowkeyRanges();
+    if (rkRanges.size() > 0) {
+      return rkRanges.get(0).getStopRow();
+    }
+    return HConstants.EMPTY_END_ROW;
   }
 
   public Object getSerializedFilter() {
