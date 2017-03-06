@@ -178,6 +178,19 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     return indexDesc.allColumnsIndexed(info.columns);
   }
 
+  private IndexDescriptor selectIndexForNonCoveringPlan(ScanPrel scan, Iterable<IndexDescriptor> indexes) {
+    IndexDescriptor ret = null;
+    int maxIndexedNum = 0;
+    //XXX the implement here should make decision based on selectivity, for now, we pick the index cover
+    //the most index fields.
+    for(IndexDescriptor index: indexes) {
+      if(index.getIndexColumns().size() > maxIndexedNum) {
+        maxIndexedNum = index.getIndexColumns().size();
+        ret = index;
+      }
+    }
+    return ret;
+  }
   /**
    *
    */
@@ -302,10 +315,10 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
       try {
-        if (nonCoveringIndexes.size() == 1) {
+        if (nonCoveringIndexes.size() > 0) {
+          IndexDescriptor index = selectIndexForNonCoveringPlan(scan, nonCoveringIndexes);
           IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
               remainderCondition, builder);
           planGen.go(filter, convert(scan, scan.getTraitSet()));
