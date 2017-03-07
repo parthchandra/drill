@@ -118,7 +118,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
                                    scanSpec.getIndexFid(),
                                    scanSpec.getIndexName());
       } else {
-          t = MapRDB.getTable(scanSpec.getTableName());
+          t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName());
       }
       TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());

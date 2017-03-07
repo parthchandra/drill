@@ -28,7 +28,7 @@ import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.record.AbstractRecordBatch;
-import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
+import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
 import org.apache.drill.exec.vector.BaseValueVector;
@@ -45,9 +45,9 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RestrictedJsonRecordReader.class);
 
   public RestrictedJsonRecordReader(MapRDBSubScanSpec subScanSpec,
-      MapRDBFormatPluginConfig formatPluginConfig,
-      List<SchemaPath> projectedColumns, FragmentContext context) {
-    super(subScanSpec, formatPluginConfig, projectedColumns, context);
+                                    MapRDBFormatPlugin formatPlugin,
+                                    List<SchemaPath> projectedColumns, FragmentContext context) {
+    super(subScanSpec, formatPlugin, projectedColumns, context);
    }
 
   public void readToInitSchema() {
@@ -112,6 +112,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
           timer1.stop();
           timer2.start();
           vectorWriter.setPosition(recordCount);
+          Table table = super.formatPlugin.getJsonTableCache().getTable(subScanSpec.getTableName());
           reader = (DBDocumentReaderBase) table.findById(strRowkey).asReader();
           MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
           if (getIdOnly()) {
