@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.logical.FormatPluginConfig;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.base.AbstractGroupScan;
 import org.apache.drill.exec.server.DrillbitContext;
@@ -50,6 +51,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   private final MapRDBFormatMatcher matcher;
   private final Configuration hbaseConf;
   private final Connection connection;
+  private final MapRDBTableCache jsonTableCache;
 
   public MapRDBFormatPlugin(String name, DrillbitContext context, Configuration fsConf,
       StoragePluginConfig storageConfig, MapRDBFormatPluginConfig formatConfig) throws IOException {
@@ -58,11 +60,21 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
     hbaseConf = HBaseConfiguration.create(fsConf);
     hbaseConf.set(ConnectionFactory.DEFAULT_DB, ConnectionFactory.MAPR_ENGINE2);
     connection = ConnectionFactory.createConnection(hbaseConf);
+    jsonTableCache = new MapRDBTableCache(context.getConfig());
   }
 
   @Override
   public FormatMatcher getMatcher() {
     return matcher;
+  }
+
+  @Override
+  public MapRDBFormatPluginConfig getConfig() {
+    return (MapRDBFormatPluginConfig)(super.getConfig());
+  }
+
+  public MapRDBTableCache getJsonTableCache() {
+    return jsonTableCache;
   }
 
   @Override

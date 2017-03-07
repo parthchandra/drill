@@ -39,6 +39,7 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.ops.OperatorStats;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.store.AbstractRecordReader;
+import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.vector.BaseValueVector;
@@ -98,14 +99,15 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private final boolean disableCountOptimization;
 
   protected final MapRDBSubScanSpec subScanSpec;
+  protected final MapRDBFormatPlugin formatPlugin;
 
-  public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec,
-      MapRDBFormatPluginConfig formatPluginConfig,
-      List<SchemaPath> projectedColumns, FragmentContext context) {
+  public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec, MapRDBFormatPlugin formatPlugin,
+                                List<SchemaPath> projectedColumns, FragmentContext context) {
     buffer = context.getManagedBuffer();
     projectedFields = null;
     tablePath = new Path(Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName());
     this.subScanSpec = subScanSpec;
+    this.formatPlugin = formatPlugin;
     indexFid = subScanSpec.getIndexFid();
     documentReaderIterators = null;
     includeId = false;
@@ -117,13 +119,13 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
       condition = com.mapr.db.impl.ConditionImpl.parseFrom(ByteBufs.wrap(serializedFilter));
     }
 
-    disableCountOptimization = formatPluginConfig.disableCountOptimization();
+    disableCountOptimization = formatPlugin.getConfig().shouldDisableCountOptimization();
     setColumns(projectedColumns);
     unionEnabled = context.getOptions().getOption(ExecConstants.ENABLE_UNION_TYPE);
-    readNumbersAsDouble = formatPluginConfig.isReadAllNumbersAsDouble();
-    allTextMode = formatPluginConfig.isAllTextMode();
-    ignoreSchemaChange = formatPluginConfig.isIgnoreSchemaChange();
-    disablePushdown = !formatPluginConfig.isEnablePushdown();
+    readNumbersAsDouble = formatPlugin.getConfig().isReadAllNumbersAsDouble();
+    allTextMode = formatPlugin.getConfig().isAllTextMode();
+    ignoreSchemaChange = formatPlugin.getConfig().isIgnoreSchemaChange();
+    disablePushdown = !formatPlugin.getConfig().isEnablePushdown();
   }
 
   @Override
@@ -192,7 +194,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     this.operatorContext = context;
 
     try {
-      table = indexFid == null ? MapRDB.getTable(tablePath) : MapRDB.getIndexTable(tablePath, indexFid, "");
+      table = indexFid == null ? formatPlugin.getJsonTableCache().getTable(tablePath.toString()) : MapRDB.getIndexTable(tablePath, indexFid, "");
       table.setOption(TableOption.EXCLUDEID, !includeId);
       documentStream = table.find(condition, projectedFields);
       documentReaderIterators = documentStream.documentReaders().iterator();
@@ -525,9 +527,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     if (documentStream != null) {
       documentStream.close();
     }
-    if (table != null) {
-      table.close();
-    }
+    formatPlugin.getJsonTableCache().closeTable(table);
   }
 
 }

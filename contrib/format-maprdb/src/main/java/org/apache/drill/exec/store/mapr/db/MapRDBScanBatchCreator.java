@@ -49,7 +49,7 @@ public class MapRDBScanBatchCreator implements BatchCreator<MapRDBSubScan>{
               subScan.getColumns(),
               context));
         } else {
-          readers.add(new MaprDBJsonRecordReader(scanSpec, subScan.getFormatPluginConfig(), subScan.getColumns(), context));
+          readers.add(new MaprDBJsonRecordReader(scanSpec, subScan.getFormatPlugin(), subScan.getColumns(), context));
         }
       } catch (Exception e) {
         throw new ExecutionSetupException(e);
