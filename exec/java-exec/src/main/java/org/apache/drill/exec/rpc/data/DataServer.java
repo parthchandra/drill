@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.rpc.data;
 
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -24,11 +25,13 @@ import io.netty.util.concurrent.GenericFutureListener;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.BitData.BitClientHandshake;
 import org.apache.drill.exec.proto.BitData.BitServerHandshake;
+import org.apache.drill.exec.proto.BitData.FragmentRecordBatch;
 import org.apache.drill.exec.proto.BitData.RpcType;
 import org.apache.drill.exec.proto.UserBitShared.RpcChannel;
 import org.apache.drill.exec.rpc.BasicServer;
 import org.apache.drill.exec.rpc.OutOfMemoryHandler;
 import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
+import org.apache.drill.exec.rpc.ResponseSender;
 import org.apache.drill.exec.rpc.RpcException;
 
 import com.google.protobuf.MessageLite;
@@ -90,7 +93,17 @@ public class DataServer extends BasicServer<RpcType, DataServerConnection> {
     };
   }
 
-  private class ProxyCloseHandler implements GenericFutureListener<ChannelFuture> {
+  BufferAllocator getAllocator() {
+    return config.getAllocator();
+  }
+
+  // Used for receiving a batch even if there is a local data tunnel.
+  void receiveBatch(FragmentRecordBatch fragmentBatch, ByteBuf body, ResponseSender sender) {
+   config.getMessageHandler().receiveBatch(fragmentBatch, body, sender);
+  }
+
+
+    private class ProxyCloseHandler implements GenericFutureListener<ChannelFuture> {
 
     private volatile GenericFutureListener<ChannelFuture> handler;
 

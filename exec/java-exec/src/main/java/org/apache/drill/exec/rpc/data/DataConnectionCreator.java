@@ -70,7 +70,7 @@ public class DataConnectionCreator implements AutoCloseable {
     if (endpoint.equals(localIdentity)) {
       return new LocalDataTunnel(server, localEventLoop);
     } else {
-      DataConnectionManager newManager = new DataConnectionManager(endpoint, context);
+      DataConnectionManager newManager = new DataConnectionManager(endpoint, config);
       DataConnectionManager oldManager = connectionManager.putIfAbsent(endpoint, newManager);
       if (oldManager != null) {
         newManager = oldManager;

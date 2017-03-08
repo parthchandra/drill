@@ -53,8 +53,11 @@ class DataServerRequestHandler implements RequestHandler<DataServerConnection> {
   public void handle(DataServerConnection connection, int rpcType, ByteBuf pBody, ByteBuf dBody,
                      ResponseSender sender) throws RpcException {
     assert rpcType == BitData.RpcType.REQ_RECORD_BATCH_VALUE;
-
     final FragmentRecordBatch fragmentBatch = RpcBus.get(pBody, FragmentRecordBatch.PARSER);
+    receiveBatch(fragmentBatch, dBody, sender);
+  }
+
+  void receiveBatch(FragmentRecordBatch fragmentBatch, ByteBuf dBody, ResponseSender sender) {
     final AckSender ack = new AckSender(sender);
 
     // increment so we don't get false returns.

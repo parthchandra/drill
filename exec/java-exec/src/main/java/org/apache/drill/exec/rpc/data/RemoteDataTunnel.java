@@ -31,39 +31,83 @@ import org.apache.drill.exec.rpc.ListeningCommand;
 import org.apache.drill.exec.rpc.RpcConnectionHandler.FailureType;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.testing.ControlsInjector;
+import org.apache.drill.exec.testing.ExecutionControls;
 
 
-class RemoteDataTunnel implements DataTunnel {
+public class RemoteDataTunnel implements DataTunnel {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RemoteDataTunnel.class);
 
   private final DataConnectionManager manager;
   private final Semaphore sendingSemaphore = new Semaphore(3);
 
+  // Needed for injecting a test pause
+  private boolean isInjectionControlSet;
+  private ControlsInjector testInjector;
+  private ExecutionControls testControls;
+  private org.slf4j.Logger testLogger;
+
+
   public RemoteDataTunnel(DataConnectionManager manager) {
     this.manager = manager;
   }
 
-  @Override
+  /**
+   * Once a DataTunnel is created, clients of DataTunnel can pass injection controls to enable setting injections at
+   * pre-defined places. Currently following injection sites are available.
+   *
+   * 1. In method {@link #sendRecordBatch(RpcOutcomeListener, FragmentWritableBatch)}, an interruptible pause injection
+   *    is available before acquiring the sending slot. Site name is: "data-tunnel-send-batch-wait-for-interrupt"
+   *
+   * @param testInjector
+   * @param testControls
+   * @param testLogger
+   */
+  public void setTestInjectionControls(final ControlsInjector testInjector,
+      final ExecutionControls testControls, final org.slf4j.Logger testLogger) {
+    isInjectionControlSet = true;
+    this.testInjector = testInjector;
+    this.testControls = testControls;
+    this.testLogger = testLogger;
+  }
+
   public void sendRecordBatch(RpcOutcomeListener<Ack> outcomeListener, FragmentWritableBatch batch) {
     SendBatchAsyncListen b = new SendBatchAsyncListen(outcomeListener, batch);
     try{
+      if (isInjectionControlSet) {
+        // Wait for interruption if set. Used to simulate the fragment interruption while the fragment is waiting for
+        // semaphore acquire. We expect the
+        testInjector.injectInterruptiblePause(testControls, "data-tunnel-send-batch-wait-for-interrupt", testLogger);
+      }
+
       sendingSemaphore.acquire();
       manager.runCommand(b);
-    }catch(InterruptedException e){
-      outcomeListener.failed(new RpcException("Interrupted while trying to get sending semaphore.", e));
-      // TODO InterruptedException
+    }catch(final InterruptedException e){
+      // Release the buffers first before informing the listener about the interrupt.
+      for(ByteBuf buffer : batch.getBuffers()) {
+        buffer.release();
+      }
+
+      outcomeListener.interrupted(e);
+
+      // Preserve evidence that the interruption occurred so that code higher up on the call stack can learn of the
+      // interruption and respond to it if it wants to.
+      Thread.currentThread().interrupt();
     }
   }
 
-  @Override
+  // TODO: This is not used anywhere. Can we remove this method and SendBatchAsyncFuture?
   public DrillRpcFuture<Ack> sendRecordBatch(FragmentContext context, FragmentWritableBatch batch) {
     SendBatchAsyncFuture b = new SendBatchAsyncFuture(batch, context);
     try{
       sendingSemaphore.acquire();
       manager.runCommand(b);
-    }catch(InterruptedException e){
+    }catch(final InterruptedException e){
       b.connectionFailed(FailureType.CONNECTION, new RpcException("Interrupted while trying to get sending semaphore.", e));
-      // TODO InterruptedException
+
+      // Preserve evidence that the interruption occurred so that code higher up on the call stack can learn of the
+      // interruption and respond to it if it wants to.
+      Thread.currentThread().interrupt();
     }
     return b.getFuture();
   }
@@ -89,6 +133,11 @@ class RemoteDataTunnel implements DataTunnel {
       inner.success(value, buffer);
     }
 
+    @Override
+    public void interrupted(InterruptedException e) {
+      sendingSemaphore.release();
+      inner.interrupted(e);
+    }
   }
 
   private class SendBatchAsyncListen extends ListeningCommand<Ack, DataClientConnection> {

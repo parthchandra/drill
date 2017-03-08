@@ -32,6 +32,8 @@ import org.apache.drill.exec.rpc.Response;
 import org.apache.drill.exec.rpc.ResponseSender;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.testing.ControlsInjector;
+import org.apache.drill.exec.testing.ExecutionControls;
 
 public class LocalDataTunnel implements DataTunnel {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LocalDataTunnel.class);
@@ -40,10 +42,24 @@ public class LocalDataTunnel implements DataTunnel {
   private final EventLoop eventLoop;
   private final Semaphore sendingSemaphore = new Semaphore(3);
 
+  //TODO: implement injection control for LocalDataTunnel?
+  private boolean isInjectionControlSet;
+
   public LocalDataTunnel(DataServer dataServer, EventLoop eventLoop) {
     super();
     this.dataServer = dataServer;
     this.eventLoop = eventLoop;
+  }
+
+  /**
+   * Not implemented yet for LocalDataTunnel
+   * @param testInjector
+   * @param testControls
+   * @param testLogger
+   */
+  public void setTestInjectionControls(final ControlsInjector testInjector,
+      final ExecutionControls testControls, final org.slf4j.Logger testLogger) {
+    isInjectionControlSet = false;
   }
 
   @Override

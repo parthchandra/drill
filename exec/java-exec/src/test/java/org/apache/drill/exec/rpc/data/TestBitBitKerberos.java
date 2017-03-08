@@ -260,7 +260,7 @@ public class TestBitBitKerberos extends BaseTestQuery {
     port = server.bind(port, true);
     DrillbitEndpoint ep = DrillbitEndpoint.newBuilder().setAddress("localhost").setDataPort(port).build();
     DataConnectionManager connectionManager = new DataConnectionManager(ep, config);
-    DataTunnel tunnel = new DataTunnel(connectionManager);
+    DataTunnel tunnel = new RemoteDataTunnel(connectionManager);
     AtomicLong max = new AtomicLong(0);
     for (int i = 0; i < 40; i++) {
       long t1 = System.currentTimeMillis();

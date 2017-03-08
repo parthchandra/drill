@@ -123,7 +123,7 @@ public class TestBitRpc extends ExecTest {
 
     port = server.bind(port, true);
     DrillbitEndpoint ep = DrillbitEndpoint.newBuilder().setAddress("localhost").setDataPort(port).build();
-    DataConnectionManager manager = new DataConnectionManager(ep, c2);
+    DataConnectionManager manager = new DataConnectionManager(ep, config);
     DataTunnel tunnel = new RemoteDataTunnel(manager);
     AtomicLong max = new AtomicLong(0);
     for (int i = 0; i < 40; i++) {
