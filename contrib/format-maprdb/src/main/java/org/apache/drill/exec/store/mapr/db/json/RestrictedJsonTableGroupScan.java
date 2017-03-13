@@ -25,21 +25,20 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
+import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
-
-import com.google.common.collect.Maps;
 
 /**
  * A RestrictedJsonTableGroupScan encapsulates (along with a subscan) the functionality
@@ -48,9 +47,6 @@ import com.google.common.collect.Maps;
  */
 @JsonTypeName("restricted-json-scan")
 public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
-
-  // A map of minor fragment id to the corresponding subscan instance
-  private Map<Integer, RestrictedMapRDBSubScan> fragmentSubscanMap = Maps.newHashMap();
 
   @JsonCreator
   public RestrictedJsonTableGroupScan(@JsonProperty("userName") String userName,
@@ -78,12 +74,18 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
         minorFragmentId);
     RestrictedMapRDBSubScan subscan =
         new RestrictedMapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(), getStoragePlugin().getConfig(),
-        endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
+        getEndPointFragmentMapping(minorFragmentId), columns, TABLE_JSON);
 
-    // Remember that this minor fragment corresponds to a specific subscan. This will be used
-    // later for associating the subscan with a join instance from where to get the rowkeys
-    fragmentSubscanMap.put(minorFragmentId, subscan);
     return subscan;
+  }
+
+  private List<RestrictedMapRDBSubScanSpec> getEndPointFragmentMapping(int minorFragmentId) {
+    List<RestrictedMapRDBSubScanSpec> restrictedSubScanSpecList = Lists.newArrayList();
+    List<MapRDBSubScanSpec> subScanSpecList = endpointFragmentMapping.get(minorFragmentId);
+    for(MapRDBSubScanSpec s : subScanSpecList) {
+      restrictedSubScanSpecList.add((RestrictedMapRDBSubScanSpec) s);
+    }
+    return restrictedSubScanSpecList;
   }
 
   /**
@@ -92,7 +94,6 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
    */
   private RestrictedJsonTableGroupScan(RestrictedJsonTableGroupScan that) {
     super(that);
-    this.fragmentSubscanMap = that.fragmentSubscanMap;
   }
 
   @Override
@@ -113,14 +114,6 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
   public ScanStats getScanStats() {
     //TODO: model the cost for restricted scan
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
-  }
-
-  @Override
-  public void addJoinForRestrictedScan(HashJoinBatch joinBatch, int minorFragmentId) {
-    RestrictedMapRDBSubScan subscan = fragmentSubscanMap.get(minorFragmentId);
-    if (subscan != null) {
-      subscan.setJoinForSubScan(joinBatch);
-    }
   }
 
   @Override

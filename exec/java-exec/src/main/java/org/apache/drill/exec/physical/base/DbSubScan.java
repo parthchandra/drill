@@ -17,6 +17,8 @@
  */
 package org.apache.drill.exec.physical.base;
 
+import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 
@@ -28,5 +30,14 @@ public interface DbSubScan extends SubScan {
    */
   @JsonIgnore
   boolean isRestrictedSubScan();
+
+  /**
+   * For a restricted sub-scan, this method allows associating a (hash)join instance.  A subscan within a minor
+   * fragment must have a corresponding (hash)join batch instance from which it will retrieve its set of
+   * rowkeys to perform the restricted scan.
+   * @param batch
+   */
+  @JsonIgnore
+  void addJoinForRestrictedSubScan(HashJoinBatch batch);
 
 }

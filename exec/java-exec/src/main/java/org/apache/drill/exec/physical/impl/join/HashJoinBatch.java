@@ -524,9 +524,8 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
     this.right = right;
     joinType = popConfig.getJoinType();
     conditions = popConfig.getConditions();
-    if (popConfig.getScanForRowKeyJoin() != null) {
-      this.isRowKeyJoin = true;
-    }
+    this.isRowKeyJoin = popConfig.isRowKeyJoin();
+
     comparators = Lists.newArrayListWithExpectedSize(conditions.size());
     for (int i=0; i<conditions.size(); i++) {
       JoinCondition cond = conditions.get(i);
