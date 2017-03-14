@@ -119,6 +119,7 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.HASHAGG_MAX_MEMORY_VALIDATOR,
       ExecConstants.HASHAGG_MIN_BATCHES_PER_PARTITION_VALIDATOR, // for tuning
       PlannerSettings.INDEX_PLANNING,
+      PlannerSettings.USE_SIMPLE_OPTIMIZER,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,
