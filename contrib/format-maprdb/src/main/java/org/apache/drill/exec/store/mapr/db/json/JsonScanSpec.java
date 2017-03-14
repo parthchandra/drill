@@ -42,7 +42,7 @@ public class JsonScanSpec {
                       @JsonProperty("indexDesc") IndexDesc indexDesc,
 	                    @JsonProperty("condition") QueryCondition condition) {
 	  this.tableName = tableName;
-    this.indexDesc = indexDesc;
+         this.indexDesc = indexDesc;
 	  this.condition = condition;
   }
 

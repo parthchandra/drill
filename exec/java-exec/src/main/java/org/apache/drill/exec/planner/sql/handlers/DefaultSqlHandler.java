@@ -164,16 +164,22 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     final ConvertedRelNode convertedRelNode = validateAndConvert(sqlNode);
     final RelDataType validatedRowType = convertedRelNode.getValidatedRowType();
     final RelNode queryRelNode = convertedRelNode.getConvertedNode();
+    Prel prel;
 
-    final DrillRel drel = convertToDrel(queryRelNode, validatedRowType);
-    final Prel prel = convertToPrel(drel);
+    if (context.getPlannerSettings().isUseSimpleOptimizer()) {
+      final DrillRel drel = convertToDrelSimpleOpt(queryRelNode, validatedRowType);
+      prel = convertToPrelSimpleOpt(drel);
+    } else {
+      final DrillRel drel = convertToDrel(queryRelNode, validatedRowType);
+      prel = convertToPrel(drel);
+    }
+
     logAndSetTextPlan("Drill Physical", prel, logger);
     final PhysicalOperator pop = convertToPop(prel);
     final PhysicalPlan plan = convertToPlan(pop);
     log("Drill Plan", plan, logger);
     return plan;
   }
-
 
   /**
    * Rewrite the parse tree. Used before validating the parse tree. Useful if a particular statement needs to converted
@@ -294,6 +300,45 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     return new DrillScreenRel(topPreservedNameProj.getCluster(), topPreservedNameProj.getTraitSet(),
         topPreservedNameProj);
   }
+
+  /**
+   * Return Drill Logical RelNode tree for a SELECT statement, when it is executed / explained directly.
+   * This will be called when simple optimizer is enabled for operational queries.
+   *
+   * @param relNode : root RelNode corresponds to Calcite Logical RelNode.
+   * @param validatedRowType : the rowType for the final field names. A rename project may be placed on top of the root.
+   * @return
+   * @throws RelConversionException
+   * @throws SqlUnsupportedException
+   */
+  protected DrillRel convertToDrelSimpleOpt(RelNode relNode, RelDataType validatedRowType) {
+    if (context.getOptions().getOption(ExecConstants.EARLY_LIMIT0_OPT) &&
+        context.getPlannerSettings().isTypeInferenceEnabled() &&
+        FindLimit0Visitor.containsLimit0(relNode)) {
+      // if the schema is known, return the schema directly
+      final DrillRel shorterPlan;
+      if ((shorterPlan = FindLimit0Visitor.getDirectScanRelIfFullySchemaed(relNode)) != null) {
+        return shorterPlan;
+      }
+
+      if (FindHardDistributionScans.canForceSingleMode(relNode)) {
+        // disable distributed mode
+        context.getPlannerSettings().forceSingleMode();
+      }
+    }
+    /*
+     * begin logical planning phase
+     */
+    final RelTraitSet logicalTraits = relNode.getTraitSet().plus(DrillRel.DRILL_LOGICAL);
+    final RelNode r1 = transform(PlannerType.VOLCANO, PlannerPhase.LOGICAL_SIMPLE_OPT, relNode, logicalTraits);
+    final DrillRel r2 = (DrillRel) r1;
+    // Put a non-trivial topProject to ensure the final output field name is preserved, when necessary.
+    DrillRel topPreservedNameProj = addRenamedProject(r2, validatedRowType);
+    DrillRel screenRel = new DrillScreenRel(topPreservedNameProj.getCluster(), topPreservedNameProj.getTraitSet(), topPreservedNameProj);
+
+    return screenRel;
+  }
+
 
   /**
    * A shuttle designed to finalize all RelNodes.
@@ -563,6 +608,38 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     phyRelNode = RelUniqifier.uniqifyGraph(phyRelNode);
 
     return phyRelNode;
+  }
+
+  /**
+   * Return Drill Physical RelNode tree for a Drill Logical RelNode.
+   *
+   * @param logicalRel : corresponds to Drill Logical RelNode.
+   * @return
+   * @throws RelConversionException
+   */
+  protected Prel convertToPrelSimpleOpt(DrillRel logicalRel) throws RelConversionException {
+      /*
+     * begin physical planning phase
+     */
+    final RelTraitSet physicalTraits = logicalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL);
+    Prel physicalRel;
+    final RelNode r3 = transform(PlannerType.VOLCANO, PlannerPhase.PHYSICAL_SIMPLE_OPT, logicalRel, physicalTraits);
+    physicalRel = (Prel) r3.accept(new PrelFinalizer());
+
+    /**
+     * For description of the following transformations,
+     * please see {@link  #convertToPrel(RelNode)  2, 3, 5, 7 and 8 }
+     */
+    physicalRel = FinalColumnReorderer.addFinalColumnOrdering(physicalRel);
+    physicalRel = ExcessiveExchangeIdentifier.removeExcessiveEchanges(physicalRel, targetSliceSize);
+    if (!context.getSession().isSupportComplexTypes()) {
+      logger.debug("Client does not support complex types, add ComplexToJson operator.");
+      physicalRel = ComplexToJsonPrelVisitor.addComplexToJsonPrel(physicalRel);
+    }
+    physicalRel = SelectionVectorPrelVisitor.addSelectionRemoversWhereNecessary(physicalRel);
+    physicalRel = RelUniqifier.uniqifyGraph(physicalRel);
+
+    return physicalRel;
   }
 
   protected PhysicalOperator convertToPop(Prel prel) throws IOException {

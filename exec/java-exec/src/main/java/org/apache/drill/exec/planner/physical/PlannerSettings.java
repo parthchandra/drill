@@ -83,6 +83,8 @@ public class PlannerSettings implements Context{
   public static final String UNIONALL_DISTRIBUTE_KEY = "planner.enable_unionall_distribute";
   public static final BooleanValidator UNIONALL_DISTRIBUTE = new BooleanValidator(UNIONALL_DISTRIBUTE_KEY, false);
   public static final BooleanValidator INDEX_PLANNING = new BooleanValidator("planner.enable_index_planning", true);
+  public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
+  public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY, false);
 
   public static final OptionValidator IDENTIFIER_MAX_LENGTH =
       new RangeLongValidator("planner.identifier_max_length", 128 /* A minimum length is needed because option names are identifiers themselves */,
@@ -265,6 +267,9 @@ public class PlannerSettings implements Context{
 
   public boolean isIndexPlanningEnabled() {
     return options.getOption(INDEX_PLANNING);
+  }
+  public boolean isUseSimpleOptimizer() {
+    return options.getOption(USE_SIMPLE_OPTIMIZER);
   }
 
   @Override

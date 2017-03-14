@@ -92,8 +92,10 @@ public abstract class AbstractStoragePlugin implements StoragePlugin {
     case LOGICAL_PRUNE_AND_JOIN:
     case LOGICAL_PRUNE:
     case LOGICAL:
+    case LOGICAL_SIMPLE_OPT:
       return getLogicalOptimizerRules(optimizerContext);
     case PHYSICAL:
+    case PHYSICAL_SIMPLE_OPT:
       return getPhysicalOptimizerRules(optimizerContext);
     case PARTITION_PRUNING:
     case JOIN_PLANNING:

@@ -181,6 +181,23 @@ public enum PlannerPhase {
           PlannerPhase.getPhysicalRules(context),
           getStorageRules(context, plugins, this));
     }
+  },
+
+  LOGICAL_SIMPLE_OPT("Logical Planner for Simple Optimizer") {
+    public RuleSet getRules(OptimizerRulesContext context, Collection<StoragePlugin> plugins) {
+      return PlannerPhase.mergedRuleSets(
+          PlannerPhase.getLogicalRulesSimpleOpt(context),
+          getStorageRules(context, plugins, this));
+    }
+  },
+
+  PHYSICAL_SIMPLE_OPT("Physical Planner for Simple Optimizer") {
+    public RuleSet getRules(OptimizerRulesContext context, Collection<StoragePlugin> plugins) {
+      return PlannerPhase.mergedRuleSets(
+          PlannerPhase.getPhysicalRulesSimpleOpt(context),
+          getStorageRules(context, plugins, this));
+    }
+
   };
 
   public final String description;
@@ -399,6 +416,50 @@ public enum PlannerPhase {
   static final RuleSet DRILL_PHYSICAL_DISK = RuleSets.ofList(ImmutableSet.of(
       ProjectPrule.INSTANCE
     ));
+
+  /*
+   * These rules are used when simple optimizer is enabled for operational queries.
+   */
+  static final RuleSet getLogicalRulesSimpleOpt(OptimizerRulesContext optimizerRulesContext) {
+    final List<RelOptRule> ruleList = new ArrayList<RelOptRule>();
+
+    ruleList.add(DrillPushFilterPastProjectRule.INSTANCE);
+    ruleList.add(ProjectRemoveRule.INSTANCE);
+    ruleList.add(SortRemoveRule.INSTANCE);
+    ruleList.add(DrillPushProjectPastFilterRule.INSTANCE);
+    ruleList.add(DrillPushProjIntoScan.INSTANCE);
+    ruleList.add(DrillScanRule.INSTANCE);
+    ruleList.add(DrillFilterRule.INSTANCE);
+    ruleList.add(DrillProjectRule.INSTANCE);
+    ruleList.add(DrillLimitRule.INSTANCE);
+    ruleList.add(DrillSortRule.INSTANCE);
+
+    return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
+  }
+
+  /*
+   * These rules are used when simple optimizer is enabled for operational queries.
+   */
+  static final RuleSet getPhysicalRulesSimpleOpt(OptimizerRulesContext optimizerRulesContext) {
+    final List<RelOptRule> ruleList = new ArrayList<RelOptRule>();
+    final PlannerSettings ps = optimizerRulesContext.getPlannerSettings();
+
+    ruleList.add(SortConvertPrule.INSTANCE);
+    ruleList.add(SortPrule.INSTANCE);
+    ruleList.add(ProjectPrule.INSTANCE);
+    ruleList.add(ScanPrule.INSTANCE);
+    ruleList.add(ScreenPrule.INSTANCE);
+    ruleList.add(ExpandConversionRule.INSTANCE);
+    ruleList.add(FilterPrule.INSTANCE);
+    ruleList.add(LimitPrule.INSTANCE);
+
+    if (ps.isIndexPlanningEnabled()) {
+      ruleList.add(DbScanToIndexScanPrule.getFilterOnProject(optimizerRulesContext));
+      ruleList.add(DbScanToIndexScanPrule.getFilterOnScan(optimizerRulesContext));
+    }
+
+    return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
+  }
 
   static final RuleSet getPhysicalRules(OptimizerRulesContext optimizerRulesContext) {
     final List<RelOptRule> ruleList = new ArrayList<RelOptRule>();

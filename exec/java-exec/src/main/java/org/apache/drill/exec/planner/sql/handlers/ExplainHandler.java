@@ -58,14 +58,25 @@ public class ExplainHandler extends DefaultSqlHandler {
     final RelNode queryRelNode = convertedRelNode.getConvertedNode();
 
     log("Calcite", queryRelNode, logger, null);
-    DrillRel drel = convertToDrel(queryRelNode, validatedRowType);
+    DrillRel drel;
+    if (context.getPlannerSettings().isUseSimpleOptimizer()) {
+      drel = convertToDrelSimpleOpt(queryRelNode, validatedRowType);
+    } else {
+      drel = convertToDrel(queryRelNode, validatedRowType);
+    }
 
     if (mode == ResultMode.LOGICAL) {
       LogicalExplain logicalResult = new LogicalExplain(drel, level, context);
       return DirectPlan.createDirectPlan(context, logicalResult);
     }
 
-    Prel prel = convertToPrel(drel);
+    Prel prel;
+    if (context.getPlannerSettings().isUseSimpleOptimizer()) {
+      prel = convertToPrelSimpleOpt(drel);
+    } else {
+      prel = convertToPrel(drel);
+    }
+
     logAndSetTextPlan("Drill Physical", prel, logger);
     PhysicalOperator pop = convertToPop(prel);
     PhysicalPlan plan = convertToPlan(pop);
