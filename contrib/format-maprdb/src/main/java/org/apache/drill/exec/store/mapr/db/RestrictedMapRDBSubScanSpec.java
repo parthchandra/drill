@@ -17,8 +17,6 @@
  */
 package org.apache.drill.exec.store.mapr.db;
 
-import java.util.NoSuchElementException;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;

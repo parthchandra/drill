@@ -17,10 +17,10 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
-import static org.ojai.DocumentConstants.ID_KEY;
+import static org.apache.drill.exec.store.mapr.PluginConstants.DOCUMENT_SCHEMA_PATH;
+import static org.apache.drill.exec.store.mapr.PluginErrorHandler.dataReadError;
 import static org.ojai.DocumentConstants.ID_FIELD;
 
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -40,22 +40,25 @@ import org.apache.drill.exec.ops.OperatorStats;
 import org.apache.drill.exec.physical.impl.OutputMutator;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
-import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
+import org.apache.drill.exec.util.EncodedSchemaPathSet;
 import org.apache.drill.exec.vector.BaseValueVector;
-import org.apache.drill.exec.vector.complex.impl.MapOrListWriterImpl;
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
 import org.apache.hadoop.fs.Path;
 import org.ojai.DocumentReader;
-import org.ojai.DocumentReader.EventType;
 import org.ojai.DocumentStream;
 import org.ojai.FieldPath;
 import org.ojai.FieldSegment;
-import org.ojai.Value;
 import org.ojai.store.QueryCondition;
+import org.ojai.util.FieldProjector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
@@ -64,19 +67,21 @@ import com.mapr.db.exceptions.DBException;
 import com.mapr.db.impl.IdCodec;
 import com.mapr.db.ojai.DBDocumentReaderBase;
 import com.mapr.db.util.ByteBufs;
-import com.mapr.org.apache.hadoop.hbase.util.Bytes;
 
 import io.netty.buffer.DrillBuf;
 
 public class MaprDBJsonRecordReader extends AbstractRecordReader {
-  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MaprDBJsonRecordReader.class);
+  private static final Logger logger = LoggerFactory.getLogger(MaprDBJsonRecordReader.class);
 
-  public static final SchemaPath ID_PATH = SchemaPath.getSimplePath(ID_KEY);
-  private final long MILLISECONDS_IN_A_DAY  = (long)1000 * 60 * 60 * 24;
+  protected static final FieldPath[] ID_ONLY_PROJECTION = { ID_FIELD };
 
   protected Table table;
   private QueryCondition condition;
-  private FieldPath[] projectedFields;
+
+  /**
+   * A set of projected FieldPaths that are pushed into MapR-DB Scanner
+   */
+  private FieldPath[] scannedFields;
 
   private final Path tablePath;
   private final String indexFid;
@@ -91,6 +96,10 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
 
   private boolean includeId;
   private boolean idOnly;
+
+  private boolean projectWholeDocument;
+  private FieldProjector projector;
+
   private final boolean unionEnabled;
   private final boolean readNumbersAsDouble;
   private boolean disablePushdown;
@@ -100,16 +109,20 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
 
   protected final MapRDBSubScanSpec subScanSpec;
   protected final MapRDBFormatPlugin formatPlugin;
+  
+  protected OjaiValueWriter valueWriter;
+  protected DocumentReaderVectorWriter documentWriter;
 
   public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec, MapRDBFormatPlugin formatPlugin,
                                 List<SchemaPath> projectedColumns, FragmentContext context) {
     buffer = context.getManagedBuffer();
-    projectedFields = null;
+    scannedFields = null;
     tablePath = new Path(Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName());
     this.subScanSpec = subScanSpec;
     this.formatPlugin = formatPlugin;
     indexFid = subScanSpec.getIndexFid();
     documentReaderIterators = null;
+    projectWholeDocument = false;
     includeId = false;
     idOnly    = false;
     byte[] serializedFilter = subScanSpec.getSerializedFilter();
@@ -131,47 +144,75 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   @Override
   protected Collection<SchemaPath> transformColumns(Collection<SchemaPath> columns) {
     Set<SchemaPath> transformed = Sets.newLinkedHashSet();
+    Set<SchemaPath> encodedSchemaPathSet = Sets.newLinkedHashSet();
+
     if (disablePushdown) {
       transformed.add(AbstractRecordReader.STAR_COLUMN);
       includeId = true;
-      return transformed;
-    }
-
-    if (isStarQuery()) {
-      transformed.add(AbstractRecordReader.STAR_COLUMN);
-      includeId = true;
-      if (isSkipQuery()) {
-    	// `SELECT COUNT(*)` query
-    	if (!disableCountOptimization) {
-          projectedFields = new FieldPath[1];
-          projectedFields[0] = ID_FIELD;
-        }
-      }
-      return transformed;
-    }
-
-    Set<FieldPath> projectedFieldsSet = Sets.newTreeSet();
-    for (SchemaPath column : columns) {
-      if (column.getRootSegment().getPath().equalsIgnoreCase(ID_KEY)) {
+    } else {
+      if (isStarQuery()) {
+        transformed.add(AbstractRecordReader.STAR_COLUMN);
         includeId = true;
-        if (!disableCountOptimization) {
-          projectedFieldsSet.add(ID_FIELD);
+        if (isSkipQuery() && !disableCountOptimization) {
+          // `SELECT COUNT(*)` query
+          idOnly = true;
+          scannedFields = ID_ONLY_PROJECTION;
         }
       } else {
-        projectedFieldsSet.add(getFieldPathForProjection(column));
+        Set<FieldPath> scannedFieldsSet = Sets.newTreeSet();
+        Set<FieldPath> projectedFieldsSet = null;
+
+        for (SchemaPath column : columns) {
+          if (EncodedSchemaPathSet.isEncodedSchemaPath(column)) {
+            encodedSchemaPathSet.add(column);
+          } else {
+            transformed.add(column);
+            if (!DOCUMENT_SCHEMA_PATH.equals(column)) {
+              FieldPath fp = getFieldPathForProjection(column);
+              scannedFieldsSet.add(fp);
+            } else {
+              projectWholeDocument = true;
+            }
+          }
+        }
+        if (projectWholeDocument) {
+          // we do not want to project the fields from the encoded field path list
+          // hence make a copy of the scannedFieldsSet here for projection.
+          projectedFieldsSet = new ImmutableSet.Builder<FieldPath>()
+              .addAll(scannedFieldsSet).build();
+        }
+
+        if (encodedSchemaPathSet.size() > 0) {
+          Collection<SchemaPath> decodedSchemaPaths = EncodedSchemaPathSet.decode(encodedSchemaPathSet);
+          // now we look at the fields which are part of encoded field set and either 
+          // add them to scanned set or clear the scanned set if all fields were requested.
+          for (SchemaPath column : decodedSchemaPaths) {
+            if (column.equals(AbstractRecordReader.STAR_COLUMN)) {
+              includeId = true;
+              scannedFieldsSet.clear();
+              break;
+            }
+            scannedFieldsSet.add(getFieldPathForProjection(column));
+          }
+        }
+
+        if (scannedFieldsSet.size() > 0) {
+          if (includesIdField(scannedFieldsSet)) {
+            includeId = true;
+          }
+          scannedFields = scannedFieldsSet.toArray(new FieldPath[scannedFieldsSet.size()]);
+        }
+
+        if (disableCountOptimization) {
+          idOnly = (scannedFields == null);
+        }
+
+        if(projectWholeDocument) {
+          projector = new FieldProjector(projectedFieldsSet);
+        }
+
       }
-
-      transformed.add(column);
     }
-
-    if (projectedFieldsSet.size() > 0) {
-      projectedFields = projectedFieldsSet.toArray(new FieldPath[projectedFieldsSet.size()]);
-    }
-
-    if (disableCountOptimization) {
-      idOnly = (projectedFields == null);
-    }
-
     return transformed;
   }
 
@@ -196,8 +237,26 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     try {
       table = indexFid == null ? formatPlugin.getJsonTableCache().getTable(tablePath.toString()) : MapRDB.getIndexTable(tablePath, indexFid, "");
       table.setOption(TableOption.EXCLUDEID, !includeId);
-      documentStream = table.find(condition, projectedFields);
+      documentStream = table.find(condition, scannedFields);
       documentReaderIterators = documentStream.documentReaders().iterator();
+      
+      if (allTextMode) {
+        valueWriter = new AllTextValueWriter(buffer);
+      } else if (readNumbersAsDouble) {
+        valueWriter = new NumbersAsDoubleValueWriter(buffer);
+      } else {
+        valueWriter = new OjaiValueWriter(buffer);
+      }
+
+      if (projectWholeDocument) {
+        documentWriter = new ProjectionPassthroughVectorWriter(valueWriter, projector, includeId);
+      } else if (isSkipQuery()) {
+        documentWriter = new RowCountVectorWriter(valueWriter);
+      } else if (idOnly) {
+        documentWriter = new IdOnlyVectorWriter(valueWriter);
+      } else {
+        documentWriter = new FieldTransferVectorWriter(valueWriter);
+      }
     } catch (DBException e) {
       throw new ExecutionSetupException(e);
     }
@@ -219,19 +278,9 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
       try {
         reader = nextDocumentReader();
         if (reader == null) {
-          break; // no more documents for this scanner
-        } else if (isSkipQuery()) {
-          vectorWriter.rootAsMap().bit("count").writeBit(1);
+          break; // no more documents for this reader
         } else {
-          MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
-          if (idOnly) {
-            writeId(writer, reader.getId());
-          } else {
-            if (reader.next() != EventType.START_MAP) {
-              throw dataReadError("The document did not start with START_MAP!");
-            }
-            writeToListOrMap(writer, reader);
-          }
+          documentWriter.writeDBDocument(vectorWriter, reader);
         }
         recordCount++;
       } catch (UserException e) {
@@ -241,11 +290,12 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
                 reader == null ? null : IdCodec.asString(reader.getId())))
             .build(logger);
       } catch (SchemaChangeException e) {
+        String err_row = reader.getId().asJsonString();
         if (ignoreSchemaChange) {
-          logger.warn("{}. Dropping the row from result.", e.getMessage());
+          logger.warn("{}. Dropping row '{}' from result.", e.getMessage(), err_row);
           logger.debug("Stack trace:", e);
         } else {
-          throw dataReadError(e);
+          throw dataReadError(logger, e, "SchemaChangeException for row '{}'.", err_row);
         }
       }
     }
@@ -253,229 +303,6 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     vectorWriter.setValueCount(recordCount);
     logger.debug("Took {} ms to get {} records", watch.elapsed(TimeUnit.MILLISECONDS), recordCount);
     return recordCount;
-  }
-
-  protected void writeId(MapOrListWriterImpl writer, Value id) throws SchemaChangeException {
-    try {
-      switch(id.getType()) {
-      case STRING:
-        writeString(writer, ID_KEY, id.getString());
-        break;
-      case BINARY:
-        writeBinary(writer, ID_KEY, id.getBinary());
-        break;
-      default:
-        throw new UnsupportedOperationException(id.getType() +
-            " is not a supported type for _id field.");
-      }
-    } catch (IllegalStateException | IllegalArgumentException e) {
-      throw schemaChangeException(e, "Possible schema change at _id: '%s'", IdCodec.asString(id));
-    }
-  }
-
-  protected void writeToListOrMap(MapOrListWriterImpl writer, DBDocumentReaderBase reader) throws SchemaChangeException {
-    String fieldName = null;
-    writer.start();
-    outside: while (true) {
-      EventType event = reader.next();
-      if (event == null
-          || event == EventType.END_MAP
-          || event == EventType.END_ARRAY) {
-        break outside;
-      } else if (reader.inMap()) {
-        fieldName = reader.getFieldName();
-      }
-
-      try {
-        switch (event) {
-        case NULL:
-          break; // not setting the field will leave it as null
-        case BINARY:
-          writeBinary(writer, fieldName, reader.getBinary());
-          break;
-        case BOOLEAN:
-          writeBoolean(writer, fieldName, reader);
-          break;
-        case STRING:
-          writeString(writer, fieldName, reader.getString());
-          break;
-        case BYTE:
-          writeByte(writer, fieldName, reader);
-          break;
-        case SHORT:
-          writeShort(writer, fieldName, reader);
-          break;
-        case INT:
-          writeInt(writer, fieldName, reader);
-          break;
-        case LONG:
-          writeLong(writer, fieldName, reader);
-          break;
-        case FLOAT:
-          writeFloat(writer, fieldName, reader);
-          break;
-        case DOUBLE:
-          writeDouble(writer, fieldName, reader);
-          break;
-        case DECIMAL:
-          throw unsupportedError("Decimal type is currently not supported.");
-        case DATE:
-          writeDate(writer, fieldName, reader);
-          break;
-        case TIME:
-          writeTime(writer, fieldName, reader);
-          break;
-        case TIMESTAMP:
-          writeTimeStamp(writer, fieldName, reader);
-          break;
-        case INTERVAL:
-          throw unsupportedError("Interval type is currently not supported.");
-        case START_MAP:
-          writeToListOrMap((MapOrListWriterImpl) (reader.inMap() ? writer.map(fieldName) : writer.listoftmap(fieldName)), reader);
-          break;
-        case START_ARRAY:
-          writeToListOrMap((MapOrListWriterImpl) writer.list(fieldName), reader);
-          break;
-        default:
-          throw unsupportedError("Unsupported type: %s encountered during the query.", event);
-        }
-      } catch (IllegalStateException | IllegalArgumentException e) {
-        throw schemaChangeException(e, "Possible schema change at _id: '%s', field: '%s'", IdCodec.asString(reader.getId()), fieldName);
-      }
-    }
-    writer.end();
-  }
-
-  private void writeTimeStamp(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, reader.getTimestamp().toUTCString());
-    } else {
-      ((writer.map != null) ? writer.map.timeStamp(fieldName) : writer.list.timeStamp()).writeTimeStamp(reader.getTimestampLong());
-    }
-  }
-
-  private void writeTime(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, reader.getTime().toTimeStr());
-    } else {
-      ((writer.map != null) ? writer.map.time(fieldName) : writer.list.time()).writeTime(reader.getTimeInt());
-    }
-  }
-
-  private void writeDate(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, reader.getDate().toDateStr());
-    } else {
-      long milliSecondsSinceEpoch = reader.getDateInt() * MILLISECONDS_IN_A_DAY;
-      ((writer.map != null) ? writer.map.date(fieldName) : writer.list.date()).writeDate(milliSecondsSinceEpoch);
-    }
-  }
-
-  private void writeDouble(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getDouble()));
-    } else {
-      writer.float8(fieldName).writeFloat8(reader.getDouble());
-    }
-  }
-
-  private void writeFloat(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getFloat()));
-    } else if (readNumbersAsDouble) {
-      writer.float8(fieldName).writeFloat8(reader.getFloat());
-    } else {
-      writer.float4(fieldName).writeFloat4(reader.getFloat());
-    }
-  }
-
-  private void writeLong(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getLong()));
-    } else if (readNumbersAsDouble) {
-      writer.float8(fieldName).writeFloat8(reader.getLong());
-    } else {
-      writer.bigInt(fieldName).writeBigInt(reader.getLong());
-    }
-  }
-
-  private void writeInt(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getInt()));
-    } else if (readNumbersAsDouble) {
-      writer.float8(fieldName).writeFloat8(reader.getInt());
-    } else {
-      writer.integer(fieldName).writeInt(reader.getInt());
-    }
-  }
-
-  private void writeShort(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getShort()));
-    } else if (readNumbersAsDouble) {
-      writer.float8(fieldName).writeFloat8(reader.getShort());
-    } else {
-      ((writer.map != null) ? writer.map.smallInt(fieldName) : writer.list.smallInt()).writeSmallInt(reader.getShort());
-    }
-  }
-
-  private void writeByte(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getByte()));
-    } else if (readNumbersAsDouble) {
-      writer.float8(fieldName).writeFloat8(reader.getByte());
-    } else {
-      ((writer.map != null) ? writer.map.tinyInt(fieldName) : writer.list.tinyInt()).writeTinyInt(reader.getByte());
-    }
-  }
-
-  private void writeBoolean(MapOrListWriterImpl writer, String fieldName, DBDocumentReaderBase reader) {
-    if (allTextMode) {
-      writeString(writer, fieldName, String.valueOf(reader.getBoolean()));
-    } else {
-      writer.bit(fieldName).writeBit(reader.getBoolean() ? 1 : 0);
-    }
-  }
-
-  private void writeBinary(MapOrListWriterImpl writer, String fieldName, ByteBuffer buf) {
-    if (allTextMode) {
-      writeString(writer, fieldName, Bytes.toString(buf));
-    } else {
-      buffer = buffer.reallocIfNeeded(buf.remaining());
-      buffer.setBytes(0, buf, buf.position(), buf.remaining());
-      writer.varBinary(fieldName).writeVarBinary(0, buf.remaining(), buffer);
-    }
-  }
-
-  private void writeString(MapOrListWriterImpl writer, String fieldName, String value) {
-    final byte[] strBytes = Bytes.toBytes(value);
-    buffer = buffer.reallocIfNeeded(strBytes.length);
-    buffer.setBytes(0, strBytes);
-    writer.varChar(fieldName).writeVarChar(0, strBytes.length, buffer);
-  }
-
-  protected UserException unsupportedError(String format, Object... args) {
-    return UserException.unsupportedError()
-        .message(String.format(format, args))
-        .build(logger);
-  }
-
-  protected UserException dataReadError(Throwable t) {
-    return dataReadError(t, null);
-  }
-
-  protected UserException dataReadError(String format, Object... args) {
-    return dataReadError(null, format, args);
-  }
-
-  protected UserException dataReadError(Throwable t, String format, Object... args) {
-    return UserException.dataReadError(t)
-        .message(format == null ? null : String.format(format, args))
-        .build(logger);
-  }
-
-  protected SchemaChangeException schemaChangeException(Throwable t, String format, Object... args) {
-    return new SchemaChangeException(format, t, args);
   }
 
   protected DBDocumentReaderBase nextDocumentReader() {
@@ -496,7 +323,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
         }
       }
     } catch (DBException e) {
-      throw dataReadError(e);
+      throw dataReadError(logger, e);
     }
   }
 
@@ -520,6 +347,15 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
       child = new FieldSegment.NameSegment(pathSegments.pop().getPath(), child, false);
     }
     return new FieldPath(child);
+  }
+
+  public static boolean includesIdField(Collection<FieldPath> projected) {
+    return Iterables.tryFind(projected, new Predicate<FieldPath>() {
+      @Override
+      public boolean apply(FieldPath path) {
+        return Preconditions.checkNotNull(path).equals(ID_FIELD);
+      }
+    }).isPresent();
   }
 
   @Override
