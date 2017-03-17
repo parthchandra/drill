@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.logical.FormatPluginConfig;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.base.AbstractGroupScan;
 import org.apache.drill.exec.server.DrillbitContext;
@@ -42,8 +41,8 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
-import com.mapr.fs.tables.TableProperties;
 import com.mapr.fs.tables.IndexDesc;
+import com.mapr.fs.tables.TableProperties;
 
 public class MapRDBFormatPlugin extends TableFormatPlugin {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBFormatPlugin.class);

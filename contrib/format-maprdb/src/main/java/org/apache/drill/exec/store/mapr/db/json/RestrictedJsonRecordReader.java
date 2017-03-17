@@ -17,11 +17,11 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
+import static org.apache.drill.exec.store.mapr.PluginErrorHandler.dataReadError;
+
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import com.mapr.db.MapRDB;
-import com.mapr.db.impl.IdCodec;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -34,11 +34,9 @@ import org.apache.drill.exec.store.mapr.db.RestrictedMapRDBSubScanSpec;
 import org.apache.drill.exec.vector.BaseValueVector;
 
 import com.google.common.base.Stopwatch;
-import com.mapr.db.ojai.DBDocumentReaderBase;
 import com.mapr.db.Table;
-import org.apache.drill.exec.vector.complex.impl.MapOrListWriterImpl;
-import org.ojai.DocumentReader;
-
+import com.mapr.db.impl.IdCodec;
+import com.mapr.db.ojai.DBDocumentReaderBase;
 
 
 public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
@@ -55,15 +53,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     vectorWriter.setPosition(0);
     try {
       reader = (DBDocumentReaderBase) table.find().iterator().next().asReader();
-      MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
-      if (getIdOnly()) {
-        writeId(writer, reader.getId());
-      } else {
-        if (reader.next() != DocumentReader.EventType.START_MAP) {
-          throw dataReadError("The document did not start with START_MAP!");
-        }
-      }
-      writeToListOrMap(writer, reader);
+      documentWriter.writeDBDocument(vectorWriter, reader);
     }
     catch(UserException e) {
       throw UserException.unsupportedError(e)
@@ -76,7 +66,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
         logger.warn("{}. Dropping the row from result.", e.getMessage());
         logger.debug("Stack trace:", e);
       } else {
-        throw dataReadError(e);
+        throw dataReadError(logger, e);
       }
     }
     finally {
@@ -114,15 +104,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
           vectorWriter.setPosition(recordCount);
           Table table = super.formatPlugin.getJsonTableCache().getTable(subScanSpec.getTableName());
           reader = (DBDocumentReaderBase) table.findById(strRowkey).asReader();
-          MapOrListWriterImpl writer = new MapOrListWriterImpl(vectorWriter.rootAsMap());
-          if (getIdOnly()) {
-            writeId(writer, reader.getId());
-          } else {
-            if (reader.next() != DocumentReader.EventType.START_MAP) {
-              throw dataReadError("The document did not start with START_MAP!");
-            }
-          }
-          writeToListOrMap(writer, reader);
+          documentWriter.writeDBDocument(vectorWriter, reader);
           recordCount++;
           timer2.stop();
         } catch (UserException e) {
@@ -136,7 +118,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
             logger.warn("{}. Dropping the row from result.", e.getMessage());
             logger.debug("Stack trace:", e);
           } else {
-            throw dataReadError(e);
+            throw dataReadError(logger, e);
           }
         }
       }

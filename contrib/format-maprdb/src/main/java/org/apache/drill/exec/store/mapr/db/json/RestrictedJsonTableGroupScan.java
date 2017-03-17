@@ -18,7 +18,6 @@
 package org.apache.drill.exec.store.mapr.db.json;
 
 import java.util.List;
-import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
