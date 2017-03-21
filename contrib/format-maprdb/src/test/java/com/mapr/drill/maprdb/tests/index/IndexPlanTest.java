@@ -27,7 +27,6 @@ import org.apache.drill.PlanTestBase;
 import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -159,7 +158,6 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
-  @Ignore
   public void NonCoveringPlan() throws Exception {
 
     String query = "SELECT t.`name`.`fname` AS `fname` FROM hbase.`index_test_primary` as t " +
@@ -199,7 +197,6 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
-  @Ignore
   public void NonCoveringWithSimpleFieldsOnly() throws Exception {
 
     String query = "SELECT t.rowid AS `rowid` FROM hbase.`index_test_primary` as t " +
@@ -221,7 +218,6 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
-  @Ignore
   public void NonCoveringWithExtraConditonOnPrimary() throws Exception {
 
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
@@ -263,7 +259,6 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 */
   @Test
-  @Ignore
   public void CompositeIndexNonCoveringPlan() throws Exception {
 
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +

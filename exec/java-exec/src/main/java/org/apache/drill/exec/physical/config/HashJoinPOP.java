@@ -84,7 +84,9 @@ public class HashJoinPOP extends AbstractBase {
     @Override
     public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
         Preconditions.checkArgument(children.size() == 2);
-        return new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, isRowKeyJoin);
+        HashJoinPOP hj = new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, isRowKeyJoin);
+        hj.setSubScanForRowKeyJoin(this.getSubScanForRowKeyJoin());
+        return hj;
     }
 
     @Override
