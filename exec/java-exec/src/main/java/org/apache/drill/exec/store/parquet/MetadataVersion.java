@@ -134,6 +134,19 @@ public class MetadataVersion implements Comparable<MetadataVersion> {
     public static final String V3_1 = "3.1";
 
     /**
+     * Version 3.2: An array with the components of the field name in
+     * {@link Metadata.ColumnTypeMetadata_v3.Key} class is replaced by the SchemaPath.<br>
+     * See DRILL-4264
+     */
+    public static final String V3_2 = "3.2";
+
+    /**
+     * Version 3.3: Changed serialization of BINARY and FIXED_LEN_BYTE_ARRAY fields.<br>
+     * See DRILL-4139
+     */
+    public static final String V3_3 = "3.3";
+
+    /**
      * All historical versions of the Drill metadata cache files. In case of introducing a new parquet metadata version
      * please follow the {@link MetadataVersion#FORMAT}.
      */
@@ -141,7 +154,9 @@ public class MetadataVersion implements Comparable<MetadataVersion> {
         new MetadataVersion(V1),
         new MetadataVersion(V2),
         new MetadataVersion(V3),
-        new MetadataVersion(V3_1)
+        new MetadataVersion(V3_1),
+        new MetadataVersion(V3_2),
+        new MetadataVersion(V3_3)
     );
 
     /**
