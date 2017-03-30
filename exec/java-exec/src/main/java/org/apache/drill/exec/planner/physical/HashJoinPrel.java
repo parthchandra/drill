@@ -23,10 +23,11 @@ import java.util.List;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.drill.common.logical.data.JoinCondition;
-import org.apache.drill.exec.physical.base.GroupScan;
+
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.physical.impl.join.JoinUtils;
+import org.apache.drill.exec.physical.impl.join.JoinUtils.JoinControl;
 import org.apache.drill.exec.physical.impl.join.JoinUtils.JoinCategory;
 import org.apache.drill.exec.planner.cost.DrillCostBase.DrillCostFactory;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
@@ -45,24 +46,27 @@ public class HashJoinPrel  extends JoinPrel {
 
   private boolean swapped = false;
   protected boolean isRowKeyJoin = false;
+  private int joinControl;
 
   public HashJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
                       JoinRelType joinType) throws InvalidRelException {
-    this(cluster, traits, left, right, condition, joinType, false, false);
+    this(cluster, traits, left, right, condition, joinType, false, false, JoinControl.DEFAULT);
   }
 
   public HashJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
-      JoinRelType joinType, boolean swapped, boolean isRowKeyJoin) throws InvalidRelException {
+      JoinRelType joinType, boolean swapped, boolean isRowKeyJoin, int joinControl) throws InvalidRelException {
     super(cluster, traits, left, right, condition, joinType);
     this.swapped = swapped;
     this.isRowKeyJoin = isRowKeyJoin;
     joincategory = JoinUtils.getJoinCategory(left, right, condition, leftKeys, rightKeys, filterNulls);
+    this.joinControl = joinControl;
   }
 
   @Override
   public Join copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right, JoinRelType joinType, boolean semiJoinDone) {
     try {
-      return new HashJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType, this.swapped, this.isRowKeyJoin);
+      return new HashJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType, this.swapped,
+          this.isRowKeyJoin, this.joinControl);
     }catch (InvalidRelException e) {
       throw new AssertionError(e);
     }
@@ -84,9 +88,9 @@ public class HashJoinPrel  extends JoinPrel {
     // Depending on whether the left/right is swapped for hash inner join, pass in different
     // combinations of parameters.
     if (! swapped) {
-      return getHashJoinPop(creator, left, right, leftKeys, rightKeys, isRowKeyJoin);
+      return getHashJoinPop(creator, left, right, leftKeys, rightKeys, isRowKeyJoin, joinControl);
     } else {
-      return getHashJoinPop(creator, right, left, rightKeys, leftKeys, isRowKeyJoin);
+      return getHashJoinPop(creator, right, left, rightKeys, leftKeys, isRowKeyJoin, joinControl);
     }
   }
 
@@ -102,7 +106,7 @@ public class HashJoinPrel  extends JoinPrel {
 
   private PhysicalOperator getHashJoinPop(PhysicalPlanCreator creator, RelNode left, RelNode right,
                                           List<Integer> leftKeys, List<Integer> rightKeys,
-                                          boolean isRowKeyJoin) throws IOException{
+                                          boolean isRowKeyJoin, int htControl) throws IOException{
     final List<String> fields = getRowType().getFieldNames();
     assert isUnique(fields);
 
@@ -118,7 +122,7 @@ public class HashJoinPrel  extends JoinPrel {
 
     buildJoinConditions(conditions, leftFields, rightFields, leftKeys, rightKeys);
 
-    HashJoinPOP hjoin = new HashJoinPOP(leftPop, rightPop, conditions, jtype, isRowKeyJoin);
+    HashJoinPOP hjoin = new HashJoinPOP(leftPop, rightPop, conditions, jtype, isRowKeyJoin, htControl);
     return creator.addMetadata(this, hjoin);
   }
 

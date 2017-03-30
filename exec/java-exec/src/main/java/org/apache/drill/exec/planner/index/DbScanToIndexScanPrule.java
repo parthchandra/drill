@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -272,9 +272,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         remainderCondition = indexInfoMap.get(idx).remainderCondition;
       }
       else {
-      /*
       //multiple indexes, let us try to intersect results from multiple index tables
-      IndexScanIntersectGenerator planGen = new IndexScanIntersectGenerator(
+      IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
           call, project, scan, indexInfoMap, builder);
       try {
         planGen.go(filter, convert(scan, scan.getTraitSet()));
@@ -283,7 +282,6 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         return;
       }
       //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
-      */
         return;
       }
 

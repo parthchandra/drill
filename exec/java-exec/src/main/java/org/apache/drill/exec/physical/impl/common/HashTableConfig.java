@@ -33,17 +33,27 @@ public class HashTableConfig  {
   private final List<NamedExpression> keyExprsBuild;
   private final List<NamedExpression> keyExprsProbe;
   private final List<Comparator> comparators;
+  private final int joinControl;
+
+  public HashTableConfig(int initialCapacity, @JsonProperty("loadFactor") float loadFactor,
+                         List<NamedExpression> keyExprsBuild,
+                         List<NamedExpression> keyExprsProbe,
+                        List<Comparator> comparators) {
+    this(initialCapacity,loadFactor, keyExprsBuild, keyExprsProbe, comparators,0);
+  }
 
   @JsonCreator
   public HashTableConfig(@JsonProperty("initialCapacity") int initialCapacity, @JsonProperty("loadFactor") float loadFactor,
                          @JsonProperty("keyExprsBuild") List<NamedExpression> keyExprsBuild,
                          @JsonProperty("keyExprsProbe") List<NamedExpression> keyExprsProbe,
-                         @JsonProperty("comparators") List<Comparator> comparators) {
+                         @JsonProperty("comparators") List<Comparator> comparators,
+                         @JsonProperty("joinControl") int joinControl) {
     this.initialCapacity = initialCapacity;
     this.loadFactor = loadFactor;
     this.keyExprsBuild = keyExprsBuild;
     this.keyExprsProbe = keyExprsProbe;
     this.comparators = comparators;
+    this.joinControl = joinControl;
   }
 
   public int getInitialCapacity() {
@@ -66,4 +76,7 @@ public class HashTableConfig  {
     return comparators;
   }
 
+  public int getJoinControl() {
+    return joinControl;
+  }
 }

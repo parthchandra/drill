@@ -48,6 +48,7 @@ public abstract class DrillJoinRelBase extends Join implements DrillRelNode {
   protected List<Integer> leftKeys = Lists.newArrayList();
   protected List<Integer> rightKeys = Lists.newArrayList();
 
+
   /**
    * The join key positions for which null values will not match.
    */

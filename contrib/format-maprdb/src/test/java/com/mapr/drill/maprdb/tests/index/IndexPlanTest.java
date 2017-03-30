@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -236,7 +236,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     return;
   }
-/* Enable intersect test when intersect plan code is checked in
+
   @Test
   public void Intersect2indexesPlan() throws Exception {
 
@@ -257,7 +257,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     return;
   }
-*/
+
   @Test
   public void CompositeIndexNonCoveringPlan() throws Exception {
 
