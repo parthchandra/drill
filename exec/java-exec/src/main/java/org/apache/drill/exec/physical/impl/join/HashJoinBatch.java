@@ -115,6 +115,9 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
   // Whether this HashJoin is used for a row-key based join
   private boolean isRowKeyJoin = false;
 
+
+  private JoinUtils.JoinControl joinControl;
+
   // An iterator over the build side hash table (only applicable for row-key joins)
   private boolean buildComplete = false;
 
@@ -331,12 +334,13 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
 
     final HashTableConfig htConfig =
         new HashTableConfig((int) context.getOptions().getOption(ExecConstants.MIN_HASH_TABLE_SIZE),
-            HashTable.DEFAULT_LOAD_FACTOR, rightExpr, leftExpr, comparators);
+            HashTable.DEFAULT_LOAD_FACTOR, rightExpr, leftExpr, comparators, joinControl.asInt());
 
     // Create the chained hash table
     final ChainedHashTable ht =
         new ChainedHashTable(htConfig, context, oContext.getAllocator(), this.right, this.left, null);
     hashTable = ht.createAndSetupHashTable(null);
+
   }
 
   public void executeBuildPhase() throws SchemaChangeException, ClassTransformationException, IOException {
@@ -389,12 +393,17 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
 
         // For every record in the build batch , hash the key columns
         for (int i = 0; i < currentRecordCount; i++) {
-          hashTable.put(i, htIndex, 1 /* retry count */);
+          HashTable.PutStatus putResult = hashTable.put(i, htIndex, 1 /* retry count */);
 
                         /* Use the global index returned by the hash table, to store
                          * the current record index and batch index. This will be used
                          * later when we probe and find a match.
                          */
+          //if it is intersect distinct and the key is already in hashtable, skip setCurrentIndex
+          if (joinControl.isIntersectDistinct() && putResult == HashTable.PutStatus.KEY_PRESENT) {
+            continue;
+          }
+
           hjHelper.setCurrentIndex(htIndex.value, buildBatchIndex, i);
         }
 
@@ -525,6 +534,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
     joinType = popConfig.getJoinType();
     conditions = popConfig.getConditions();
     this.isRowKeyJoin = popConfig.isRowKeyJoin();
+    this.joinControl = new JoinUtils.JoinControl(popConfig.getJoinControl());
 
     comparators = Lists.newArrayListWithExpectedSize(conditions.size());
     for (int i=0; i<conditions.size(); i++) {

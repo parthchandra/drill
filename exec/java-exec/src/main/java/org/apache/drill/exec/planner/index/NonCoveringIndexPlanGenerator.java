@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -32,6 +32,7 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.physical.impl.join.JoinUtils.JoinControl;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
@@ -272,7 +273,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     HashJoinPrel hjPrel = new HashJoinPrel(filter.getCluster(), leftTraits, convertedLeft,
         convertedRight, joinCondition, JoinRelType.INNER, false,
-        true /* useful for join-restricted scans */);
+        true /* useful for join-restricted scans */, JoinControl.DEFAULT);
 
     RelNode newRel = hjPrel;
 

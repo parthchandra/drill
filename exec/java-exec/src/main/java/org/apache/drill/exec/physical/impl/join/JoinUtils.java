@@ -263,4 +263,38 @@ public class JoinUtils {
     return isScalarSubquery(left) || isScalarSubquery(right);
   }
 
+  /**
+   * For the int type control,
+   * the meaning of each bit start from lowest:
+   * bit 0: intersect or not, 0 -- default(no intersect), 1 -- INTERSECT (DISTINCT as default)
+   * bit 1: intersect type, 0 -- default (DISTINCT), 1 -- INTERSECT_ALL
+   */
+  public static class JoinControl {
+    public final static int DEFAULT = 0;
+    public final static int INTERSECT_DISTINCT = 0x01;//0001
+    public final static int INTERSECT_ALL = 0x03; //0011
+    public final static int INTERSECT_MASK = 0x03;
+    private final int joinControl;
+
+    public JoinControl(int intControl) {
+      joinControl = intControl;
+    }
+
+    public boolean isIntersect() {
+      return (joinControl & INTERSECT_MASK) != 0;
+    }
+
+    public boolean isIntersectDistinct() {
+      return (joinControl & INTERSECT_MASK) == INTERSECT_DISTINCT;
+    }
+
+    public boolean isIntersectAll() {
+      return (joinControl & INTERSECT_MASK) == INTERSECT_ALL;
+    }
+
+    public int asInt() {
+      return joinControl;
+    }
+
+  }
 }

@@ -31,6 +31,7 @@ import org.apache.drill.exec.compile.sig.RuntimeOverridden;
 import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.planner.common.DrillJoinRelBase;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TransferPair;
@@ -550,8 +551,8 @@ public abstract class HashTableTemplate implements HashTable {
   }
 
   @Override
-  public void put(int incomingRowIdx, IndexPointer htIdxHolder, int retryCount) {
-    put(incomingRowIdx, htIdxHolder);
+  public PutStatus put(int incomingRowIdx, IndexPointer htIdxHolder, int retryCount) {
+    return put(incomingRowIdx, htIdxHolder);
   }
 
   private PutStatus put(int incomingRowIdx, IndexPointer htIdxHolder) {

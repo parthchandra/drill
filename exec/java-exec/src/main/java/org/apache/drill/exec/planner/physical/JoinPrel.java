@@ -69,8 +69,6 @@ public abstract class JoinPrel extends DrillJoinRelBase implements Prel{
 
   /**
    * Check to make sure that the fields of the inputs are the same as the output field names.  If not, insert a project renaming them.
-   * @param implementor
-   * @param i
    * @param offset
    * @param input
    * @return

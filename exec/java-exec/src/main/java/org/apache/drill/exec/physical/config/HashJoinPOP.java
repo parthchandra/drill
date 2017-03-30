@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -46,6 +46,7 @@ public class HashJoinPOP extends AbstractBase {
     private final List<JoinCondition> conditions;
     private final JoinRelType joinType;
     private final boolean isRowKeyJoin;
+    private final int joinControl;
 
     @JsonProperty("subScanForRowKeyJoin")
     private SubScan subScanForRowKeyJoin;
@@ -56,7 +57,7 @@ public class HashJoinPOP extends AbstractBase {
             List<JoinCondition> conditions,
             JoinRelType joinType
     ) {
-        this(left, right, conditions, joinType, false);
+        this(left, right, conditions, joinType, false, 0);
     }
 
     @JsonCreator
@@ -65,7 +66,8 @@ public class HashJoinPOP extends AbstractBase {
             @JsonProperty("right") PhysicalOperator right,
             @JsonProperty("conditions") List<JoinCondition> conditions,
             @JsonProperty("joinType") JoinRelType joinType,
-            @JsonProperty("isRowKeyJoin") boolean isRowKeyJoin
+            @JsonProperty("isRowKeyJoin") boolean isRowKeyJoin,
+            @JsonProperty("joinControl") int joinControl
     ) {
         this.left = left;
         this.right = right;
@@ -74,6 +76,7 @@ public class HashJoinPOP extends AbstractBase {
         this.joinType = joinType;
         this.isRowKeyJoin = isRowKeyJoin;
         this.subScanForRowKeyJoin = null;
+        this.joinControl = joinControl;
     }
 
     @Override
@@ -84,7 +87,7 @@ public class HashJoinPOP extends AbstractBase {
     @Override
     public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
         Preconditions.checkArgument(children.size() == 2);
-        HashJoinPOP hj = new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, isRowKeyJoin);
+        HashJoinPOP hj = new HashJoinPOP(children.get(0), children.get(1), conditions, joinType, isRowKeyJoin, joinControl);
         hj.setSubScanForRowKeyJoin(this.getSubScanForRowKeyJoin());
         return hj;
     }
@@ -115,6 +118,11 @@ public class HashJoinPOP extends AbstractBase {
       return isRowKeyJoin;
     }
 
+    @JsonProperty("joinControl")
+    public int getJoinControl() {
+        return joinControl;
+    }
+
     @JsonProperty("subScanForRowKeyJoin")
     public SubScan getSubScanForRowKeyJoin() {
       return subScanForRowKeyJoin;
@@ -130,7 +138,7 @@ public class HashJoinPOP extends AbstractBase {
             for(JoinCondition c : conditions){
                 flippedConditions.add(c.flip());
             }
-            return new HashJoinPOP(right, left, flippedConditions, JoinRelType.LEFT, isRowKeyJoin);
+            return new HashJoinPOP(right, left, flippedConditions, JoinRelType.LEFT, isRowKeyJoin, joinControl);
         }else{
             return this;
         }

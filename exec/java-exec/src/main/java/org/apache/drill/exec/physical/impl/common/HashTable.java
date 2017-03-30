@@ -61,7 +61,7 @@ public interface HashTable {
 
   public void updateBatches();
 
-  public void put(int incomingRowIdx, IndexPointer htIdxHolder, int retryCount);
+  public PutStatus put(int incomingRowIdx, IndexPointer htIdxHolder, int retryCount);
 
   public int containsKey(int incomingRowIdx, boolean isProbe);
 
