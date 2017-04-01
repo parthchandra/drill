@@ -161,7 +161,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     if ( state == AbstractRecordBatch.BatchState.BUILD_SCHEMA ) {
       return true;
     }
-     if( state == AbstractRecordBatch.BatchState.FIRST) {
+    if( state == AbstractRecordBatch.BatchState.FIRST) {
        rss.getJoinForSubScan().setState(AbstractRecordBatch.BatchState.NOT_FIRST);
       return true;
     }
