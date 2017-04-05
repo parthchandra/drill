@@ -32,10 +32,9 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
 import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
-import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
-import java.util.BitSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,8 +101,36 @@ public class IndexConditionInfo {
     /**
      * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
      * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
-     * that are relevant to this.indexes
-     * @return
+     * that are relevant to this.indexes. The conditions are separated on LEADING index columns.
+     * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
+     */
+    public Map<IndexDescriptor, IndexConditionInfo> getLeadingKeyIndexConditionMap() {
+
+      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = Maps.newLinkedHashMap();
+
+      RexNode initCondition = condition;
+      for(IndexDescriptor index : indexes) {
+        List<SchemaPath> leadingColumns = new ArrayList<>();
+        if(initCondition.isAlwaysTrue()) {
+          break;
+        }
+        //TODO: Ensure we dont get NULL pointer exceptions
+        leadingColumns.add(index.getIndexColumns().get(0));
+        IndexConditionInfo info = indexConditionRelatedToFields(leadingColumns, initCondition);
+        if(info == null || info.hasIndexCol == false) {
+          continue;
+        }
+        indexInfoMap.put(index, info);
+        initCondition = info.remainderCondition;
+      }
+      return indexInfoMap;
+    }
+
+    /**
+     * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
+     * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
+     * that are relevant to this.indexes. The conditions are separated based on index columns.
+     * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
      */
     public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap() {
 

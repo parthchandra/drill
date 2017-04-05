@@ -24,6 +24,7 @@ import com.sun.tools.javac.util.Pair;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.logical.DrillTable;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.Collection;
 
@@ -31,11 +32,11 @@ import java.util.Collection;
 public abstract class AbstractIndexGroupScan extends AbstractGroupScan implements IndexGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexGroupScan.class);
 
-  protected Pair<RexNode, Long> conditionRowCountPair;
-  protected long maxRowCount = ScanStats.TRIVIAL_TABLE.getRecordCount();
+  protected Pair<RexNode, Double> conditionRowCountPair;
+  protected double maxRowCount = ScanStats.TRIVIAL_TABLE.getRecordCount();
   public AbstractIndexGroupScan(String userName) {
     super(userName);
-    conditionRowCountPair = new Pair<>((RexNode)null, (long)0);
+    conditionRowCountPair = new Pair<>((RexNode)null, 0.0);
   }
 
   public AbstractIndexGroupScan(AbstractIndexGroupScan that) {
@@ -51,13 +52,13 @@ public abstract class AbstractIndexGroupScan extends AbstractGroupScan implement
   }
 
   @Override
-  public void setRowCount(RexNode condition, long count, long capCount) {
-    this.maxRowCount = capCount;
+  public void setRowCount(RexNode condition, double count, double capCount) {
+    this.maxRowCount = (long)capCount;
     this.conditionRowCountPair = new Pair<>(condition, count);
   }
 
   @Override
-  public long getRowCount(RexNode condition) {
+  public double getRowCount(RexNode condition, ScanPrel scanPrel) {
     if(this.conditionRowCountPair.fst != null &&
         (this.conditionRowCountPair.fst == condition)) {
       return this.conditionRowCountPair.snd;

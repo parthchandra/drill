@@ -31,6 +31,7 @@ import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
+import org.apache.drill.exec.planner.index.MapRDBStatistics;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
@@ -52,8 +53,9 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
                             @JsonProperty("storage") FileSystemPlugin storagePlugin,
                             @JsonProperty("format") MapRDBFormatPlugin formatPlugin,
                             @JsonProperty("scanSpec") JsonScanSpec scanSpec, /* scan spec of the original table */
-                            @JsonProperty("columns") List<SchemaPath> columns) {
-    super(userName, storagePlugin, formatPlugin, scanSpec, columns);
+                            @JsonProperty("columns") List<SchemaPath> columns,
+                            @JsonProperty("")MapRDBStatistics statistics) {
+    super(userName, storagePlugin, formatPlugin, scanSpec, columns, statistics);
   }
 
   // TODO:  this method needs to be fully implemented

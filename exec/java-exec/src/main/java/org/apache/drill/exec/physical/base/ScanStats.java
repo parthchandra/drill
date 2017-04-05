@@ -24,12 +24,12 @@ public class ScanStats {
 
   public static final ScanStats ZERO_RECORD_TABLE = new ScanStats(GroupScanProperty.EXACT_ROW_COUNT, 0, 1, 1);
 
-  private final long recordCount;
-  private final float cpuCost;
-  private final float diskCost;
+  private final double recordCount;
+  private final double cpuCost;
+  private final double diskCost;
   private final GroupScanProperty property;
 
-  public ScanStats(GroupScanProperty property, long recordCount, float cpuCost, float diskCost) {
+  public ScanStats(GroupScanProperty property, double recordCount, double cpuCost, double diskCost) {
     super();
     this.recordCount = recordCount;
     this.cpuCost = cpuCost;
@@ -37,15 +37,15 @@ public class ScanStats {
     this.property = property;
   }
 
-  public long getRecordCount() {
+  public double getRecordCount() {
     return recordCount;
   }
 
-  public float getCpuCost() {
+  public double getCpuCost() {
     return cpuCost;
   }
 
-  public float getDiskCost() {
+  public double getDiskCost() {
     return diskCost;
   }
 

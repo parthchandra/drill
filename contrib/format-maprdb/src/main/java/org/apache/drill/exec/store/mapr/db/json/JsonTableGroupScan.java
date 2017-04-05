@@ -20,20 +20,30 @@ package org.apache.drill.exec.store.mapr.db.json;
 import static org.apache.drill.exec.store.mapr.db.util.CommonFns.isNullOrEmpty;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.FieldReference;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
+import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.planner.physical.PartitionFunction;
+import org.apache.drill.exec.planner.index.IndexDescriptor;
+import org.apache.drill.exec.planner.index.MapRDBIndexDescriptor;
+import org.apache.drill.exec.planner.index.MapRDBStatistics;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -66,7 +76,21 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JsonTableGroupScan.class);
 
   public static final String TABLE_JSON = "json";
-
+  /*
+   * The <forcedRowCountMap> maintains a mapping of <RexNode, Rowcount>. These RowCounts take precedence over
+   * anything computed using <MapRDBStatistics> stats. Currently, it is used for picking index plans with the
+   * index_selectivity_factor. We forcibly set the full table rows as HUGE <Statistics.ROWCOUNT_HUGE> in this
+   * map when the selectivity of the index is lower than index_selectivity_factor. During costing, the table
+   * rowCount is returned as HUGE instead of the correct <stats> rowcount. This results in the planner choosing
+   * the cheaper index plans!
+   * NOTE: Full table rowCounts are specified with the NULL condition. e.g. forcedRowCountMap<NULL, 1000>
+   */
+  protected Map<RexNode, Double> forcedRowCountMap;
+  /*
+   * This stores the statistics associated with this GroupScan. Please note that the stats must be initialized
+   * before using it to compute filter row counts based on query conditions.
+   */
+  protected MapRDBStatistics stats;
   protected MapRDBTableStats tableStats;
   protected JsonScanSpec scanSpec;
   protected long rowCount;
@@ -88,6 +112,18 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
                             MapRDBFormatPlugin formatPlugin, JsonScanSpec scanSpec, List<SchemaPath> columns) {
     super(storagePlugin, formatPlugin, columns, userName);
     this.scanSpec = scanSpec;
+    this.stats = new MapRDBStatistics();
+    this.forcedRowCountMap = new HashMap<>();
+    init();
+  }
+
+  public JsonTableGroupScan(String userName, FileSystemPlugin storagePlugin,
+                            MapRDBFormatPlugin formatPlugin, JsonScanSpec scanSpec, List<SchemaPath> columns,
+                            MapRDBStatistics stats) {
+    super(storagePlugin, formatPlugin, columns, userName);
+    this.scanSpec = scanSpec;
+    this.stats = stats;
+    this.forcedRowCountMap = new HashMap<>();
     init();
   }
 
@@ -99,7 +135,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     super(that);
     this.scanSpec = that.scanSpec;
     this.endpointFragmentMapping = that.endpointFragmentMapping;
+    this.stats = that.stats;
     this.tableStats = that.tableStats;
+    this.forcedRowCountMap = that.forcedRowCountMap;
   }
 
   @Override
@@ -109,18 +147,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     return newScan;
   }
 
-  /**
-   * Create a new groupScan, which is a clone of this.
-   * Initialize scanSpec.
-   * We should recompute regionsToScan as it depends upon scanSpec.
-   * @param scanSpec
-   */
-  public JsonTableGroupScan clone(JsonScanSpec scanSpec) {
-    JsonTableGroupScan newScan = new JsonTableGroupScan(this);
-    newScan.scanSpec = scanSpec;
-    newScan.computeRegionsToScan();
-    return newScan;
-  }
 
   /**
    * Compute regions to scan based on the scanSpec
@@ -142,6 +168,13 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     }
   }
 
+  public GroupScan clone(JsonScanSpec scanSpec) {
+    JsonTableGroupScan newScan = new JsonTableGroupScan(this);
+    newScan.scanSpec = scanSpec;
+    return newScan;
+  }
+
+  @SuppressWarnings("deprecation")
   private void init() {
     logger.debug("Getting tablet locations");
     try {
@@ -189,9 +222,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @Override
   public MapRDBSubScan getSpecificScan(int minorFragmentId) {
     assert minorFragmentId < endpointFragmentMapping.size() : String.format(
-        "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.", endpointFragmentMapping.size(),
-        minorFragmentId);
-    return new MapRDBSubScan(getUserName(), formatPlugin, endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
+        "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.",
+        endpointFragmentMapping.size(), minorFragmentId);
+    return new MapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(),
+        getStoragePlugin().getConfig(), endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
   }
 
   @Override
@@ -201,10 +235,25 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       return indexScanStats();
     }
 
-    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
+    double rowCount = stats.getRowCount(scanSpec.getCondition());
+    // If UNKNOWN, use defaults
+    if (rowCount == Statistics.ROWCOUNT_UNKNOWN) {
+      rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows();
+    }
     final int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
-    float diskCost = avgColumnSize * numColumns * rowCount;
+    double diskCost = avgColumnSize * numColumns * rowCount;
+    /*
+     * Table scan cost made INFINITE in order to pick index plans. Use the MAX possible rowCount for
+     * costing purposes.
+     * NOTE: Full table rowCounts are specified with the NULL condition.
+     * e.g. forcedRowCountMap<NULL, 1000>
+     */
+    if (forcedRowCountMap.get(null) != null && //Forced full table rowcount and it is HUGE
+        forcedRowCountMap.get(null) == Statistics.ROWCOUNT_HUGE) {
+      rowCount = Statistics.ROWCOUNT_HUGE;
+      diskCost = Statistics.ROWCOUNT_HUGE;
+    }
     logger.debug("JsonGroupScan:{} rowCount:{}, diskCost:{}", this, rowCount, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
@@ -213,12 +262,17 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     int totalColNum = 100;
     boolean filterPushed = (scanSpec.getSerializedFilter() != null);
     if(scanSpec != null && scanSpec.getIndexDesc() != null) {
-      totalColNum = scanSpec.getIndexDesc().getCoveredFields().size() + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
+      totalColNum = scanSpec.getIndexDesc().getCoveredFields().size()
+          + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
     }
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
-    long rowCount = (long) ((filterPushed ? 0.0001f : 0.001f) * tableStats.getNumRows());
+    double rowCount = stats.getRowCount(scanSpec.getCondition());
+    // If UNKNOWN, use defaults
+    if (rowCount == Statistics.ROWCOUNT_UNKNOWN) {
+      rowCount = (filterPushed ? 0.0001f : 0.001f) * tableStats.getNumRows();
+    }
     final int avgColumnSize = 10;
-    float diskCost = avgColumnSize * numColumns * rowCount;
+    double diskCost = avgColumnSize * numColumns * rowCount;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
@@ -284,31 +338,96 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
             this.getStoragePlugin(),
             this.getFormatPlugin(),
             this.getScanSpec(),
-            this.getColumns());
+            this.getColumns(),
+            this.getStatistics());
     newScan.columns = columns;
     return newScan;
   }
 
   /**
-   *
-   * @param condition
-   * @param count
+   * Get the estimated row count after applying the {@link RexNode} condition
+   * @param condition, filter to apply
+   * @param index, to use for generating the estimate
+   * @return row count post filtering
    */
-  @Override
-  @JsonIgnore
-  public void setRowCount(RexNode condition, long count, long capRowCount) {
-    rowCount = count;
+  public double getEstimatedRowCount(QueryCondition condition, IndexDescriptor index, ScanPrel scanPrel) {
+    if (condition == null) {
+      return Statistics.ROWCOUNT_UNKNOWN;
+    }
+    return getEstimatedRowCountInternal(condition,
+        (IndexDesc)((MapRDBIndexDescriptor)index).getOriginalDesc(), scanPrel);
   }
 
   /**
-   *
-   * @param condition, with this condition to search the possible rowCount
-   * @return rowCount of records of certain condition
+   * Get the estimated row count after applying the {@link QueryCondition} condition
+   * @param condition, filter to apply
+   * @param index, to use for generating the estimate
+   * @return row count post filtering
+   */
+  private double getEstimatedRowCountInternal(QueryCondition condition, IndexDesc index, ScanPrel scanPrel) {
+    // double totalRows = getRowCount(null, scanPrel);
+    // Get the index table and use the DB API to get the estimated number of rows
+    Table primaryTable;
+    if (scanSpec.isSecondaryIndex()) {
+      // If stats not cached get it from the table.
+      primaryTable = MapRDB.getTable(scanSpec.getPrimaryTablePath());
+    } else {
+      primaryTable = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName());
+    }
+    Table idxTable = MapRDB.getIndexTable(primaryTable.getPath(), index.getIndexFid(), index.getIndexName());
+    if (idxTable != null) {
+      return idxTable.getMetaTable().getScanStats(condition).getEstimatedNumRows();
+    } else {
+      return Statistics.ROWCOUNT_UNKNOWN;
+    }
+  }
+  /**
+   * Set the row count resulting from applying the {@link RexNode} condition. Forced row counts will take
+   * precedence over stats row counts
+   * @param condition
+   * @param count
+   * @param capRowCount
    */
   @Override
   @JsonIgnore
-  public long getRowCount(RexNode condition) {
-    return rowCount;
+  public void setRowCount(RexNode condition, double count, double capRowCount) {
+    forcedRowCountMap.put(condition, count);
+  }
+
+  @Override
+  public void setStatistics(Statistics statistics) {
+    assert statistics instanceof MapRDBStatistics : String.format(
+        "Passed unexpected statistics instance. Expects MAPR-DB Statistics instance");
+    this.stats = ((MapRDBStatistics) statistics);
+  }
+
+  /**
+   * Get the row count after applying the {@link RexNode} condition
+   * @param condition, filter to apply
+   * @return row count post filtering
+   */
+  @Override
+  @JsonIgnore
+  public double getRowCount(RexNode condition, ScanPrel scanPrel) {
+    // Do not use statistics if row count is forced. Forced rowcounts take precedence over stats
+    if (forcedRowCountMap.get(condition) != null) {
+      return forcedRowCountMap.get(condition);
+    }
+    if (condition != null) {
+      return stats.getRowCount(condition, scanPrel);
+    } else {
+      return tableStats.getNumRows();
+    }
+  }
+
+  @Override
+  public void initializeStatistics(RexBuilder builder, PlannerSettings settings) {
+    stats.init(builder, settings);
+  }
+
+  @Override
+  public MapRDBStatistics getStatistics() {
+    return stats;
   }
 
   @Override
@@ -323,4 +442,19 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     return new JsonTableRangePartitionFunction(refList, scanSpec.getTableName());
   }
 
+  /**
+   * Convert a given {@link LogicalExpression} condition into a {@link QueryCondition} condition
+   * @param condition expressed as a {@link LogicalExpression}
+   * @return {@link QueryCondition} condition equivalent to the given expression
+   */
+  @JsonIgnore
+  public QueryCondition convertToQueryCondition(LogicalExpression condition) {
+    final JsonConditionBuilder jsonConditionBuilder = new JsonConditionBuilder(this, condition);
+    final JsonScanSpec newScanSpec = jsonConditionBuilder.parseTree();
+    if (newScanSpec != null) {
+      return newScanSpec.getCondition();
+    } else {
+      return null;
+    }
+  }
 }
