@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.planner.physical;
 
+import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -44,7 +45,13 @@ public class ScanPrule extends Prule{
 
     final RelTraitSet traits = scan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition);
 
-    final DrillScanPrel newScan = ScanPrel.create(scan, traits, groupScan, scan.getRowType());
+    final ScanPrel newScan = ScanPrel.create(scan, traits, groupScan, scan.getRowType());
+    if (newScan.getGroupScan() instanceof DbGroupScan) {
+      // We finally have a physical scan rel - initialize statistics
+      DbGroupScan dbScan = ((DbGroupScan) scan.getGroupScan());
+      dbScan.initializeStatistics(newScan.getCluster().getRexBuilder(),
+          PrelUtil.getPlannerSettings(call.getPlanner()));
+    }
 
     call.transformTo(newScan);
   }

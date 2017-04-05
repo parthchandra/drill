@@ -95,6 +95,7 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       PlannerSettings.INDEX_FORCE_SORT_NONCOVERING,
       PlannerSettings.INDEX_USE_HASHJOIN_NONCOVERING,
       PlannerSettings.USE_SIMPLE_OPTIMIZER,
+      PlannerSettings.INDEX_SELECTIVITY_FACTOR,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,

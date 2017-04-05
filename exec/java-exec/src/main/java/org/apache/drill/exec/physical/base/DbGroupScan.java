@@ -18,14 +18,18 @@
 package org.apache.drill.exec.physical.base;
 
 import org.apache.drill.common.expression.FieldReference;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.index.IndexCollection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
-import org.apache.drill.exec.planner.physical.DrillDistributionTrait.DistributionField;
 import org.apache.drill.exec.planner.physical.PartitionFunction;
+import org.apache.drill.exec.planner.index.Statistics;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.List;
@@ -45,6 +49,39 @@ public interface DbGroupScan extends GroupScan {
    */
   @JsonIgnore
   public IndexCollection getSecondaryIndexCollection(DrillScanRelBase scan);
+
+  /**
+   * Set the artificial row count after applying the {@link RexNode} condition
+   * @param condition
+   * @param count
+   * @param capRowCount
+   */
+  @JsonIgnore
+  public void setRowCount(RexNode condition, double count, double capRowCount);
+
+  /**
+   * Get the row count after applying the {@link RexNode} condition
+   * @param condition, filter to apply
+   * @param scanPrel, the current scan physical rel
+   * @return row count post filtering
+   */
+  @JsonIgnore
+  public double getRowCount(RexNode condition, ScanPrel scanPrel);
+
+  /**
+   * Get the statistics for this {@link DbGroupScan}
+   * @return the {@link Statistics} for this Scan
+   */
+  @JsonIgnore
+  public Statistics getStatistics();
+
+  /**
+   * Initialize the statistics
+   * @param builder - The expression builder
+   * @param settings - The planner settings
+   */
+  @JsonIgnore
+  public void initializeStatistics(RexBuilder builder, PlannerSettings settings);
 
   public List<SchemaPath> getColumns();
 
@@ -81,12 +118,11 @@ public interface DbGroupScan extends GroupScan {
   @JsonIgnore
   SchemaPath getRowKeyPath();
 
-/**
- * Get a partition function instance for range based partitioning
- * @param refList a list of FieldReference exprs that are participating in the range partitioning
- * @return instance of a partitioning function
- */
+  /**
+   * Get a partition function instance for range based partitioning
+   * @param refList a list of FieldReference exprs that are participating in the range partitioning
+   * @return instance of a partitioning function
+   */
   @JsonIgnore
   PartitionFunction getRangePartitionFunction(List<FieldReference> refList);
-
 }

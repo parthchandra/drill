@@ -85,6 +85,7 @@ public class PlannerSettings implements Context{
   public static final BooleanValidator INDEX_PLANNING = new BooleanValidator("planner.enable_index_planning", true);
   public static final BooleanValidator INDEX_FORCE_SORT_NONCOVERING = new BooleanValidator("planner.index_force_sort_noncovering", false);
   public static final BooleanValidator INDEX_USE_HASHJOIN_NONCOVERING = new BooleanValidator("planner.index_use_hashjoin_noncovering", false);
+  public static final RangeDoubleValidator INDEX_SELECTIVITY_FACTOR = new RangeDoubleValidator("planner.index_selectivity_factor", 0.0, 1.0, 0.8);
   public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
   public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY, false);
 
@@ -277,6 +278,10 @@ public class PlannerSettings implements Context{
 
   public boolean isIndexUseHashJoinNonCovering() {
     return options.getOption(INDEX_USE_HASHJOIN_NONCOVERING);
+  }
+
+  public double getIndexSelectivityFactor() {
+    return options.getOption(INDEX_SELECTIVITY_FACTOR);
   }
 
   public boolean isUseSimpleOptimizer() {
