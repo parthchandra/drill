@@ -100,7 +100,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`contact`.`phone` AS `phone` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexFid="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
         new String[]{"HashJoin"}
     );
 
@@ -121,7 +121,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexFid="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
         new String[]{"HashJoin"}
     );
 
@@ -143,7 +143,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.contact.phone = '6500005471'";
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary"},
-        new String[]{"HashJoin", "indexFid="}
+        new String[]{"HashJoin", "indexName="}
     );
 
     System.out.println("No Index Plan Verified!");
@@ -164,7 +164,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`name`.`fname` AS `fname` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"HashJoin", ".*JsonTableGroupScan.*tableName=.*index_test_primary,", ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
+        new String[] {"HashJoin", ".*JsonTableGroupScan.*tableName=.*index_test_primary,", ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
         new String[]{}
     );
 
@@ -184,7 +184,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t._id AS `rowid` FROM hbase.`index_test_primary` as t " +
         " where t.driverlicense = '100007423'";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
+        new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
         new String[]{"HashJoin"}
     );
 
@@ -205,7 +205,7 @@ public class IndexPlanTest extends BaseJsonTest {
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin(.*[\n\r])+.*" +
             "JsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
-            "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="},
+            "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
         new String[]{}
     );
 
@@ -225,7 +225,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.personal.age = 53 AND t.name.fname='KfFzK'";
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin", ".*RestrictedJsonTableGroupScan",
-            ".*JsonTableGroupScan.*indexFid=",},
+            ".*JsonTableGroupScan.*indexName=",},
         new String[]{}
     );
 
@@ -244,7 +244,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
         " where t.personal.age = 53 AND t.personal.income=45";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexFid=(.*[\n\r])+.*JsonTableGroupScan.*indexFid="},
+        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
         new String[]{}
     );
 
@@ -266,7 +266,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
 
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexFid="},
+        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
         null
     );
 
@@ -286,7 +286,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`address`.`city` AS `city` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*indexFid="},
+        new String[] {".*JsonTableGroupScan.*indexName="},
         new String[]{"HashJoin", "Filter"}
     );
 

@@ -112,8 +112,14 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
 
   @Override
   public ScanStats getScanStats() {
-    //TODO: model the cost for restricted scan
-    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
+    //TODO: ideally here we should use the rowcount from index scan, and multiply a factor of restricted scan
+    int totalColNum = 10;
+    int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
+    long rowCount = (long)(0.001f * tableStats.getNumRows());
+    final int avgColumnSize = 10;
+    float diskCost = avgColumnSize * numColumns * rowCount;
+    return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
+    //return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
   }
 
   @Override

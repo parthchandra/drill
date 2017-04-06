@@ -159,7 +159,7 @@ public class JsonScanSpec {
 
   @Override
   public String toString() {
-    String fidInfo = (getIndexFid() != null)? ", indexFid=" + getIndexFid() : "";
+    String fidInfo = (getIndexFid() != null)? ", indexName=" + getIndexName() : "";
     return "JsonScanSpec [tableName=" + tableName
         + ", condition=" + (condition == null ? null : condition.toString())
         + fidInfo
