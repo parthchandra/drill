@@ -200,7 +200,8 @@ public class MaprDBTestsSuite {
       table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user005\", \"age\":54, \"name\": {\"first\":\"David\", \"last\":\"Ackert\"}}"));
       table.flush();
 
-      DBTests.waitForIndexFlush(table.getPath());
+      //DBTests.waitForIndexFlush(table.getPath());
+      Thread.sleep(1000);
     }
 
   }

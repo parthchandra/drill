@@ -180,7 +180,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       totalColNum = scanSpec.getIndexDesc().getCoveredFields().size() + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
     }
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
-    long rowCount = (long) ((filterPushed ? 0.001f : 0.01f) * tableStats.getNumRows());
+    long rowCount = (long) ((filterPushed ? 0.0001f : 0.001f) * tableStats.getNumRows());
     final int avgColumnSize = 10;
     float diskCost = avgColumnSize * numColumns * rowCount;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);

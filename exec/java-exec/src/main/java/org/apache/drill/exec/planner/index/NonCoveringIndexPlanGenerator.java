@@ -164,7 +164,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
   // Range distribute the right side of the join, on row keys using a range partitioning function
-  private RelNode createRangeDistRight(final ProjectPrel rightIndexProjectPrel,
+  protected RelNode createRangeDistRight(final RelNode rightPrel,
       final RelDataTypeField rightRowKeyField,
       final DbGroupScan origDbGroupScan) {
 
@@ -179,7 +179,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         ImmutableList.copyOf(rangeDistFields), origDbGroupScan.getRangePartitionFunction(rangeDistRefList));
 
     RelTraitSet rightTraits = newTraitSet(distRangeRight).plus(Prel.DRILL_PHYSICAL);
-    RelNode convertedRight = Prule.convert(rightIndexProjectPrel, rightTraits);
+    RelNode convertedRight = Prule.convert(rightPrel, rightTraits);
 
     return convertedRight;
   }

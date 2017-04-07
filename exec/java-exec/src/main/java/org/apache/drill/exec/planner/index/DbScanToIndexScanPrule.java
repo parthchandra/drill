@@ -263,7 +263,7 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         return;
       }
 
-      //if there is only one index found, no need to o intersect, but just a regular non-covering plan
+      //if there is only one index found, no need to do intersect, but just a regular non-covering plan
       //some part of filter condition needs to apply on primary table.
       if(indexInfoMap.size() == 1) {
         IndexDescriptor idx = indexInfoMap.keySet().iterator().next();
@@ -272,9 +272,11 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         remainderCondition = indexInfoMap.get(idx).remainderCondition;
       }
       else {
-      //multiple indexes, let us try to intersect results from multiple index tables
-      IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
-          call, project, scan, indexInfoMap, builder);
+        //multiple indexes, let us try to intersect results from multiple index tables
+        //TODO: make sure the smallest selectivity of these indexes times rowcount smaller than broadcast threshold
+
+        IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
+            call, project, scan, indexInfoMap, builder);
       try {
         planGen.go(filter, convert(scan, scan.getTraitSet()));
       } catch (Exception e) {

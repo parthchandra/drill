@@ -27,18 +27,25 @@ import org.apache.drill.PlanTestBase;
 import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.FixMethodOrder;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.runners.MethodSorters;
 
 import java.util.List;
 
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @Category(ClusterTest.class)
 public class IndexPlanTest extends BaseJsonTest {
 
   final static String PRIMARY_TABLE_NAME = "/tmp/index_test_primary";
   final static List<TableName> indexes = Lists.newArrayList();
   final static int PRIMARY_TABLE_SIZE = 10000;
+  private static final String sliceTargetSmall = "alter session set `planner.slice_target` = 1";
+  private static final String sliceTargetDefault = "alter session reset `planner.slice_target`";
+  private static final String noIndexPlan = "alter session set `planner.enable_index_planning` = false";
+  private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
 
   /**
    *  A sample row of this 10K table:
@@ -99,6 +106,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`contact`.`phone` AS `phone` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
         new String[]{"HashJoin"}
@@ -117,9 +125,9 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test
   public void CoveringPlanWithOnlyIndexedField() throws Exception {
-
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
         new String[]{"HashJoin"}
@@ -128,6 +136,7 @@ public class IndexPlanTest extends BaseJsonTest {
     System.out.println("Covering Plan Verified!");
 
     testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
         .sqlQuery(query)
         .ordered()
         .baselineColumns("ssn").baselineValues("100007423")
@@ -141,6 +150,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.contact.phone = '6500005471'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary"},
         new String[]{"HashJoin", "indexName="}
@@ -163,6 +173,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`name`.`fname` AS `fname` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin", ".*JsonTableGroupScan.*tableName=.*index_test_primary,", ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
         new String[]{}
@@ -178,11 +189,40 @@ public class IndexPlanTest extends BaseJsonTest {
 
     return;
   }
+
+  @Test
+  public void RangeConditionIndexPlan() throws Exception {
+    String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
+        " where t.personal.age > 52 AND t.name.fname='KfFzK'";
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin", ".*JsonTableGroupScan.*tableName=.*index_test_primary,", ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
+        new String[]{}
+    );
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .optionSettingQueriesForBaseline(noIndexPlan)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+
+    testBuilder()
+        .optionSettingQueriesForTestQuery(sliceTargetSmall)
+        .optionSettingQueriesForBaseline(sliceTargetDefault)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+  }
+
   @Test
   public void CoveringWithSimpleFieldsOnly() throws Exception {
 
     String query = "SELECT t._id AS `rowid` FROM hbase.`index_test_primary` as t " +
         " where t.driverlicense = '100007423'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
         new String[]{"HashJoin"}
@@ -202,6 +242,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.rowid AS `rowid` FROM hbase.`index_test_primary` as t " +
         " where t.driverlicense = '100007423'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin(.*[\n\r])+.*" +
             "JsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
@@ -223,6 +264,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
         " where t.personal.age = 53 AND t.name.fname='KfFzK'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin", ".*RestrictedJsonTableGroupScan",
             ".*JsonTableGroupScan.*indexName=",},
@@ -243,6 +285,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
         " where t.personal.age = 53 AND t.personal.income=45";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
         new String[]{}
@@ -255,7 +298,14 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("lname").baselineValues("foNwtze")
         .baselineColumns("lname").baselineValues("qGZVfY")
         .go();
-
+    testBuilder()
+        .optionSettingQueriesForTestQuery(sliceTargetSmall)
+        .optionSettingQueriesForBaseline(sliceTargetDefault)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
     return;
   }
 
@@ -264,7 +314,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
-
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
         null
@@ -277,6 +327,14 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("ssn").baselineValues("100008861")
         .go();
 
+    testBuilder()
+        .optionSettingQueriesForTestQuery(sliceTargetSmall)
+        .optionSettingQueriesForBaseline(sliceTargetDefault)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
     return;
   }
 
@@ -285,6 +343,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     String query = "SELECT t.`address`.`city` AS `city` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
+    test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*JsonTableGroupScan.*indexName="},
         new String[]{"HashJoin", "Filter"}
@@ -296,10 +355,18 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("city").baselineValues("pfrrs")
         .baselineColumns("city").baselineValues("pfrrs")
         .go();
+
+    testBuilder()
+        .optionSettingQueriesForTestQuery(sliceTargetSmall)
+        .optionSettingQueriesForBaseline(sliceTargetDefault)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
     return;
   }
 
-  @Ignore  // ignored until table is created with multiple regions (this is needed for the parallel plan)
   @Test
   public void TestNonCoveringRangePartition_1() throws Exception {
 
@@ -308,22 +375,24 @@ public class IndexPlanTest extends BaseJsonTest {
     String[] expectedPlan = new String[] {"HashJoin(.*[\n\r])+.*" +
         "RestrictedJsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
         "RangePartitionExchange(.*[\n\r])+.*" +
-    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexFid="};
-
+    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="};
+    test(defaultHavingIndexPlan);
+    test(sliceTargetSmall);
     PlanTestBase.testPlanMatchingPatterns(query,
         expectedPlan, new String[]{});
 
     try {
       testBuilder()
-      .sqlQuery(query)
-      .unOrdered()
-      .optionSettingQueriesForTestQuery("alter session set `planner.slice_target` = 1")
-      .baselineColumns("lname").baselineValues("UZwNk")
-      .baselineColumns("lname").baselineValues("foNwtze")
-      .baselineColumns("lname").baselineValues("qGZVfY")
-      .go();
+          .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+          .optionSettingQueriesForBaseline(noIndexPlan)
+          .unOrdered()
+          .sqlQuery(query)
+          .sqlBaselineQuery(query)
+          .build()
+          .run();
     } finally {
-      test("alter session reset `planner.slice_target`");
+      test(defaultHavingIndexPlan);
+      test(sliceTargetDefault);
     }
     return;
   }
