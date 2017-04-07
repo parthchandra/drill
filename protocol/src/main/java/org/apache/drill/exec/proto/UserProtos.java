@@ -131,17 +131,29 @@ public final class UserProtos {
      */
     GET_SERVER_META(13, 8),
     /**
+     * <code>NEW_SESSION = 25;</code>
+     */
+    NEW_SESSION(14, 25),
+    /**
+     * <code>RUN_QUERY_WITH_SESSION = 27;</code>
+     */
+    RUN_QUERY_WITH_SESSION(15, 27),
+    /**
+     * <code>CLOSE_SESSION = 28;</code>
+     */
+    CLOSE_SESSION(16, 28),
+    /**
      * <code>QUERY_DATA = 6;</code>
      *
      * <pre>
      * bit to user
      * </pre>
      */
-    QUERY_DATA(14, 6),
+    QUERY_DATA(17, 6),
     /**
      * <code>QUERY_HANDLE = 7;</code>
      */
-    QUERY_HANDLE(15, 7),
+    QUERY_HANDLE(18, 7),
     /**
      * <code>QUERY_PLAN_FRAGMENTS = 13;</code>
      *
@@ -149,7 +161,7 @@ public final class UserProtos {
      * return plan fragments
      * </pre>
      */
-    QUERY_PLAN_FRAGMENTS(16, 13),
+    QUERY_PLAN_FRAGMENTS(19, 13),
     /**
      * <code>CATALOGS = 18;</code>
      *
@@ -157,7 +169,7 @@ public final class UserProtos {
      * return catalogs metadata in response to GET_CATALOGS
      * </pre>
      */
-    CATALOGS(17, 18),
+    CATALOGS(20, 18),
     /**
      * <code>SCHEMAS = 19;</code>
      *
@@ -165,7 +177,7 @@ public final class UserProtos {
      * return schema metadata in response to GET_SCHEMAS
      * </pre>
      */
-    SCHEMAS(18, 19),
+    SCHEMAS(21, 19),
     /**
      * <code>TABLES = 20;</code>
      *
@@ -173,7 +185,7 @@ public final class UserProtos {
      * return table metadata in response to GET_TABLES
      * </pre>
      */
-    TABLES(19, 20),
+    TABLES(22, 20),
     /**
      * <code>COLUMNS = 21;</code>
      *
@@ -181,7 +193,7 @@ public final class UserProtos {
      * return column metadata in response to GET_COLUMNS
      * </pre>
      */
-    COLUMNS(20, 21),
+    COLUMNS(23, 21),
     /**
      * <code>PREPARED_STATEMENT = 23;</code>
      *
@@ -189,7 +201,7 @@ public final class UserProtos {
      * return preparated statement in response to CREATE_PREPARED_STATEMENT
      * </pre>
      */
-    PREPARED_STATEMENT(21, 23),
+    PREPARED_STATEMENT(24, 23),
     /**
      * <code>SERVER_META = 9;</code>
      *
@@ -197,7 +209,7 @@ public final class UserProtos {
      * return server infos in respose to GET_SERVER_META
      * </pre>
      */
-    SERVER_META(22, 9),
+    SERVER_META(25, 9),
     /**
      * <code>QUERY_RESULT = 10;</code>
      *
@@ -205,7 +217,11 @@ public final class UserProtos {
      * drillbit is reporting a query status change, most likely a terminal message, to the user
      * </pre>
      */
-    QUERY_RESULT(23, 10),
+    QUERY_RESULT(26, 10),
+    /**
+     * <code>SESSION_HANDLE = 26;</code>
+     */
+    SESSION_HANDLE(27, 26),
     /**
      * <code>SASL_MESSAGE = 24;</code>
      *
@@ -213,7 +229,7 @@ public final class UserProtos {
      * user to bit and bit to user
      * </pre>
      */
-    SASL_MESSAGE(24, 24),
+    SASL_MESSAGE(28, 24),
     ;
 
     /**
@@ -313,6 +329,18 @@ public final class UserProtos {
      */
     public static final int GET_SERVER_META_VALUE = 8;
     /**
+     * <code>NEW_SESSION = 25;</code>
+     */
+    public static final int NEW_SESSION_VALUE = 25;
+    /**
+     * <code>RUN_QUERY_WITH_SESSION = 27;</code>
+     */
+    public static final int RUN_QUERY_WITH_SESSION_VALUE = 27;
+    /**
+     * <code>CLOSE_SESSION = 28;</code>
+     */
+    public static final int CLOSE_SESSION_VALUE = 28;
+    /**
      * <code>QUERY_DATA = 6;</code>
      *
      * <pre>
@@ -389,6 +417,10 @@ public final class UserProtos {
      */
     public static final int QUERY_RESULT_VALUE = 10;
     /**
+     * <code>SESSION_HANDLE = 26;</code>
+     */
+    public static final int SESSION_HANDLE_VALUE = 26;
+    /**
      * <code>SASL_MESSAGE = 24;</code>
      *
      * <pre>
@@ -416,6 +448,9 @@ public final class UserProtos {
         case 17: return GET_COLUMNS;
         case 22: return CREATE_PREPARED_STATEMENT;
         case 8: return GET_SERVER_META;
+        case 25: return NEW_SESSION;
+        case 27: return RUN_QUERY_WITH_SESSION;
+        case 28: return CLOSE_SESSION;
         case 6: return QUERY_DATA;
         case 7: return QUERY_HANDLE;
         case 13: return QUERY_PLAN_FRAGMENTS;
@@ -426,6 +461,7 @@ public final class UserProtos {
         case 23: return PREPARED_STATEMENT;
         case 9: return SERVER_META;
         case 10: return QUERY_RESULT;
+        case 26: return SESSION_HANDLE;
         case 24: return SASL_MESSAGE;
         default: return null;
       }
@@ -5776,6 +5812,16 @@ public final class UserProtos {
      * <code>optional .exec.user.SaslSupport sasl_support = 9;</code>
      */
     org.apache.drill.exec.proto.UserProtos.SaslSupport getSaslSupport();
+
+    // optional bool enable_multiplex = 10 [default = false];
+    /**
+     * <code>optional bool enable_multiplex = 10 [default = false];</code>
+     */
+    boolean hasEnableMultiplex();
+    /**
+     * <code>optional bool enable_multiplex = 10 [default = false];</code>
+     */
+    boolean getEnableMultiplex();
   }
   /**
    * Protobuf type {@code exec.user.UserToBitHandshake}
@@ -5907,6 +5953,11 @@ public final class UserProtos {
                 bitField0_ |= 0x00000100;
                 saslSupport_ = value;
               }
+              break;
+            }
+            case 80: {
+              bitField0_ |= 0x00000200;
+              enableMultiplex_ = input.readBool();
               break;
             }
           }
@@ -6111,6 +6162,22 @@ public final class UserProtos {
       return saslSupport_;
     }
 
+    // optional bool enable_multiplex = 10 [default = false];
+    public static final int ENABLE_MULTIPLEX_FIELD_NUMBER = 10;
+    private boolean enableMultiplex_;
+    /**
+     * <code>optional bool enable_multiplex = 10 [default = false];</code>
+     */
+    public boolean hasEnableMultiplex() {
+      return ((bitField0_ & 0x00000200) == 0x00000200);
+    }
+    /**
+     * <code>optional bool enable_multiplex = 10 [default = false];</code>
+     */
+    public boolean getEnableMultiplex() {
+      return enableMultiplex_;
+    }
+
     private void initFields() {
       channel_ = org.apache.drill.exec.proto.UserBitShared.RpcChannel.USER;
       supportListening_ = false;
@@ -6121,6 +6188,7 @@ public final class UserProtos {
       supportTimeout_ = false;
       clientInfos_ = org.apache.drill.exec.proto.UserProtos.RpcEndpointInfos.getDefaultInstance();
       saslSupport_ = org.apache.drill.exec.proto.UserProtos.SaslSupport.UNKNOWN_SASL_SUPPORT;
+      enableMultiplex_ = false;
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -6167,6 +6235,9 @@ public final class UserProtos {
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
         output.writeEnum(9, saslSupport_.getNumber());
       }
+      if (((bitField0_ & 0x00000200) == 0x00000200)) {
+        output.writeBool(10, enableMultiplex_);
+      }
       getUnknownFields().writeTo(output);
     }
 
@@ -6211,6 +6282,10 @@ public final class UserProtos {
       if (((bitField0_ & 0x00000100) == 0x00000100)) {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(9, saslSupport_.getNumber());
+      }
+      if (((bitField0_ & 0x00000200) == 0x00000200)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBoolSize(10, enableMultiplex_);
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -6361,6 +6436,8 @@ public final class UserProtos {
         bitField0_ = (bitField0_ & ~0x00000080);
         saslSupport_ = org.apache.drill.exec.proto.UserProtos.SaslSupport.UNKNOWN_SASL_SUPPORT;
         bitField0_ = (bitField0_ & ~0x00000100);
+        enableMultiplex_ = false;
+        bitField0_ = (bitField0_ & ~0x00000200);
         return this;
       }
 
@@ -6437,6 +6514,10 @@ public final class UserProtos {
           to_bitField0_ |= 0x00000100;
         }
         result.saslSupport_ = saslSupport_;
+        if (((from_bitField0_ & 0x00000200) == 0x00000200)) {
+          to_bitField0_ |= 0x00000200;
+        }
+        result.enableMultiplex_ = enableMultiplex_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -6479,6 +6560,9 @@ public final class UserProtos {
         }
         if (other.hasSaslSupport()) {
           setSaslSupport(other.getSaslSupport());
+        }
+        if (other.hasEnableMultiplex()) {
+          setEnableMultiplex(other.getEnableMultiplex());
         }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
@@ -7064,6 +7148,39 @@ public final class UserProtos {
       public Builder clearSaslSupport() {
         bitField0_ = (bitField0_ & ~0x00000100);
         saslSupport_ = org.apache.drill.exec.proto.UserProtos.SaslSupport.UNKNOWN_SASL_SUPPORT;
+        onChanged();
+        return this;
+      }
+
+      // optional bool enable_multiplex = 10 [default = false];
+      private boolean enableMultiplex_ ;
+      /**
+       * <code>optional bool enable_multiplex = 10 [default = false];</code>
+       */
+      public boolean hasEnableMultiplex() {
+        return ((bitField0_ & 0x00000200) == 0x00000200);
+      }
+      /**
+       * <code>optional bool enable_multiplex = 10 [default = false];</code>
+       */
+      public boolean getEnableMultiplex() {
+        return enableMultiplex_;
+      }
+      /**
+       * <code>optional bool enable_multiplex = 10 [default = false];</code>
+       */
+      public Builder setEnableMultiplex(boolean value) {
+        bitField0_ |= 0x00000200;
+        enableMultiplex_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional bool enable_multiplex = 10 [default = false];</code>
+       */
+      public Builder clearEnableMultiplex() {
+        bitField0_ = (bitField0_ & ~0x00000200);
+        enableMultiplex_ = false;
         onChanged();
         return this;
       }
@@ -41643,6 +41760,1695 @@ public final class UserProtos {
     // @@protoc_insertion_point(class_scope:exec.user.RunQuery)
   }
 
+  public interface NewSessionRequestOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // optional .exec.user.UserProperties properties = 1;
+    /**
+     * <code>optional .exec.user.UserProperties properties = 1;</code>
+     */
+    boolean hasProperties();
+    /**
+     * <code>optional .exec.user.UserProperties properties = 1;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.UserProperties getProperties();
+    /**
+     * <code>optional .exec.user.UserProperties properties = 1;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.UserPropertiesOrBuilder getPropertiesOrBuilder();
+  }
+  /**
+   * Protobuf type {@code exec.user.NewSessionRequest}
+   */
+  public static final class NewSessionRequest extends
+      com.google.protobuf.GeneratedMessage
+      implements NewSessionRequestOrBuilder {
+    // Use NewSessionRequest.newBuilder() to construct.
+    private NewSessionRequest(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private NewSessionRequest(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final NewSessionRequest defaultInstance;
+    public static NewSessionRequest getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public NewSessionRequest getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private NewSessionRequest(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              org.apache.drill.exec.proto.UserProtos.UserProperties.Builder subBuilder = null;
+              if (((bitField0_ & 0x00000001) == 0x00000001)) {
+                subBuilder = properties_.toBuilder();
+              }
+              properties_ = input.readMessage(org.apache.drill.exec.proto.UserProtos.UserProperties.PARSER, extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(properties_);
+                properties_ = subBuilder.buildPartial();
+              }
+              bitField0_ |= 0x00000001;
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_NewSessionRequest_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_NewSessionRequest_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class, org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<NewSessionRequest> PARSER =
+        new com.google.protobuf.AbstractParser<NewSessionRequest>() {
+      public NewSessionRequest parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new NewSessionRequest(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<NewSessionRequest> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
+    // optional .exec.user.UserProperties properties = 1;
+    public static final int PROPERTIES_FIELD_NUMBER = 1;
+    private org.apache.drill.exec.proto.UserProtos.UserProperties properties_;
+    /**
+     * <code>optional .exec.user.UserProperties properties = 1;</code>
+     */
+    public boolean hasProperties() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>optional .exec.user.UserProperties properties = 1;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.UserProperties getProperties() {
+      return properties_;
+    }
+    /**
+     * <code>optional .exec.user.UserProperties properties = 1;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.UserPropertiesOrBuilder getPropertiesOrBuilder() {
+      return properties_;
+    }
+
+    private void initFields() {
+      properties_ = org.apache.drill.exec.proto.UserProtos.UserProperties.getDefaultInstance();
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      if (hasProperties()) {
+        if (!getProperties().isInitialized()) {
+          memoizedIsInitialized = 0;
+          return false;
+        }
+      }
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeMessage(1, properties_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, properties_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.NewSessionRequest parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.drill.exec.proto.UserProtos.NewSessionRequest prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code exec.user.NewSessionRequest}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.drill.exec.proto.UserProtos.NewSessionRequestOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_NewSessionRequest_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_NewSessionRequest_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class, org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder.class);
+      }
+
+      // Construct using org.apache.drill.exec.proto.UserProtos.NewSessionRequest.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getPropertiesFieldBuilder();
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        if (propertiesBuilder_ == null) {
+          properties_ = org.apache.drill.exec.proto.UserProtos.UserProperties.getDefaultInstance();
+        } else {
+          propertiesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_NewSessionRequest_descriptor;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.NewSessionRequest getDefaultInstanceForType() {
+        return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.getDefaultInstance();
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.NewSessionRequest build() {
+        org.apache.drill.exec.proto.UserProtos.NewSessionRequest result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.NewSessionRequest buildPartial() {
+        org.apache.drill.exec.proto.UserProtos.NewSessionRequest result = new org.apache.drill.exec.proto.UserProtos.NewSessionRequest(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
+        }
+        if (propertiesBuilder_ == null) {
+          result.properties_ = properties_;
+        } else {
+          result.properties_ = propertiesBuilder_.build();
+        }
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.drill.exec.proto.UserProtos.NewSessionRequest) {
+          return mergeFrom((org.apache.drill.exec.proto.UserProtos.NewSessionRequest)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.drill.exec.proto.UserProtos.NewSessionRequest other) {
+        if (other == org.apache.drill.exec.proto.UserProtos.NewSessionRequest.getDefaultInstance()) return this;
+        if (other.hasProperties()) {
+          mergeProperties(other.getProperties());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        if (hasProperties()) {
+          if (!getProperties().isInitialized()) {
+            
+            return false;
+          }
+        }
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.drill.exec.proto.UserProtos.NewSessionRequest parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.drill.exec.proto.UserProtos.NewSessionRequest) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // optional .exec.user.UserProperties properties = 1;
+      private org.apache.drill.exec.proto.UserProtos.UserProperties properties_ = org.apache.drill.exec.proto.UserProtos.UserProperties.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.UserProperties, org.apache.drill.exec.proto.UserProtos.UserProperties.Builder, org.apache.drill.exec.proto.UserProtos.UserPropertiesOrBuilder> propertiesBuilder_;
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public boolean hasProperties() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.UserProperties getProperties() {
+        if (propertiesBuilder_ == null) {
+          return properties_;
+        } else {
+          return propertiesBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public Builder setProperties(org.apache.drill.exec.proto.UserProtos.UserProperties value) {
+        if (propertiesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          properties_ = value;
+          onChanged();
+        } else {
+          propertiesBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public Builder setProperties(
+          org.apache.drill.exec.proto.UserProtos.UserProperties.Builder builderForValue) {
+        if (propertiesBuilder_ == null) {
+          properties_ = builderForValue.build();
+          onChanged();
+        } else {
+          propertiesBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public Builder mergeProperties(org.apache.drill.exec.proto.UserProtos.UserProperties value) {
+        if (propertiesBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) == 0x00000001) &&
+              properties_ != org.apache.drill.exec.proto.UserProtos.UserProperties.getDefaultInstance()) {
+            properties_ =
+              org.apache.drill.exec.proto.UserProtos.UserProperties.newBuilder(properties_).mergeFrom(value).buildPartial();
+          } else {
+            properties_ = value;
+          }
+          onChanged();
+        } else {
+          propertiesBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public Builder clearProperties() {
+        if (propertiesBuilder_ == null) {
+          properties_ = org.apache.drill.exec.proto.UserProtos.UserProperties.getDefaultInstance();
+          onChanged();
+        } else {
+          propertiesBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.UserProperties.Builder getPropertiesBuilder() {
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return getPropertiesFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.UserPropertiesOrBuilder getPropertiesOrBuilder() {
+        if (propertiesBuilder_ != null) {
+          return propertiesBuilder_.getMessageOrBuilder();
+        } else {
+          return properties_;
+        }
+      }
+      /**
+       * <code>optional .exec.user.UserProperties properties = 1;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.UserProperties, org.apache.drill.exec.proto.UserProtos.UserProperties.Builder, org.apache.drill.exec.proto.UserProtos.UserPropertiesOrBuilder> 
+          getPropertiesFieldBuilder() {
+        if (propertiesBuilder_ == null) {
+          propertiesBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              org.apache.drill.exec.proto.UserProtos.UserProperties, org.apache.drill.exec.proto.UserProtos.UserProperties.Builder, org.apache.drill.exec.proto.UserProtos.UserPropertiesOrBuilder>(
+                  properties_,
+                  getParentForChildren(),
+                  isClean());
+          properties_ = null;
+        }
+        return propertiesBuilder_;
+      }
+
+      // @@protoc_insertion_point(builder_scope:exec.user.NewSessionRequest)
+    }
+
+    static {
+      defaultInstance = new NewSessionRequest(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:exec.user.NewSessionRequest)
+  }
+
+  public interface SessionHandleOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // optional string session_id = 1;
+    /**
+     * <code>optional string session_id = 1;</code>
+     */
+    boolean hasSessionId();
+    /**
+     * <code>optional string session_id = 1;</code>
+     */
+    java.lang.String getSessionId();
+    /**
+     * <code>optional string session_id = 1;</code>
+     */
+    com.google.protobuf.ByteString
+        getSessionIdBytes();
+  }
+  /**
+   * Protobuf type {@code exec.user.SessionHandle}
+   */
+  public static final class SessionHandle extends
+      com.google.protobuf.GeneratedMessage
+      implements SessionHandleOrBuilder {
+    // Use SessionHandle.newBuilder() to construct.
+    private SessionHandle(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private SessionHandle(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final SessionHandle defaultInstance;
+    public static SessionHandle getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public SessionHandle getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private SessionHandle(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              bitField0_ |= 0x00000001;
+              sessionId_ = input.readBytes();
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_SessionHandle_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_SessionHandle_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.drill.exec.proto.UserProtos.SessionHandle.class, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<SessionHandle> PARSER =
+        new com.google.protobuf.AbstractParser<SessionHandle>() {
+      public SessionHandle parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new SessionHandle(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<SessionHandle> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
+    // optional string session_id = 1;
+    public static final int SESSION_ID_FIELD_NUMBER = 1;
+    private java.lang.Object sessionId_;
+    /**
+     * <code>optional string session_id = 1;</code>
+     */
+    public boolean hasSessionId() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>optional string session_id = 1;</code>
+     */
+    public java.lang.String getSessionId() {
+      java.lang.Object ref = sessionId_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        if (bs.isValidUtf8()) {
+          sessionId_ = s;
+        }
+        return s;
+      }
+    }
+    /**
+     * <code>optional string session_id = 1;</code>
+     */
+    public com.google.protobuf.ByteString
+        getSessionIdBytes() {
+      java.lang.Object ref = sessionId_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        sessionId_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    private void initFields() {
+      sessionId_ = "";
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeBytes(1, getSessionIdBytes());
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(1, getSessionIdBytes());
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.SessionHandle parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.drill.exec.proto.UserProtos.SessionHandle prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code exec.user.SessionHandle}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_SessionHandle_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_SessionHandle_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.drill.exec.proto.UserProtos.SessionHandle.class, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder.class);
+      }
+
+      // Construct using org.apache.drill.exec.proto.UserProtos.SessionHandle.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        sessionId_ = "";
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_SessionHandle_descriptor;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.SessionHandle getDefaultInstanceForType() {
+        return org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance();
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.SessionHandle build() {
+        org.apache.drill.exec.proto.UserProtos.SessionHandle result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.SessionHandle buildPartial() {
+        org.apache.drill.exec.proto.UserProtos.SessionHandle result = new org.apache.drill.exec.proto.UserProtos.SessionHandle(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
+        }
+        result.sessionId_ = sessionId_;
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.drill.exec.proto.UserProtos.SessionHandle) {
+          return mergeFrom((org.apache.drill.exec.proto.UserProtos.SessionHandle)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.drill.exec.proto.UserProtos.SessionHandle other) {
+        if (other == org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance()) return this;
+        if (other.hasSessionId()) {
+          bitField0_ |= 0x00000001;
+          sessionId_ = other.sessionId_;
+          onChanged();
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.drill.exec.proto.UserProtos.SessionHandle parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.drill.exec.proto.UserProtos.SessionHandle) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // optional string session_id = 1;
+      private java.lang.Object sessionId_ = "";
+      /**
+       * <code>optional string session_id = 1;</code>
+       */
+      public boolean hasSessionId() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      /**
+       * <code>optional string session_id = 1;</code>
+       */
+      public java.lang.String getSessionId() {
+        java.lang.Object ref = sessionId_;
+        if (!(ref instanceof java.lang.String)) {
+          java.lang.String s = ((com.google.protobuf.ByteString) ref)
+              .toStringUtf8();
+          sessionId_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>optional string session_id = 1;</code>
+       */
+      public com.google.protobuf.ByteString
+          getSessionIdBytes() {
+        java.lang.Object ref = sessionId_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          sessionId_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>optional string session_id = 1;</code>
+       */
+      public Builder setSessionId(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000001;
+        sessionId_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional string session_id = 1;</code>
+       */
+      public Builder clearSessionId() {
+        bitField0_ = (bitField0_ & ~0x00000001);
+        sessionId_ = getDefaultInstance().getSessionId();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>optional string session_id = 1;</code>
+       */
+      public Builder setSessionIdBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000001;
+        sessionId_ = value;
+        onChanged();
+        return this;
+      }
+
+      // @@protoc_insertion_point(builder_scope:exec.user.SessionHandle)
+    }
+
+    static {
+      defaultInstance = new SessionHandle(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:exec.user.SessionHandle)
+  }
+
+  public interface RunQueryWithSessionHandleOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
+
+    // optional .exec.user.RunQuery runQuery = 1;
+    /**
+     * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+     */
+    boolean hasRunQuery();
+    /**
+     * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.RunQuery getRunQuery();
+    /**
+     * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.RunQueryOrBuilder getRunQueryOrBuilder();
+
+    // optional .exec.user.SessionHandle sessionHandle = 2;
+    /**
+     * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+     */
+    boolean hasSessionHandle();
+    /**
+     * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.SessionHandle getSessionHandle();
+    /**
+     * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+     */
+    org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder getSessionHandleOrBuilder();
+  }
+  /**
+   * Protobuf type {@code exec.user.RunQueryWithSessionHandle}
+   */
+  public static final class RunQueryWithSessionHandle extends
+      com.google.protobuf.GeneratedMessage
+      implements RunQueryWithSessionHandleOrBuilder {
+    // Use RunQueryWithSessionHandle.newBuilder() to construct.
+    private RunQueryWithSessionHandle(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
+      super(builder);
+      this.unknownFields = builder.getUnknownFields();
+    }
+    private RunQueryWithSessionHandle(boolean noInit) { this.unknownFields = com.google.protobuf.UnknownFieldSet.getDefaultInstance(); }
+
+    private static final RunQueryWithSessionHandle defaultInstance;
+    public static RunQueryWithSessionHandle getDefaultInstance() {
+      return defaultInstance;
+    }
+
+    public RunQueryWithSessionHandle getDefaultInstanceForType() {
+      return defaultInstance;
+    }
+
+    private final com.google.protobuf.UnknownFieldSet unknownFields;
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+        getUnknownFields() {
+      return this.unknownFields;
+    }
+    private RunQueryWithSessionHandle(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      initFields();
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            default: {
+              if (!parseUnknownField(input, unknownFields,
+                                     extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+            case 10: {
+              org.apache.drill.exec.proto.UserProtos.RunQuery.Builder subBuilder = null;
+              if (((bitField0_ & 0x00000001) == 0x00000001)) {
+                subBuilder = runQuery_.toBuilder();
+              }
+              runQuery_ = input.readMessage(org.apache.drill.exec.proto.UserProtos.RunQuery.PARSER, extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(runQuery_);
+                runQuery_ = subBuilder.buildPartial();
+              }
+              bitField0_ |= 0x00000001;
+              break;
+            }
+            case 18: {
+              org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder subBuilder = null;
+              if (((bitField0_ & 0x00000002) == 0x00000002)) {
+                subBuilder = sessionHandle_.toBuilder();
+              }
+              sessionHandle_ = input.readMessage(org.apache.drill.exec.proto.UserProtos.SessionHandle.PARSER, extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(sessionHandle_);
+                sessionHandle_ = subBuilder.buildPartial();
+              }
+              bitField0_ |= 0x00000002;
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e.getMessage()).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_RunQueryWithSessionHandle_descriptor;
+    }
+
+    protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_RunQueryWithSessionHandle_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class, org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder.class);
+    }
+
+    public static com.google.protobuf.Parser<RunQueryWithSessionHandle> PARSER =
+        new com.google.protobuf.AbstractParser<RunQueryWithSessionHandle>() {
+      public RunQueryWithSessionHandle parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new RunQueryWithSessionHandle(input, extensionRegistry);
+      }
+    };
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<RunQueryWithSessionHandle> getParserForType() {
+      return PARSER;
+    }
+
+    private int bitField0_;
+    // optional .exec.user.RunQuery runQuery = 1;
+    public static final int RUNQUERY_FIELD_NUMBER = 1;
+    private org.apache.drill.exec.proto.UserProtos.RunQuery runQuery_;
+    /**
+     * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+     */
+    public boolean hasRunQuery() {
+      return ((bitField0_ & 0x00000001) == 0x00000001);
+    }
+    /**
+     * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.RunQuery getRunQuery() {
+      return runQuery_;
+    }
+    /**
+     * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.RunQueryOrBuilder getRunQueryOrBuilder() {
+      return runQuery_;
+    }
+
+    // optional .exec.user.SessionHandle sessionHandle = 2;
+    public static final int SESSIONHANDLE_FIELD_NUMBER = 2;
+    private org.apache.drill.exec.proto.UserProtos.SessionHandle sessionHandle_;
+    /**
+     * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+     */
+    public boolean hasSessionHandle() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.SessionHandle getSessionHandle() {
+      return sessionHandle_;
+    }
+    /**
+     * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+     */
+    public org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder getSessionHandleOrBuilder() {
+      return sessionHandle_;
+    }
+
+    private void initFields() {
+      runQuery_ = org.apache.drill.exec.proto.UserProtos.RunQuery.getDefaultInstance();
+      sessionHandle_ = org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance();
+    }
+    private byte memoizedIsInitialized = -1;
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized != -1) return isInitialized == 1;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      getSerializedSize();
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        output.writeMessage(1, runQuery_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeMessage(2, sessionHandle_);
+      }
+      getUnknownFields().writeTo(output);
+    }
+
+    private int memoizedSerializedSize = -1;
+    public int getSerializedSize() {
+      int size = memoizedSerializedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (((bitField0_ & 0x00000001) == 0x00000001)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, runQuery_);
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(2, sessionHandle_);
+      }
+      size += getUnknownFields().getSerializedSize();
+      memoizedSerializedSize = size;
+      return size;
+    }
+
+    private static final long serialVersionUID = 0L;
+    @java.lang.Override
+    protected java.lang.Object writeReplace()
+        throws java.io.ObjectStreamException {
+      return super.writeReplace();
+    }
+
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseDelimitedFrom(input, extensionRegistry);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input);
+    }
+    public static org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return PARSER.parseFrom(input, extensionRegistry);
+    }
+
+    public static Builder newBuilder() { return Builder.create(); }
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder(org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle prototype) {
+      return newBuilder().mergeFrom(prototype);
+    }
+    public Builder toBuilder() { return newBuilder(this); }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code exec.user.RunQueryWithSessionHandle}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandleOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_RunQueryWithSessionHandle_descriptor;
+      }
+
+      protected com.google.protobuf.GeneratedMessage.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_RunQueryWithSessionHandle_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class, org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder.class);
+      }
+
+      // Construct using org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessage.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessage.alwaysUseFieldBuilders) {
+          getRunQueryFieldBuilder();
+          getSessionHandleFieldBuilder();
+        }
+      }
+      private static Builder create() {
+        return new Builder();
+      }
+
+      public Builder clear() {
+        super.clear();
+        if (runQueryBuilder_ == null) {
+          runQuery_ = org.apache.drill.exec.proto.UserProtos.RunQuery.getDefaultInstance();
+        } else {
+          runQueryBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        if (sessionHandleBuilder_ == null) {
+          sessionHandle_ = org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance();
+        } else {
+          sessionHandleBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+
+      public Builder clone() {
+        return create().mergeFrom(buildPartial());
+      }
+
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return org.apache.drill.exec.proto.UserProtos.internal_static_exec_user_RunQueryWithSessionHandle_descriptor;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle getDefaultInstanceForType() {
+        return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.getDefaultInstance();
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle build() {
+        org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      public org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle buildPartial() {
+        org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle result = new org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle(this);
+        int from_bitField0_ = bitField0_;
+        int to_bitField0_ = 0;
+        if (((from_bitField0_ & 0x00000001) == 0x00000001)) {
+          to_bitField0_ |= 0x00000001;
+        }
+        if (runQueryBuilder_ == null) {
+          result.runQuery_ = runQuery_;
+        } else {
+          result.runQuery_ = runQueryBuilder_.build();
+        }
+        if (((from_bitField0_ & 0x00000002) == 0x00000002)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        if (sessionHandleBuilder_ == null) {
+          result.sessionHandle_ = sessionHandle_;
+        } else {
+          result.sessionHandle_ = sessionHandleBuilder_.build();
+        }
+        result.bitField0_ = to_bitField0_;
+        onBuilt();
+        return result;
+      }
+
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle) {
+          return mergeFrom((org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle other) {
+        if (other == org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.getDefaultInstance()) return this;
+        if (other.hasRunQuery()) {
+          mergeRunQuery(other.getRunQuery());
+        }
+        if (other.hasSessionHandle()) {
+          mergeSessionHandle(other.getSessionHandle());
+        }
+        this.mergeUnknownFields(other.getUnknownFields());
+        return this;
+      }
+
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle) e.getUnfinishedMessage();
+          throw e;
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      // optional .exec.user.RunQuery runQuery = 1;
+      private org.apache.drill.exec.proto.UserProtos.RunQuery runQuery_ = org.apache.drill.exec.proto.UserProtos.RunQuery.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.RunQuery, org.apache.drill.exec.proto.UserProtos.RunQuery.Builder, org.apache.drill.exec.proto.UserProtos.RunQueryOrBuilder> runQueryBuilder_;
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public boolean hasRunQuery() {
+        return ((bitField0_ & 0x00000001) == 0x00000001);
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.RunQuery getRunQuery() {
+        if (runQueryBuilder_ == null) {
+          return runQuery_;
+        } else {
+          return runQueryBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public Builder setRunQuery(org.apache.drill.exec.proto.UserProtos.RunQuery value) {
+        if (runQueryBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          runQuery_ = value;
+          onChanged();
+        } else {
+          runQueryBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public Builder setRunQuery(
+          org.apache.drill.exec.proto.UserProtos.RunQuery.Builder builderForValue) {
+        if (runQueryBuilder_ == null) {
+          runQuery_ = builderForValue.build();
+          onChanged();
+        } else {
+          runQueryBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public Builder mergeRunQuery(org.apache.drill.exec.proto.UserProtos.RunQuery value) {
+        if (runQueryBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) == 0x00000001) &&
+              runQuery_ != org.apache.drill.exec.proto.UserProtos.RunQuery.getDefaultInstance()) {
+            runQuery_ =
+              org.apache.drill.exec.proto.UserProtos.RunQuery.newBuilder(runQuery_).mergeFrom(value).buildPartial();
+          } else {
+            runQuery_ = value;
+          }
+          onChanged();
+        } else {
+          runQueryBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000001;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public Builder clearRunQuery() {
+        if (runQueryBuilder_ == null) {
+          runQuery_ = org.apache.drill.exec.proto.UserProtos.RunQuery.getDefaultInstance();
+          onChanged();
+        } else {
+          runQueryBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000001);
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.RunQuery.Builder getRunQueryBuilder() {
+        bitField0_ |= 0x00000001;
+        onChanged();
+        return getRunQueryFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.RunQueryOrBuilder getRunQueryOrBuilder() {
+        if (runQueryBuilder_ != null) {
+          return runQueryBuilder_.getMessageOrBuilder();
+        } else {
+          return runQuery_;
+        }
+      }
+      /**
+       * <code>optional .exec.user.RunQuery runQuery = 1;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.RunQuery, org.apache.drill.exec.proto.UserProtos.RunQuery.Builder, org.apache.drill.exec.proto.UserProtos.RunQueryOrBuilder> 
+          getRunQueryFieldBuilder() {
+        if (runQueryBuilder_ == null) {
+          runQueryBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              org.apache.drill.exec.proto.UserProtos.RunQuery, org.apache.drill.exec.proto.UserProtos.RunQuery.Builder, org.apache.drill.exec.proto.UserProtos.RunQueryOrBuilder>(
+                  runQuery_,
+                  getParentForChildren(),
+                  isClean());
+          runQuery_ = null;
+        }
+        return runQueryBuilder_;
+      }
+
+      // optional .exec.user.SessionHandle sessionHandle = 2;
+      private org.apache.drill.exec.proto.UserProtos.SessionHandle sessionHandle_ = org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance();
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.SessionHandle, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder, org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder> sessionHandleBuilder_;
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public boolean hasSessionHandle() {
+        return ((bitField0_ & 0x00000002) == 0x00000002);
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.SessionHandle getSessionHandle() {
+        if (sessionHandleBuilder_ == null) {
+          return sessionHandle_;
+        } else {
+          return sessionHandleBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public Builder setSessionHandle(org.apache.drill.exec.proto.UserProtos.SessionHandle value) {
+        if (sessionHandleBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          sessionHandle_ = value;
+          onChanged();
+        } else {
+          sessionHandleBuilder_.setMessage(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public Builder setSessionHandle(
+          org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder builderForValue) {
+        if (sessionHandleBuilder_ == null) {
+          sessionHandle_ = builderForValue.build();
+          onChanged();
+        } else {
+          sessionHandleBuilder_.setMessage(builderForValue.build());
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public Builder mergeSessionHandle(org.apache.drill.exec.proto.UserProtos.SessionHandle value) {
+        if (sessionHandleBuilder_ == null) {
+          if (((bitField0_ & 0x00000002) == 0x00000002) &&
+              sessionHandle_ != org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance()) {
+            sessionHandle_ =
+              org.apache.drill.exec.proto.UserProtos.SessionHandle.newBuilder(sessionHandle_).mergeFrom(value).buildPartial();
+          } else {
+            sessionHandle_ = value;
+          }
+          onChanged();
+        } else {
+          sessionHandleBuilder_.mergeFrom(value);
+        }
+        bitField0_ |= 0x00000002;
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public Builder clearSessionHandle() {
+        if (sessionHandleBuilder_ == null) {
+          sessionHandle_ = org.apache.drill.exec.proto.UserProtos.SessionHandle.getDefaultInstance();
+          onChanged();
+        } else {
+          sessionHandleBuilder_.clear();
+        }
+        bitField0_ = (bitField0_ & ~0x00000002);
+        return this;
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder getSessionHandleBuilder() {
+        bitField0_ |= 0x00000002;
+        onChanged();
+        return getSessionHandleFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      public org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder getSessionHandleOrBuilder() {
+        if (sessionHandleBuilder_ != null) {
+          return sessionHandleBuilder_.getMessageOrBuilder();
+        } else {
+          return sessionHandle_;
+        }
+      }
+      /**
+       * <code>optional .exec.user.SessionHandle sessionHandle = 2;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilder<
+          org.apache.drill.exec.proto.UserProtos.SessionHandle, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder, org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder> 
+          getSessionHandleFieldBuilder() {
+        if (sessionHandleBuilder_ == null) {
+          sessionHandleBuilder_ = new com.google.protobuf.SingleFieldBuilder<
+              org.apache.drill.exec.proto.UserProtos.SessionHandle, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder, org.apache.drill.exec.proto.UserProtos.SessionHandleOrBuilder>(
+                  sessionHandle_,
+                  getParentForChildren(),
+                  isClean());
+          sessionHandle_ = null;
+        }
+        return sessionHandleBuilder_;
+      }
+
+      // @@protoc_insertion_point(builder_scope:exec.user.RunQueryWithSessionHandle)
+    }
+
+    static {
+      defaultInstance = new RunQueryWithSessionHandle(true);
+      defaultInstance.initFields();
+    }
+
+    // @@protoc_insertion_point(class_scope:exec.user.RunQueryWithSessionHandle)
+  }
+
   private static com.google.protobuf.Descriptors.Descriptor
     internal_static_exec_user_Property_descriptor;
   private static
@@ -41798,6 +43604,21 @@ public final class UserProtos {
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_exec_user_RunQuery_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_exec_user_NewSessionRequest_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_exec_user_NewSessionRequest_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_exec_user_SessionHandle_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_exec_user_SessionHandle_fieldAccessorTable;
+  private static com.google.protobuf.Descriptors.Descriptor
+    internal_static_exec_user_RunQueryWithSessionHandle_descriptor;
+  private static
+    com.google.protobuf.GeneratedMessage.FieldAccessorTable
+      internal_static_exec_user_RunQueryWithSessionHandle_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -41817,7 +43638,7 @@ public final class UserProtos {
       "\t\022\024\n\014majorVersion\030\003 \001(\r\022\024\n\014minorVersion\030" +
       "\004 \001(\r\022\024\n\014patchVersion\030\005 \001(\r\022\023\n\013applicati" +
       "on\030\006 \001(\t\022\023\n\013buildNumber\030\007 \001(\r\022\030\n\020version",
-      "Qualifier\030\010 \001(\t\"\375\002\n\022UserToBitHandshake\022." +
+      "Qualifier\030\010 \001(\t\"\236\003\n\022UserToBitHandshake\022." +
       "\n\007channel\030\001 \001(\0162\027.exec.shared.RpcChannel" +
       ":\004USER\022\031\n\021support_listening\030\002 \001(\010\022\023\n\013rpc" +
       "_version\030\003 \001(\005\0221\n\013credentials\030\004 \001(\0132\034.ex" +
@@ -41826,210 +43647,218 @@ public final class UserProtos {
       "ort_complex_types\030\006 \001(\010:\005false\022\036\n\017suppor" +
       "t_timeout\030\007 \001(\010:\005false\0221\n\014client_infos\030\010" +
       " \001(\0132\033.exec.user.RpcEndpointInfos\022,\n\014sas" +
-      "l_support\030\t \001(\0162\026.exec.user.SaslSupport\"",
-      "S\n\016RequestResults\022&\n\010query_id\030\001 \001(\0132\024.ex" +
-      "ec.shared.QueryId\022\031\n\021maximum_responses\030\002" +
-      " \001(\005\"g\n\025GetQueryPlanFragments\022\r\n\005query\030\001" +
-      " \002(\t\022$\n\004type\030\002 \001(\0162\026.exec.shared.QueryTy" +
-      "pe\022\031\n\nsplit_plan\030\003 \001(\010:\005false\"\316\001\n\022QueryP" +
-      "lanFragments\0223\n\006status\030\001 \002(\0162#.exec.shar" +
-      "ed.QueryResult.QueryState\022&\n\010query_id\030\002 " +
-      "\001(\0132\024.exec.shared.QueryId\0221\n\tfragments\030\003" +
-      " \003(\0132\036.exec.bit.control.PlanFragment\022(\n\005" +
-      "error\030\004 \001(\0132\031.exec.shared.DrillPBError\"\253",
-      "\002\n\022BitToUserHandshake\022\023\n\013rpc_version\030\002 \001" +
-      "(\005\022*\n\006status\030\003 \001(\0162\032.exec.user.Handshake" +
-      "Status\022\017\n\007errorId\030\004 \001(\t\022\024\n\014errorMessage\030" +
-      "\005 \001(\t\0221\n\014server_infos\030\006 \001(\0132\033.exec.user." +
-      "RpcEndpointInfos\022 \n\030authenticationMechan" +
-      "isms\030\007 \003(\t\022-\n\021supported_methods\030\010 \003(\0162\022." +
-      "exec.user.RpcType\022\021\n\tencrypted\030\t \001(\010\022\026\n\016" +
-      "maxWrappedSize\030\n \001(\005\"-\n\nLikeFilter\022\017\n\007pa" +
-      "ttern\030\001 \001(\t\022\016\n\006escape\030\002 \001(\t\"D\n\016GetCatalo" +
-      "gsReq\0222\n\023catalog_name_filter\030\001 \001(\0132\025.exe",
-      "c.user.LikeFilter\"M\n\017CatalogMetadata\022\024\n\014" +
-      "catalog_name\030\001 \001(\t\022\023\n\013description\030\002 \001(\t\022" +
-      "\017\n\007connect\030\003 \001(\t\"\223\001\n\017GetCatalogsResp\022(\n\006" +
-      "status\030\001 \001(\0162\030.exec.user.RequestStatus\022," +
-      "\n\010catalogs\030\002 \003(\0132\032.exec.user.CatalogMeta" +
-      "data\022(\n\005error\030\003 \001(\0132\031.exec.shared.DrillP" +
-      "BError\"v\n\rGetSchemasReq\0222\n\023catalog_name_" +
-      "filter\030\001 \001(\0132\025.exec.user.LikeFilter\0221\n\022s" +
-      "chema_name_filter\030\002 \001(\0132\025.exec.user.Like" +
-      "Filter\"i\n\016SchemaMetadata\022\024\n\014catalog_name",
-      "\030\001 \001(\t\022\023\n\013schema_name\030\002 \001(\t\022\r\n\005owner\030\003 \001" +
-      "(\t\022\014\n\004type\030\004 \001(\t\022\017\n\007mutable\030\005 \001(\t\"\220\001\n\016Ge" +
-      "tSchemasResp\022(\n\006status\030\001 \001(\0162\030.exec.user" +
-      ".RequestStatus\022*\n\007schemas\030\002 \003(\0132\031.exec.u" +
-      "ser.SchemaMetadata\022(\n\005error\030\003 \001(\0132\031.exec" +
-      ".shared.DrillPBError\"\302\001\n\014GetTablesReq\0222\n" +
-      "\023catalog_name_filter\030\001 \001(\0132\025.exec.user.L" +
-      "ikeFilter\0221\n\022schema_name_filter\030\002 \001(\0132\025." +
-      "exec.user.LikeFilter\0220\n\021table_name_filte" +
-      "r\030\003 \001(\0132\025.exec.user.LikeFilter\022\031\n\021table_",
-      "type_filter\030\004 \003(\t\"\\\n\rTableMetadata\022\024\n\014ca" +
-      "talog_name\030\001 \001(\t\022\023\n\013schema_name\030\002 \001(\t\022\022\n" +
-      "\ntable_name\030\003 \001(\t\022\014\n\004type\030\004 \001(\t\"\215\001\n\rGetT" +
-      "ablesResp\022(\n\006status\030\001 \001(\0162\030.exec.user.Re" +
-      "questStatus\022(\n\006tables\030\002 \003(\0132\030.exec.user." +
-      "TableMetadata\022(\n\005error\030\003 \001(\0132\031.exec.shar" +
-      "ed.DrillPBError\"\333\001\n\rGetColumnsReq\0222\n\023cat" +
-      "alog_name_filter\030\001 \001(\0132\025.exec.user.LikeF" +
-      "ilter\0221\n\022schema_name_filter\030\002 \001(\0132\025.exec" +
-      ".user.LikeFilter\0220\n\021table_name_filter\030\003 ",
-      "\001(\0132\025.exec.user.LikeFilter\0221\n\022column_nam" +
-      "e_filter\030\004 \001(\0132\025.exec.user.LikeFilter\"\251\003" +
-      "\n\016ColumnMetadata\022\024\n\014catalog_name\030\001 \001(\t\022\023" +
-      "\n\013schema_name\030\002 \001(\t\022\022\n\ntable_name\030\003 \001(\t\022" +
-      "\023\n\013column_name\030\004 \001(\t\022\030\n\020ordinal_position" +
-      "\030\005 \001(\005\022\025\n\rdefault_value\030\006 \001(\t\022\023\n\013is_null" +
-      "able\030\007 \001(\010\022\021\n\tdata_type\030\010 \001(\t\022\027\n\017char_ma" +
-      "x_length\030\t \001(\005\022\031\n\021char_octet_length\030\n \001(" +
-      "\005\022\031\n\021numeric_precision\030\013 \001(\005\022\037\n\027numeric_" +
-      "precision_radix\030\014 \001(\005\022\025\n\rnumeric_scale\030\r",
-      " \001(\005\022\033\n\023date_time_precision\030\016 \001(\005\022\025\n\rint" +
-      "erval_type\030\017 \001(\t\022\032\n\022interval_precision\030\020" +
-      " \001(\005\022\023\n\013column_size\030\021 \001(\005\"\220\001\n\016GetColumns" +
+      "l_support\030\t \001(\0162\026.exec.user.SaslSupport\022",
+      "\037\n\020enable_multiplex\030\n \001(\010:\005false\"S\n\016Requ" +
+      "estResults\022&\n\010query_id\030\001 \001(\0132\024.exec.shar" +
+      "ed.QueryId\022\031\n\021maximum_responses\030\002 \001(\005\"g\n" +
+      "\025GetQueryPlanFragments\022\r\n\005query\030\001 \002(\t\022$\n" +
+      "\004type\030\002 \001(\0162\026.exec.shared.QueryType\022\031\n\ns" +
+      "plit_plan\030\003 \001(\010:\005false\"\316\001\n\022QueryPlanFrag" +
+      "ments\0223\n\006status\030\001 \002(\0162#.exec.shared.Quer" +
+      "yResult.QueryState\022&\n\010query_id\030\002 \001(\0132\024.e" +
+      "xec.shared.QueryId\0221\n\tfragments\030\003 \003(\0132\036." +
+      "exec.bit.control.PlanFragment\022(\n\005error\030\004",
+      " \001(\0132\031.exec.shared.DrillPBError\"\253\002\n\022BitT" +
+      "oUserHandshake\022\023\n\013rpc_version\030\002 \001(\005\022*\n\006s" +
+      "tatus\030\003 \001(\0162\032.exec.user.HandshakeStatus\022" +
+      "\017\n\007errorId\030\004 \001(\t\022\024\n\014errorMessage\030\005 \001(\t\0221" +
+      "\n\014server_infos\030\006 \001(\0132\033.exec.user.RpcEndp" +
+      "ointInfos\022 \n\030authenticationMechanisms\030\007 " +
+      "\003(\t\022-\n\021supported_methods\030\010 \003(\0162\022.exec.us" +
+      "er.RpcType\022\021\n\tencrypted\030\t \001(\010\022\026\n\016maxWrap" +
+      "pedSize\030\n \001(\005\"-\n\nLikeFilter\022\017\n\007pattern\030\001" +
+      " \001(\t\022\016\n\006escape\030\002 \001(\t\"D\n\016GetCatalogsReq\0222",
+      "\n\023catalog_name_filter\030\001 \001(\0132\025.exec.user." +
+      "LikeFilter\"M\n\017CatalogMetadata\022\024\n\014catalog" +
+      "_name\030\001 \001(\t\022\023\n\013description\030\002 \001(\t\022\017\n\007conn" +
+      "ect\030\003 \001(\t\"\223\001\n\017GetCatalogsResp\022(\n\006status\030" +
+      "\001 \001(\0162\030.exec.user.RequestStatus\022,\n\010catal" +
+      "ogs\030\002 \003(\0132\032.exec.user.CatalogMetadata\022(\n" +
+      "\005error\030\003 \001(\0132\031.exec.shared.DrillPBError\"" +
+      "v\n\rGetSchemasReq\0222\n\023catalog_name_filter\030" +
+      "\001 \001(\0132\025.exec.user.LikeFilter\0221\n\022schema_n" +
+      "ame_filter\030\002 \001(\0132\025.exec.user.LikeFilter\"",
+      "i\n\016SchemaMetadata\022\024\n\014catalog_name\030\001 \001(\t\022" +
+      "\023\n\013schema_name\030\002 \001(\t\022\r\n\005owner\030\003 \001(\t\022\014\n\004t" +
+      "ype\030\004 \001(\t\022\017\n\007mutable\030\005 \001(\t\"\220\001\n\016GetSchema" +
+      "sResp\022(\n\006status\030\001 \001(\0162\030.exec.user.Reques" +
+      "tStatus\022*\n\007schemas\030\002 \003(\0132\031.exec.user.Sch" +
+      "emaMetadata\022(\n\005error\030\003 \001(\0132\031.exec.shared" +
+      ".DrillPBError\"\302\001\n\014GetTablesReq\0222\n\023catalo" +
+      "g_name_filter\030\001 \001(\0132\025.exec.user.LikeFilt" +
+      "er\0221\n\022schema_name_filter\030\002 \001(\0132\025.exec.us" +
+      "er.LikeFilter\0220\n\021table_name_filter\030\003 \001(\013",
+      "2\025.exec.user.LikeFilter\022\031\n\021table_type_fi" +
+      "lter\030\004 \003(\t\"\\\n\rTableMetadata\022\024\n\014catalog_n" +
+      "ame\030\001 \001(\t\022\023\n\013schema_name\030\002 \001(\t\022\022\n\ntable_" +
+      "name\030\003 \001(\t\022\014\n\004type\030\004 \001(\t\"\215\001\n\rGetTablesRe" +
+      "sp\022(\n\006status\030\001 \001(\0162\030.exec.user.RequestSt" +
+      "atus\022(\n\006tables\030\002 \003(\0132\030.exec.user.TableMe" +
+      "tadata\022(\n\005error\030\003 \001(\0132\031.exec.shared.Dril" +
+      "lPBError\"\333\001\n\rGetColumnsReq\0222\n\023catalog_na" +
+      "me_filter\030\001 \001(\0132\025.exec.user.LikeFilter\0221" +
+      "\n\022schema_name_filter\030\002 \001(\0132\025.exec.user.L",
+      "ikeFilter\0220\n\021table_name_filter\030\003 \001(\0132\025.e" +
+      "xec.user.LikeFilter\0221\n\022column_name_filte" +
+      "r\030\004 \001(\0132\025.exec.user.LikeFilter\"\251\003\n\016Colum" +
+      "nMetadata\022\024\n\014catalog_name\030\001 \001(\t\022\023\n\013schem" +
+      "a_name\030\002 \001(\t\022\022\n\ntable_name\030\003 \001(\t\022\023\n\013colu" +
+      "mn_name\030\004 \001(\t\022\030\n\020ordinal_position\030\005 \001(\005\022" +
+      "\025\n\rdefault_value\030\006 \001(\t\022\023\n\013is_nullable\030\007 " +
+      "\001(\010\022\021\n\tdata_type\030\010 \001(\t\022\027\n\017char_max_lengt" +
+      "h\030\t \001(\005\022\031\n\021char_octet_length\030\n \001(\005\022\031\n\021nu" +
+      "meric_precision\030\013 \001(\005\022\037\n\027numeric_precisi",
+      "on_radix\030\014 \001(\005\022\025\n\rnumeric_scale\030\r \001(\005\022\033\n" +
+      "\023date_time_precision\030\016 \001(\005\022\025\n\rinterval_t" +
+      "ype\030\017 \001(\t\022\032\n\022interval_precision\030\020 \001(\005\022\023\n" +
+      "\013column_size\030\021 \001(\005\"\220\001\n\016GetColumnsResp\022(\n" +
+      "\006status\030\001 \001(\0162\030.exec.user.RequestStatus\022" +
+      "*\n\007columns\030\002 \003(\0132\031.exec.user.ColumnMetad" +
+      "ata\022(\n\005error\030\003 \001(\0132\031.exec.shared.DrillPB" +
+      "Error\"/\n\032CreatePreparedStatementReq\022\021\n\ts" +
+      "ql_query\030\001 \001(\t\"\326\003\n\024ResultColumnMetadata\022" +
+      "\024\n\014catalog_name\030\001 \001(\t\022\023\n\013schema_name\030\002 \001",
+      "(\t\022\022\n\ntable_name\030\003 \001(\t\022\023\n\013column_name\030\004 " +
+      "\001(\t\022\r\n\005label\030\005 \001(\t\022\021\n\tdata_type\030\006 \001(\t\022\023\n" +
+      "\013is_nullable\030\007 \001(\010\022\021\n\tprecision\030\010 \001(\005\022\r\n" +
+      "\005scale\030\t \001(\005\022\016\n\006signed\030\n \001(\010\022\024\n\014display_" +
+      "size\030\013 \001(\005\022\022\n\nis_aliased\030\014 \001(\010\0225\n\rsearch" +
+      "ability\030\r \001(\0162\036.exec.user.ColumnSearchab" +
+      "ility\0223\n\014updatability\030\016 \001(\0162\035.exec.user." +
+      "ColumnUpdatability\022\026\n\016auto_increment\030\017 \001" +
+      "(\010\022\030\n\020case_sensitivity\030\020 \001(\010\022\020\n\010sortable" +
+      "\030\021 \001(\010\022\022\n\nclass_name\030\022 \001(\t\022\023\n\013is_currenc",
+      "y\030\024 \001(\010\".\n\027PreparedStatementHandle\022\023\n\013se" +
+      "rver_info\030\001 \001(\014\"\200\001\n\021PreparedStatement\0220\n" +
+      "\007columns\030\001 \003(\0132\037.exec.user.ResultColumnM" +
+      "etadata\0229\n\rserver_handle\030\002 \001(\0132\".exec.us" +
+      "er.PreparedStatementHandle\"\253\001\n\033CreatePre" +
+      "paredStatementResp\022(\n\006status\030\001 \001(\0162\030.exe" +
+      "c.user.RequestStatus\0228\n\022prepared_stateme" +
+      "nt\030\002 \001(\0132\034.exec.user.PreparedStatement\022(" +
+      "\n\005error\030\003 \001(\0132\031.exec.shared.DrillPBError" +
+      "\"\022\n\020GetServerMetaReq\"P\n\016ConvertSupport\022\037",
+      "\n\004from\030\001 \002(\0162\021.common.MinorType\022\035\n\002to\030\002 " +
+      "\002(\0162\021.common.MinorType\"\223\001\n\021GetServerMeta" +
       "Resp\022(\n\006status\030\001 \001(\0162\030.exec.user.Request" +
-      "Status\022*\n\007columns\030\002 \003(\0132\031.exec.user.Colu" +
-      "mnMetadata\022(\n\005error\030\003 \001(\0132\031.exec.shared." +
-      "DrillPBError\"/\n\032CreatePreparedStatementR" +
-      "eq\022\021\n\tsql_query\030\001 \001(\t\"\326\003\n\024ResultColumnMe" +
-      "tadata\022\024\n\014catalog_name\030\001 \001(\t\022\023\n\013schema_n" +
-      "ame\030\002 \001(\t\022\022\n\ntable_name\030\003 \001(\t\022\023\n\013column_",
-      "name\030\004 \001(\t\022\r\n\005label\030\005 \001(\t\022\021\n\tdata_type\030\006" +
-      " \001(\t\022\023\n\013is_nullable\030\007 \001(\010\022\021\n\tprecision\030\010" +
-      " \001(\005\022\r\n\005scale\030\t \001(\005\022\016\n\006signed\030\n \001(\010\022\024\n\014d" +
-      "isplay_size\030\013 \001(\005\022\022\n\nis_aliased\030\014 \001(\010\0225\n" +
-      "\rsearchability\030\r \001(\0162\036.exec.user.ColumnS" +
-      "earchability\0223\n\014updatability\030\016 \001(\0162\035.exe" +
-      "c.user.ColumnUpdatability\022\026\n\016auto_increm" +
-      "ent\030\017 \001(\010\022\030\n\020case_sensitivity\030\020 \001(\010\022\020\n\010s" +
-      "ortable\030\021 \001(\010\022\022\n\nclass_name\030\022 \001(\t\022\023\n\013is_" +
-      "currency\030\024 \001(\010\".\n\027PreparedStatementHandl",
-      "e\022\023\n\013server_info\030\001 \001(\014\"\200\001\n\021PreparedState" +
-      "ment\0220\n\007columns\030\001 \003(\0132\037.exec.user.Result" +
-      "ColumnMetadata\0229\n\rserver_handle\030\002 \001(\0132\"." +
-      "exec.user.PreparedStatementHandle\"\253\001\n\033Cr" +
-      "eatePreparedStatementResp\022(\n\006status\030\001 \001(" +
-      "\0162\030.exec.user.RequestStatus\0228\n\022prepared_" +
-      "statement\030\002 \001(\0132\034.exec.user.PreparedStat" +
-      "ement\022(\n\005error\030\003 \001(\0132\031.exec.shared.Drill" +
-      "PBError\"\022\n\020GetServerMetaReq\"P\n\016ConvertSu" +
-      "pport\022\037\n\004from\030\001 \002(\0162\021.common.MinorType\022\035",
-      "\n\002to\030\002 \002(\0162\021.common.MinorType\"\223\001\n\021GetSer" +
-      "verMetaResp\022(\n\006status\030\001 \001(\0162\030.exec.user." +
-      "RequestStatus\022*\n\013server_meta\030\002 \001(\0132\025.exe" +
-      "c.user.ServerMeta\022(\n\005error\030\003 \001(\0132\031.exec." +
-      "shared.DrillPBError\"\377\r\n\nServerMeta\022\035\n\025al" +
-      "l_tables_selectable\030\001 \001(\010\022%\n\035blob_includ" +
-      "ed_in_max_row_size\030\002 \001(\010\022\030\n\020catalog_at_s" +
-      "tart\030\003 \001(\010\022\031\n\021catalog_separator\030\004 \001(\t\022\024\n" +
-      "\014catalog_term\030\005 \001(\t\0222\n\017collate_support\030\006" +
-      " \003(\0162\031.exec.user.CollateSupport\022!\n\031colum",
-      "n_aliasing_supported\030\007 \001(\010\0222\n\017convert_su" +
-      "pport\030\010 \003(\0132\031.exec.user.ConvertSupport\022E" +
-      "\n\031correlation_names_support\030\t \001(\0162\".exec" +
-      ".user.CorrelationNamesSupport\022\033\n\023date_ti" +
-      "me_functions\030\n \003(\t\022F\n\032date_time_literals" +
-      "_support\030\013 \003(\0162\".exec.user.DateTimeLiter" +
-      "alsSupport\0223\n\020group_by_support\030\014 \001(\0162\031.e" +
-      "xec.user.GroupBySupport\0226\n\021identifier_ca" +
-      "sing\030\r \001(\0162\033.exec.user.IdentifierCasing\022" +
-      "\037\n\027identifier_quote_string\030\016 \001(\t\022$\n\034like",
-      "_escape_clause_supported\030\017 \001(\010\022!\n\031max_bi" +
-      "nary_literal_length\030\020 \001(\r\022\037\n\027max_catalog" +
-      "_name_length\030\021 \001(\r\022\037\n\027max_char_literal_l" +
-      "ength\030\022 \001(\r\022\036\n\026max_column_name_length\030\023 " +
-      "\001(\r\022\037\n\027max_columns_in_group_by\030\024 \001(\r\022\037\n\027" +
-      "max_columns_in_order_by\030\025 \001(\r\022\035\n\025max_col" +
-      "umns_in_select\030\026 \001(\r\022\036\n\026max_cursor_name_" +
-      "length\030\027 \001(\r\022\034\n\024max_logical_lob_size\030\030 \001" +
-      "(\r\022\024\n\014max_row_size\030\031 \001(\r\022\036\n\026max_schema_n" +
-      "ame_length\030\032 \001(\r\022\034\n\024max_statement_length",
-      "\030\033 \001(\r\022\026\n\016max_statements\030\034 \001(\r\022\035\n\025max_ta" +
-      "ble_name_length\030\035 \001(\r\022\034\n\024max_tables_in_s" +
-      "elect\030\036 \001(\r\022\034\n\024max_user_name_length\030\037 \001(" +
-      "\r\0220\n\016null_collation\030  \001(\0162\030.exec.user.Nu" +
-      "llCollation\022&\n\036null_plus_non_null_equals" +
-      "_null\030! \001(\010\022\031\n\021numeric_functions\030\" \003(\t\0223" +
-      "\n\020order_by_support\030# \003(\0162\031.exec.user.Ord" +
-      "erBySupport\0227\n\022outer_join_support\030$ \003(\0162" +
-      "\033.exec.user.OuterJoinSupport\022=\n\030quoted_i" +
-      "dentifier_casing\030% \001(\0162\033.exec.user.Ident",
-      "ifierCasing\022\021\n\tread_only\030& \001(\010\022\023\n\013schema" +
-      "_term\030\' \001(\t\022\034\n\024search_escape_string\030( \001(" +
-      "\t\022#\n\033select_for_update_supported\030) \001(\010\022\032" +
-      "\n\022special_characters\030* \001(\t\022\024\n\014sql_keywor" +
-      "ds\030+ \003(\t\022\030\n\020string_functions\030, \003(\t\0224\n\020su" +
-      "bquery_support\030- \003(\0162\032.exec.user.SubQuer" +
-      "ySupport\022\030\n\020system_functions\030. \003(\t\022\022\n\nta" +
-      "ble_term\030/ \001(\t\022\035\n\025transaction_supported\030" +
-      "0 \001(\010\022.\n\runion_support\0301 \003(\0162\027.exec.user" +
-      ".UnionSupport\"\353\001\n\010RunQuery\0221\n\014results_mo",
-      "de\030\001 \001(\0162\033.exec.user.QueryResultsMode\022$\n" +
-      "\004type\030\002 \001(\0162\026.exec.shared.QueryType\022\014\n\004p" +
-      "lan\030\003 \001(\t\0221\n\tfragments\030\004 \003(\0132\036.exec.bit." +
-      "control.PlanFragment\022E\n\031prepared_stateme" +
-      "nt_handle\030\005 \001(\0132\".exec.user.PreparedStat" +
-      "ementHandle*\320\003\n\007RpcType\022\r\n\tHANDSHAKE\020\000\022\007" +
-      "\n\003ACK\020\001\022\013\n\007GOODBYE\020\002\022\r\n\tRUN_QUERY\020\003\022\020\n\014C" +
-      "ANCEL_QUERY\020\004\022\023\n\017REQUEST_RESULTS\020\005\022\027\n\023RE" +
-      "SUME_PAUSED_QUERY\020\013\022\034\n\030GET_QUERY_PLAN_FR" +
-      "AGMENTS\020\014\022\020\n\014GET_CATALOGS\020\016\022\017\n\013GET_SCHEM",
-      "AS\020\017\022\016\n\nGET_TABLES\020\020\022\017\n\013GET_COLUMNS\020\021\022\035\n" +
-      "\031CREATE_PREPARED_STATEMENT\020\026\022\023\n\017GET_SERV" +
-      "ER_META\020\010\022\016\n\nQUERY_DATA\020\006\022\020\n\014QUERY_HANDL" +
-      "E\020\007\022\030\n\024QUERY_PLAN_FRAGMENTS\020\r\022\014\n\010CATALOG" +
-      "S\020\022\022\013\n\007SCHEMAS\020\023\022\n\n\006TABLES\020\024\022\013\n\007COLUMNS\020" +
-      "\025\022\026\n\022PREPARED_STATEMENT\020\027\022\017\n\013SERVER_META" +
-      "\020\t\022\020\n\014QUERY_RESULT\020\n\022\020\n\014SASL_MESSAGE\020\030*H" +
-      "\n\013SaslSupport\022\030\n\024UNKNOWN_SASL_SUPPORT\020\000\022" +
-      "\r\n\tSASL_AUTH\020\001\022\020\n\014SASL_PRIVACY\020\002*#\n\020Quer" +
-      "yResultsMode\022\017\n\013STREAM_FULL\020\001*q\n\017Handsha",
-      "keStatus\022\013\n\007SUCCESS\020\001\022\030\n\024RPC_VERSION_MIS" +
-      "MATCH\020\002\022\017\n\013AUTH_FAILED\020\003\022\023\n\017UNKNOWN_FAIL" +
-      "URE\020\004\022\021\n\rAUTH_REQUIRED\020\005*D\n\rRequestStatu" +
-      "s\022\022\n\016UNKNOWN_STATUS\020\000\022\006\n\002OK\020\001\022\n\n\006FAILED\020" +
-      "\002\022\013\n\007TIMEOUT\020\003*Y\n\023ColumnSearchability\022\031\n" +
-      "\025UNKNOWN_SEARCHABILITY\020\000\022\010\n\004NONE\020\001\022\010\n\004CH" +
-      "AR\020\002\022\n\n\006NUMBER\020\003\022\007\n\003ALL\020\004*K\n\022ColumnUpdat" +
-      "ability\022\030\n\024UNKNOWN_UPDATABILITY\020\000\022\r\n\tREA" +
-      "D_ONLY\020\001\022\014\n\010WRITABLE\020\002*1\n\016CollateSupport" +
-      "\022\016\n\nCS_UNKNOWN\020\000\022\017\n\013CS_GROUP_BY\020\001*J\n\027Cor",
-      "relationNamesSupport\022\013\n\007CN_NONE\020\001\022\026\n\022CN_" +
-      "DIFFERENT_NAMES\020\002\022\n\n\006CN_ANY\020\003*\271\003\n\027DateTi" +
-      "meLiteralsSupport\022\016\n\nDL_UNKNOWN\020\000\022\013\n\007DL_" +
-      "DATE\020\001\022\013\n\007DL_TIME\020\002\022\020\n\014DL_TIMESTAMP\020\003\022\024\n" +
-      "\020DL_INTERVAL_YEAR\020\004\022\025\n\021DL_INTERVAL_MONTH" +
-      "\020\005\022\023\n\017DL_INTERVAL_DAY\020\006\022\024\n\020DL_INTERVAL_H" +
-      "OUR\020\007\022\026\n\022DL_INTERVAL_MINUTE\020\010\022\026\n\022DL_INTE" +
-      "RVAL_SECOND\020\t\022\035\n\031DL_INTERVAL_YEAR_TO_MON" +
-      "TH\020\n\022\033\n\027DL_INTERVAL_DAY_TO_HOUR\020\013\022\035\n\031DL_" +
-      "INTERVAL_DAY_TO_MINUTE\020\014\022\035\n\031DL_INTERVAL_",
-      "DAY_TO_SECOND\020\r\022\036\n\032DL_INTERVAL_HOUR_TO_M" +
-      "INUTE\020\016\022\036\n\032DL_INTERVAL_HOUR_TO_SECOND\020\017\022" +
-      " \n\034DL_INTERVAL_MINUTE_TO_SECOND\020\020*Y\n\016Gro" +
-      "upBySupport\022\013\n\007GB_NONE\020\001\022\022\n\016GB_SELECT_ON" +
-      "LY\020\002\022\024\n\020GB_BEYOND_SELECT\020\003\022\020\n\014GB_UNRELAT" +
-      "ED\020\004*x\n\020IdentifierCasing\022\016\n\nIC_UNKNOWN\020\000" +
-      "\022\023\n\017IC_STORES_LOWER\020\001\022\023\n\017IC_STORES_MIXED" +
-      "\020\002\022\023\n\017IC_STORES_UPPER\020\003\022\025\n\021IC_SUPPORTS_M" +
-      "IXED\020\004*X\n\rNullCollation\022\016\n\nNC_UNKNOWN\020\000\022" +
-      "\017\n\013NC_AT_START\020\001\022\r\n\tNC_AT_END\020\002\022\013\n\007NC_HI",
-      "GH\020\003\022\n\n\006NC_LOW\020\004*E\n\016OrderBySupport\022\016\n\nOB" +
-      "_UNKNOWN\020\000\022\020\n\014OB_UNRELATED\020\001\022\021\n\rOB_EXPRE" +
-      "SSION\020\002*\226\001\n\020OuterJoinSupport\022\016\n\nOJ_UNKNO" +
-      "WN\020\000\022\013\n\007OJ_LEFT\020\001\022\014\n\010OJ_RIGHT\020\002\022\013\n\007OJ_FU" +
-      "LL\020\003\022\r\n\tOJ_NESTED\020\004\022\022\n\016OJ_NOT_ORDERED\020\005\022" +
-      "\014\n\010OJ_INNER\020\006\022\031\n\025OJ_ALL_COMPARISON_OPS\020\007" +
-      "*\204\001\n\017SubQuerySupport\022\016\n\nSQ_UNKNOWN\020\000\022\021\n\r" +
-      "SQ_CORRELATED\020\001\022\024\n\020SQ_IN_COMPARISON\020\002\022\020\n" +
-      "\014SQ_IN_EXISTS\020\003\022\020\n\014SQ_IN_INSERT\020\004\022\024\n\020SQ_" +
-      "IN_QUANTIFIED\020\005*;\n\014UnionSupport\022\r\n\tU_UNK",
-      "NOWN\020\000\022\013\n\007U_UNION\020\001\022\017\n\013U_UNION_ALL\020\002B+\n\033" +
-      "org.apache.drill.exec.protoB\nUserProtosH" +
-      "\001"
+      "Status\022*\n\013server_meta\030\002 \001(\0132\025.exec.user." +
+      "ServerMeta\022(\n\005error\030\003 \001(\0132\031.exec.shared." +
+      "DrillPBError\"\377\r\n\nServerMeta\022\035\n\025all_table" +
+      "s_selectable\030\001 \001(\010\022%\n\035blob_included_in_m" +
+      "ax_row_size\030\002 \001(\010\022\030\n\020catalog_at_start\030\003 " +
+      "\001(\010\022\031\n\021catalog_separator\030\004 \001(\t\022\024\n\014catalo" +
+      "g_term\030\005 \001(\t\0222\n\017collate_support\030\006 \003(\0162\031.",
+      "exec.user.CollateSupport\022!\n\031column_alias" +
+      "ing_supported\030\007 \001(\010\0222\n\017convert_support\030\010" +
+      " \003(\0132\031.exec.user.ConvertSupport\022E\n\031corre" +
+      "lation_names_support\030\t \001(\0162\".exec.user.C" +
+      "orrelationNamesSupport\022\033\n\023date_time_func" +
+      "tions\030\n \003(\t\022F\n\032date_time_literals_suppor" +
+      "t\030\013 \003(\0162\".exec.user.DateTimeLiteralsSupp" +
+      "ort\0223\n\020group_by_support\030\014 \001(\0162\031.exec.use" +
+      "r.GroupBySupport\0226\n\021identifier_casing\030\r " +
+      "\001(\0162\033.exec.user.IdentifierCasing\022\037\n\027iden",
+      "tifier_quote_string\030\016 \001(\t\022$\n\034like_escape" +
+      "_clause_supported\030\017 \001(\010\022!\n\031max_binary_li" +
+      "teral_length\030\020 \001(\r\022\037\n\027max_catalog_name_l" +
+      "ength\030\021 \001(\r\022\037\n\027max_char_literal_length\030\022" +
+      " \001(\r\022\036\n\026max_column_name_length\030\023 \001(\r\022\037\n\027" +
+      "max_columns_in_group_by\030\024 \001(\r\022\037\n\027max_col" +
+      "umns_in_order_by\030\025 \001(\r\022\035\n\025max_columns_in" +
+      "_select\030\026 \001(\r\022\036\n\026max_cursor_name_length\030" +
+      "\027 \001(\r\022\034\n\024max_logical_lob_size\030\030 \001(\r\022\024\n\014m" +
+      "ax_row_size\030\031 \001(\r\022\036\n\026max_schema_name_len",
+      "gth\030\032 \001(\r\022\034\n\024max_statement_length\030\033 \001(\r\022" +
+      "\026\n\016max_statements\030\034 \001(\r\022\035\n\025max_table_nam" +
+      "e_length\030\035 \001(\r\022\034\n\024max_tables_in_select\030\036" +
+      " \001(\r\022\034\n\024max_user_name_length\030\037 \001(\r\0220\n\016nu" +
+      "ll_collation\030  \001(\0162\030.exec.user.NullColla" +
+      "tion\022&\n\036null_plus_non_null_equals_null\030!" +
+      " \001(\010\022\031\n\021numeric_functions\030\" \003(\t\0223\n\020order" +
+      "_by_support\030# \003(\0162\031.exec.user.OrderBySup" +
+      "port\0227\n\022outer_join_support\030$ \003(\0162\033.exec." +
+      "user.OuterJoinSupport\022=\n\030quoted_identifi",
+      "er_casing\030% \001(\0162\033.exec.user.IdentifierCa" +
+      "sing\022\021\n\tread_only\030& \001(\010\022\023\n\013schema_term\030\'" +
+      " \001(\t\022\034\n\024search_escape_string\030( \001(\t\022#\n\033se" +
+      "lect_for_update_supported\030) \001(\010\022\032\n\022speci" +
+      "al_characters\030* \001(\t\022\024\n\014sql_keywords\030+ \003(" +
+      "\t\022\030\n\020string_functions\030, \003(\t\0224\n\020subquery_" +
+      "support\030- \003(\0162\032.exec.user.SubQuerySuppor" +
+      "t\022\030\n\020system_functions\030. \003(\t\022\022\n\ntable_ter" +
+      "m\030/ \001(\t\022\035\n\025transaction_supported\0300 \001(\010\022." +
+      "\n\runion_support\0301 \003(\0162\027.exec.user.UnionS",
+      "upport\"\353\001\n\010RunQuery\0221\n\014results_mode\030\001 \001(" +
+      "\0162\033.exec.user.QueryResultsMode\022$\n\004type\030\002" +
+      " \001(\0162\026.exec.shared.QueryType\022\014\n\004plan\030\003 \001" +
+      "(\t\0221\n\tfragments\030\004 \003(\0132\036.exec.bit.control" +
+      ".PlanFragment\022E\n\031prepared_statement_hand" +
+      "le\030\005 \001(\0132\".exec.user.PreparedStatementHa" +
+      "ndle\"B\n\021NewSessionRequest\022-\n\nproperties\030" +
+      "\001 \001(\0132\031.exec.user.UserProperties\"#\n\rSess" +
+      "ionHandle\022\022\n\nsession_id\030\001 \001(\t\"s\n\031RunQuer" +
+      "yWithSessionHandle\022%\n\010runQuery\030\001 \001(\0132\023.e",
+      "xec.user.RunQuery\022/\n\rsessionHandle\030\002 \001(\013" +
+      "2\030.exec.user.SessionHandle*\244\004\n\007RpcType\022\r" +
+      "\n\tHANDSHAKE\020\000\022\007\n\003ACK\020\001\022\013\n\007GOODBYE\020\002\022\r\n\tR" +
+      "UN_QUERY\020\003\022\020\n\014CANCEL_QUERY\020\004\022\023\n\017REQUEST_" +
+      "RESULTS\020\005\022\027\n\023RESUME_PAUSED_QUERY\020\013\022\034\n\030GE" +
+      "T_QUERY_PLAN_FRAGMENTS\020\014\022\020\n\014GET_CATALOGS" +
+      "\020\016\022\017\n\013GET_SCHEMAS\020\017\022\016\n\nGET_TABLES\020\020\022\017\n\013G" +
+      "ET_COLUMNS\020\021\022\035\n\031CREATE_PREPARED_STATEMEN" +
+      "T\020\026\022\023\n\017GET_SERVER_META\020\010\022\017\n\013NEW_SESSION\020" +
+      "\031\022\032\n\026RUN_QUERY_WITH_SESSION\020\033\022\021\n\rCLOSE_S",
+      "ESSION\020\034\022\016\n\nQUERY_DATA\020\006\022\020\n\014QUERY_HANDLE" +
+      "\020\007\022\030\n\024QUERY_PLAN_FRAGMENTS\020\r\022\014\n\010CATALOGS" +
+      "\020\022\022\013\n\007SCHEMAS\020\023\022\n\n\006TABLES\020\024\022\013\n\007COLUMNS\020\025" +
+      "\022\026\n\022PREPARED_STATEMENT\020\027\022\017\n\013SERVER_META\020" +
+      "\t\022\020\n\014QUERY_RESULT\020\n\022\022\n\016SESSION_HANDLE\020\032\022" +
+      "\020\n\014SASL_MESSAGE\020\030*H\n\013SaslSupport\022\030\n\024UNKN" +
+      "OWN_SASL_SUPPORT\020\000\022\r\n\tSASL_AUTH\020\001\022\020\n\014SAS" +
+      "L_PRIVACY\020\002*#\n\020QueryResultsMode\022\017\n\013STREA" +
+      "M_FULL\020\001*q\n\017HandshakeStatus\022\013\n\007SUCCESS\020\001" +
+      "\022\030\n\024RPC_VERSION_MISMATCH\020\002\022\017\n\013AUTH_FAILE",
+      "D\020\003\022\023\n\017UNKNOWN_FAILURE\020\004\022\021\n\rAUTH_REQUIRE" +
+      "D\020\005*D\n\rRequestStatus\022\022\n\016UNKNOWN_STATUS\020\000" +
+      "\022\006\n\002OK\020\001\022\n\n\006FAILED\020\002\022\013\n\007TIMEOUT\020\003*Y\n\023Col" +
+      "umnSearchability\022\031\n\025UNKNOWN_SEARCHABILIT" +
+      "Y\020\000\022\010\n\004NONE\020\001\022\010\n\004CHAR\020\002\022\n\n\006NUMBER\020\003\022\007\n\003A" +
+      "LL\020\004*K\n\022ColumnUpdatability\022\030\n\024UNKNOWN_UP" +
+      "DATABILITY\020\000\022\r\n\tREAD_ONLY\020\001\022\014\n\010WRITABLE\020" +
+      "\002*1\n\016CollateSupport\022\016\n\nCS_UNKNOWN\020\000\022\017\n\013C" +
+      "S_GROUP_BY\020\001*J\n\027CorrelationNamesSupport\022" +
+      "\013\n\007CN_NONE\020\001\022\026\n\022CN_DIFFERENT_NAMES\020\002\022\n\n\006",
+      "CN_ANY\020\003*\271\003\n\027DateTimeLiteralsSupport\022\016\n\n" +
+      "DL_UNKNOWN\020\000\022\013\n\007DL_DATE\020\001\022\013\n\007DL_TIME\020\002\022\020" +
+      "\n\014DL_TIMESTAMP\020\003\022\024\n\020DL_INTERVAL_YEAR\020\004\022\025" +
+      "\n\021DL_INTERVAL_MONTH\020\005\022\023\n\017DL_INTERVAL_DAY" +
+      "\020\006\022\024\n\020DL_INTERVAL_HOUR\020\007\022\026\n\022DL_INTERVAL_" +
+      "MINUTE\020\010\022\026\n\022DL_INTERVAL_SECOND\020\t\022\035\n\031DL_I" +
+      "NTERVAL_YEAR_TO_MONTH\020\n\022\033\n\027DL_INTERVAL_D" +
+      "AY_TO_HOUR\020\013\022\035\n\031DL_INTERVAL_DAY_TO_MINUT" +
+      "E\020\014\022\035\n\031DL_INTERVAL_DAY_TO_SECOND\020\r\022\036\n\032DL" +
+      "_INTERVAL_HOUR_TO_MINUTE\020\016\022\036\n\032DL_INTERVA",
+      "L_HOUR_TO_SECOND\020\017\022 \n\034DL_INTERVAL_MINUTE" +
+      "_TO_SECOND\020\020*Y\n\016GroupBySupport\022\013\n\007GB_NON" +
+      "E\020\001\022\022\n\016GB_SELECT_ONLY\020\002\022\024\n\020GB_BEYOND_SEL" +
+      "ECT\020\003\022\020\n\014GB_UNRELATED\020\004*x\n\020IdentifierCas" +
+      "ing\022\016\n\nIC_UNKNOWN\020\000\022\023\n\017IC_STORES_LOWER\020\001" +
+      "\022\023\n\017IC_STORES_MIXED\020\002\022\023\n\017IC_STORES_UPPER" +
+      "\020\003\022\025\n\021IC_SUPPORTS_MIXED\020\004*X\n\rNullCollati" +
+      "on\022\016\n\nNC_UNKNOWN\020\000\022\017\n\013NC_AT_START\020\001\022\r\n\tN" +
+      "C_AT_END\020\002\022\013\n\007NC_HIGH\020\003\022\n\n\006NC_LOW\020\004*E\n\016O" +
+      "rderBySupport\022\016\n\nOB_UNKNOWN\020\000\022\020\n\014OB_UNRE",
+      "LATED\020\001\022\021\n\rOB_EXPRESSION\020\002*\226\001\n\020OuterJoin" +
+      "Support\022\016\n\nOJ_UNKNOWN\020\000\022\013\n\007OJ_LEFT\020\001\022\014\n\010" +
+      "OJ_RIGHT\020\002\022\013\n\007OJ_FULL\020\003\022\r\n\tOJ_NESTED\020\004\022\022" +
+      "\n\016OJ_NOT_ORDERED\020\005\022\014\n\010OJ_INNER\020\006\022\031\n\025OJ_A" +
+      "LL_COMPARISON_OPS\020\007*\204\001\n\017SubQuerySupport\022" +
+      "\016\n\nSQ_UNKNOWN\020\000\022\021\n\rSQ_CORRELATED\020\001\022\024\n\020SQ" +
+      "_IN_COMPARISON\020\002\022\020\n\014SQ_IN_EXISTS\020\003\022\020\n\014SQ" +
+      "_IN_INSERT\020\004\022\024\n\020SQ_IN_QUANTIFIED\020\005*;\n\014Un" +
+      "ionSupport\022\r\n\tU_UNKNOWN\020\000\022\013\n\007U_UNION\020\001\022\017" +
+      "\n\013U_UNION_ALL\020\002B+\n\033org.apache.drill.exec",
+      ".protoB\nUserProtosH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -42059,7 +43888,7 @@ public final class UserProtos {
           internal_static_exec_user_UserToBitHandshake_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exec_user_UserToBitHandshake_descriptor,
-              new java.lang.String[] { "Channel", "SupportListening", "RpcVersion", "Credentials", "Properties", "SupportComplexTypes", "SupportTimeout", "ClientInfos", "SaslSupport", });
+              new java.lang.String[] { "Channel", "SupportListening", "RpcVersion", "Credentials", "Properties", "SupportComplexTypes", "SupportTimeout", "ClientInfos", "SaslSupport", "EnableMultiplex", });
           internal_static_exec_user_RequestResults_descriptor =
             getDescriptor().getMessageTypes().get(4);
           internal_static_exec_user_RequestResults_fieldAccessorTable = new
@@ -42222,6 +44051,24 @@ public final class UserProtos {
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_exec_user_RunQuery_descriptor,
               new java.lang.String[] { "ResultsMode", "Type", "Plan", "Fragments", "PreparedStatementHandle", });
+          internal_static_exec_user_NewSessionRequest_descriptor =
+            getDescriptor().getMessageTypes().get(31);
+          internal_static_exec_user_NewSessionRequest_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_exec_user_NewSessionRequest_descriptor,
+              new java.lang.String[] { "Properties", });
+          internal_static_exec_user_SessionHandle_descriptor =
+            getDescriptor().getMessageTypes().get(32);
+          internal_static_exec_user_SessionHandle_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_exec_user_SessionHandle_descriptor,
+              new java.lang.String[] { "SessionId", });
+          internal_static_exec_user_RunQueryWithSessionHandle_descriptor =
+            getDescriptor().getMessageTypes().get(33);
+          internal_static_exec_user_RunQueryWithSessionHandle_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_exec_user_RunQueryWithSessionHandle_descriptor,
+              new java.lang.String[] { "RunQuery", "SessionHandle", });
           return null;
         }
       };

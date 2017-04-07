@@ -447,6 +447,8 @@ public final class SchemaUserProtos
 
                 if(message.hasSaslSupport())
                     output.writeEnum(9, message.getSaslSupport().getNumber(), false);
+                if(message.hasEnableMultiplex())
+                    output.writeBool(10, message.getEnableMultiplex(), false);
             }
             public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.UserToBitHandshake message)
             {
@@ -516,6 +518,9 @@ public final class SchemaUserProtos
                         case 9:
                             builder.setSaslSupport(org.apache.drill.exec.proto.UserProtos.SaslSupport.valueOf(input.readEnum()));
                             break;
+                        case 10:
+                            builder.setEnableMultiplex(input.readBool());
+                            break;
                         default:
                             input.handleUnknownField(number, this);
                     }
@@ -565,6 +570,7 @@ public final class SchemaUserProtos
                 case 7: return "supportTimeout";
                 case 8: return "clientInfos";
                 case 9: return "saslSupport";
+                case 10: return "enableMultiplex";
                 default: return null;
             }
         }
@@ -585,6 +591,7 @@ public final class SchemaUserProtos
             fieldMap.put("supportTimeout", 7);
             fieldMap.put("clientInfos", 8);
             fieldMap.put("saslSupport", 9);
+            fieldMap.put("enableMultiplex", 10);
         }
     }
 
@@ -4557,6 +4564,352 @@ public final class SchemaUserProtos
             fieldMap.put("plan", 3);
             fieldMap.put("fragments", 4);
             fieldMap.put("preparedStatementHandle", 5);
+        }
+    }
+
+    public static final class NewSessionRequest
+    {
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.MessageSchema WRITE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.MessageSchema();
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.BuilderSchema MERGE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.BuilderSchema();
+        
+        public static class MessageSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.NewSessionRequest>
+        {
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.NewSessionRequest message) throws java.io.IOException
+            {
+                if(message.hasProperties())
+                    output.writeObject(1, message.getProperties(), org.apache.drill.exec.proto.SchemaUserProtos.UserProperties.WRITE, false);
+
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.NewSessionRequest message)
+            {
+                return message.isInitialized();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.NewSessionRequest> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class.getName();
+            }
+            //unused
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.NewSessionRequest message) throws java.io.IOException {}
+            public org.apache.drill.exec.proto.UserProtos.NewSessionRequest newMessage() { return null; }
+        }
+        public static class BuilderSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder>
+        {
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder builder) throws java.io.IOException
+            {
+                for(int number = input.readFieldNumber(this);; number = input.readFieldNumber(this))
+                {
+                    switch(number)
+                    {
+                        case 0:
+                            return;
+                        case 1:
+                            builder.setProperties(input.mergeObject(org.apache.drill.exec.proto.UserProtos.UserProperties.newBuilder(), org.apache.drill.exec.proto.SchemaUserProtos.UserProperties.MERGE));
+
+                            break;
+                        default:
+                            input.handleUnknownField(number, this);
+                    }
+                }
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder builder)
+            {
+                return builder.isInitialized();
+            }
+            public org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder newMessage()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.newBuilder();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.NewSessionRequest.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.NewSessionRequest.class.getName();
+            }
+            //unused
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.NewSessionRequest.Builder builder) throws java.io.IOException {}
+        }
+        public static java.lang.String getFieldName(int number)
+        {
+            switch(number)
+            {
+                case 1: return "properties";
+                default: return null;
+            }
+        }
+        public static int getFieldNumber(java.lang.String name)
+        {
+            java.lang.Integer number = fieldMap.get(name);
+            return number == null ? 0 : number.intValue();
+        }
+        private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+        static
+        {
+            fieldMap.put("properties", 1);
+        }
+    }
+
+    public static final class SessionHandle
+    {
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.MessageSchema WRITE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.MessageSchema();
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.BuilderSchema MERGE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.BuilderSchema();
+        
+        public static class MessageSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.SessionHandle>
+        {
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.SessionHandle message) throws java.io.IOException
+            {
+                if(message.hasSessionId())
+                    output.writeString(1, message.getSessionId(), false);
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.SessionHandle message)
+            {
+                return message.isInitialized();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.SessionHandle> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.class.getName();
+            }
+            //unused
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.SessionHandle message) throws java.io.IOException {}
+            public org.apache.drill.exec.proto.UserProtos.SessionHandle newMessage() { return null; }
+        }
+        public static class BuilderSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder>
+        {
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder builder) throws java.io.IOException
+            {
+                for(int number = input.readFieldNumber(this);; number = input.readFieldNumber(this))
+                {
+                    switch(number)
+                    {
+                        case 0:
+                            return;
+                        case 1:
+                            builder.setSessionId(input.readString());
+                            break;
+                        default:
+                            input.handleUnknownField(number, this);
+                    }
+                }
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder builder)
+            {
+                return builder.isInitialized();
+            }
+            public org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder newMessage()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.newBuilder();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.SessionHandle.class.getName();
+            }
+            //unused
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.SessionHandle.Builder builder) throws java.io.IOException {}
+        }
+        public static java.lang.String getFieldName(int number)
+        {
+            switch(number)
+            {
+                case 1: return "sessionId";
+                default: return null;
+            }
+        }
+        public static int getFieldNumber(java.lang.String name)
+        {
+            java.lang.Integer number = fieldMap.get(name);
+            return number == null ? 0 : number.intValue();
+        }
+        private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+        static
+        {
+            fieldMap.put("sessionId", 1);
+        }
+    }
+
+    public static final class RunQueryWithSessionHandle
+    {
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.MessageSchema WRITE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.MessageSchema();
+        public static final org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.BuilderSchema MERGE =
+            new org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.BuilderSchema();
+        
+        public static class MessageSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle>
+        {
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle message) throws java.io.IOException
+            {
+                if(message.hasRunQuery())
+                    output.writeObject(1, message.getRunQuery(), org.apache.drill.exec.proto.SchemaUserProtos.RunQuery.WRITE, false);
+
+                if(message.hasSessionHandle())
+                    output.writeObject(2, message.getSessionHandle(), org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.WRITE, false);
+
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle message)
+            {
+                return message.isInitialized();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class.getName();
+            }
+            //unused
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle message) throws java.io.IOException {}
+            public org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle newMessage() { return null; }
+        }
+        public static class BuilderSchema implements com.dyuproject.protostuff.Schema<org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder>
+        {
+            public void mergeFrom(com.dyuproject.protostuff.Input input, org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder builder) throws java.io.IOException
+            {
+                for(int number = input.readFieldNumber(this);; number = input.readFieldNumber(this))
+                {
+                    switch(number)
+                    {
+                        case 0:
+                            return;
+                        case 1:
+                            builder.setRunQuery(input.mergeObject(org.apache.drill.exec.proto.UserProtos.RunQuery.newBuilder(), org.apache.drill.exec.proto.SchemaUserProtos.RunQuery.MERGE));
+
+                            break;
+                        case 2:
+                            builder.setSessionHandle(input.mergeObject(org.apache.drill.exec.proto.UserProtos.SessionHandle.newBuilder(), org.apache.drill.exec.proto.SchemaUserProtos.SessionHandle.MERGE));
+
+                            break;
+                        default:
+                            input.handleUnknownField(number, this);
+                    }
+                }
+            }
+            public boolean isInitialized(org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder builder)
+            {
+                return builder.isInitialized();
+            }
+            public org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder newMessage()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.newBuilder();
+            }
+            public java.lang.String getFieldName(int number)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.getFieldName(number);
+            }
+            public int getFieldNumber(java.lang.String name)
+            {
+                return org.apache.drill.exec.proto.SchemaUserProtos.RunQueryWithSessionHandle.getFieldNumber(name);
+            }
+            public java.lang.Class<org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder> typeClass()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder.class;
+            }
+            public java.lang.String messageName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class.getSimpleName();
+            }
+            public java.lang.String messageFullName()
+            {
+                return org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.class.getName();
+            }
+            //unused
+            public void writeTo(com.dyuproject.protostuff.Output output, org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle.Builder builder) throws java.io.IOException {}
+        }
+        public static java.lang.String getFieldName(int number)
+        {
+            switch(number)
+            {
+                case 1: return "runQuery";
+                case 2: return "sessionHandle";
+                default: return null;
+            }
+        }
+        public static int getFieldNumber(java.lang.String name)
+        {
+            java.lang.Integer number = fieldMap.get(name);
+            return number == null ? 0 : number.intValue();
+        }
+        private static final java.util.HashMap<java.lang.String,java.lang.Integer> fieldMap = new java.util.HashMap<java.lang.String,java.lang.Integer>();
+        static
+        {
+            fieldMap.put("runQuery", 1);
+            fieldMap.put("sessionHandle", 2);
         }
     }
 

@@ -305,7 +305,7 @@ enum CoreOperatorType {
   WINDOW = 34;
   NESTED_LOOP_JOIN = 35;
   AVRO_SUB_SCAN = 36;
-  PCAP_SUB_SCAN = 37
+  PCAP_SUB_SCAN = 37;
   MAPRDB_SUB_SCAN = 38;
 }
 

@@ -29,6 +29,9 @@ enum RpcType {
   GET_COLUMNS = 17; // user is requesting metadata of column(s)
   CREATE_PREPARED_STATEMENT = 22; // user is sending a request to create prepared statement
   GET_SERVER_META = 8; // user is sending a request to receive server metadata
+  NEW_SESSION = 25;
+  RUN_QUERY_WITH_SESSION = 27;
+  CLOSE_SESSION = 28;
 
   // bit to user
   QUERY_DATA = 6; // drillbit is sending a query result data batch to the user
@@ -40,8 +43,8 @@ enum RpcType {
   COLUMNS = 21; // return column metadata in response to GET_COLUMNS
   PREPARED_STATEMENT = 23; // return preparated statement in response to CREATE_PREPARED_STATEMENT
   SERVER_META = 9; // return server infos in respose to GET_SERVER_META
-
   QUERY_RESULT = 10; // drillbit is reporting a query status change, most likely a terminal message, to the user
+  SESSION_HANDLE = 26;
 
   // user to bit and bit to user
   SASL_MESSAGE = 24;
@@ -83,6 +86,7 @@ message UserToBitHandshake {
   optional bool support_timeout = 7 [default = false];
   optional RpcEndpointInfos client_infos = 8;
   optional SaslSupport sasl_support = 9;
+  optional bool enable_multiplex = 10 [default = false];
 }
 
 message RequestResults {
@@ -676,4 +680,17 @@ message RunQuery {
    * to state on server side which is returned in response to CreatePreparedStatementReq.
    */
   optional PreparedStatementHandle prepared_statement_handle = 5;
+}
+
+message NewSessionRequest {
+  optional UserProperties properties = 1;
+}
+
+message SessionHandle {
+  optional string session_id = 1;
+}
+
+message RunQueryWithSessionHandle {
+  optional RunQuery runQuery = 1;
+  optional SessionHandle sessionHandle = 2;
 }
