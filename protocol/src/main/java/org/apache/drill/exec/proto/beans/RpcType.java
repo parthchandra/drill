@@ -36,6 +36,9 @@ public enum RpcType implements com.dyuproject.protostuff.EnumLite<RpcType>
     GET_COLUMNS(17),
     CREATE_PREPARED_STATEMENT(22),
     GET_SERVER_META(8),
+    NEW_SESSION(25),
+    RUN_QUERY_WITH_SESSION(27),
+    CLOSE_SESSION(28),
     QUERY_DATA(6),
     QUERY_HANDLE(7),
     QUERY_PLAN_FRAGMENTS(13),
@@ -46,6 +49,7 @@ public enum RpcType implements com.dyuproject.protostuff.EnumLite<RpcType>
     PREPARED_STATEMENT(23),
     SERVER_META(9),
     QUERY_RESULT(10),
+    SESSION_HANDLE(26),
     SASL_MESSAGE(24);
     
     public final int number;
@@ -89,6 +93,10 @@ public enum RpcType implements com.dyuproject.protostuff.EnumLite<RpcType>
             case 22: return CREATE_PREPARED_STATEMENT;
             case 23: return PREPARED_STATEMENT;
             case 24: return SASL_MESSAGE;
+            case 25: return NEW_SESSION;
+            case 26: return SESSION_HANDLE;
+            case 27: return RUN_QUERY_WITH_SESSION;
+            case 28: return CLOSE_SESSION;
             default: return null;
         }
     }
