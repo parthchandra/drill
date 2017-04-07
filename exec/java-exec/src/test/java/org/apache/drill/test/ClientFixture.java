@@ -32,7 +32,6 @@ import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.testing.Controls;
 import org.apache.drill.exec.testing.ControlsInjectionUtil;
 import org.apache.drill.test.ClusterFixture.FixtureTestServices;
-import org.apache.drill.test.QueryBuilder.QuerySummary;
 
 public class ClientFixture implements AutoCloseable {
 

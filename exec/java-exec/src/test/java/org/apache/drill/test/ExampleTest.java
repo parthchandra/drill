@@ -28,7 +28,6 @@ import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.physical.impl.xsort.managed.ExternalSortBatch;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.test.LogFixture.LogFixtureBuilder;
-import org.apache.drill.test.QueryBuilder.QuerySummary;
 import org.junit.Ignore;
 import org.junit.Test;
 

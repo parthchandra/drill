@@ -18,26 +18,18 @@
 package org.apache.drill.test;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.drill.PlanTestBase;
 import org.apache.drill.QueryTestUtil;
 import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.client.PrintingResultsListener;
 import org.apache.drill.exec.client.QuerySubmitter.Format;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
-import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.record.RecordBatchLoader;
 import org.apache.drill.exec.record.VectorWrapper;
-import org.apache.drill.exec.rpc.ConnectionThrottle;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.user.AwaitableUserResultsListener;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
@@ -55,153 +47,6 @@ import com.google.common.base.Preconditions;
  */
 
 public class QueryBuilder {
-
-  /**
-   * Listener used to retrieve the query summary (only) asynchronously
-   * using a {@link QuerySummaryFuture}.
-   */
-
-  public class SummaryOnlyQueryEventListener implements UserResultsListener {
-
-    /**
-     * The future to be notified. Created here and returned by the
-     * query builder.
-     */
-
-    private final QuerySummaryFuture future;
-    private QueryId queryId;
-    private int recordCount;
-    private int batchCount;
-    private long startTime;
-
-    public SummaryOnlyQueryEventListener(QuerySummaryFuture future) {
-      this.future = future;
-      startTime = System.currentTimeMillis();
-    }
-
-    @Override
-    public void queryIdArrived(QueryId queryId) {
-      this.queryId = queryId;
-    }
-
-    @Override
-    public void submissionFailed(UserException ex) {
-      future.completed(
-          new QuerySummary(queryId, recordCount, batchCount,
-                           System.currentTimeMillis() - startTime, ex));
-    }
-
-    @Override
-    public void dataArrived(QueryDataBatch result, ConnectionThrottle throttle) {
-      batchCount++;
-      recordCount += result.getHeader().getRowCount();
-      result.release();
-    }
-
-    @Override
-    public void queryCompleted(QueryState state) {
-      future.completed(
-          new QuerySummary(queryId, recordCount, batchCount,
-                           System.currentTimeMillis() - startTime, state));
-    }
-  }
-
-  /**
-   * The future used to wait for the completion of an async query. Returns
-   * just the summary of the query.
-   */
-
-  public class QuerySummaryFuture implements Future<QuerySummary> {
-
-    /**
-     * Synchronizes the listener thread and the test thread that
-     * launched the query.
-     */
-
-    private CountDownLatch lock = new CountDownLatch(1);
-    private QuerySummary summary;
-
-    /**
-     * Unsupported at present.
-     */
-
-    @Override
-    public boolean cancel(boolean mayInterruptIfRunning) {
-      throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Always returns false.
-     */
-
-    @Override
-    public boolean isCancelled() { return false; }
-
-    @Override
-    public boolean isDone() { return summary != null; }
-
-    @Override
-    public QuerySummary get() throws InterruptedException, ExecutionException {
-      lock.await();
-      return summary;
-    }
-
-    /**
-     * Not supported at present, just does a non-timeout get.
-     */
-
-    @Override
-    public QuerySummary get(long timeout, TimeUnit unit)
-        throws InterruptedException, ExecutionException, TimeoutException {
-      return get();
-    }
-
-    protected void completed(QuerySummary querySummary) {
-      summary = querySummary;
-      lock.countDown();
-    }
-  }
-
-  /**
-   * Summary results of a query: records, batches, run time.
-   */
-
-  public static class QuerySummary {
-    private final QueryId queryId;
-    private final int records;
-    private final int batches;
-    private final long ms;
-    private final QueryState finalState;
-    private final Exception error;
-
-    public QuerySummary(QueryId queryId, int recordCount, int batchCount, long elapsed, QueryState state) {
-      this.queryId = queryId;
-      records = recordCount;
-      batches = batchCount;
-      ms = elapsed;
-      finalState = state;
-      error = null;
-    }
-
-    public QuerySummary(QueryId queryId, int recordCount, int batchCount, long elapsed, Exception ex) {
-      this.queryId = queryId;
-      records = recordCount;
-      batches = batchCount;
-      ms = elapsed;
-      finalState = null;
-      error = ex;
-    }
-
-    public boolean failed() { return error != null; }
-    public boolean succeeded() { return error == null; }
-    public long recordCount() { return records; }
-    public int batchCount() { return batches; }
-    public long runTimeMs() { return ms; }
-    public QueryId queryId() { return queryId; }
-    public String queryIdString() { return QueryIdHelper.getQueryId(queryId); }
-    public Exception error() { return error; }
-    public QueryState finalState() { return finalState; }
-  }
 
   private final ClientFixture client;
   private QueryType queryType;
