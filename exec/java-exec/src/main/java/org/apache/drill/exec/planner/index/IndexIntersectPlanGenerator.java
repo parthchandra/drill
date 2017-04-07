@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -40,6 +41,7 @@ import org.apache.drill.exec.physical.impl.join.JoinUtils.JoinControl;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
+import org.apache.drill.exec.planner.physical.JoinPruleBase;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
@@ -117,12 +119,14 @@ public class IndexIntersectPlanGenerator extends NonCoveringIndexPlanGenerator {
   }
 
   public RelNode buildOriginalProject (RelNode newRel) {
+    RelDataType origRowType = origProject == null ? origScan.getRowType() : origProject.getRowType();
+
     final RelDataTypeFactory.FieldInfoBuilder finalFieldTypeBuilder =
         origScan.getCluster().getTypeFactory().builder();
 
     List<RelDataTypeField> hjRowFields = newRel.getRowType().getFieldList();
     int toRemoveRowKeyCount = 1;
-    if (getRowKeyIndex(origProject.getRowType(), origScan)  < 0 ) {
+    if (getRowKeyIndex(origRowType, origScan)  < 0 ) {
       toRemoveRowKeyCount = 2;
     }
     finalFieldTypeBuilder.addAll(hjRowFields.subList(0, hjRowFields.size()-toRemoveRowKeyCount));
@@ -172,11 +176,17 @@ public class IndexIntersectPlanGenerator extends NonCoveringIndexPlanGenerator {
     final ProjectPrel indexProjectPrel = new ProjectPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
         indexFilterPrel, indexProjectExprs, indexProjectRowType);
 
-    final DrillDistributionTrait distBroadcastRight = new DrillDistributionTrait(DrillDistributionTrait.DistributionType.BROADCAST_DISTRIBUTED);
-    RelTraitSet indexTraits = newTraitSet(distBroadcastRight).plus(Prel.DRILL_PHYSICAL);
-    RelNode converted = Prule.convert(indexProjectPrel, indexTraits);
+    RelTraitSet indexTraits = newTraitSet().plus(Prel.DRILL_PHYSICAL);
 
     //if build(right) side does not exist, this index scan is the right most.
+    if(right == null) {
+      final DrillDistributionTrait distRight =
+          new DrillDistributionTrait(DrillDistributionTrait.DistributionType.BROADCAST_DISTRIBUTED);
+      indexTraits = newTraitSet(distRight).plus(Prel.DRILL_PHYSICAL);
+    }
+
+    RelNode converted = Prule.convert(indexProjectPrel, indexTraits);
+
     if (right == null) {
       return converted;
     }
@@ -265,11 +275,14 @@ public class IndexIntersectPlanGenerator extends NonCoveringIndexPlanGenerator {
       remnant = indexInfoMap.get(pair.getKey()).remainderCondition;
     }
 
+    final RelDataTypeField rightRowKeyField = indexPlan.getRowType().getFieldList().get(0);
+    final RelNode rangeDistRight = createRangeDistRight(indexPlan, rightRowKeyField, (DbGroupScan)origScan.getGroupScan());
+
     //now with index plan constructed, build plan of left(probe) side to use restricted db scan
 
     Pair<RelNode, DbGroupScan> leftRelAndScan = buildRestrictedDBScan(remnant);
 
-    RelNode finalRel = buildRowKeyJoin(leftRelAndScan.left, indexPlan, true, JoinControl.DEFAULT);
+    RelNode finalRel = buildRowKeyJoin(leftRelAndScan.left, rangeDistRight, true, JoinControl.DEFAULT);
 
     return finalRel;
   }

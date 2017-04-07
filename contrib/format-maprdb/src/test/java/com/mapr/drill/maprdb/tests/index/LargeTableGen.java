@@ -20,8 +20,12 @@ package com.mapr.drill.maprdb.tests.index;
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
+import com.mapr.db.TableDescriptor;
+import com.mapr.db.impl.TableDescriptorImpl;
 import com.mapr.db.tests.utils.DBTests;
 import com.mapr.fs.utils.ssh.TestCluster;
+import org.apache.commons.lang.text.StrBuilder;
+import org.apache.hadoop.fs.Path;
 import org.ojai.Document;
 import org.ojai.DocumentStream;
 import org.ojai.json.Json;
@@ -52,19 +56,32 @@ import java.io.StringBufferInputStream;
  */
 public class LargeTableGen extends LargeTableGenBase {
 
+  static final int SPLIT_SIZE = 5000;
   private Admin admin;
 
   public LargeTableGen(Admin dbadmin) {
     admin = dbadmin;
   }
 
-  Table createOrGetTable(String tableName) {
+  Table createOrGetTable(String tableName, int recordNum) {
     if (admin.tableExists(tableName)) {
       return MapRDB.getTable(tableName);
       //admin.deleteTable(tableName);
     }
     else {
-      return admin.createTable(tableName);
+      TableDescriptor desc = new TableDescriptorImpl(new Path(tableName));
+
+      int splits = (recordNum / SPLIT_SIZE) - (((recordNum % SPLIT_SIZE) > 1)? 0 : 1);
+
+      String[] splitsStr = new String[splits];
+      StringBuilder strBuilder = new StringBuilder("Splits:");
+      for(int i=0; i<splits; ++i) {
+        splitsStr[i] = String.format("%d", (i+1)*SPLIT_SIZE);
+        strBuilder.append(splitsStr[i] + ", ");
+      }
+      System.out.print(strBuilder.toString());
+
+      return admin.createTable(desc, splitsStr);
     }
   }
 
@@ -111,7 +128,7 @@ public class LargeTableGen extends LargeTableGenBase {
     //create Json String
     int batch, i;
     int BATCH_SIZE=2000;
-    try (Table table = createOrGetTable(tablePath)) {
+    try (Table table = createOrGetTable(tablePath, recordNumber)) {
       //create index
       createIndex(table, indexDef);
       for (batch = 0; batch < recordNumber; batch += BATCH_SIZE) {
@@ -137,6 +154,7 @@ public class LargeTableGen extends LargeTableGenBase {
       }
       table.flush();
       DBTests.waitForIndexFlush(table.getPath());
+      //Thread.sleep(5000);
     }
   }
 }

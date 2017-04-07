@@ -66,7 +66,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   public static final String TABLE_JSON = "json";
 
-  protected MapRDBTableStats stats;
+  protected MapRDBTableStats tableStats;
   protected JsonScanSpec scanSpec;
   protected long rowCount;
 
@@ -98,7 +98,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     super(that);
     this.scanSpec = that.scanSpec;
     this.endpointFragmentMapping = that.endpointFragmentMapping;
-    this.stats = that.stats;
+    this.tableStats = that.tableStats;
   }
 
   @Override
@@ -155,7 +155,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
           t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName());
       }
       TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
-      stats = new MapRDBTableStats(conf, scanSpec.getTableName());
+      tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
       regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       for (TabletInfo tabletInfo : tabletInfos) {
@@ -198,7 +198,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       return indexScanStats();
     }
 
-    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * stats.getNumRows());
+    long rowCount = (long) ((scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows());
     final int avgColumnSize = 10;
     int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
     float diskCost = avgColumnSize * numColumns * rowCount;
@@ -213,7 +213,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       totalColNum = scanSpec.getIndexDesc().getCoveredFields().size() + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
     }
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
-    long rowCount = (long) ((filterPushed ? 0.001f : 0.01f) * stats.getNumRows());
+    long rowCount = (long) ((filterPushed ? 0.0001f : 0.001f) * tableStats.getNumRows());
     final int avgColumnSize = 10;
     float diskCost = avgColumnSize * numColumns * rowCount;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
