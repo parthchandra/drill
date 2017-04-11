@@ -97,6 +97,50 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   }
 
   /**
+   * Interface for getting user session properties and interacting with user connection. Separating this interface from
+   * {@link AbstractRemoteConnection} implementation for user connection:
+   * <p><ul>
+   *   <li> Connection is passed to Foreman and Screen operators. Instead passing this interface exposes few details.
+   *   <li> Makes it easy to have wrappers around user connection which can be helpful to tap the messages and data
+   *        going to the actual client.
+   * </ul>
+   */
+  public interface UserClientConnection extends AutoCloseable {
+    /**
+     * @return User session object.
+     */
+    UserSession getSession();
+
+    /**
+     * Send query result outcome to client. Outcome is returned through <code>listener</code>
+     * @param listener
+     * @param result
+     */
+    void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result);
+
+    /**
+     * Send query data to client. Outcome is returned through <code>listener</code>
+     * @param listener
+     * @param result
+     */
+    void sendData(RpcOutcomeListener<Ack> listener, QueryWritableBatch result);
+
+    /**
+     * Returns the {@link ChannelFuture} which will be notified when this
+     * channel is closed.  This method always returns the same future instance.
+     */
+    ChannelFuture getChannelClosureFuture();
+
+    /**
+     * @return Return the client node address.
+     */
+    SocketAddress getRemoteAddress();
+
+    @Override
+    void close();
+  }
+
+  /**
    * {@link AbstractRemoteConnection} implementation for user connection. Also implements {@link UserClientConnection}.
    */
   public class BitToUserConnection extends AbstractServerConnection<BitToUserConnection>
@@ -154,6 +198,10 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
       final String targetName = session.getTargetUserName();
       if (config.getImpersonationManager() != null && targetName != null) {
         config.getImpersonationManager().replaceUserOnSession(targetName, session);
+      }
+      if (inbound.hasEnableMultiplex() && inbound.getEnableMultiplex()) {
+        changeHandlerTo(new MultiUserServerRequestHandler(userWorker, config));
+        session.unsetTargetUserName();
       }
     }
 

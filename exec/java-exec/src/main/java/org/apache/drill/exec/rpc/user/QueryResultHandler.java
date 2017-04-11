@@ -17,11 +17,15 @@
  */
 package org.apache.drill.exec.rpc.user;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -379,6 +383,7 @@ public class QueryResultHandler {
                   logger.warn("Buffering listener failed before results were transferred to the actual listener.");
                 }
               }
+              queryIdToResultsListenersMap.clear();
             }
           });
       parentHandler.connectionSucceeded(connection);
@@ -387,6 +392,15 @@ public class QueryResultHandler {
     @Override
     public void connectionFailed(FailureType type, Throwable t) {
       parentHandler.connectionFailed(type, t);
+    }
+  }
+
+  public void failAndRemoveListeners(final Predicate<QueryId> predicate, final UserException.Builder builder) {
+    final List<QueryId> queriesToFail = Lists.newArrayList(
+        Iterables.filter(queryIdToResultsListenersMap.keySet(), predicate));
+    for (final QueryId queryId : queriesToFail) {
+      queryIdToResultsListenersMap.remove(queryId)
+          .submissionFailed(builder.build(logger));
     }
   }
 }

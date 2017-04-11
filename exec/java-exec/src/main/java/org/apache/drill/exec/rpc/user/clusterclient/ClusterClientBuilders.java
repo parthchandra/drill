@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.client;
+package org.apache.drill.exec.rpc.user.clusterclient;
 
-import org.apache.drill.exec.rpc.NonTransientRpcException;
+import org.apache.drill.exec.rpc.user.clusterclient.zkbased.ZKBasedConnectionPoolBuilder;
 
 /**
- * Exception for malformed connection string from client
+ * Factory and utility methods.
  */
-public class InvalidConnectionInfoException extends NonTransientRpcException {
+public final class ClusterClientBuilders {
+//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(ClusterClientBuilders.class);
 
-  public InvalidConnectionInfoException(String message) {
-    super(message);
+  /**
+   * Create new ZooKeeper based connection pool builder.
+   *
+   * @return new ZooKeeper based connection pool builder
+   */
+  public static ZKBasedConnectionPoolBuilder newZKBasedPool() {
+    return new ZKBasedConnectionPoolBuilder();
   }
 
-  public InvalidConnectionInfoException(String message, Object... args) {
-    super(String.format(message, args));
+  // prevent instantiation
+  private ClusterClientBuilders() {
   }
 }

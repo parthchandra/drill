@@ -250,6 +250,24 @@ public class PreparedStatementProvider {
     }
 
     @Override
+    public void close() {
+    }
+
+    @Override
+    public void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result) {
+      // Release the wait latch if the query is terminated.
+      final QueryState state = result.getQueryState();
+      if (state == QueryState.FAILED || state  == QueryState.CANCELED || state == QueryState.COMPLETED) {
+        if (state == QueryState.FAILED) {
+          error = result.getError(0);
+        }
+        latch.countDown();
+      }
+
+      listener.success(Acks.OK, null);
+    }
+
+    @Override
     public void sendData(RpcOutcomeListener<Ack> listener, QueryWritableBatch result) {
       // Save the query results schema and release the buffers.
       if (fields == null) {
