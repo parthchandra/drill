@@ -41,6 +41,8 @@ public final class DrillProperties extends Properties {
 
   public static final String SCHEMA = "schema";
 
+  public static final String MULTIPLEX = "multiplex";
+
   public static final String USER = "user";
 
   public static final String PASSWORD = "password";

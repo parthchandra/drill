@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *    http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.client;
-
-import org.apache.drill.exec.rpc.NonTransientRpcException;
+package org.apache.drill.exec.rpc.user.clusterclient;
 
 /**
- * Exception for malformed connection string from client
+ * Behaves both like a cluster client and a connection.
  */
-public class InvalidConnectionInfoException extends NonTransientRpcException {
-
-  public InvalidConnectionInfoException(String message) {
-    super(message);
-  }
-
-  public InvalidConnectionInfoException(String message, Object... args) {
-    super(String.format(message, args));
-  }
+public interface DrillConnectionPool extends DrillConnection, DrillClusterClient {
 }

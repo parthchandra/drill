@@ -51,6 +51,7 @@ import org.apache.drill.exec.proto.UserProtos.RpcEndpointInfos;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.SaslSupport;
+import org.apache.drill.exec.proto.UserProtos.SessionHandle;
 import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
 import org.apache.drill.exec.rpc.AbstractClientConnection;
 import org.apache.drill.exec.rpc.Acks;
@@ -90,7 +91,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
   private static final Logger logger = org.slf4j.LoggerFactory.getLogger(UserClient.class);
 
   private final BufferAllocator allocator;
-  private final QueryResultHandler queryResultHandler = new QueryResultHandler();
+  protected final QueryResultHandler queryResultHandler = new QueryResultHandler();
   private final String clientName;
   private final boolean supportComplexTypes;
 
@@ -146,6 +147,8 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
         .setClientInfos(UserRpcUtils.getRpcEndpointInfos(clientName))
         .setSaslSupport(SaslSupport.SASL_AUTH)
         .setProperties(properties.serializeForServer())
+        .setEnableMultiplex(properties.containsKey(DrillProperties.MULTIPLEX) &&
+            Boolean.parseBoolean(properties.getProperty(DrillProperties.MULTIPLEX)))
         .build();
 
     connect(handshake, endpoint).checkedGet();
@@ -321,6 +324,8 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
       return SaslMessage.getDefaultInstance();
     case RpcType.SERVER_META_VALUE:
       return GetServerMetaResp.getDefaultInstance();
+    case RpcType.SESSION_HANDLE_VALUE:
+      return SessionHandle.getDefaultInstance();
     }
     throw new RpcException(String.format("Unable to deal with RpcType of %d", rpcType));
   }

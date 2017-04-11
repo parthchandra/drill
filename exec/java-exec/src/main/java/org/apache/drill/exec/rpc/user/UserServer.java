@@ -100,7 +100,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
    *        going to the actual client.
    * </ul>
    */
-  public interface UserClientConnection {
+  public interface UserClientConnection extends AutoCloseable {
     /**
      * @return User session object.
      */
@@ -130,6 +130,9 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
      * @return Return the client node address.
      */
     SocketAddress getRemoteAddress();
+
+    @Override
+    void close();
   }
 
   /**
@@ -185,6 +188,10 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
       final String targetName = session.getTargetUserName();
       if (config.getImpersonationManager() != null && targetName != null) {
         config.getImpersonationManager().replaceUserOnSession(targetName, session);
+      }
+      if (inbound.hasEnableMultiplex() && inbound.getEnableMultiplex()) {
+        changeHandlerTo(new MultiUserServerRequestHandler(userWorker, config));
+        session.unsetTargetUserName();
       }
     }
 

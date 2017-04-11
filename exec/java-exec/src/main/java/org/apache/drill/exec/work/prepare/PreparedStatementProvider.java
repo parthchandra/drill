@@ -256,6 +256,10 @@ public class PreparedStatementProvider {
     }
 
     @Override
+    public void close() {
+    }
+
+    @Override
     public void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result) {
       // Release the wait latch if the query is terminated.
       final QueryState state = result.getQueryState();
