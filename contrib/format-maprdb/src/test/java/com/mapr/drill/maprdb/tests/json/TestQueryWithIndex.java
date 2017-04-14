@@ -36,7 +36,7 @@ public class TestQueryWithIndex extends BaseJsonTest {
     runSQLAndVerifyCount(sql, 1);
 
     // plan test
-    final String[] expectedPlan = {"indexFid=\\d+\\.\\d+\\.\\d+"};
+    final String[] expectedPlan = {"indexName=testindex"};
     final String[] excludedPlan = {};
 
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
