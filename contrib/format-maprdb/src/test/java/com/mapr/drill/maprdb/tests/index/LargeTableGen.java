@@ -17,6 +17,15 @@
  */
 package com.mapr.drill.maprdb.tests.index;
 
+import static com.mapr.drill.maprdb.tests.MaprDBTestsSuite.INDEX_FLUSH_TIMEOUT;
+
+import java.io.InputStream;
+import java.io.StringBufferInputStream;
+
+import org.apache.hadoop.fs.Path;
+import org.ojai.DocumentStream;
+import org.ojai.json.Json;
+
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
@@ -24,14 +33,6 @@ import com.mapr.db.TableDescriptor;
 import com.mapr.db.impl.TableDescriptorImpl;
 import com.mapr.db.tests.utils.DBTests;
 import com.mapr.fs.utils.ssh.TestCluster;
-import org.apache.commons.lang.text.StrBuilder;
-import org.apache.hadoop.fs.Path;
-import org.ojai.Document;
-import org.ojai.DocumentStream;
-import org.ojai.json.Json;
-
-import java.io.InputStream;
-import java.io.StringBufferInputStream;
 
 /**
  * This class is to generate a MapR json table of this schema:
@@ -98,7 +99,7 @@ public class LargeTableGen extends LargeTableGenBase {
           + ((indexDef[2 * i + 1].length()==0)?"":" -nonindexedfields '%s'"),
           i, indexDefInCommand(indexDef[2 * i]), indexDefInCommand(indexDef[2 * i + 1]));
       TestCluster.runCommand(indexCmd);
-      DBTests.maprfs().getTableIndexes(table.getPath(), true);
+      DBTests.admin().getTableIndexes(table.getPath(), true);
     }
   }
 
@@ -153,7 +154,7 @@ public class LargeTableGen extends LargeTableGenBase {
         }
       }
       table.flush();
-      DBTests.waitForIndexFlush(table.getPath());
+      DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
       //Thread.sleep(5000);
     }
   }

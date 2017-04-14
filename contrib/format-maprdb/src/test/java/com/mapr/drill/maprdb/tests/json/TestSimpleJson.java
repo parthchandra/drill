@@ -36,6 +36,7 @@ import com.mapr.db.MapRDB;
 import com.mapr.tests.annotations.ClusterTest;
 
 @Category(ClusterTest.class)
+@SuppressWarnings("deprecation")
 public class TestSimpleJson extends BaseJsonTest {
 
   @Test

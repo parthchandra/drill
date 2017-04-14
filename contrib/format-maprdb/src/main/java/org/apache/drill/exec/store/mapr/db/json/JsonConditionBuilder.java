@@ -30,7 +30,7 @@ import org.ojai.store.QueryCondition.Op;
 import com.google.common.collect.ImmutableList;
 import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
-import com.mapr.fs.tables.IndexFieldDesc;
+import com.mapr.db.index.IndexFieldDesc;
 
 public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void, RuntimeException> implements DrillHBaseConstants {
 

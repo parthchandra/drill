@@ -18,6 +18,8 @@
 
 package org.apache.drill.exec.planner.index;
 
+import static org.apache.drill.exec.store.mapr.db.json.FieldPathHelper.fieldPath2SchemaPath;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,12 +38,16 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatMatcher;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import com.mapr.db.Admin;
+import com.mapr.db.MapRDB;
+import com.mapr.db.exceptions.DBException;
+import com.mapr.db.index.IndexDesc;
+import com.mapr.db.index.IndexFieldDesc;
 import com.mapr.fs.MapRFileSystem;
-import com.mapr.fs.tables.IndexDesc;
-import com.mapr.fs.tables.IndexFieldDesc;
 
 public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDiscover {
 
@@ -61,10 +67,9 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
    * @return
    */
   private IndexCollection getTableIndexFromMFS(String tableName) {
-    MapRFileSystem mfs = getMaprFS();
     try {
       Set<DrillIndexDescriptor> idxSet = new HashSet<>();
-      Collection<IndexDesc> indexes = mfs.getTableIndexes(new Path(tableName));
+      Collection<IndexDesc> indexes = admin().getTableIndexes(new Path(tableName));
       for (IndexDesc idx : indexes) {
         DrillIndexDescriptor hbaseIdx = buildIndexDescriptor(tableName, idx);
         if (hbaseIdx == null) {
@@ -79,8 +84,8 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         return null;
       }
       return new DrillIndexCollection(getOriginalScanPrel(), idxSet);
-    } catch (IOException ex) {
-      logger.error("Could not get table index from File system. {}", ex.getMessage());
+    } catch (DBException ex) {
+      logger.error("Could not get table index from File system. {}", ex);
     }
     return null;
   }
@@ -116,20 +121,10 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     return null;
   }
 
-  private SchemaPath fieldName2SchemaPath(String fieldName) {
-    if (fieldName.contains(":")) {
-      fieldName = fieldName.split(":")[1];
-    }
-    if (fieldName.contains(".")) {
-      return SchemaPath.getCompoundPath(fieldName.split("\\."));
-    }
-    return SchemaPath.getSimplePath(fieldName);
-  }
-
   private List<SchemaPath> field2SchemaPath(Collection<IndexFieldDesc> descCollection) {
     List<SchemaPath> listSchema = new ArrayList<>();
     for (IndexFieldDesc field : descCollection) {
-      listSchema.add(fieldName2SchemaPath(field.getFieldName()));
+      listSchema.add(fieldPath2SchemaPath(field.getFieldPath()));
     }
     return listSchema;
   }
@@ -158,9 +153,11 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     return idx;
   }
 
-  private MapRFileSystem getMaprFS() {
+  @SuppressWarnings("deprecation")
+  private Admin admin() {
     assert getOriginalScan() instanceof MapRDBGroupScan;
-    return ((MapRDBGroupScan) getOriginalScan()).getFormatPlugin().getMaprFS();
+    Configuration conf = ((MapRDBGroupScan) getOriginalScan()).getFormatPlugin().getFsConf();
+    return MapRDB.getAdmin(conf);
   }
 
 }

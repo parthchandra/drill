@@ -41,6 +41,8 @@ import com.mapr.db.Table;
 import com.mapr.db.tests.utils.DBTests;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBFilterPushDown;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBSimple;
+import com.mapr.drill.maprdb.tests.index.IndexPlanTest;
+import com.mapr.drill.maprdb.tests.json.TestQueryWithIndex;
 import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
 import com.mapr.fs.utils.ssh.TestCluster;
 
@@ -48,9 +50,13 @@ import com.mapr.fs.utils.ssh.TestCluster;
 @SuiteClasses({
   TestMapRDBSimple.class,
   TestMapRDBFilterPushDown.class,
+  IndexPlanTest.class,
+  TestQueryWithIndex.class,
   TestSimpleJson.class
 })
 public class MaprDBTestsSuite {
+  public static final int INDEX_FLUSH_TIMEOUT = 60000;
+
   private static final String TMP_BUSINESS_TABLE = "/tmp/business";
 
   private static final String TMP_TABLE_WITH_INDEX = "/tmp/drill_test_table_with_index";
@@ -190,7 +196,7 @@ public class MaprDBTestsSuite {
           + " -indexedfields '\"name.last\":1'"
           + " -nonindexedfields '\"age\":1'");
       // FIXME: refresh the index schema, without this the puts are not getting propagated to indexes
-      DBTests.maprfs().getTableIndexes(table.getPath(), true);
+      DBTests.admin().getTableIndexes(table.getPath(), true);
 
       // insert data
       table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user001\", \"age\":43, \"name\": {\"first\":\"Sam\", \"last\":\"Harris\"}}"));
@@ -200,8 +206,7 @@ public class MaprDBTestsSuite {
       table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user005\", \"age\":54, \"name\": {\"first\":\"David\", \"last\":\"Ackert\"}}"));
       table.flush();
 
-      //DBTests.waitForIndexFlush(table.getPath());
-      Thread.sleep(1000);
+      DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
     }
 
   }
