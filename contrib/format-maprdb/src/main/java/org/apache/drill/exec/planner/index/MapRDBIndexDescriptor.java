@@ -17,13 +17,22 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import org.apache.drill.common.expression.SchemaPath;
-
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+
+import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.store.mapr.PluginConstants;
+import org.apache.drill.exec.util.EncodedSchemaPathSet;
+
+import com.google.common.collect.ImmutableSet;
 
 public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
 
-  protected Object desc;
+  protected final Object desc;
+  protected final Set<SchemaPath> allFields;
+  protected final Set<SchemaPath> indexedFields;
+
   public MapRDBIndexDescriptor(List<SchemaPath> indexCols,
                                List<SchemaPath> nonIndexCols,
                                List<SchemaPath> rowKeyColumns,
@@ -33,13 +42,28 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
                                Object desc) {
     super(indexCols, nonIndexCols, rowKeyColumns, indexName, tableName, type);
     this.desc = desc;
+    this.indexedFields = ImmutableSet.copyOf(indexColumns);
+    this.allFields = new ImmutableSet.Builder<SchemaPath>()
+        .add(PluginConstants.DOCUMENT_SCHEMA_PATH)
+        .addAll(indexColumns)
+        .addAll(nonIndexColumns)
+        .build();
   }
 
   public Object getOriginalDesc(){
     return desc;
   }
 
-  public void setOriginalDesc(Object desc) {
-    this.desc = desc;
+  @Override
+  public boolean isCoveringIndex(List<SchemaPath> columns) {
+    final Collection<SchemaPath> decodedColumns = EncodedSchemaPathSet.decode(columns);
+    return allFields.containsAll(decodedColumns);
   }
+
+  @Override
+  public boolean allColumnsIndexed(Collection<SchemaPath> columns) {
+    final Collection<SchemaPath> decodedColumns = EncodedSchemaPathSet.decode(columns);
+    return indexedFields.containsAll(decodedColumns);
+  }
+
 }
