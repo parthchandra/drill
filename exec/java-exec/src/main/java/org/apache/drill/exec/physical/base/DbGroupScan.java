@@ -29,8 +29,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.index.Statistics;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.List;
 
@@ -62,11 +62,11 @@ public interface DbGroupScan extends GroupScan {
   /**
    * Get the row count after applying the {@link RexNode} condition
    * @param condition, filter to apply
-   * @param scanPrel, the current scan physical rel
+   * @param scanRel, the current scan logical rel
    * @return row count post filtering
    */
   @JsonIgnore
-  public double getRowCount(RexNode condition, ScanPrel scanPrel);
+  public double getRowCount(RexNode condition, DrillScanRel scanRel);
 
   /**
    * Get the statistics for this {@link DbGroupScan}

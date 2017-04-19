@@ -272,6 +272,7 @@ public class DbScanToIndexScanPrule extends Prule {
       RexBuilder builder) {
     double totalRows = 0;
     double filterRows = totalRows;
+    DrillScanRel scan = indexContext.scan;
     if (! (indexContext.scan.getGroupScan() instanceof DbGroupScan) ) {
       return;
     }
@@ -306,6 +307,14 @@ public class DbScanToIndexScanPrule extends Prule {
     List<FunctionalIndexInfo> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
 
+    IndexSelector selector = new IndexSelector(indexCondition, collection,
+        ((DbGroupScan) scan.getGroupScan()).getStatistics(),
+        builder,
+        indexContext.call.getPlanner(),
+        totalRows,
+        scan);
+
+
     // get the list of covering and non-covering indexes for this collection
     for (IndexDescriptor indexDesc : collection) {
       if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
@@ -315,8 +324,17 @@ public class DbScanToIndexScanPrule extends Prule {
         } else {
           nonCoveringIndexes.add(indexDesc);
         }
+
+        selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
+            indexContext.project != null ? indexContext.project.getRowType().getFieldCount() :
+              scan.getRowType().getFieldCount());
+
       }
     }
+
+    /******Commented out temporarily until testing issues are resolved************/
+    // selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
+
 
     if (logger.isDebugEnabled()) {
       StringBuffer strBuf = new StringBuffer();
@@ -408,8 +426,8 @@ public class DbScanToIndexScanPrule extends Prule {
       try {
         if (nonCoveringIndexes.size() > 0) {
           IndexDescriptor index = selectIndexForNonCoveringPlan(indexContext.scan, nonCoveringIndexes);
-          //Copy primary table statistics to index table
           IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
+          //Copy primary table statistics to index table
           idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index, idxScan, indexCondition,

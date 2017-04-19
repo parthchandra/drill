@@ -6,29 +6,29 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p/>
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.planner.index;
+package org.apache.drill.exec.store.mapr.db;
 
-import org.apache.calcite.rex.RexNode;
-import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.cost.DrillCostBase;
 
-public interface Statistics {
+public class MapRDBCost {
+  public static final int AVG_COLUMN_SIZE = 10;
+  public static final int DB_BLOCK_SIZE = 8192;  // bytes per block
 
-  double ROWCOUNT_UNKNOWN = -1;
-  //HUGE is same as DrillCostBase.HUGE
-  double ROWCOUNT_HUGE = Double.MAX_VALUE;
+  // TODO: Currently, DrillCostBase has a byte read cost, but not a block read cost. The block
+  // read cost is dependent on block size and the type of the storage, so it makes more sense to
+  // define one here. However, the appropriate factor needs to be decided.
+  public static final int SSD_BLOCK_SEQ_READ_COST = 32 * DrillCostBase.BASE_CPU_COST;
 
-  /** Returns the statistics given the specified filter condition
-   *  @param condition - Filter specified as a {@link RexNode}
-   *  @param scanPrel - The current scan physical rel
-   */
-  double getRowCount(RexNode condition, DrillScanRel scanRel);
+  // for SSD random and sequential costs are the same
+  public static final int SSD_BLOCK_RANDOM_READ_COST = SSD_BLOCK_SEQ_READ_COST;
+
 }

@@ -18,9 +18,11 @@
 package org.apache.drill.exec.planner.index;
 
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -35,6 +37,7 @@ import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOpera
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -110,7 +113,7 @@ public class IndexConditionInfo {
 
       RexNode initCondition = condition;
       for(IndexDescriptor index : indexes) {
-        List<SchemaPath> leadingColumns = new ArrayList<>();
+        List<LogicalExpression> leadingColumns = new ArrayList<>();
         if(initCondition.isAlwaysTrue()) {
           break;
         }
@@ -160,7 +163,7 @@ public class IndexConditionInfo {
      * @param condition
      * @return
      */
-    private IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
+    public IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
       // Use the same filter analyzer that is used for partitioning columns
       RewriteCombineBinaryOperators reverseVisitor =
           new RewriteCombineBinaryOperators(true, builder);
@@ -185,22 +188,6 @@ public class IndexConditionInfo {
       indexCondition = indexCondition.accept(reverseVisitor);
 
       return new IndexConditionInfo(indexCondition, remainderCondition, true);
-    }
-
-    private boolean isColumnIndexed(SchemaPath path, IndexDescriptor index) {
-      if (index.getIndexColumnOrdinal(path) >= 0) {
-        return true;
-      }
-      return false;
-    }
-
-    private boolean isColumnIndexed(SchemaPath path, Iterable<IndexDescriptor> indexes) {
-      for (IndexDescriptor index : indexes) {
-        if (index.getIndexColumnOrdinal(path) >= 0) {
-          return true;
-        }
-      }
-      return false;
     }
 
   }
