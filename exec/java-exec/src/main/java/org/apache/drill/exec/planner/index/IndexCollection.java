@@ -17,14 +17,9 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import java.util.Iterator;
-import java.util.List;
-
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
-import org.apache.drill.exec.planner.PartitionLocation;
 
 // Interface used to describe an index collection
 public interface IndexCollection extends Iterable<IndexDescriptor> {

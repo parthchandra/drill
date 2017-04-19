@@ -17,9 +17,7 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import com.google.common.collect.Maps;
 import org.apache.calcite.rel.RelNode;
-
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
@@ -30,8 +28,6 @@ import org.apache.drill.exec.planner.logical.DrillTable;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-
 
 public class DrillIndexDescriptor extends AbstractIndexDescriptor {
 

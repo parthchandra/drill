@@ -47,6 +47,7 @@ import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
+import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
@@ -55,6 +56,7 @@ import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.MapRDBTableStats;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HConstants;
 import org.codehaus.jackson.annotate.JsonCreator;
 
 import com.fasterxml.jackson.annotation.JacksonInject;
@@ -206,9 +208,20 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN) {
       rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows();
     }
-    final int avgColumnSize = 10;
-    int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
-    double diskCost = avgColumnSize * numColumns * rowCount;
+    final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
+    final int numColumns = (columns == null || columns.isEmpty()) ? 100 : columns.size();
+
+    double rowsFromDisk = rowCount;
+    if (scanSpec.getStartRow() == HConstants.EMPTY_START_ROW &&
+        scanSpec.getStopRow() == HConstants.EMPTY_END_ROW) {
+      // both start and stop rows are empty, indicating this is a full scan so
+      // use the total rows for calculating disk i/o
+      rowsFromDisk = tableStats.getNumRows();
+    }
+    double totalBlocks = Math.ceil((avgColumnSize * numColumns * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
+    double numBlocks = Math.ceil(((avgColumnSize * numColumns * rowsFromDisk)/MapRDBCost.DB_BLOCK_SIZE));
+    numBlocks = Math.min(totalBlocks, numBlocks);
+    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
     /*
      * Table scan cost made INFINITE in order to pick index plans. Use the MAX possible rowCount for
      * costing purposes.
@@ -237,8 +250,19 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN) {
       rowCount = (filterPushed ? 0.0001f : 0.001f) * tableStats.getNumRows();
     }
-    final int avgColumnSize = 10;
-    double diskCost = avgColumnSize * numColumns * rowCount;
+    final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
+
+    double rowsFromDisk = rowCount;
+    if (scanSpec.getStartRow() == HConstants.EMPTY_START_ROW &&
+        scanSpec.getStopRow() == HConstants.EMPTY_END_ROW) {
+      // both start and stop rows are empty, indicating this is a full scan so
+      // use the total rows for calculating disk i/o
+      rowsFromDisk = tableStats.getNumRows();
+    }
+    double totalBlocks = Math.ceil((avgColumnSize * numColumns * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
+    double numBlocks = Math.ceil(((avgColumnSize * numColumns * rowsFromDisk)/MapRDBCost.DB_BLOCK_SIZE));
+    numBlocks = Math.min(totalBlocks, numBlocks);
+    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
@@ -347,6 +371,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       return Statistics.ROWCOUNT_UNKNOWN;
     }
   }
+
   /**
    * Set the row count resulting from applying the {@link RexNode} condition. Forced row counts will take
    * precedence over stats row counts

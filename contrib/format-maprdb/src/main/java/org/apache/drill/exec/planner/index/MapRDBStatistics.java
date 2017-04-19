@@ -159,7 +159,7 @@ public class MapRDBStatistics implements Statistics {
       addToCache(idxCondition, rowCount, jTabGrpScan, scanPrel);
     }
     // Add the rowCount for non-pushable predicates
-    if (idxRemCondition != null) {
+    if (idxRemCondition != null && !idxRemCondition.isAlwaysTrue()) {
       double rowCount = totalRows * computeSelectivity(idxRemCondition, totalRows, scanPrel);
       addToCache(idxRemCondition, rowCount, jTabGrpScan, scanPrel);
     }

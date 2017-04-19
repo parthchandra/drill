@@ -19,10 +19,8 @@ package org.apache.drill.exec.planner.physical;
 
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
-import org.apache.drill.exec.ops.QueryContext;
 import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.server.options.OptionValidator;
-import org.apache.drill.exec.server.options.TypeValidators;
 import org.apache.drill.exec.server.options.TypeValidators.BooleanValidator;
 import org.apache.drill.exec.server.options.TypeValidators.LongValidator;
 import org.apache.drill.exec.server.options.TypeValidators.DoubleValidator;
@@ -86,6 +84,9 @@ public class PlannerSettings implements Context{
   public static final BooleanValidator INDEX_FORCE_SORT_NONCOVERING = new BooleanValidator("planner.index_force_sort_noncovering", false);
   public static final BooleanValidator INDEX_USE_HASHJOIN_NONCOVERING = new BooleanValidator("planner.index_use_hashjoin_noncovering", false);
   public static final RangeDoubleValidator INDEX_SELECTIVITY_FACTOR = new RangeDoubleValidator("planner.index_selectivity_factor", 0.0, 1.0, 0.8);
+  public static final RangeDoubleValidator INDEX_COVERING_NONCOVERING_FACTOR = new RangeDoubleValidator("planner.index_covering_to_noncovering_factor", 0.0, Double.MAX_VALUE, 100.0);
+  public static final RangeLongValidator MAX_CANDIDATE_INDEXES_PER_TABLE = new RangeLongValidator("planner.max_candidate_indexes_per_table", 0, 100, 5);
+  public static final RangeDoubleValidator INDEX_IO_COST_FACTOR = new RangeDoubleValidator("planner.index_io_cost_factor", 0, Double.MAX_VALUE, 1.0d);
   public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
   public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY, false);
 
@@ -282,6 +283,18 @@ public class PlannerSettings implements Context{
 
   public double getIndexSelectivityFactor() {
     return options.getOption(INDEX_SELECTIVITY_FACTOR);
+  }
+
+  public double getIndexCoveringToNonCoveringFactor() {
+    return options.getOption(INDEX_COVERING_NONCOVERING_FACTOR);
+  }
+
+  public long getMaxCandidateIndexesPerTable() {
+    return options.getOption(MAX_CANDIDATE_INDEXES_PER_TABLE);
+  }
+
+  public double getIndexIOCostFactor() {
+    return options.getOption(INDEX_IO_COST_FACTOR);
   }
 
   public boolean isUseSimpleOptimizer() {

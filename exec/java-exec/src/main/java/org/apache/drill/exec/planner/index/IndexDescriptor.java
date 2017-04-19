@@ -17,9 +17,13 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
 
 
 /**
@@ -55,5 +59,8 @@ public interface IndexDescriptor extends IndexDefinition {
   boolean supportsFullTextSearch();
 
   FunctionalIndexInfo getFunctionalInfo();
+
+  public RelOptCost getCost(IndexProperties indexProps, RelOptPlanner planner,
+      int numProjectedFields, GroupScan primaryGroupScan);
 
 }
