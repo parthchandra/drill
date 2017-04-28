@@ -29,8 +29,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.ConditionNode.RowkeyRange;
-import com.mapr.fs.tables.IndexDesc;
-import com.mapr.fs.tables.IndexFieldDesc;
+import com.mapr.db.index.IndexDesc;
+import com.mapr.db.index.IndexFieldDesc;
 
 public class JsonScanSpec {
 	protected String tableName;

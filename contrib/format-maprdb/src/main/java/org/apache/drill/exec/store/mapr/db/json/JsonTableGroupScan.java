@@ -56,8 +56,8 @@ import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TabletInfo;
 import com.mapr.db.impl.TabletInfoImpl;
-import com.mapr.fs.tables.IndexDesc;
-import com.mapr.fs.tables.IndexFieldDesc;
+import com.mapr.db.index.IndexDesc;
+import com.mapr.db.index.IndexFieldDesc;
 
 @JsonTypeName("maprdb-json-scan")
 public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupScan {

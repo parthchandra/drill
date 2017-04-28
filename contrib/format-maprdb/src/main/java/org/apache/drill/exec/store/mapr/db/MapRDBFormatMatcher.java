@@ -31,8 +31,8 @@ import org.apache.drill.exec.store.mapr.TableFormatMatcher;
 import org.apache.drill.exec.store.mapr.TableFormatPlugin;
 import org.apache.hadoop.fs.FileStatus;
 
+import com.mapr.db.index.IndexDesc;
 import com.mapr.fs.MapRFileStatus;
-import com.mapr.fs.tables.IndexDesc;
 
 public class MapRDBFormatMatcher extends TableFormatMatcher {
 

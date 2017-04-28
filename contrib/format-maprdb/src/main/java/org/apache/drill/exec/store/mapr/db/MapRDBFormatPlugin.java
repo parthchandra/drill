@@ -41,7 +41,7 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
-import com.mapr.fs.tables.IndexDesc;
+import com.mapr.db.index.IndexDesc;
 import com.mapr.fs.tables.TableProperties;
 
 public class MapRDBFormatPlugin extends TableFormatPlugin {
