@@ -33,6 +33,7 @@ import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.index.IndexFieldDesc;
 
 public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void, RuntimeException> implements DrillHBaseConstants {
+//  private final static org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JsonConditionBuilder.class);
 
   final private JsonTableGroupScan groupScan;
 
@@ -96,14 +97,27 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
           JsonScanSpec nextScanSpec = args.get(i).accept(this, null);
           if (nodeScanSpec != null && nextScanSpec != null) {
             nodeScanSpec.mergeScanSpec(functionName, nextScanSpec);
-        } else {
-          allExpressionsConverted = false;
-          if ("booleanAnd".equals(functionName)) {
+          } else {
+            allExpressionsConverted = false;
+            if ("booleanAnd".equals(functionName)) {
               nodeScanSpec = nodeScanSpec == null ? nextScanSpec : nodeScanSpec;
             }
           }
         }
         break;
+
+      case "ojai_sizeof":
+      case "ojai_typeof":
+      case "ojai_nottypeof":
+      case "ojai_matches":
+      case "ojai_notmatches":
+      case "ojai_condition": {
+        final OjaiFunctionsProcessor processor = OjaiFunctionsProcessor.process(call);
+        if (processor != null) {
+                return new JsonScanSpec(groupScan.getTableName(), groupScan.getIndexDesc(),
+                                processor.getCondition());
+        }
+      }
       }
     }
 
