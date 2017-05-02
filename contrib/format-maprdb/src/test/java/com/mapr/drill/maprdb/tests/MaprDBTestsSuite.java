@@ -41,6 +41,8 @@ import com.mapr.db.Table;
 import com.mapr.db.tests.utils.DBTests;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBFilterPushDown;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBSimple;
+import com.mapr.drill.maprdb.tests.index.IndexPlanTest;
+import com.mapr.drill.maprdb.tests.json.TestQueryWithIndex;
 import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
 import com.mapr.fs.utils.ssh.TestCluster;
 
@@ -48,6 +50,8 @@ import com.mapr.fs.utils.ssh.TestCluster;
 @SuiteClasses({
   TestMapRDBSimple.class,
   TestMapRDBFilterPushDown.class,
+  IndexPlanTest.class,
+  TestQueryWithIndex.class,
   TestSimpleJson.class
 })
 public class MaprDBTestsSuite {
