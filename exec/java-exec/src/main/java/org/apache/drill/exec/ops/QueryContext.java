@@ -301,4 +301,5 @@ public class QueryContext implements AutoCloseable, OptimizerRulesContext, Schem
       closed = true;
     }
   }
+
 }

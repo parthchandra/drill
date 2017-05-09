@@ -133,6 +133,10 @@ public class ConfiguredIndexDiscover extends IndexDiscoverBase {
         //original scan is not on FileSystemPlugin. Need to find a default or configured FileSystemPlugin to use
 
       }
+      if(idxConfig == null) {
+        return null;
+      }
+
       List<DrillIndexDefinition> indexes = idxConfig.getTableIndex(tableName);
       return buildIndexCollectionFromConfig(idxConfig.storage, indexes);
     } catch(Exception e) {

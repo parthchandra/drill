@@ -55,7 +55,7 @@ import java.util.Map;
  * IndexScanIntersectGenerator is to generate index plan against multiple index tables,
  * the input indexes are assumed to be ranked by selectivity(low to high) already.
  */
-public class IndexIntersectPlanGenerator extends NonCoveringIndexPlanGenerator {
+public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
 
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexIntersectPlanGenerator.class);
 
@@ -66,7 +66,7 @@ public class IndexIntersectPlanGenerator extends NonCoveringIndexPlanGenerator {
                                      ScanPrel origScan,
                                      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap,
                                      RexBuilder builder) {
-    super(call, origProject, origScan, null, null, null, builder);
+    super(call, origProject, origScan, null, null, builder);
     this.indexInfoMap = indexInfoMap;
   }
 
@@ -145,17 +145,22 @@ public class IndexIntersectPlanGenerator extends NonCoveringIndexPlanGenerator {
     return finalRel;
   }
 
+  private FunctionalIndexInfo getFunctionalIndexInfo(IndexDescriptor index) {
+    return index.getFunctionalInfo();
+  }
+
   public RelNode buildIntersectPlan(Map.Entry<IndexDescriptor, RexNode> pair, RelNode right)
       throws InvalidRelException {
     IndexDescriptor index = pair.getKey();
     RexNode condition = pair.getValue();
 
+    FunctionalIndexInfo functionInfo = getFunctionalIndexInfo(index);
     IndexGroupScan indexScan = index.getIndexGroupScan();
-    RelDataType indexScanRowType = convertRowTypeForIndexScan(origScan, condition, indexScan);
+    RelDataType indexScanRowType = convertRowTypeForIndexScan(origScan, condition, indexScan, functionInfo);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexScan, indexScanRowType);
     FilterPrel  indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
-        indexScanPrel, convertConditionForIndexScan(condition,indexScanRowType));
+        indexScanPrel, convertConditionForIndexScan(condition, indexScanRowType, functionInfo));
     // project the rowkey column from the index scan
     List<RexNode> indexProjectExprs = Lists.newArrayList();
     int rowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType(), origScan);//indexGroupScan.getRowKeyOrdinal();

@@ -17,15 +17,17 @@
  */
 package org.apache.drill.exec.planner.index;
 
-
 import com.google.common.collect.Maps;
-import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
-import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.exec.planner.logical.DrillOptiq;
+import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
+import org.apache.drill.exec.planner.physical.PrelUtil;
 
 import java.util.BitSet;
 import java.util.List;
@@ -33,25 +35,26 @@ import java.util.Map;
 
 public class RexSeparator {
 
-  final private List<SchemaPath> relatedPaths;
-  final private RelDataType rowType;
+  final private List<LogicalExpression> relatedPaths;
+  final private RelNode inputRel;
   final private RexBuilder builder;
 
-  public RexSeparator(List<SchemaPath> relatedPaths, RelDataType rowType, RexBuilder builder) {
+  public RexSeparator(List<LogicalExpression> relatedPaths, RelNode inputRel, RexBuilder builder) {
     this.relatedPaths = relatedPaths;
-    this.rowType = rowType;
+    this.inputRel = inputRel;
     this.builder = builder;
   }
 
   public RexNode getSeparatedCondition(RexNode expr) {
-    SimpleRexRemap.FieldsMarker marker = new SimpleRexRemap.FieldsMarker(rowType);
+    IndexableExprMarker marker = new IndexableExprMarker(inputRel);
     expr.accept(marker);
 
-    final Map<RexNode, String> markMap = Maps.newHashMap();
-    final Map<RexNode, String> relevantRexMap = marker.getFieldAndPos();
-    for(Map.Entry<RexNode, String> entry : relevantRexMap.entrySet()) {
-      //for the schemaPath found in expr, only these in relatedPaths is related
-      if(relatedPaths.contains(SchemaPath.getCompoundPath(entry.getValue().split("\\.")))) {
+    final Map<RexNode, LogicalExpression> markMap = Maps.newHashMap();
+    final Map<RexNode, LogicalExpression> relevantRexMap = marker.getIndexableExpression();
+    for(Map.Entry<RexNode, LogicalExpression> entry : relevantRexMap.entrySet()) {
+      //for the expressions found in expr, only these in relatedPaths is related
+      LogicalExpression relevantExpr = entry.getValue();
+      if (relatedPaths.contains(relevantExpr)) {
         markMap.put(entry.getKey(), entry.getValue());
       }
     }
@@ -63,10 +66,10 @@ public class RexSeparator {
 
   private static class ConditionSeparator extends  FindPartitionConditions {
 
-    final private Map<RexNode, String> markMap;
+    final private Map<RexNode, LogicalExpression> markMap;
     private boolean inAcceptedPath;
 
-    public ConditionSeparator(Map<RexNode, String> markMap, RexBuilder builder) {
+    public ConditionSeparator(Map<RexNode, LogicalExpression> markMap, RexBuilder builder) {
       super(new BitSet(), builder);
       this.markMap = markMap;
       inAcceptedPath = false;

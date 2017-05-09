@@ -20,16 +20,29 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.drill.common.expression.CastExpression;
+import org.apache.drill.common.expression.FieldReference;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
+import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
+import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.planner.physical.SubsetTransformer;
 import org.apache.calcite.rel.InvalidRelException;
@@ -63,6 +76,9 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
     this.remainderCondition = remainderCondition;
     this.builder = builder;
   }
+
+  //This class provides the utility functions that don't rely on index(one or multiple) or final plan (covering or not),
+  //but those helper functions that focus on serving building index plan (project-filter-indexscan)
 
   public static int getRowKeyIndex(RelDataType rowType, ScanPrel origScan) {
     List<String> fieldNames = rowType.getFieldNames();
@@ -98,4 +114,135 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
     return false;
   }
 
+  // Range distribute the right side of the join, on row keys using a range partitioning function
+  protected RelNode createRangeDistRight(final RelNode rightPrel,
+                                         final RelDataTypeField rightRowKeyField,
+                                         final DbGroupScan origDbGroupScan) {
+
+    List<DrillDistributionTrait.DistributionField> rangeDistFields =
+        Lists.newArrayList(new DrillDistributionTrait.DistributionField(0 /* rowkey ordinal on the right side */));
+
+    FieldReference rangeDistRef = FieldReference.getWithQuotedRef(rightRowKeyField.getName());
+    List<FieldReference> rangeDistRefList = Lists.newArrayList();
+    rangeDistRefList.add(rangeDistRef);
+
+    final DrillDistributionTrait distRangeRight = new DrillDistributionTrait(
+        DrillDistributionTrait.DistributionType.RANGE_DISTRIBUTED,
+        ImmutableList.copyOf(rangeDistFields),
+        origDbGroupScan.getRangePartitionFunction(rangeDistRefList));
+
+    RelTraitSet rightTraits = newTraitSet(distRangeRight).plus(Prel.DRILL_PHYSICAL);
+    RelNode convertedRight = Prule.convert(rightPrel, rightTraits);
+
+    return convertedRight;
+  }
+
+  /**
+   * For IndexScan in non-covering case, rowType to return contains only row_key('_id') of primary table.
+   * so the rowType for IndexScan should be converted from [Primary_table.row_key, primary_table.indexed_col]
+   * to [indexTable.row_key(primary_table.indexed_col), indexTable.<primary_key.row_key> (Primary_table.row_key)]
+   * This will impact the columns of scan, the rowType of ScanRel
+   *
+   * @param origScan
+   * @param indexCondition
+   * @param idxScan
+   * @return
+   */
+  public static RelDataType convertRowTypeForIndexScan(ScanPrel origScan,
+                                                       RexNode indexCondition,
+                                                       IndexGroupScan idxScan,
+                                                       FunctionalIndexInfo functionInfo) {
+    RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
+    List<RelDataTypeField> fields = new ArrayList<>();
+
+    //row_key in the rowType of scan on primary table
+    RelDataTypeField rowkey_primary;
+
+    RelRecordType newRowType = null;
+
+    //first add row_key of primary table,
+    rowkey_primary = new RelDataTypeFieldImpl(
+        ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), fields.size(),
+        typeFactory.createSqlType(SqlTypeName.ANY));
+    fields.add(rowkey_primary);
+
+    //then add indexed cols
+    IndexableExprMarker idxMarker = new IndexableExprMarker(origScan);
+    indexCondition.accept(idxMarker);
+    Map<RexNode, LogicalExpression> idxExprMap = idxMarker.getIndexableExpression();
+
+    for (LogicalExpression indexedExpr : idxExprMap.values()) {
+      if (indexedExpr instanceof SchemaPath) {
+        fields.add(new RelDataTypeFieldImpl(
+            ((SchemaPath)indexedExpr).getAsUnescapedPath(), fields.size(),
+            typeFactory.createSqlType(SqlTypeName.ANY)));
+      }
+      else if(indexedExpr instanceof CastExpression) {
+        SchemaPath newPath = functionInfo.getNewPathFromExpr(indexedExpr);
+        fields.add(new RelDataTypeFieldImpl(
+            newPath.getAsUnescapedPath(), fields.size(),
+            typeFactory.createSqlType(SqlTypeName.ANY)));
+      }
+    }
+
+    //update columns of groupscan accordingly
+    Set<RelDataTypeField> rowfields = Sets.newLinkedHashSet();
+    final List<SchemaPath> columns = Lists.newArrayList();
+    for (RelDataTypeField f : fields) {
+      SchemaPath path;
+      String pathSeg = f.getName().replaceAll("`", "");
+      final String[] segs = pathSeg.split("\\.");
+      path = SchemaPath.getCompoundPath(segs);
+      rowfields.add(new RelDataTypeFieldImpl(
+          segs[0], rowfields.size(),
+          typeFactory.createMapType(typeFactory.createSqlType(SqlTypeName.VARCHAR),
+              typeFactory.createSqlType(SqlTypeName.ANY))
+      ));
+      columns.add(path);
+    }
+    idxScan.setColumns(columns);
+
+    //rowtype does not take the whole path, but only the rootSegment of the SchemaPath
+    newRowType = new RelRecordType(Lists.newArrayList(rowfields));
+    return newRowType;
+  }
+
+  protected RexNode convertConditionForIndexScan(RexNode idxCondition,
+                                                 RelDataType idxRowType,
+                                                 FunctionalIndexInfo functionInfo) {
+    IndexableExprMarker marker = new IndexableExprMarker(origScan);
+    idxCondition.accept(marker);
+    SimpleRexRemap remap = new SimpleRexRemap(origScan, idxRowType, builder);
+    remap.setExpressionMap(functionInfo.getExprMap());
+
+    if (functionInfo.supportEqualCharConvertToLike()) {
+      final Map<LogicalExpression, LogicalExpression> indexedExprs = functionInfo.getExprMap();
+
+      final Map<RexNode, LogicalExpression> equalCastMap = marker.getEqualOnCastChar();
+
+      Map<RexNode, LogicalExpression> toRewriteEqualCastMap = Maps.newHashMap();
+
+      // the marker collected all equal-cast-varchar, now check which one we should replace
+      for (Map.Entry<RexNode, LogicalExpression> entry : equalCastMap.entrySet()) {
+        CastExpression expr = (CastExpression) entry.getValue();
+        //whether this cast varchar/char expression is indexed even the length is not the same
+        for (LogicalExpression indexed : indexedExprs.keySet()) {
+          if (indexed instanceof CastExpression) {
+            final CastExpression indexedCast = (CastExpression) indexed;
+            if (expr.getInput().equals(indexedCast.getInput())
+                && expr.getMajorType().getMinorType().equals(indexedCast.getMajorType().getMinorType())
+                //if expr's length < indexedCast's length, we should convert equal to LIKE for this condition
+                && expr.getMajorType().getWidth() < indexedCast.getMajorType().getWidth()) {
+              toRewriteEqualCastMap.put(entry.getKey(), entry.getValue());
+            }
+          }
+        }
+      }
+      if (toRewriteEqualCastMap.size() > 0) {
+        idxCondition = remap.rewriteEqualOnCharToLike(idxCondition, toRewriteEqualCastMap);
+      }
+    }
+
+    return remap.rewriteWithMap(idxCondition, marker.getIndexableExpression());
+  }
 }

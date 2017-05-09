@@ -34,24 +34,26 @@ public interface IndexDescriptor extends IndexDefinition {
    * @param indexCondition The index condition (e.g index_col1 < 10 AND index_col2 = 'abc')
    * @return The estimated row count
    */
-  public double getRows(RelNode input, RexNode indexCondition);
+  double getRows(RelNode input, RexNode indexCondition);
 
   /**
    * Whether or not the index supports getting row count statistics
    * @return True if index supports getting row count, False otherwise
    */
-  public boolean supportsRowCountStats();
+  boolean supportsRowCountStats();
 
   /**
    * Get an instance of the group scan associated with this index descriptor
    * @return An instance of group scan for this index
    */
-  public IndexGroupScan getIndexGroupScan();
+  IndexGroupScan getIndexGroupScan();
 
   /**
    * Whether or not the index supports full-text search (to allow pushing down such filters)
    * @return True if index supports full-text search, False otherwise
    */
-  public boolean supportsFullTextSearch();
+  boolean supportsFullTextSearch();
+
+  FunctionalIndexInfo getFunctionalInfo();
 
 }

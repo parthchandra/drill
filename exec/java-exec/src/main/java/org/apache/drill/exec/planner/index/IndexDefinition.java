@@ -19,6 +19,7 @@
 package org.apache.drill.exec.planner.index;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.Collection;
@@ -40,7 +41,7 @@ public interface IndexDefinition {
    * @param path The field path you want to compare to index column names.
    * @return Return ordinal of the indexed column if valid, otherwise return -1
    */
-  int getIndexColumnOrdinal(SchemaPath path);
+  int getIndexColumnOrdinal(LogicalExpression path);
 
   /**
    * Get the name of the index
@@ -52,20 +53,20 @@ public interface IndexDefinition {
    * @param columns
    * @return True for covering index, False for non-covering
    */
-  boolean isCoveringIndex(List<SchemaPath> columns);
+  boolean isCoveringIndex(List<LogicalExpression> columns);
 
   /**
    * Check if this index have all the columns specified in the supplied list of columns indexed
    * @param columns
    * @return True if all fields are indexed, False for some or all fields is not indexed
    */
-  boolean allColumnsIndexed(Collection<SchemaPath> columns);
+  boolean allColumnsIndexed(Collection<LogicalExpression> columns);
 
   /**
    * Get the list of columns (typically 1 column) that constitute the row key (primary key)
    * @return
    */
-  List<SchemaPath> getRowKeyColumns();
+  List<LogicalExpression> getRowKeyColumns();
 
   /**
    * Get the name of the table this index is associated with
@@ -79,7 +80,7 @@ public interface IndexDefinition {
   IndexType getIndexType();
 
 
-  List<SchemaPath> getIndexColumns();
+  List<LogicalExpression> getIndexColumns();
 
-  List<SchemaPath> getNonIndexColumns();
+  List<LogicalExpression> getNonIndexColumns();
 }

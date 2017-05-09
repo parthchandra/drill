@@ -21,6 +21,7 @@ import com.google.common.collect.Maps;
 import org.apache.calcite.rel.RelNode;
 
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.AbstractIndexGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
@@ -41,11 +42,9 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
 
   private DrillTable table;
 
-  private Map<String, Object> extraInfo = Maps.newHashMap();
-
-  public DrillIndexDescriptor(List<SchemaPath> indexCols,
-                               List<SchemaPath> nonIndexCols,
-                               List<SchemaPath> rowKeyColumns,
+  public DrillIndexDescriptor(List<LogicalExpression> indexCols,
+                               List<LogicalExpression> nonIndexCols,
+                               List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
@@ -105,4 +104,7 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
     return this.table;
   }
 
+  public FunctionalIndexInfo getFunctionalInfo() {
+    return null;
+  }
 }

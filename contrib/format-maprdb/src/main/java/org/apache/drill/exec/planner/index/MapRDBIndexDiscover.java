@@ -18,8 +18,6 @@
 
 package org.apache.drill.exec.planner.index;
 
-import static org.apache.drill.exec.store.mapr.db.json.FieldPathHelper.fieldPath2SchemaPath;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,7 +25,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.antlr.runtime.ANTLRStringStream;
+import org.antlr.runtime.CommonTokenStream;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.drill.common.expression.ExpressionPosition;
+import org.apache.drill.common.expression.FunctionCallFactory;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.expression.parser.ExprLexer;
+import org.apache.drill.common.expression.parser.ExprParser;
+import org.apache.drill.common.types.TypeProtos;
+import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.logical.DrillTable;
@@ -47,7 +55,6 @@ import com.mapr.db.MapRDB;
 import com.mapr.db.exceptions.DBException;
 import com.mapr.db.index.IndexDesc;
 import com.mapr.db.index.IndexFieldDesc;
-import com.mapr.fs.MapRFileSystem;
 
 public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDiscover {
 
@@ -85,7 +92,10 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       }
       return new DrillIndexCollection(getOriginalScanPrel(), idxSet);
     } catch (DBException ex) {
-      logger.error("Could not get table index from File system. {}", ex);
+      logger.error("Could not get table index from File system.", ex);
+    }
+    catch(InvalidIndexDefinitionException ex) {
+      logger.error("Invalid index definition detected.", ex);
     }
     return null;
   }
@@ -121,23 +131,150 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     return null;
   }
 
-  private List<SchemaPath> field2SchemaPath(Collection<IndexFieldDesc> descCollection) {
-    List<SchemaPath> listSchema = new ArrayList<>();
+  private SchemaPath fieldName2SchemaPath(String fieldName) {
+    if (fieldName.contains(":")) {
+      fieldName = fieldName.split(":")[1];
+    }
+    if (fieldName.contains(".")) {
+      return SchemaPath.getCompoundPath(fieldName.split("\\."));
+    }
+    return SchemaPath.getSimplePath(fieldName);
+  }
+
+  String getDrillTypeStr(String maprdbTypeStr) {
+    String typeStr = maprdbTypeStr.toUpperCase();
+    switch(typeStr){
+      case "STRING":
+        // set default width since it is not specified
+        return "VARCHAR(128)";
+      case "LONG":
+        return "BIGINT";
+      case "INT":
+      case "INTEGER":
+        return "INT";
+      case "FLOAT":
+        return "FLOAT4";
+      case "DOUBLE":
+        return "FLOAT8";
+      case "INTERVAL_YEAR_MONTH":
+        return "INTERVALYEAR";
+      case "INTERVAL_DAY_TIME":
+        return "INTERVALDAY";
+      case "BOOLEAN":
+        return "BIT";
+      case "BINARY":
+        return "VARBINARY";
+      case "ANY":
+      case "DECIMAL":
+        return null;
+      default: return typeStr;
+    }
+
+  }
+
+  TypeProtos.MajorType getDrillType(String typeStr) {
+    switch(typeStr){
+      case "VARCHAR":
+      case "CHAR":
+      case "STRING":
+        // set default width since it is not specified
+        return
+            Types.required(TypeProtos.MinorType.VARCHAR).toBuilder().setWidth(
+                getOriginalScanPrel().getCluster().getTypeFactory().createSqlType(SqlTypeName.VARCHAR).getPrecision()).build();
+      case "LONG":
+      case "BIGINT":
+        return Types.required(TypeProtos.MinorType.BIGINT);
+      case "INT":
+      case "INTEGER":
+        return Types.required(TypeProtos.MinorType.INT);
+      case "FLOAT":
+        return Types.required(TypeProtos.MinorType.FLOAT4);
+      case "DOUBLE":
+        return Types.required(TypeProtos.MinorType.FLOAT8);
+      case "INTERVAL_YEAR_MONTH":
+        return Types.required(TypeProtos.MinorType.INTERVALYEAR);
+      case "INTERVAL_DAY_TIME":
+        return Types.required(TypeProtos.MinorType.INTERVALDAY);
+      case "BOOLEAN":
+        return Types.required(TypeProtos.MinorType.BIT);
+      case "BINARY":
+        return Types.required(TypeProtos.MinorType.VARBINARY).toBuilder().build();
+      case "ANY":
+      case "DECIMAL":
+        return null;
+      default: return Types.required(TypeProtos.MinorType.valueOf(typeStr));
+    }
+  }
+
+  /**
+   * build castExpression withe the type and field defined in indexDesc
+   * @param field
+   * @param type
+   * @return
+   */
+  private LogicalExpression castFunctionCall(String field, String type) {
+    TypeProtos.MajorType castType = getDrillType(type);
+    if(castType == null) {//no cast
+      return fieldName2SchemaPath(field);
+    }
+    return FunctionCallFactory.createCast(castType, ExpressionPosition.UNKNOWN, fieldName2SchemaPath(field));
+  }
+
+  private LogicalExpression castFunctionSQLSyntax(String field, String type) throws InvalidIndexDefinitionException {
+    //get castTypeStr so we can construct SQL syntax string before MapRDB could provide such syntax
+    String castTypeStr = getDrillTypeStr(type);
+    if(castTypeStr == null) {//no cast
+      throw new InvalidIndexDefinitionException("cast function type not recognized: " + type + "for field " + field);
+    }
+    try {
+      String castFunc = String.format("cast( %s as %s)", field, castTypeStr);
+      final ExprLexer lexer = new ExprLexer(new ANTLRStringStream(castFunc));
+      final CommonTokenStream tokens = new CommonTokenStream(lexer);
+      final ExprParser parser = new ExprParser(tokens);
+      final ExprParser.parse_return ret = parser.parse();
+      logger.trace("{}, {}", tokens, ret);
+      return ret.e;
+    }catch(Exception ex) {
+      logger.error("parse failed{}", ex);
+    }
+    return null;
+  }
+
+  private LogicalExpression getIndexExpression(IndexFieldDesc desc) throws InvalidIndexDefinitionException {
+    final String fieldName = desc.getFieldPath().asPathString();
+    final String functionDef = desc.getFunctionName();
+    if ((functionDef != null)) {//this is a function
+      String[] tokens = functionDef.split("\\s+");
+      if (tokens[0].equalsIgnoreCase("cast")) {
+        if (tokens.length != 3) {
+          throw new InvalidIndexDefinitionException("cast function definition not recognized: " + functionDef);
+        }
+        return castFunctionSQLSyntax(fieldName, tokens[2]);
+      }
+    }
+    //else it is a schemaPath
+    return fieldName2SchemaPath(fieldName);
+  }
+
+  private List<LogicalExpression> field2SchemaPath(Collection<IndexFieldDesc> descCollection)
+      throws InvalidIndexDefinitionException {
+    List<LogicalExpression> listSchema = new ArrayList<>();
     for (IndexFieldDesc field : descCollection) {
-      listSchema.add(fieldPath2SchemaPath(field.getFieldPath()));
+        listSchema.add(getIndexExpression(field));
     }
     return listSchema;
   }
 
-  private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc) {
+  private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc)
+      throws InvalidIndexDefinitionException {
     if (desc.isExternal()) {
       //XX: not support external index
       return null;
     }
 
     IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
-    List<SchemaPath> indexFields = field2SchemaPath(desc.getIndexedFields());
-    List<SchemaPath> coveringFields = field2SchemaPath(desc.getCoveredFields());
+    List<LogicalExpression> indexFields = field2SchemaPath(desc.getIndexedFields());
+    List<LogicalExpression> coveringFields = field2SchemaPath(desc.getCoveredFields());
     coveringFields.add(SchemaPath.getSimplePath("_id"));
     DrillIndexDescriptor idx = new MapRDBIndexDescriptor (
         indexFields,
