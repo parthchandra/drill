@@ -23,7 +23,8 @@ import java.util.Map;
 
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
-import org.apache.drill.common.expression.SchemaPath;
+import org.apache.calcite.rel.RelNode;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
@@ -36,7 +37,6 @@ import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
-import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -166,16 +166,19 @@ public abstract class DbScanToIndexScanPrule extends Prule {
 
   /**
    *
-   * @param rowType
+   * @param inputRel  the rel node provide input for filter to operate upon
    * @param indexCondition
    * @param indexDesc
-   * @return If all fields involved in this condition are in the indexed fields of the single IndexDescriptor, return true
+   * @return If all indexable expressions involved in this condition are in the indexed fields of
+   * the single IndexDescriptor, return true
    */
-  static private boolean conditionIndexed(RelDataType rowType, RexNode indexCondition, IndexDescriptor indexDesc) {
-    List<RexNode> conditions = Lists.newArrayList();
-    conditions.add(indexCondition);
-    PrelUtil.ProjectPushInfo info = PrelUtil.getColumns(rowType, conditions);
-    return indexDesc.allColumnsIndexed(info.columns);
+  static private boolean conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
+    IndexableExprMarker exprMarker = new IndexableExprMarker(inputRel);
+    indexCondition.accept(exprMarker);
+    Map<RexNode, LogicalExpression>  mapRexExpr = exprMarker.getIndexableExpression();
+    List<LogicalExpression>infoCols = Lists.newArrayList();
+    infoCols.addAll(mapRexExpr.values());
+    return indexDesc.allColumnsIndexed(infoCols);
   }
 
   private IndexDescriptor selectIndexForNonCoveringPlan(ScanPrel scan, Iterable<IndexDescriptor> indexes) {
@@ -222,14 +225,15 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     RexNode indexCondition = cInfo.indexCondition;
     RexNode remainderCondition = cInfo.remainderCondition;
 
-    List<IndexDescriptor> coveringIndexes = Lists.newArrayList();
+    List<FunctionalIndexInfo> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
 
     // get the list of covering and non-covering indexes for this collection
     for (IndexDescriptor indexDesc : collection) {
-      if(conditionIndexed(scan.getRowType(), indexCondition, indexDesc)) {
-        if (isCoveringIndex(scan, indexDesc)) {
-          coveringIndexes.add(indexDesc);
+      if(conditionIndexed(scan, indexCondition, indexDesc)) {
+        FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+        if (isCoveringIndex(scan, functionInfo)) {
+          coveringIndexes.add(functionInfo);
         } else {
           nonCoveringIndexes.add(indexDesc);
         }
@@ -240,8 +244,8 @@ public abstract class DbScanToIndexScanPrule extends Prule {
       StringBuffer strBuf = new StringBuffer();
       strBuf.append("Split  indexes:");
       if (coveringIndexes.size() > 0) {
-        for (IndexDescriptor coveringIdx : coveringIndexes) {
-          strBuf.append(coveringIdx.getIndexName()).append(",");
+        for (FunctionalIndexInfo coveringIdxInfo : coveringIndexes) {
+          strBuf.append(coveringIdxInfo.getIndexDesc().getIndexName()).append(",");
         }
       }
       if(nonCoveringIndexes.size() > 0) {
@@ -286,17 +290,17 @@ public abstract class DbScanToIndexScanPrule extends Prule {
       //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
         return;
       }
-
     }
 
     boolean createdCovering = false;
     try {
-      for (IndexDescriptor indexDesc : coveringIndexes) {
-        IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
+      for (FunctionalIndexInfo indexInfo : coveringIndexes) {
+        IndexGroupScan idxScan = indexInfo.getIndexDesc().getIndexGroupScan();
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
 
-        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
-            remainderCondition, builder);
+        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(call, indexInfo,
+            project, scan, idxScan, indexCondition, remainderCondition, builder);
+
         planGen.go(filter, convert(scan, scan.getTraitSet()));
         createdCovering = true;
       }
@@ -319,7 +323,7 @@ public abstract class DbScanToIndexScanPrule extends Prule {
           IndexDescriptor index = selectIndexForNonCoveringPlan(scan, nonCoveringIndexes);
           IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, project, scan, idxScan, indexCondition,
+          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, index, project, scan, idxScan, indexCondition,
               remainderCondition, builder);
           planGen.go(filter, convert(scan, scan.getTraitSet()));
         }
@@ -348,11 +352,34 @@ public abstract class DbScanToIndexScanPrule extends Prule {
    * For a particular table scan for table T1 and an index on that table, find out if it is a covering index
    * @return
    */
-  private boolean isCoveringIndex(ScanPrel scan, IndexDescriptor index) {
-    DbGroupScan groupScan = (DbGroupScan)scan.getGroupScan();
-    List<SchemaPath> tableCols = groupScan.getColumns();
-    return index.isCoveringIndex(tableCols);
+  private boolean isCoveringIndex(ScanPrel scan, FunctionalIndexInfo functionInfo) {
+    if(functionInfo.hasFunctional()) {
+      //need info from full query
+      return queryCoveredByIndex(functionInfo);
+    }
+    else {
+      DbGroupScan groupScan = (DbGroupScan) scan.getGroupScan();
+      List<LogicalExpression> tableCols = Lists.newArrayList();
+      tableCols.addAll(groupScan.getColumns());
+      return functionInfo.getIndexDesc().isCoveringIndex(tableCols);
+    }
   }
 
-}
+  //this check queryCoveredByIndex is needed only when there is a function based index field.
+  //If there is no function based index field, we don't need to worry whether there could be
+  //expressions not covered by the index existing somewhere out of the visible scope of this rule(project-filter-scan).
 
+  /**
+   * For the given index with functional field, e.g. cast(a.b as INT), use the knowledge of the whole query(cached in optimizerContext from previous convert process)
+   * to check if there are expressions other than indexed function cast(a.b as INT) has field a.b and a.b is not in the index
+   * @param functionInfo
+   * @return false if the query could not be covered by the index (should not create covering index plan)
+   */
+  boolean queryCoveredByIndex(FunctionalIndexInfo functionInfo) {
+    //for indexed functions, if relevant schemapaths are included in index(in indexed fields or non-indexed fields),
+    // we don't need to check the whole query
+    return false;
+  }
+
+
+}

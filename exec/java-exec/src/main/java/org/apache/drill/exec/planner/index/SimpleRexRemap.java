@@ -17,8 +17,10 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
@@ -37,67 +39,112 @@ import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.rex.RexVisitorImpl;
 
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.util.NlsString;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.PathSegment;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Rewrite RexNode with these policies:
  * 1) field renamed. The input field was named differently in index table,
  * 2) field is in different position of underlying rowtype
  *
- * TODO: 3) certain operator needs rewriting.
+ * TODO: 3) certain operator needs rewriting. e.g. CAST function
  * This class for now applies to only filter on scan, for filter-on-project-on-scan. A stack of
  * rowType is required.
  */
 public class SimpleRexRemap {
+  final RelNode origRel;
   final RelDataType origRowType;
   final RelDataType newRowType;
-  private Map<RexNode, String> markMap;//path-->rexNode in expr(indexCondition)
 
   private RexBuilder builder;
+  private Map<LogicalExpression, LogicalExpression> destExprMap;
 
-  public SimpleRexRemap(RelDataType origRowType,
+  public SimpleRexRemap(RelNode origRel,
                         RelDataType newRowType, RexBuilder builder) {
     super();
-    this.origRowType = origRowType;
+    this.origRel = origRel;
+    this.origRowType = origRel.getRowType();
     this.newRowType = newRowType;
     this.builder = builder;
+    this.destExprMap = Maps.newHashMap();
   }
 
-  public RexNode rewrite(RexNode expr) {
-    FieldsMarker marker = new FieldsMarker(origRowType);
-    expr.accept(marker);
-    this.markMap = marker.getFieldAndPos();
+  public SimpleRexRemap setExpressionMap(Map<LogicalExpression, LogicalExpression>  exprMap) {
+    destExprMap.putAll(exprMap);
+    return this;
+  }
 
-    Map<String, RexNode> destNodeMap = Maps.newHashMap();
-    for(Map.Entry<RexNode, String> entry: this.markMap.entrySet()) {
-      //if this path is required to replace(in fieldMap), replace the correspondent rexNode to reflect the new field in newRowType
-      String entryPath = entry.getValue();
+  public RexNode rewriteEqualOnCharToLike(RexNode expr,
+                                          Map<RexNode, LogicalExpression> equalOnCastCharExprs) {
+    Map<RexNode, RexNode> srcToReplace = Maps.newIdentityHashMap();
+    for(Map.Entry<RexNode, LogicalExpression> entry: equalOnCastCharExprs.entrySet()) {
+      RexNode equalOp = entry.getKey();
+      LogicalExpression opInput = entry.getValue();
 
+      final ImmutableList<RexNode> operands = ((RexCall)equalOp).operands;
+      RexLiteral newLiteral = null;
+      RexNode input = null;
+      if(operands.size() == 2 ) {
+        RexLiteral oplit = null;
+        if (operands.get(0) instanceof RexLiteral) {
+          oplit = (RexLiteral) operands.get(0);
+          if(oplit.getTypeName() == SqlTypeName.CHAR) {
+            newLiteral = builder.makeLiteral(((NlsString) oplit.getValue()).getValue() + "%");
+            input = operands.get(1);
+          }
+        }
+        else if (operands.get(1) instanceof RexLiteral) {
+          oplit = (RexLiteral) operands.get(1);
+          if(oplit.getTypeName() == SqlTypeName.CHAR) {
+            newLiteral = builder.makeLiteral(((NlsString) oplit.getValue()).getValue() + "%");
+            input = operands.get(0);
+          }
+        }
+      }
+      if(newLiteral != null) {
+        srcToReplace.put(equalOp, builder.makeCall(SqlStdOperatorTable.LIKE, input, newLiteral));
+      }
+    }
+    if (srcToReplace.size() > 0) {
+      RexReplace replacer = new RexReplace(srcToReplace);
+      RexNode resultRex = expr.accept(replacer);
+      return resultRex;
+    }
+    return expr;
+  }
+
+  public RexNode rewriteWithMap(RexNode expr, Map<RexNode, LogicalExpression> mapRexToExpr) {
+    Map<RexNode, RexNode> destNodeMap = Maps.newHashMap();
+    for(Map.Entry<RexNode, LogicalExpression> entry: mapRexToExpr.entrySet()) {
+      LogicalExpression entryExpr = entry.getValue();
+
+      LogicalExpression destExpr = destExprMap.get(entryExpr);
       //then build rexNode from the path
-      RexNode destRex = buildRexForField(entryPath, newRowType);
-      destNodeMap.put(entryPath, destRex);
+      RexNode destRex = buildRexForField(destExpr==null?entryExpr : destExpr, newRowType);
+      destNodeMap.put(entry.getKey(), destRex);
     }
 
-    //we marked the nodes could be replaced in pathMap, and we prepared nodes to replace in destNodeMap
-    //now we visit through the nodes and replace the marked nodes if destNode is available for it.
-    RexReplace replacer = new RexReplace(markMap, destNodeMap);
+    //Visit through the nodes, if destExprMap has an entry to provide substitute to replace a rexNode, replace the rexNode
+    RexReplace replacer = new RexReplace(destNodeMap);
     RexNode resultRex = expr.accept(replacer);
     return resultRex;
   }
 
-  public static RelDataTypeField findField(String fieldName, RelDataType rowType) {
-    final String[] parts = fieldName.replaceAll("`", "").split("\\.");
-    final String rootPart = parts[0];
+  public RexNode rewrite(RexNode expr) {
+    IndexableExprMarker marker = new IndexableExprMarker(origRel);
+    expr.accept(marker);
+    return rewriteWithMap(expr, marker.getIndexableExpression());
+  }
 
-    for (RelDataTypeField f : rowType.getFieldList()) {
-      if (rootPart.equalsIgnoreCase(f.getName())) {
-        return f;
-      }
-    }
-    return null;
+  private RexNode buildRexForField(LogicalExpression expr, RelDataType newRowType) {
+    ExprToRex toRex = new ExprToRex(origRel, newRowType, builder);
+    return expr.accept(toRex, null);
   }
 
   public static String getFullPath(PathSegment pathSeg) {
@@ -108,26 +155,6 @@ public class SimpleRexRemap {
     return String.format("%s.%s",
         nameSeg.getPath(),
         getFullPath(nameSeg.getChild()));
-  }
-
-  //reverse
-  private RexNode makeItemOperator(String[] paths, int index, RelDataType rowType) {
-    if( index == 0 ) {//last one, return ITEM([0]-inputRef, [1] Literal)
-      final RelDataTypeField field = findField(paths[0], rowType);
-      return builder.makeInputRef(field.getType(), field.getIndex());
-    }
-    return builder.makeCall(SqlStdOperatorTable.ITEM, makeItemOperator(paths,index-1, rowType), builder.makeLiteral(paths[index]));
-  }
-
-  private RexNode buildRexForField(String strPath, RelDataType rowType) {
-    //if size is 0, return InputRef directly, else return ITEM(ITEM($1, 'seg1'), 'seg2')
-    if( ! strPath.contains(".") ) {
-      final RelDataTypeField field = findField(strPath, rowType);
-      return field == null ? null : builder.makeInputRef(field.getType(), field.getIndex());
-    }
-    String[] paths = strPath.split("\\.");
-
-    return makeItemOperator(paths, paths.length-1, rowType);
   }
 
   private static PathSegment convertLiteral(RexLiteral literal) {
@@ -159,19 +186,21 @@ public class SimpleRexRemap {
       this.stackDepth = 0;
     }
 
-    public PathSegment newPath(PathSegment segment, RexNode node) {
+    private PathSegment newPath(PathSegment segment, RexNode node) {
       if (stackDepth == 0) {
         desiredFields.put(node, getFullPath(segment));
       }
       return segment;
     }
-    public PathSegment newPath(String path, RexNode node) {
+
+    private PathSegment newPath(String path, RexNode node) {
       PathSegment segment = new PathSegment.NameSegment(path);
       if (stackDepth == 0) {
         desiredFields.put(node, getFullPath(segment));
       }
       return segment;
     }
+
     public Map<RexNode, String> getFieldAndPos() {
       return ImmutableMap.copyOf(desiredFields);
     }
@@ -209,21 +238,17 @@ public class SimpleRexRemap {
 
   public static class RexReplace extends RexShuttle {
 
-    final Map<RexNode, String> marks;
-    final Map<String, RexNode> substitutes;
+    final Map<RexNode, RexNode> rexMap;
 
-    public RexReplace( Map<RexNode, String> markNodes,
-                       Map<String, RexNode> substituteNodes ) {
-      this.marks = markNodes;
-      this.substitutes = substituteNodes;
+    public RexReplace( Map<RexNode, RexNode> rexMap) {
+      this.rexMap = rexMap;
     }
-
     boolean toReplace(RexNode node) {
-      return marks.containsKey(node);
+      return rexMap.containsKey(node);
     }
 
     RexNode replace(RexNode node) {
-      return substitutes.get(marks.get(node));
+      return rexMap.get(node);
     }
 
     public RexNode visitOver(RexOver over) {
@@ -262,5 +287,5 @@ public class SimpleRexRemap {
       return toReplace(rangeRef) ? replace(rangeRef) : super.visitRangeRef(rangeRef);
     }
   }
-}
 
+}

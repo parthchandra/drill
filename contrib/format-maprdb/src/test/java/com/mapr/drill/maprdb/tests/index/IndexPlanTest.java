@@ -79,7 +79,9 @@ public class IndexPlanTest extends BaseJsonTest {
             "address.state,address.city", "name.fname,name.lname",//mainly for composite key test
             "personal.age", "",
             "personal.income", "",
-            "driverlicense", ""
+            "driverlicense", "",
+            "$CAST(id.ssn@INT)", "contact.phone",
+            "$CAST(driverlicense@STRING)",""
         };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
   }
@@ -221,7 +223,7 @@ public class IndexPlanTest extends BaseJsonTest {
   public void CoveringWithSimpleFieldsOnly() throws Exception {
 
     String query = "SELECT t._id AS `rowid` FROM hbase.`index_test_primary` as t " +
-        " where t.driverlicense = '100007423'";
+        " where t.driverlicense = 100007423";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName="},
@@ -241,7 +243,7 @@ public class IndexPlanTest extends BaseJsonTest {
   public void NonCoveringWithSimpleFieldsOnly() throws Exception {
 
     String query = "SELECT t.rowid AS `rowid` FROM hbase.`index_test_primary` as t " +
-        " where t.driverlicense = '100007423'";
+        " where t.driverlicense = 100007423";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"HashJoin(.*[\n\r])+.*" +
@@ -396,5 +398,68 @@ public class IndexPlanTest extends BaseJsonTest {
     }
     return;
   }
+/*
+  @Test
+  public void TestCastCoveringPlan() throws Exception {
+    String query = "SELECT t.contact.phone AS `phone` FROM hbase.`index_test_primary` as t " +
+        " where CAST(t.id.ssn as INT) = 100007423";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"HashJoin"}
+    );
 
+    System.out.println("TestCastCoveringPlan Plan Verified!");
+
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("phone").baselineValues("6500005471")
+        .go();
+
+    return;
+  }
+*/
+  @Test
+  public void TestCastNonCoveringPlan() throws Exception {
+    String query = "SELECT t.id.ssn AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where CAST(t.id.ssn as INT) = 100007423";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{}
+    );
+
+    System.out.println("TestCastNonCoveringPlan Plan Verified!");
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("ssn").baselineValues("100007423")
+        .go();
+
+    return;
+  }
+
+  @Test
+  public void TestCastVarchar_ConvertToRangePlan() throws Exception {
+    String query = "SELECT t.id.ssn AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where CAST(driverlicense as VARCHAR(10)) = '100007423'";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"HashJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*MATCHES \"\\^.*100007423.*E.*\\$\".*indexName="},
+        new String[]{}
+    );
+
+    System.out.println("TestCastVarchar_ConvertToRangePlan Verified!");
+/*//uncomment this when DB team fix the crash issue
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("ssn").baselineValues("100007423")
+        .go();
+*/
+    return;
+  }
 }

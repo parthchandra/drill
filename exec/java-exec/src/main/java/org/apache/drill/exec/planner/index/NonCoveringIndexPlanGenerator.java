@@ -85,103 +85,22 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(NonCoveringIndexPlanGenerator.class);
   final protected IndexGroupScan indexGroupScan;
+  final private IndexDescriptor indexDesc;
+  // Ideally This functionInfo should be cached along with indexDesc.
+  final protected FunctionalIndexInfo functionInfo;
 
   public NonCoveringIndexPlanGenerator(RelOptRuleCall call,
-      ProjectPrel origProject,
-      ScanPrel origScan,
-      IndexGroupScan indexGroupScan,
-      RexNode indexCondition,
-      RexNode remainderCondition,
-      RexBuilder builder) {
+                                       IndexDescriptor indexDesc,
+                                       ProjectPrel origProject,
+                                       ScanPrel origScan,
+                                       IndexGroupScan indexGroupScan,
+                                       RexNode indexCondition,
+                                       RexNode remainderCondition,
+                                       RexBuilder builder) {
     super(call, origProject, origScan, indexCondition, remainderCondition, builder);
     this.indexGroupScan = indexGroupScan;
-  }
-
-  /**
-   * For IndexScan in non-covering case, rowType to return contains only row_key('_id') of primary table.
-   * so the rowType for IndexScan should be converted from [Primary_table.row_key, primary_table.indexed_col]
-   * to [indexTable.row_key(primary_table.indexed_col), indexTable.<primary_key.row_key> (Primary_table.row_key)]
-   * This will impact the columns of scan, the rowType of ScanRel
-   *
-   * @param origScan
-   * @param indexCondition
-   * @param idxScan
-   * @return
-   */
-  public static RelDataType convertRowTypeForIndexScan(ScanPrel origScan,
-                                                RexNode indexCondition,
-                                                IndexGroupScan idxScan) {
-    RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
-    List<RelDataTypeField> fields = new ArrayList<>();
-
-    //row_key in the rowType of scan on primary table
-    RelDataTypeField rowkey_primary;
-
-    RelRecordType newRowType = null;
-
-      //first add row_key of primary table,
-      rowkey_primary = new RelDataTypeFieldImpl(
-          ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), fields.size(),
-          typeFactory.createSqlType(SqlTypeName.ANY));
-      fields.add(rowkey_primary);
-      //then add indexed cols
-    List<RexNode> conditions = Lists.newArrayList();
-    conditions.add(indexCondition);
-    PrelUtil.ProjectPushInfo info = PrelUtil.getColumns(origScan.getRowType(), conditions);
-
-    for (SchemaPath indexedPath: info.columns) {
-      fields.add(new RelDataTypeFieldImpl(
-          indexedPath.getAsUnescapedPath(), fields.size(),
-          typeFactory.createSqlType(SqlTypeName.ANY)));
-    }
-
-    //update columns of groupscan accordingly
-    Set<RelDataTypeField> rowfields = Sets.newLinkedHashSet();
-    final List<SchemaPath> columns = Lists.newArrayList();
-    for (RelDataTypeField f : fields) {
-      SchemaPath path;
-      String pathSeg = f.getName().replaceAll("`", "");
-      final String[] segs = pathSeg.split("\\.");
-      path = SchemaPath.getCompoundPath(segs);
-      rowfields.add(new RelDataTypeFieldImpl(
-          segs[0], rowfields.size(),
-          typeFactory.createMapType(typeFactory.createSqlType(SqlTypeName.VARCHAR),
-              typeFactory.createSqlType(SqlTypeName.ANY))
-      ));
-      columns.add(path);
-    }
-    idxScan.setColumns(columns);
-
-    //rowtype does not take the whole path, but only the rootSegment of the SchemaPath
-    newRowType = new RelRecordType(Lists.newArrayList(rowfields));
-    return newRowType;
-  }
-
-  protected RexNode convertConditionForIndexScan(RexNode idxCondition, RelDataType idxRowType) {
-
-    SimpleRexRemap remap = new SimpleRexRemap(origScan.getRowType(), idxRowType, builder);
-    return remap.rewrite(idxCondition);
-  }
-
-  // Range distribute the right side of the join, on row keys using a range partitioning function
-  protected RelNode createRangeDistRight(final RelNode rightPrel,
-      final RelDataTypeField rightRowKeyField,
-      final DbGroupScan origDbGroupScan) {
-
-    List<DistributionField> rangeDistFields =
-        Lists.newArrayList(new DistributionField(0 /* rowkey ordinal on the right side */));
-
-    FieldReference rangeDistRef = FieldReference.getWithQuotedRef(rightRowKeyField.getName());
-    List<FieldReference> rangeDistRefList = Lists.newArrayList();
-    rangeDistRefList.add(rangeDistRef);
-
-    final DrillDistributionTrait distRangeRight = new DrillDistributionTrait(DrillDistributionTrait.DistributionType.RANGE_DISTRIBUTED,
-        ImmutableList.copyOf(rangeDistFields), origDbGroupScan.getRangePartitionFunction(rangeDistRefList));
-
-    RelTraitSet rightTraits = newTraitSet(distRangeRight).plus(Prel.DRILL_PHYSICAL);
-    RelNode convertedRight = Prule.convert(rightPrel, rightTraits);
-
-    return convertedRight;
+    this.indexDesc = indexDesc;
+    this.functionInfo = indexDesc.getFunctionalInfo();
   }
 
   @Override
@@ -194,13 +113,13 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
     RelDataType indexScanRowType = convertRowTypeForIndexScan(
-        origScan, indexCondition, indexGroupScan);
+        origScan, indexCondition, indexGroupScan, functionInfo);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet(), indexGroupScan, indexScanRowType);
     DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
-    RexNode convertedIndexCondition = convertConditionForIndexScan(indexCondition, indexScanRowType);
+    RexNode convertedIndexCondition = convertConditionForIndexScan(indexCondition, indexScanRowType, functionInfo);
     FilterPrel  rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
           indexScanPrel, convertedIndexCondition);
     // project the rowkey column from the index scan

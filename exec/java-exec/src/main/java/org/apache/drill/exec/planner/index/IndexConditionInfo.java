@@ -26,6 +26,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.util.BitSets;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
@@ -89,10 +90,10 @@ public class IndexConditionInfo {
      * @return
      */
     public IndexConditionInfo getCollectiveInfo() {
-      Set<SchemaPath> paths = Sets.newLinkedHashSet();
+      Set<LogicalExpression> paths = Sets.newLinkedHashSet();
       for ( IndexDescriptor index : indexes ) {
         paths.addAll(index.getIndexColumns());
-        paths.addAll(index.getNonIndexColumns());
+        //paths.addAll(index.getNonIndexColumns());
       }
       return indexConditionRelatedToFields(Lists.newArrayList(paths), condition);
     }
@@ -123,20 +124,22 @@ public class IndexConditionInfo {
     }
 
     /**
-     * Given a list of schemaPath(usually indexed fields in one or a set of indexes),
-     * separate a filter condition into 1), relevant subset of condition and 2) the rest in remainderCondition
+     * Given a list of Index Expressions(usually indexed fields/functions from one or a set of indexes),
+     * separate a filter condition into
+     *     1), relevant subset of conditions (by relevant, it means at least one given index Expression was found and,
+     *     2), the rest in remainderCondition
      * @param relevantPaths
      * @param condition
      * @return
      */
-    private IndexConditionInfo indexConditionRelatedToFields(List<SchemaPath> relevantPaths, RexNode condition) {
+    private IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
       // Use the same filter analyzer that is used for partitioning columns
       RewriteCombineBinaryOperators reverseVisitor =
           new RewriteCombineBinaryOperators(true, builder);
 
       condition = condition.accept(reverseVisitor);
 
-      RexSeparator separator = new RexSeparator(relevantPaths, scan.getRowType(), builder);
+      RexSeparator separator = new RexSeparator(relevantPaths, scan, builder);
       RexNode indexCondition = separator.getSeparatedCondition(condition);
 
       if (indexCondition == null) {

@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 
@@ -31,9 +32,9 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 public abstract class AbstractIndexDescriptor extends DrillIndexDefinition implements IndexDescriptor {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexDescriptor .class);
 
-  public AbstractIndexDescriptor(List<SchemaPath> indexCols,
-                               List<SchemaPath> nonIndexCols,
-                               List<SchemaPath> rowKeyColumns,
+  public AbstractIndexDescriptor(List<LogicalExpression> indexCols,
+                               List<LogicalExpression> nonIndexCols,
+                               List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {

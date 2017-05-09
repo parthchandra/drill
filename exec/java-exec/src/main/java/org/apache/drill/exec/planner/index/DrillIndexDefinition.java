@@ -17,12 +17,19 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.drill.common.expression.CastExpression;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.types.TypeProtos;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class DrillIndexDefinition implements IndexDefinition {
@@ -32,7 +39,7 @@ public class DrillIndexDefinition implements IndexDefinition {
    * NOTE: the indexed column could be of type columnfamily.column
    */
   @JsonProperty
-  protected final List<SchemaPath> indexColumns;
+  protected final List<LogicalExpression> indexColumns;
 
   /**
    * nonIndexColumns: the list of columns that are included in the index as 'covering'
@@ -40,10 +47,13 @@ public class DrillIndexDefinition implements IndexDefinition {
    * query request can be satisfied directly by the index and avoid accessing the table altogether.
    */
   @JsonProperty
-  protected final List<SchemaPath> nonIndexColumns;
+  protected final List<LogicalExpression> nonIndexColumns;
+
+  @JsonIgnore
+  protected final Set<LogicalExpression> allIndexColumns;
 
   @JsonProperty
-  protected final List<SchemaPath> rowKeyColumns;
+  protected final List<LogicalExpression> rowKeyColumns;
 
   /**
    * indexName: name of the index that should be unique within the scope of a table
@@ -56,9 +66,9 @@ public class DrillIndexDefinition implements IndexDefinition {
   @JsonProperty
   protected final IndexDescriptor.IndexType indexType;
 
-  public DrillIndexDefinition(List<SchemaPath> indexCols,
-                                 List<SchemaPath> nonIndexCols,
-                                 List<SchemaPath> rowKeyColumns,
+  public DrillIndexDefinition(List<LogicalExpression> indexCols,
+                                 List<LogicalExpression> nonIndexCols,
+                                 List<LogicalExpression> rowKeyColumns,
                                  String indexName,
                                  String tableName,
                                  IndexDescriptor.IndexType type) {
@@ -68,28 +78,64 @@ public class DrillIndexDefinition implements IndexDefinition {
     this.indexName = indexName;
     this.tableName = tableName;
     this.indexType = type;
+    this.allIndexColumns = Sets.newHashSet(indexColumns);
+    this.allIndexColumns.addAll(nonIndexColumns);
+
   }
 
   @Override
-  public int getIndexColumnOrdinal(SchemaPath path) {
+  public int getIndexColumnOrdinal(LogicalExpression path) {
     int id = indexColumns.indexOf(path);
     return id;
   }
 
-
   @Override
-  public boolean isCoveringIndex(List<SchemaPath> columns) {
-    Set<SchemaPath> allColumns = Sets.newHashSet();
-    allColumns.addAll(indexColumns);
-    allColumns.addAll(nonIndexColumns);
-    return allColumns.containsAll(columns);
+  public boolean isCoveringIndex(List<LogicalExpression> columns) {
+    return allIndexColumns.containsAll(columns);
   }
 
   @Override
-  public boolean allColumnsIndexed(Collection<SchemaPath> columns) {
-    Set<SchemaPath> indexCols = Sets.newHashSet();
-    indexCols.addAll(indexColumns);
-    return indexCols.containsAll(columns);
+  public boolean allColumnsIndexed(Collection<LogicalExpression> columns) {
+    return columnsInIndexFields(columns, indexColumns);
+  }
+
+  boolean castIsCompatible(CastExpression castExpr, Collection<LogicalExpression> indexFields) {
+    for(LogicalExpression indexExpr : indexFields) {
+      if(indexExpr.getClass() != castExpr.getClass()) {
+        continue;
+      }
+      CastExpression indexCastExpr = (CastExpression)indexExpr;
+      //we compare input using equals because we know we are comparing SchemaPath,
+      //if we extend to support other expression, make sure the equals of that expression
+      //is implemented properly, otherwise it will fall to identity comparison
+      if ( !castExpr.getInput().equals(indexCastExpr.getInput()) ) {
+          continue;
+      }
+
+      if( castExpr.getMajorType().getMinorType() != indexCastExpr.getMajorType().getMinorType()) {
+        continue;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  protected boolean columnsInIndexFields(Collection<LogicalExpression> columns, Collection<LogicalExpression> indexFields) {
+    //we need to do extra check, so we could allow the case when query condition expression is not identical with indexed fields
+    //and they still could use the index either by implicit cast or the difference is allowed, e.g. width of varchar
+    for (LogicalExpression col : columns) {
+      if (col instanceof CastExpression) {
+        if (!castIsCompatible((CastExpression) col, indexFields)) {
+          return false;
+        }
+      }
+      else {
+        if (!indexFields.contains(col)) {
+          return false;
+        }
+      }
+    }
+    return true;//indexFields.containsAll(columns);
   }
 
   @Override
@@ -144,19 +190,19 @@ public class DrillIndexDefinition implements IndexDefinition {
 
   @Override
   @JsonProperty
-  public List<SchemaPath> getRowKeyColumns() {
+  public List<LogicalExpression> getRowKeyColumns() {
     return this.rowKeyColumns;
   }
 
   @Override
   @JsonProperty
-  public List<SchemaPath> getIndexColumns() {
+  public List<LogicalExpression> getIndexColumns() {
     return this.indexColumns;
   }
 
   @Override
   @JsonProperty
-  public List<SchemaPath> getNonIndexColumns() {
+  public List<LogicalExpression> getNonIndexColumns() {
     return this.nonIndexColumns;
   }
 

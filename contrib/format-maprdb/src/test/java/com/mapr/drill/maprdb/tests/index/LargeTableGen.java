@@ -139,7 +139,7 @@ public class LargeTableGen extends LargeTableGenBase {
           strBuf.append(String.format("{\"rowid\": \"%d\", \"id\": {\"ssn\": \"%s\"}, \"contact\": {\"phone\": \"%s\", \"email\": \"%s\"}," +
                   "\"address\": {\"city\": \"%s\", \"state\": \"%s\"}, \"name\": { \"fname\": \"%s\", \"lname\": \"%s\" }," +
                   "\"personal\": {\"age\" : %s, \"income\": %s}," +
-                  "\"driverlicense\": \"%s\" } \n",
+                  "\"driverlicense\":{\"$numberLong\": %s} } \n",
               i + 1, getSSN(i), getPhone(i), getEmail(i),
               getAddress(i)[2], getAddress(i)[1], getFirstName(i), getLastName(i),
               getAge(i), getIncome(i), getSSN(i)));

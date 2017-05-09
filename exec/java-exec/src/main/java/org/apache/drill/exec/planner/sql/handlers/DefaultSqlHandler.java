@@ -165,6 +165,7 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     final ConvertedRelNode convertedRelNode = validateAndConvert(sqlNode);
     final RelDataType validatedRowType = convertedRelNode.getValidatedRowType();
     final RelNode queryRelNode = convertedRelNode.getConvertedNode();
+
     Prel prel;
 
     if (context.getPlannerSettings().isUseSimpleOptimizer()) {
@@ -195,6 +196,7 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
   }
 
   protected ConvertedRelNode validateAndConvert(SqlNode sqlNode) throws ForemanSetupException, RelConversionException, ValidationException {
+
     final SqlNode rewrittenSqlNode = rewrite(sqlNode);
     final TypedSqlNode validatedTypedSqlNode = validateNode(rewrittenSqlNode);
     final SqlNode validated = validatedTypedSqlNode.getSqlNode();

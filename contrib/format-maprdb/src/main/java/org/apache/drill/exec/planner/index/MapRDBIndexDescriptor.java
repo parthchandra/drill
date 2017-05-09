@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,25 +17,29 @@
  */
 package org.apache.drill.exec.planner.index;
 
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
+import com.google.common.collect.Lists;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.expr.CloneVisitor;
 import org.apache.drill.exec.store.mapr.PluginConstants;
 import org.apache.drill.exec.util.EncodedSchemaPathSet;
+import org.apache.drill.common.expression.LogicalExpression;
 
 import com.google.common.collect.ImmutableSet;
 
 public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
 
   protected final Object desc;
-  protected final Set<SchemaPath> allFields;
-  protected final Set<SchemaPath> indexedFields;
+  protected final Set<LogicalExpression> allFields;
+  protected final Set<LogicalExpression> indexedFields;
 
-  public MapRDBIndexDescriptor(List<SchemaPath> indexCols,
-                               List<SchemaPath> nonIndexCols,
-                               List<SchemaPath> rowKeyColumns,
+  public MapRDBIndexDescriptor(List<LogicalExpression> indexCols,
+                               List<LogicalExpression> nonIndexCols,
+                               List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type,
@@ -43,7 +47,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
     super(indexCols, nonIndexCols, rowKeyColumns, indexName, tableName, type);
     this.desc = desc;
     this.indexedFields = ImmutableSet.copyOf(indexColumns);
-    this.allFields = new ImmutableSet.Builder<SchemaPath>()
+    this.allFields = new ImmutableSet.Builder<LogicalExpression>()
         .add(PluginConstants.DOCUMENT_SCHEMA_PATH)
         .addAll(indexColumns)
         .addAll(nonIndexColumns)
@@ -55,15 +59,38 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   }
 
   @Override
-  public boolean isCoveringIndex(List<SchemaPath> columns) {
-    final Collection<SchemaPath> decodedColumns = EncodedSchemaPathSet.decode(columns);
-    return allFields.containsAll(decodedColumns);
+  public boolean isCoveringIndex(List<LogicalExpression> columns) {
+    DecodePathinExpr decodeExpr = new DecodePathinExpr();
+    List<LogicalExpression> decodedCols = Lists.newArrayList();
+    for(LogicalExpression expr : columns) {
+      decodedCols.add(expr.accept(decodeExpr, null));
+    }
+    return columnsInIndexFields(decodedCols, allFields);
   }
 
   @Override
-  public boolean allColumnsIndexed(Collection<SchemaPath> columns) {
-    final Collection<SchemaPath> decodedColumns = EncodedSchemaPathSet.decode(columns);
-    return indexedFields.containsAll(decodedColumns);
+  public boolean allColumnsIndexed(Collection<LogicalExpression> columns) {
+    DecodePathinExpr decodeExpr = new DecodePathinExpr();
+    List<LogicalExpression> decodedCols = Lists.newArrayList();
+    for(LogicalExpression expr : columns) {
+      decodedCols.add(expr.accept(decodeExpr, null));
+    }
+    return columnsInIndexFields(decodedCols, indexedFields);
   }
 
+  public FunctionalIndexInfo getFunctionalInfo() {
+    return new MapRDBFunctionalIndexInfo(this);
+  }
+  /**
+   * Search through a LogicalExpression, finding all internal schema path references and returning a decoded path.
+   */
+  private class DecodePathinExpr extends CloneVisitor {
+
+    @Override
+    public LogicalExpression visitSchemaPath(SchemaPath path, Void value) {
+      List<SchemaPath> paths = Lists.newArrayList();
+      paths.add(path);
+      return EncodedSchemaPathSet.decode(paths).iterator().next();
+    }
+  }
 }
