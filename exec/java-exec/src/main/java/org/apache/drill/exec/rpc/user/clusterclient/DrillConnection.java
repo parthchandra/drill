@@ -18,11 +18,19 @@
 package org.apache.drill.exec.rpc.user.clusterclient;
 
 import org.apache.drill.common.exceptions.DrillIOException;
+import org.apache.drill.exec.memory.BufferAllocator;
 
 import java.io.Closeable;
 import java.util.Properties;
 
 public interface DrillConnection {
+
+  /**
+   * Gets the {@link BufferAllocator buffer allocator} used by this connection.
+   *
+   * @return buffer allocator
+   */
+  BufferAllocator getAllocator();
 
   /**
    * Establish a new session over this connection based on the properties.

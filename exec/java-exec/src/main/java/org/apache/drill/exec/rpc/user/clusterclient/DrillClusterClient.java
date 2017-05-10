@@ -17,7 +17,16 @@
  */
 package org.apache.drill.exec.rpc.user.clusterclient;
 
+import org.apache.drill.exec.memory.BufferAllocator;
+
 public interface DrillClusterClient {
+
+  /**
+   * Gets the {@link BufferAllocator buffer allocator} used by this client.
+   *
+   * @return buffer allocator
+   */
+  BufferAllocator getAllocator();
 
   /**
    * Release resources, and close all {@link DrillConnection connections}

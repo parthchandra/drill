@@ -20,6 +20,7 @@ package org.apache.drill.exec.rpc.user.clusterclient;
 import com.google.common.collect.Maps;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillIOException;
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserProtos.NewSessionRequest;
@@ -45,6 +46,11 @@ public class DrillConnectionImpl extends UserClient implements DrillConnection {
         clusterClient.allocator, clusterClient.eventLoopGroup, clusterClient.executor);
     this.clusterClient = clusterClient;
     this.endpoint = endpoint;
+  }
+
+  @Override
+  public BufferAllocator getAllocator() {
+    return clusterClient.getAllocator();
   }
 
   @Override

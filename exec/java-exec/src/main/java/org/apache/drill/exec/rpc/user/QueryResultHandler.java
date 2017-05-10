@@ -399,8 +399,10 @@ public class QueryResultHandler {
     final List<QueryId> queriesToFail = Lists.newArrayList(
         Iterables.filter(queryIdToResultsListenersMap.keySet(), predicate));
     for (final QueryId queryId : queriesToFail) {
-      queryIdToResultsListenersMap.remove(queryId)
-          .submissionFailed(builder.build(logger));
+      final UserResultsListener listener = queryIdToResultsListenersMap.remove(queryId);
+      if (listener != null) {
+        listener.submissionFailed(builder.build(logger));
+      }
     }
   }
 }
