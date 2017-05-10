@@ -23,6 +23,7 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillIOException;
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.rpc.NonTransientRpcException;
 import org.apache.drill.exec.rpc.user.clusterclient.AbstractDrillClusterClient;
@@ -65,6 +66,11 @@ public class ZKBasedConnectionPool extends AbstractDrillClusterClient implements
             }
           }
         }).build();
+  }
+
+  @Override
+  public BufferAllocator getAllocator() {
+    return super.getAllocator();
   }
 
   @Override

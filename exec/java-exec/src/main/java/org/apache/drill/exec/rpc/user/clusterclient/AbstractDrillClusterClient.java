@@ -84,6 +84,11 @@ public abstract class AbstractDrillClusterClient implements DrillClusterClient {
         };
   }
 
+  @Override
+  public BufferAllocator getAllocator() {
+    return allocator;
+  }
+
   protected static UserCredentials getUserCredentials(final DrillProperties properties) {
     String userName = properties.getProperty(DrillProperties.USER);
     if (Strings.isNullOrEmpty(userName)) {

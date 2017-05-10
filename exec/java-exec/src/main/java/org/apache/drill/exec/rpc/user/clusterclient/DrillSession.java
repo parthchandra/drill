@@ -17,9 +17,17 @@
  */
 package org.apache.drill.exec.rpc.user.clusterclient;
 
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 
 public interface DrillSession {
+
+  /**
+   * Gets the {@link BufferAllocator buffer allocator} used by this session.
+   *
+   * @return buffer allocator
+   */
+  BufferAllocator getAllocator();
 
   /**
    * Execute a SQL query, and register the result listener for that query.

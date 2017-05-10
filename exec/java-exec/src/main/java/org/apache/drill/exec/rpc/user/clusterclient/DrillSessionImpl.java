@@ -20,6 +20,7 @@ package org.apache.drill.exec.rpc.user.clusterclient;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
@@ -43,6 +44,11 @@ public class DrillSessionImpl implements DrillSession {
   DrillSessionImpl(DrillConnectionImpl connection, SessionHandle sessionHandle) {
     this.connection = connection;
     this.sessionHandle = sessionHandle;
+  }
+
+  @Override
+  public BufferAllocator getAllocator() {
+    return connection.getAllocator();
   }
 
   @Override
