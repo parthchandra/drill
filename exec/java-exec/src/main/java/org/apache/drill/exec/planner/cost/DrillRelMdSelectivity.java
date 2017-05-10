@@ -69,6 +69,6 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
         return filterRows/totalRows;
       }
     }
-    return RelMdUtil.guessSelectivity(predicate);
+    return super.getSelectivity(rel, predicate);
   }
 }

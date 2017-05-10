@@ -163,11 +163,13 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
 
     FunctionalIndexInfo functionInfo = getFunctionalIndexInfo(index);
     IndexGroupScan indexScan = index.getIndexGroupScan();
-    RelDataType indexScanRowType = convertRowTypeForIndexScan(origScan, condition, indexScan, functionInfo);
+    RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(origScan, condition,
+        indexScan, functionInfo);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexScan, indexScanRowType);
     FilterPrel  indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
-        indexScanPrel, convertConditionForIndexScan(condition, indexScanRowType, functionInfo));
+        indexScanPrel, FunctionalIndexHelper.convertConditionForIndexScan(condition, origScan,
+        indexScanRowType, builder, functionInfo));
     // project the rowkey column from the index scan
     List<RexNode> indexProjectExprs = Lists.newArrayList();
     int rowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType(), origScan);//indexGroupScan.getRowKeyOrdinal();

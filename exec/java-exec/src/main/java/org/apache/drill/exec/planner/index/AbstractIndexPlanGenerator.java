@@ -20,14 +20,11 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
@@ -35,9 +32,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.FieldReference;
-import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
@@ -160,98 +155,14 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
                                                        RexNode indexCondition,
                                                        IndexGroupScan idxScan,
                                                        FunctionalIndexInfo functionInfo) {
-    RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
-    List<RelDataTypeField> fields = new ArrayList<>();
-
-    //row_key in the rowType of scan on primary table
-    RelDataTypeField rowkey_primary;
-
-    RelRecordType newRowType = null;
-
-    //first add row_key of primary table,
-    rowkey_primary = new RelDataTypeFieldImpl(
-        ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), fields.size(),
-        typeFactory.createSqlType(SqlTypeName.ANY));
-    fields.add(rowkey_primary);
-
-    //then add indexed cols
-    IndexableExprMarker idxMarker = new IndexableExprMarker(origScan);
-    indexCondition.accept(idxMarker);
-    Map<RexNode, LogicalExpression> idxExprMap = idxMarker.getIndexableExpression();
-
-    for (LogicalExpression indexedExpr : idxExprMap.values()) {
-      if (indexedExpr instanceof SchemaPath) {
-        fields.add(new RelDataTypeFieldImpl(
-            ((SchemaPath)indexedExpr).getAsUnescapedPath(), fields.size(),
-            typeFactory.createSqlType(SqlTypeName.ANY)));
-      }
-      else if(indexedExpr instanceof CastExpression) {
-        SchemaPath newPath = functionInfo.getNewPathFromExpr(indexedExpr);
-        fields.add(new RelDataTypeFieldImpl(
-            newPath.getAsUnescapedPath(), fields.size(),
-            typeFactory.createSqlType(SqlTypeName.ANY)));
-      }
-    }
-
-    //update columns of groupscan accordingly
-    Set<RelDataTypeField> rowfields = Sets.newLinkedHashSet();
-    final List<SchemaPath> columns = Lists.newArrayList();
-    for (RelDataTypeField f : fields) {
-      SchemaPath path;
-      String pathSeg = f.getName().replaceAll("`", "");
-      final String[] segs = pathSeg.split("\\.");
-      path = SchemaPath.getCompoundPath(segs);
-      rowfields.add(new RelDataTypeFieldImpl(
-          segs[0], rowfields.size(),
-          typeFactory.createMapType(typeFactory.createSqlType(SqlTypeName.VARCHAR),
-              typeFactory.createSqlType(SqlTypeName.ANY))
-      ));
-      columns.add(path);
-    }
-    idxScan.setColumns(columns);
-
-    //rowtype does not take the whole path, but only the rootSegment of the SchemaPath
-    newRowType = new RelRecordType(Lists.newArrayList(rowfields));
-    return newRowType;
+    return FunctionalIndexHelper.convertRowTypeForIndexScan(origScan, indexCondition, idxScan, functionInfo);
   }
 
   protected RexNode convertConditionForIndexScan(RexNode idxCondition,
                                                  RelDataType idxRowType,
                                                  FunctionalIndexInfo functionInfo) {
-    IndexableExprMarker marker = new IndexableExprMarker(origScan);
-    idxCondition.accept(marker);
-    SimpleRexRemap remap = new SimpleRexRemap(origScan, idxRowType, builder);
-    remap.setExpressionMap(functionInfo.getExprMap());
-
-    if (functionInfo.supportEqualCharConvertToLike()) {
-      final Map<LogicalExpression, LogicalExpression> indexedExprs = functionInfo.getExprMap();
-
-      final Map<RexNode, LogicalExpression> equalCastMap = marker.getEqualOnCastChar();
-
-      Map<RexNode, LogicalExpression> toRewriteEqualCastMap = Maps.newHashMap();
-
-      // the marker collected all equal-cast-varchar, now check which one we should replace
-      for (Map.Entry<RexNode, LogicalExpression> entry : equalCastMap.entrySet()) {
-        CastExpression expr = (CastExpression) entry.getValue();
-        //whether this cast varchar/char expression is indexed even the length is not the same
-        for (LogicalExpression indexed : indexedExprs.keySet()) {
-          if (indexed instanceof CastExpression) {
-            final CastExpression indexedCast = (CastExpression) indexed;
-            if (expr.getInput().equals(indexedCast.getInput())
-                && expr.getMajorType().getMinorType().equals(indexedCast.getMajorType().getMinorType())
-                //if expr's length < indexedCast's length, we should convert equal to LIKE for this condition
-                && expr.getMajorType().getWidth() < indexedCast.getMajorType().getWidth()) {
-              toRewriteEqualCastMap.put(entry.getKey(), entry.getValue());
-            }
-          }
-        }
-      }
-      if (toRewriteEqualCastMap.size() > 0) {
-        idxCondition = remap.rewriteEqualOnCharToLike(idxCondition, toRewriteEqualCastMap);
-      }
-    }
-
-    return remap.rewriteWithMap(idxCondition, marker.getIndexableExpression());
+    return FunctionalIndexHelper.convertConditionForIndexScan(idxCondition, origScan, idxRowType,
+        builder, functionInfo);
   }
 
   public RelTraitSet newTraitSet(RelTrait... traits) {
@@ -282,5 +193,4 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     RelNode convertedInput = Prule.convert(input, traits);
     this.go(top, convertedInput);
   }
-
 }

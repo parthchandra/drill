@@ -28,7 +28,9 @@ public interface Statistics {
 
   /** Returns the statistics given the specified filter condition
    *  @param condition - Filter specified as a {@link RexNode}
-   *  @param scanPrel - The current scan physical rel
+   *  @param scanRel - The current scan rel
    */
   double getRowCount(RexNode condition, DrillScanRel scanRel);
+
+  boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context);
 }

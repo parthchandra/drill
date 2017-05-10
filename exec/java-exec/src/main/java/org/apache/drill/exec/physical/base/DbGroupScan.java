@@ -75,14 +75,6 @@ public interface DbGroupScan extends GroupScan {
   @JsonIgnore
   public Statistics getStatistics();
 
-  /**
-   * Initialize the statistics
-   * @param builder - The expression builder
-   * @param settings - The planner settings
-   */
-  @JsonIgnore
-  public void initializeStatistics(RexBuilder builder, PlannerSettings settings);
-
   public List<SchemaPath> getColumns();
 
   public void setCostFactor(double sel);
