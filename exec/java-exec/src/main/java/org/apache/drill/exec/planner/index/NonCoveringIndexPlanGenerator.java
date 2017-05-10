@@ -29,9 +29,11 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
+import org.apache.drill.exec.planner.physical.RowKeyJoinPrel;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
@@ -83,8 +85,9 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
                                        IndexGroupScan indexGroupScan,
                                        RexNode indexCondition,
                                        RexNode remainderCondition,
-                                       RexBuilder builder) {
-    super(indexContext, indexCondition, remainderCondition, builder);
+                                       RexBuilder builder,
+                                       PlannerSettings settings) {
+    super(indexContext, indexCondition, remainderCondition, builder, settings);
     this.indexGroupScan = indexGroupScan;
     this.indexDesc = indexDesc;
     this.functionInfo = indexDesc.getFunctionalInfo();
@@ -205,25 +208,31 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         RelOptUtil.createEquiJoinCondition(convertedLeft, leftJoinKeys,
             convertedRight, rightJoinKeys, builder);
 
-    HashJoinPrel hjPrel = new HashJoinPrel(indexContext.filter.getCluster(), leftTraits, convertedLeft,
-        convertedRight, joinCondition, JoinRelType.INNER, false,
-        true /* useful for join-restricted scans */, JoinControl.DEFAULT);
-
-    RelNode newRel = hjPrel;
+    RelNode newRel;
+    if (settings.isIndexUseHashJoinNonCovering()) {
+      HashJoinPrel hjPrel = new HashJoinPrel(filter.getCluster(), leftTraits, convertedLeft,
+          convertedRight, joinCondition, JoinRelType.INNER, false,
+          true /* useful for join-restricted scans */, JoinControl.DEFAULT);
+      newRel = hjPrel;
+    } else {
+      RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(filter.getCluster(), leftTraits,
+          convertedLeft, convertedRight, joinCondition, JoinRelType.INNER);
+      newRel = rjPrel;
+    }
 
     final RelDataTypeFactory.FieldInfoBuilder finalFieldTypeBuilder =
         origScan.getCluster().getTypeFactory().builder();
 
-    List<RelDataTypeField> hjRowFields = newRel.getRowType().getFieldList();
+    List<RelDataTypeField> rjRowFields = newRel.getRowType().getFieldList();
     int toRemoveRowKeyCount = 1;
     if (getRowKeyIndex(origRowType, origScan)  < 0 ) {
       toRemoveRowKeyCount = 2;
     }
-    finalFieldTypeBuilder.addAll(hjRowFields.subList(0, hjRowFields.size()-toRemoveRowKeyCount));
+    finalFieldTypeBuilder.addAll(rjRowFields.subList(0, rjRowFields.size()-toRemoveRowKeyCount));
     final RelDataType finalProjectRowType = finalFieldTypeBuilder.build();
 
     List<RexNode> resetExprs = Lists.newArrayList();
-    for (int idx=0; idx<hjRowFields.size()-toRemoveRowKeyCount; ++idx) {
+    for (int idx=0; idx<rjRowFields.size()-toRemoveRowKeyCount; ++idx) {
       resetExprs.add(RexInputRef.of(idx, newRel.getRowType()));
     }
 

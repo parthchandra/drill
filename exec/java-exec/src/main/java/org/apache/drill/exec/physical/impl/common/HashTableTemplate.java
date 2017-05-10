@@ -23,8 +23,6 @@ import java.util.Iterator;
 import javax.inject.Named;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.types.TypeProtos.MajorType;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.compile.sig.RuntimeOverridden;
@@ -32,7 +30,6 @@ import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
-import org.apache.drill.exec.planner.common.DrillJoinRelBase;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TransferPair;
@@ -803,8 +800,8 @@ public abstract class HashTableTemplate implements HashTable {
       // set the value count for the vectors in the batch
       // TODO: investigate why the value count is not already set in the
       // batch.. it seems even outputKeys() sets the value count explicitly
-      bh.setValueCount();
       if (bh != null) {
+        bh.setValueCount();
         return Pair.of(bh.htContainer, bh.maxOccupiedIdx);
       }
     }

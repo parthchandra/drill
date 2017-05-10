@@ -521,6 +521,10 @@ public final class UserBitShared {
      * <code>MAPRDB_SUB_SCAN = 38;</code>
      */
     MAPRDB_SUB_SCAN(38, 38),
+    /**
+     * <code>ROWKEY_JOIN = 39;</code>
+     */
+    ROWKEY_JOIN(39, 39),
     ;
 
     /**
@@ -679,6 +683,10 @@ public final class UserBitShared {
      * <code>MAPRDB_SUB_SCAN = 38;</code>
      */
     public static final int MAPRDB_SUB_SCAN_VALUE = 38;
+    /**
+     * <code>ROWKEY_JOIN = 39;</code>
+     */
+    public static final int ROWKEY_JOIN_VALUE = 39;
 
 
     public final int getNumber() { return value; }
@@ -724,6 +732,7 @@ public final class UserBitShared {
         case 36: return AVRO_SUB_SCAN;
         case 37: return PCAP_SUB_SCAN;
         case 38: return MAPRDB_SUB_SCAN;
+        case 39: return ROWKEY_JOIN;
         default: return null;
       }
     }
@@ -23528,7 +23537,7 @@ public final class UserBitShared {
       "D_STATEMENT\020\005*\207\001\n\rFragmentState\022\013\n\007SENDI" +
       "NG\020\000\022\027\n\023AWAITING_ALLOCATION\020\001\022\013\n\007RUNNING" +
       "\020\002\022\014\n\010FINISHED\020\003\022\r\n\tCANCELLED\020\004\022\n\n\006FAILE" +
-      "D\020\005\022\032\n\026CANCELLATION_REQUESTED\020\006*\205\006\n\020Core" +
+      "D\020\005\022\032\n\026CANCELLATION_REQUESTED\020\006*\226\006\n\020Core" +
       "OperatorType\022\021\n\rSINGLE_SENDER\020\000\022\024\n\020BROAD",
       "CAST_SENDER\020\001\022\n\n\006FILTER\020\002\022\022\n\016HASH_AGGREG" +
       "ATE\020\003\022\r\n\tHASH_JOIN\020\004\022\016\n\nMERGE_JOIN\020\005\022\031\n\025" +
@@ -23548,10 +23557,11 @@ public final class UserBitShared {
       "CER_CONSUMER\020 \022\022\n\016HBASE_SUB_SCAN\020!\022\n\n\006WI" +
       "NDOW\020\"\022\024\n\020NESTED_LOOP_JOIN\020#\022\021\n\rAVRO_SUB" +
       "_SCAN\020$\022\021\n\rPCAP_SUB_SCAN\020%\022\023\n\017MAPRDB_SUB" +
-      "_SCAN\020&*g\n\nSaslStatus\022\020\n\014SASL_UNKNOWN\020\000\022" +
-      "\016\n\nSASL_START\020\001\022\024\n\020SASL_IN_PROGRESS\020\002\022\020\n",
-      "\014SASL_SUCCESS\020\003\022\017\n\013SASL_FAILED\020\004B.\n\033org." +
-      "apache.drill.exec.protoB\rUserBitSharedH\001"
+      "_SCAN\020&\022\017\n\013ROWKEY_JOIN\020\'*g\n\nSaslStatus\022\020" +
+      "\n\014SASL_UNKNOWN\020\000\022\016\n\nSASL_START\020\001\022\024\n\020SASL",
+      "_IN_PROGRESS\020\002\022\020\n\014SASL_SUCCESS\020\003\022\017\n\013SASL" +
+      "_FAILED\020\004B.\n\033org.apache.drill.exec.proto" +
+      "B\rUserBitSharedH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {

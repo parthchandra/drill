@@ -17,7 +17,7 @@
  */
 package org.apache.drill.exec.physical.base;
 
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -38,6 +38,6 @@ public interface DbSubScan extends SubScan {
    * @param batch
    */
   @JsonIgnore
-  void addJoinForRestrictedSubScan(HashJoinBatch batch);
+  void addJoinForRestrictedSubScan(RowKeyJoin batch);
 
 }

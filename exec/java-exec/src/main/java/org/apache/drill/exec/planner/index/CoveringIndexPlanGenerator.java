@@ -21,6 +21,7 @@ package org.apache.drill.exec.planner.index;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -36,6 +37,7 @@ import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.physical.FilterPrel;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
@@ -71,8 +73,9 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
                                     IndexGroupScan indexGroupScan,
                                     RexNode indexCondition,
                                     RexNode remainderCondition,
-                                    RexBuilder builder) {
-    super(indexContext, indexCondition, remainderCondition, builder);
+                                    RexBuilder builder,
+                                    PlannerSettings settings) {
+    super(indexContext, indexCondition, remainderCondition, builder, settings);
     this.indexGroupScan = indexGroupScan;
     this.functionInfo = functionInfo;
     this.indexDesc = this.functionInfo.getIndexDesc();

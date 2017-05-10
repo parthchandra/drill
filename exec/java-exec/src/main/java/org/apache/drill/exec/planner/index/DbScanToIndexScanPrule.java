@@ -19,7 +19,6 @@ package org.apache.drill.exec.planner.index;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -29,13 +28,10 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
-import org.apache.drill.exec.planner.logical.DrillOptiq;
-import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
@@ -47,7 +43,6 @@ import org.apache.drill.exec.planner.physical.Prule;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class DbScanToIndexScanPrule extends Prule {
@@ -349,7 +344,7 @@ public class DbScanToIndexScanPrule extends Prule {
         //TODO: make sure the smallest selectivity of these indexes times rowcount smaller than broadcast threshold
 
         IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
-            indexContext, indexInfoMap, builder);
+            indexContext, indexInfoMap, builder, settings);
         try {
           planGen.go();
         } catch (Exception e) {
@@ -367,7 +362,8 @@ public class DbScanToIndexScanPrule extends Prule {
         IndexGroupScan idxScan = indexInfo.getIndexDesc().getIndexGroupScan();
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
 
-        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan, indexCondition, remainderCondition, builder);
+        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan,
+            indexCondition, remainderCondition, builder, settings);
 
         planGen.go();
         createdCovering = true;
@@ -392,7 +388,7 @@ public class DbScanToIndexScanPrule extends Prule {
           IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index, idxScan, indexCondition,
-              remainderCondition, builder);
+              remainderCondition, builder, settings);
           planGen.go();
         }
       } catch (Exception e) {

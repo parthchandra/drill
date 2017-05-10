@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
@@ -44,6 +45,7 @@ import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.calcite.rel.type.RelDataType;
@@ -65,11 +67,13 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
   final protected RexNode remainderCondition;
   final protected RexBuilder builder;
   final protected IndexPlanCallContext indexContext;
+  final protected PlannerSettings settings;
 
   public AbstractIndexPlanGenerator(IndexPlanCallContext indexContext,
       RexNode indexCondition,
       RexNode remainderCondition,
-      RexBuilder builder) {
+      RexBuilder builder,
+      PlannerSettings settings) {
     super(indexContext.call);
     this.origProject = indexContext.project;
     this.origScan = indexContext.scan;
@@ -78,6 +82,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     this.remainderCondition = remainderCondition;
     this.indexContext = indexContext;
     this.builder = builder;
+    this.settings = settings;
   }
 
   //This class provides the utility functions that don't rely on index(one or multiple) or final plan (covering or not),
