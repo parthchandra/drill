@@ -247,11 +247,6 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
   }
 
   @Override
-  public void initializeStatistics(RexBuilder builder, PlannerSettings settings) {
-    throw new UnsupportedOperationException("initializeStatistics not implemented for BinaryTableGroupScan");
-  }
-
-  @Override
   @JsonIgnore
   public boolean isIndexScan() {
     return false;

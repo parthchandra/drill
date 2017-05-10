@@ -292,10 +292,10 @@ public class DbScanToIndexScanPrule extends Prule {
     if (scan.getGroupScan() instanceof DbGroupScan) {
       // Initialize statistics
       DbGroupScan dbScan = ((DbGroupScan) scan.getGroupScan());
-      dbScan.initializeStatistics(builder, settings);
+      dbScan.getStatistics().initialize(condition, scan, indexContext);
       totalRows = dbScan.getRowCount(null, scan);
       filterRows = dbScan.getRowCount(condition, scan);
-      if (filterRows/(double)totalRows > Math.min(1.0, 2.0 * settings.getIndexSelectivityFactor())) {
+      if (filterRows/totalRows > Math.min(1.0, 2.0 * settings.getIndexSelectivityFactor())) {
         // Generate full table scan only plans for selectivity > 2*index_selectivity_factor
         return;
       }
@@ -408,13 +408,6 @@ public class DbScanToIndexScanPrule extends Prule {
     }
 
     if (createdCovering) {
-      // Force picking the index plan if selectivity less than index_selectivity_factor
-      if (totalRows!=0
-          && filterRows/totalRows < settings.getIndexSelectivityFactor()) {
-        // Generate index only plans for selectivity <= index_selectivity_factor
-        ((DbGroupScan)scan.getGroupScan()).setRowCount(null,
-            Statistics.ROWCOUNT_HUGE, Statistics.ROWCOUNT_HUGE);
-      }
       return;
     }
 
@@ -438,15 +431,7 @@ public class DbScanToIndexScanPrule extends Prule {
         logger.warn("Exception while trying to generate non-covering index access plan", e);
         return;
       }
-      // Force picking the index plan if selectivity less than index_selectivity_factor
-      if (totalRows!=0 &&
-          filterRows/totalRows < settings.getIndexSelectivityFactor()) {
-        // Generate index only plans for selectivity <= index_selectivity_factor
-        ((DbGroupScan)scan.getGroupScan()).setRowCount(null,
-            Statistics.ROWCOUNT_HUGE, Statistics.ROWCOUNT_HUGE);
-      }
     }
-
   }
 
   private void processWithIndexSelection(

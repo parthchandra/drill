@@ -446,11 +446,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   }
 
   @Override
-  public void initializeStatistics(RexBuilder builder, PlannerSettings settings) {
-    stats.init(builder, settings);
-  }
-
-  @Override
   public MapRDBStatistics getStatistics() {
     return stats;
   }

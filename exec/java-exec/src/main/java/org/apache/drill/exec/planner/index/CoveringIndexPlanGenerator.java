@@ -36,6 +36,7 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -81,6 +82,10 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     this.indexDesc = this.functionInfo.getIndexDesc();
   }
 
+  private RelDataType rewriteFunctionalRowType(RelDataType origRowType, FunctionalIndexInfo functionInfo) {
+    return FunctionalIndexHelper.rewriteFunctionalRowType(origScan, indexContext, functionInfo);
+  }
+
   boolean pathOnlyInIndexedFunction(SchemaPath path) {
     return true;
   }
@@ -115,73 +120,19 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     return newPaths;
   }
 
-  private String getRootSeg(String fullPathString) {
-    String pathSeg = fullPathString.replaceAll("`", "");
-    final String[] segs = pathSeg.split("\\.");
-    return segs[0];
-  }
-  /**
-   * if a field in rowType serves only the to-be-replaced column(s), we should replace it with new name "$1", otherwise
-   * we should keep this dataTypeField and add a new one for "$1"
-   * @param origRowType  original rowtype to rewrite
-   * @param functionInfo functional index information that may impact rewrite
-   * @return
-   */
-  private RelDataType rewriteFunctionalRowType(RelDataType origRowType, FunctionalIndexInfo functionInfo) {
-    if (!functionInfo.hasFunctional()) {
-      return origRowType;
-    }
-    List<RelDataTypeField> fields = Lists.newArrayList();
-
-    Set<String> leftOutFieldNames  = Sets.newHashSet();
-    for (LogicalExpression expr : indexContext.leftOutPathsInFunctions) {
-      leftOutFieldNames.add(getRootSeg(((SchemaPath)expr).getAsUnescapedPath()));
-    }
-
-    Set<String> fieldInFunctions  = Sets.newHashSet();
-    for (SchemaPath path: functionInfo.allPathsInFunction()) {
-      fieldInFunctions.add(getRootSeg(path.getAsUnescapedPath()));
-    }
-
-    RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
-
-    for ( RelDataTypeField field: origRowType.getFieldList()) {
-      final String fieldName = field.getName();
-      if (fieldInFunctions.contains(fieldName)) {
-        if (!leftOutFieldNames.contains(fieldName)) {
-          continue;
-        }
-      }
-      //this should be preserved
-      String pathSeg = fieldName.replaceAll("`", "");
-      final String[] segs = pathSeg.split("\\.");
-
-      fields.add(new RelDataTypeFieldImpl(
-          segs[0], fields.size(),
-          typeFactory.createSqlType(SqlTypeName.ANY)));
-    }
-
-    //TODO: we should have the information about which $N was needed
-    for(SchemaPath dollarPath: functionInfo.allNewSchemaPaths()) {
-      fields.add(
-          new RelDataTypeFieldImpl(dollarPath.getAsUnescapedPath(), fields.size(),
-          origScan.getCluster().getTypeFactory().createSqlType(SqlTypeName.ANY)));
-    }
-    return new RelRecordType(fields);
-  }
-
   /**
    *
    * @param inputIndex
    * @param functionInfo functional index information that may impact rewrite
    * @return
    */
-  private RexNode rewriteFunctionalCondition(RexNode inputIndex, RelDataType origRowType, RelDataType newRowType,
+  private RexNode rewriteFunctionalCondition(RexNode inputIndex, RelDataType newRowType,
                                              FunctionalIndexInfo functionInfo) {
     if (!functionInfo.hasFunctional()) {
       return inputIndex;
     }
-    return convertConditionForIndexScan(inputIndex, newRowType, functionInfo);
+    return FunctionalIndexHelper.convertConditionForIndexScan(indexCondition,
+        origScan, newRowType, builder, functionInfo);
   }
 
   /**
@@ -238,13 +189,13 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         rewriteFunctionColumn(((DbGroupScan)origScan.getGroupScan()).getColumns(),
         this.functionInfo));
 
-    RelDataType newRowType = rewriteFunctionalRowType(origScan.getRowType(), functionInfo);
+    RelDataType newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(origScan, indexContext, functionInfo);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexGroupScan,
         newRowType);
 
     RexNode newIndexCondition =
-        rewriteFunctionalCondition(indexCondition, origScan.getRowType(), newRowType, functionInfo);
+        rewriteFunctionalCondition(indexCondition, newRowType, functionInfo);
     FilterPrel indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
         indexScanPrel, newIndexCondition);
 

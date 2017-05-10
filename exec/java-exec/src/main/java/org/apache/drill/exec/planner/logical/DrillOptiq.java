@@ -22,7 +22,8 @@ import java.util.GregorianCalendar;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.google.common.base.Preconditions;
+import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.ExpressionPosition;
 import org.apache.drill.common.expression.FieldReference;
@@ -93,45 +94,44 @@ public class DrillOptiq {
     final RexToDrill visitor = new RexToDrill(context, inputs);
     return expr.accept(visitor);
   }
+  public static LogicalExpression toDrill(DrillParseContext context, RelDataType type,
+                                          RexBuilder builder, RexNode expr) {
+    final RexToDrill visitor = new RexToDrill(context, type, builder);
+    return expr.accept(visitor);
+  }
 
-  public static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
-    private final RelNode input;
+  private static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
+    private final RelDataType rowType;
+    private final RexBuilder builder;
     private final DrillParseContext context;
     private final List<RelDataTypeField> fieldList;
 
     public RexToDrill(DrillParseContext context, RelNode input) {
       super(true);
       this.context = context;
-      this.inputs = inputs;
-      this.fieldList = Lists.newArrayList();
-      /*
-         Fields are enumerated by their presence order in input. Details {@link org.apache.calcite.rex.RexInputRef}.
-         Thus we can merge field list from several inputs by adding them into the list in order of appearance.
-         Each field index in the list will match field index in the RexInputRef instance which will allow us
-         to retrieve field from filed list by index in {@link #visitInputRef(RexInputRef)} method. Example:
-
-         Query: select t1.c1, t2.c1. t2.c2 from t1 inner join t2 on t1.c1 between t2.c1 and t2.c2
-
-         Input 1: $0
-         Input 2: $1, $2
-
-         Result: $0, $1, $2
-       */
-      for (RelNode input : inputs) {
-        if (input != null) {
-          fieldList.addAll(input.getRowType().getFieldList());
-        }
-      }
+      this.rowType = input.getRowType();
+      this.builder = input.getCluster().getRexBuilder();
     }
 
-    protected RelNode getInput() {
-      return input;
+    public RexToDrill(DrillParseContext context, RelDataType rowType, RexBuilder builder) {
+      super(true);
+      this.context = context;
+      this.rowType = rowType;
+      this.builder = builder;
+    }
+
+    protected RelDataType getRowType() {
+      return rowType;
+    }
+
+    protected RexBuilder getRexBuilder() {
+      return builder;
     }
 
     @Override
     public LogicalExpression visitInputRef(RexInputRef inputRef) {
       final int index = inputRef.getIndex();
-      final RelDataTypeField field = getInput().getRowType().getFieldList().get(index);
+      final RelDataTypeField field = getRowType().getFieldList().get(index);
       return FieldReference.getWithQuotedRef(field.getName());
     }
 
@@ -170,7 +170,7 @@ public class DrillOptiq {
             return FunctionCallFactory.createExpression(call.getOperator().getName().toLowerCase(),
                 ExpressionPosition.UNKNOWN, arg);
           case MINUS_PREFIX:
-            final RexBuilder builder = getInput().getCluster().getRexBuilder();
+            final RexBuilder builder = getRexBuilder();
             final List<RexNode> operands = Lists.newArrayList();
             operands.add(builder.makeExactLiteral(new BigDecimal(-1)));
             operands.add(call.getOperands().get(0));

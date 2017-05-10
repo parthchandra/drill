@@ -102,14 +102,15 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
-    RelDataType indexScanRowType = convertRowTypeForIndexScan(
+    RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(
         origScan, indexCondition, indexGroupScan, functionInfo);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexGroupScan, indexScanRowType);
     DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
-    RexNode convertedIndexCondition = convertConditionForIndexScan(indexCondition, indexScanRowType, functionInfo);
+    RexNode convertedIndexCondition = FunctionalIndexHelper.convertConditionForIndexScan(indexCondition,
+        origScan, indexScanRowType, builder, functionInfo);
     FilterPrel  rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
           indexScanPrel, convertedIndexCondition);
     // project the rowkey column from the index scan
