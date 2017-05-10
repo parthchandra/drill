@@ -17,7 +17,7 @@
  */
 package org.apache.drill.exec.physical.base;
 
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
 
 public abstract class AbstractDbSubScan extends AbstractSubScan implements DbSubScan {
 
@@ -30,7 +30,7 @@ public abstract class AbstractDbSubScan extends AbstractSubScan implements DbSub
   }
 
   @Override
-  public void addJoinForRestrictedSubScan(HashJoinBatch batch) {
+  public void addJoinForRestrictedSubScan(RowKeyJoin batch) {
     throw new UnsupportedOperationException();
   }
 

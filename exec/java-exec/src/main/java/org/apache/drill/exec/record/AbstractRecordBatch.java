@@ -224,16 +224,7 @@ public abstract class AbstractRecordBatch<T extends PhysicalOperator> implements
 
   @Override
   public VectorContainer getOutgoingContainer() {
-    return this.container;
-    //throw new UnsupportedOperationException(String.format(" You should not call getOutgoingContainer() for class %s", this.getClass().getCanonicalName()));
-  }
-
-  public BatchState getState() {
-    return state;
-  }
-
-  public void setState(BatchState newState) {
-    state = newState;
+    throw new UnsupportedOperationException(String.format(" You should not call getOutgoingContainer() for class %s", this.getClass().getCanonicalName()));
   }
 
 }

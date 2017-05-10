@@ -29,6 +29,7 @@ import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
@@ -66,11 +67,11 @@ public class RestrictedMapRDBSubScan extends MapRDBSubScan {
   }
 
   @Override
-  public void addJoinForRestrictedSubScan(HashJoinBatch hjbatch) {
+  public void addJoinForRestrictedSubScan(RowKeyJoin rjbatch) {
     // currently, all subscan specs are sharing the same join batch instance
     for (MapRDBSubScanSpec s : getRegionScanSpecList()) {
       assert (s instanceof RestrictedMapRDBSubScanSpec);
-      ((RestrictedMapRDBSubScanSpec)s).setJoinForSubScan(hjbatch);
+      ((RestrictedMapRDBSubScanSpec)s).setJoinForSubScan(rjbatch);
     }
   }
 

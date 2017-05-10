@@ -517,6 +517,10 @@ public final class UserBitShared {
      * <code>MAPRDB_SUB_SCAN = 37;</code>
      */
     MAPRDB_SUB_SCAN(37, 37),
+    /**
+     * <code>ROWKEY_JOIN = 38;</code>
+     */
+    ROWKEY_JOIN(38, 38),
     ;
 
     /**
@@ -671,6 +675,10 @@ public final class UserBitShared {
      * <code>MAPRDB_SUB_SCAN = 37;</code>
      */
     public static final int MAPRDB_SUB_SCAN_VALUE = 37;
+    /**
+     * <code>ROWKEY_JOIN = 38;</code>
+     */
+    public static final int ROWKEY_JOIN_VALUE = 38;
 
     public final int getNumber() { return value; }
 
@@ -714,6 +722,7 @@ public final class UserBitShared {
         case 35: return NESTED_LOOP_JOIN;
         case 36: return AVRO_SUB_SCAN;
         case 37: return MAPRDB_SUB_SCAN;
+        case 38: return ROWKEY_JOIN;
         default: return null;
       }
     }
@@ -22815,7 +22824,7 @@ public final class UserBitShared {
       if (ref instanceof java.lang.String) {
         return (java.lang.String) ref;
       } else {
-        com.google.protobuf.ByteString bs = 
+        com.google.protobuf.ByteString bs =
             (com.google.protobuf.ByteString) ref;
         java.lang.String s = bs.toStringUtf8();
         if (bs.isValidUtf8()) {
@@ -22831,7 +22840,7 @@ public final class UserBitShared {
         getMechanismBytes() {
       java.lang.Object ref = mechanism_;
       if (ref instanceof java.lang.String) {
-        com.google.protobuf.ByteString b = 
+        com.google.protobuf.ByteString b =
             com.google.protobuf.ByteString.copyFromUtf8(
                 (java.lang.String) ref);
         mechanism_ = b;
@@ -23165,7 +23174,7 @@ public final class UserBitShared {
           getMechanismBytes() {
         java.lang.Object ref = mechanism_;
         if (ref instanceof String) {
-          com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString b =
               com.google.protobuf.ByteString.copyFromUtf8(
                   (java.lang.String) ref);
           mechanism_ = b;
