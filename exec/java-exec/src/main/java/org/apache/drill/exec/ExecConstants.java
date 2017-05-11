@@ -441,8 +441,9 @@ public interface ExecConstants {
   String USE_DYNAMIC_UDFS_KEY = "exec.udf.use_dynamic";
   BooleanValidator USE_DYNAMIC_UDFS = new BooleanValidator(USE_DYNAMIC_UDFS_KEY, true);
 
-
   String QUERY_TRANSIENT_STATE_UPDATE_KEY = "exec.query.progress.update";
   BooleanValidator QUERY_TRANSIENT_STATE_UPDATE = new BooleanValidator(QUERY_TRANSIENT_STATE_UPDATE_KEY, true);
 
+  String ROWKEY_JOIN_BATCHSIZE_KEY = "exec.query.rowkeyjoin.batchsize";
+  PositiveLongValidator ROWKEY_JOIN_BATCHSIZE = new PositiveLongValidator(ROWKEY_JOIN_BATCHSIZE_KEY, Long.MAX_VALUE, 128);
 }

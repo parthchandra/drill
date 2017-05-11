@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.mapr.db;
 
+import com.mapr.db.impl.IdCodec;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
@@ -26,6 +27,7 @@ import org.apache.drill.exec.vector.ValueVector;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.Iterables;
+import java.nio.ByteBuffer;
 
 /**
  * A RestrictedMapRDBSubScanSpec encapsulates a join instance which contains the ValueVectors of row keys and
@@ -83,6 +85,7 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
   public boolean readyToGetRowKey() {
     return hjbatch != null && hjbatch.hashTableBuilt();
   }
+
   /**
    * Returns {@code true} if the iteration has more row keys.
    * (In other words, returns {@code true} if {@link #nextRowKey} would
@@ -106,6 +109,65 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
     }
 
     return false;
+  }
+
+  /**
+   * Returns number of rowKeys that can be read.
+   * Number of rowKeys returned will be numRowKeysToRead at the most i.e. it
+   * will be less than numRowKeysToRead if only that many exist in the currentBatch.
+   */
+  @JsonIgnore
+  public int hasRowKeys(int numRowKeysToRead) {
+    int numKeys = 0;
+
+    if (rowKeyVector != null) {
+      if (currentIndex < maxOccupiedIndex) {
+        numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
+      }
+    } else {
+      if (hjbatch != null) {
+        Pair<VectorContainer, Integer> currentBatch = hjbatch.nextBuildBatch();
+
+        // note that the hash table could be null initially during the BUILD_SCHEMA phase
+        if (currentBatch != null) {
+          init(currentBatch);
+          numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
+        }
+      }
+    }
+
+    return numKeys;
+  }
+
+  /**
+   * Returns ids of rowKeys to be read.
+   * Number of rowKey ids returned will be numRowKeysToRead at the most i.e. it
+   * will be less than numRowKeysToRead if only that many exist in the currentBatch.
+   */
+  @JsonIgnore
+  public ByteBuffer[] getRowKeyIdsToRead(int numRowKeysToRead) {
+
+    int numKeys = hasRowKeys(numRowKeysToRead);
+    if (numKeys == 0) return null;
+
+    int index = 0;
+    final ByteBuffer[] rowKeyIds = new ByteBuffer[numKeys];
+
+    while (index < numKeys) {
+      Object o = rowKeyVector.getAccessor().getObject(currentIndex + index);
+      rowKeyIds[index++] = IdCodec.encode(o.toString());
+    }
+
+    updateRowKeysRead(numKeys);
+    return rowKeyIds;
+  }
+
+  /**
+   * updates the index to reflect number of keys read.
+   */
+  @JsonIgnore
+  public void updateRowKeysRead(int numKeys) {
+    currentIndex += numKeys;
   }
 
   /**
