@@ -526,4 +526,7 @@ public interface ExecConstants {
    * <tt>-ea -Ddrill.exec.debug.validate_vectors=true</tt>
    */
   String ENABLE_VECTOR_VALIDATION = "drill.exec.debug.validate_vectors";
+
+  String ROWKEY_JOIN_BATCHSIZE_KEY = "exec.query.rowkeyjoin.batchsize";
+  PositiveLongValidator ROWKEY_JOIN_BATCHSIZE = new PositiveLongValidator(ROWKEY_JOIN_BATCHSIZE_KEY, Long.MAX_VALUE, 128);
 }

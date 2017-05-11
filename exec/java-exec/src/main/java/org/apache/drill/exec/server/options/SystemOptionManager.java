@@ -203,7 +203,8 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.PERSISTENT_TABLE_UMASK_VALIDATOR,
       ExecConstants.CPU_LOAD_AVERAGE,
       ExecConstants.ENABLE_VECTOR_VALIDATOR,
-      ExecConstants.ENABLE_ITERATOR_VALIDATOR
+      ExecConstants.ENABLE_ITERATOR_VALIDATOR,
+      ExecConstants.ROWKEY_JOIN_BATCHSIZE
     };
     final Map<String, OptionValidator> tmp = new HashMap<>();
     for (final OptionValidator validator : validators) {
