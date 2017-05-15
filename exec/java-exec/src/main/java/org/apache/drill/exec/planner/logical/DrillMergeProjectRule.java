@@ -20,24 +20,32 @@ package org.apache.drill.exec.planner.logical;
 
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.ConventionTraitDef;
+import com.google.common.collect.Maps;
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.util.Permutation;
 import org.apache.drill.exec.expr.fn.FunctionImplementationRegistry;
 import org.apache.calcite.rel.core.RelFactories.ProjectFactory;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.exec.planner.physical.PrelFactories;
+
+import java.util.List;
+import java.util.Map;
 
 public class DrillMergeProjectRule extends ProjectMergeRule {
 
   private FunctionImplementationRegistry functionRegistry;
-  private static DrillMergeProjectRule INSTANCE = null;
+  private static Map<Class, DrillMergeProjectRule> instances = Maps.newHashMap();
 
   public static DrillMergeProjectRule getInstance(boolean force, ProjectFactory pFactory, FunctionImplementationRegistry functionRegistry) {
-    if (INSTANCE == null) {
-      INSTANCE = new DrillMergeProjectRule(force, pFactory, functionRegistry);
+    if (instances.get(pFactory.getClass()) == null) {
+      instances.put(pFactory.getClass(),new DrillMergeProjectRule(force, pFactory, functionRegistry));
     }
-    return INSTANCE;
+    return instances.get(pFactory.getClass());
   }
 
   private DrillMergeProjectRule(boolean force, ProjectFactory pFactory, FunctionImplementationRegistry functionRegistry) {
@@ -50,9 +58,9 @@ public class DrillMergeProjectRule extends ProjectMergeRule {
     Project topProject = call.rel(0);
     Project bottomProject = call.rel(1);
 
-    // Make sure both projects be LogicalProject.
-    if (topProject.getTraitSet().getTrait(ConventionTraitDef.INSTANCE) != Convention.NONE ||
-        bottomProject.getTraitSet().getTrait(ConventionTraitDef.INSTANCE) != Convention.NONE) {
+    // Make sure both projects have the same convention so they could be both physical or logical.
+    if (topProject.getTraitSet().getTrait(ConventionTraitDef.INSTANCE) !=
+        bottomProject.getTraitSet().getTrait(ConventionTraitDef.INSTANCE) ) {
       return false;
     }
 
@@ -73,5 +81,26 @@ public class DrillMergeProjectRule extends ProjectMergeRule {
       }
     }
     return false;
+  }
+
+  public static Project replace(Project topProject, Project bottomProject) {
+    final List<RexNode> newProjects =
+        RelOptUtil.pushPastProject(topProject.getProjects(), bottomProject);
+
+    // replace the two projects with a combined projection
+    if(topProject instanceof DrillProjectRel) {
+      RelNode newProjectRel = DrillRelFactories.DRILL_LOGICAL_PROJECT_FACTORY.createProject(
+          bottomProject.getInput(), newProjects,
+          topProject.getRowType().getFieldNames());
+
+      return (Project) newProjectRel;
+    }
+    else {
+      RelNode newProjectRel = PrelFactories.PROJECT_FACTORY.createProject(
+          bottomProject.getInput(), newProjects,
+          topProject.getRowType().getFieldNames());
+
+      return (Project) newProjectRel;
+    }
   }
 }

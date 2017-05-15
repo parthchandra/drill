@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.lang.reflect.Constructor;
@@ -33,7 +34,7 @@ public class IndexDiscoverFactory {
   static final String INDEX_DISCOVER_CONFIG_KEY = "index.meta";
 
   public static IndexDiscover getIndexDiscover(StoragePluginConfig config,
-                                               GroupScan inScan, ScanPrel prel,
+                                               GroupScan inScan, DrillScanRelBase scanRel,
                                                Class<? extends IndexDiscover> targetIndexDiscoverClass) {
     Class discoverClass = targetIndexDiscoverClass;
 
@@ -50,8 +51,8 @@ public class IndexDiscoverFactory {
     Constructor<? extends IndexDiscoverBase> constructor;
     try {
       constructor = discoverClass.getConstructor(
-          GroupScan.class, ScanPrel.class);
-      IndexDiscoverBase idxDiscover = constructor.newInstance(inScan, prel);
+          GroupScan.class, DrillScanRelBase.class);
+      IndexDiscoverBase idxDiscover = constructor.newInstance(inScan, scanRel);
       if((targetIndexDiscoverClass != null) && (discoverClass != targetIndexDiscoverClass)) {
 
         //idxDiscover.setOriginalDiscover(targetIndexDiscoverClass);

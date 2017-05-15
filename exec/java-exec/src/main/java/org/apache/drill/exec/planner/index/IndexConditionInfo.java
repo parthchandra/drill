@@ -29,6 +29,7 @@ import org.apache.calcite.util.BitSets;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
 import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
 import org.apache.drill.exec.planner.physical.PrelUtil;
@@ -53,20 +54,20 @@ public class IndexConditionInfo {
   public static Builder newBuilder(RexNode condition,
                                    Iterable<IndexDescriptor> indexes,
                                    RexBuilder builder,
-                                   ScanPrel scan) {
+                                   DrillScanRel scan) {
     return new Builder(condition, indexes, builder, scan);
   }
 
   public static class Builder {
     final RexBuilder builder;
-    final ScanPrel scan;
+    final DrillScanRel scan;
     final Iterable<IndexDescriptor> indexes;
     private RexNode condition;
 
     public Builder(RexNode condition,
                    Iterable<IndexDescriptor> indexes,
                    RexBuilder builder,
-                   ScanPrel scan
+                   DrillScanRel scan
     ) {
       this.condition = condition;
       this.builder = builder;
@@ -77,7 +78,7 @@ public class IndexConditionInfo {
     public Builder(RexNode condition,
                    IndexDescriptor index,
                    RexBuilder builder,
-                   ScanPrel scan
+                   DrillScanRel scan
     ) {
       this.condition = condition;
       this.builder = builder;

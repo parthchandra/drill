@@ -27,6 +27,7 @@ import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.physical.impl.common.HashTable;
+import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.RecordBatch.IterOutcome;
@@ -49,7 +50,7 @@ public abstract class HashJoinProbeTemplate implements HashJoinProbe {
 
   //joinControl object derived from the int type joinControl passed from outgoingBatch(HashJoinBatch)
   //so we can do different things in hashtable for INTERSECT_DISTINCT and INTERSECT_ALL
-  private JoinUtils.JoinControl  joinControl;
+  private JoinControl joinControl;
 
   private HashJoinBatch outgoingJoinBatch = null;
 
@@ -99,7 +100,7 @@ public abstract class HashJoinProbeTemplate implements HashJoinProbe {
     this.hashTable = hashTable;
     this.hjHelper = hjHelper;
     this.outgoingJoinBatch = outgoing;
-    joinControl = new JoinUtils.JoinControl(((HashJoinPOP)outgoingJoinBatch.getPopConfig()).getJoinControl());
+    joinControl = new JoinControl(((HashJoinPOP)outgoingJoinBatch.getPopConfig()).getJoinControl());
     doSetup(context, buildBatch, probeBatch, outgoing);
   }
 

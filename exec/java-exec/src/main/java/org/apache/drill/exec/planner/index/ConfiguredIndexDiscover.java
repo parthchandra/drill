@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.StoragePlugin;
@@ -106,7 +107,7 @@ public class ConfiguredIndexDiscover extends IndexDiscoverBase {
 
   protected ConcurrentHashMap<String, String> registeredIndexes;
 
-  public ConfiguredIndexDiscover(GroupScan inScan, ScanPrel inScanPrel) {
+  public ConfiguredIndexDiscover(GroupScan inScan, DrillScanRelBase inScanPrel) {
     super((AbstractDbGroupScan) inScan, inScanPrel);
   }
 
@@ -166,7 +167,7 @@ public class ConfiguredIndexDiscover extends IndexDiscoverBase {
       materializeIndex(storage, index);
       idxSet.add(index);
     }
-    return new DrillIndexCollection(getOriginalScanPrel(), idxSet);
+    return new DrillIndexCollection(getOriginalScanRel(), idxSet);
   }
 
 }

@@ -48,6 +48,7 @@ import org.apache.drill.exec.physical.impl.common.HashTableStats;
 import org.apache.drill.exec.physical.impl.common.IndexPointer;
 import org.apache.drill.exec.physical.impl.common.Comparator;
 import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
+import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
@@ -116,7 +117,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
   private boolean isRowKeyJoin = false;
 
 
-  private JoinUtils.JoinControl joinControl;
+  private JoinControl joinControl;
 
   // An iterator over the build side hash table (only applicable for row-key joins)
   private boolean buildComplete = false;
@@ -545,7 +546,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
     joinType = popConfig.getJoinType();
     conditions = popConfig.getConditions();
     this.isRowKeyJoin = popConfig.isRowKeyJoin();
-    this.joinControl = new JoinUtils.JoinControl(popConfig.getJoinControl());
+    this.joinControl = new JoinControl(popConfig.getJoinControl());
 
     comparators = Lists.newArrayListWithExpectedSize(conditions.size());
     for (int i=0; i<conditions.size(); i++) {

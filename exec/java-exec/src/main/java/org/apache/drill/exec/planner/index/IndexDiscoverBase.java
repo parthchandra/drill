@@ -19,6 +19,8 @@
 package org.apache.drill.exec.planner.index;
 
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
@@ -38,19 +40,19 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexDiscoverBase.class);
 
   private AbstractDbGroupScan scan; // group scan corresponding to the primary table
-  private ScanPrel scanPrel;   // physical scan rel corresponding to the primary table
+  private DrillScanRelBase scanRel;   // physical scan rel corresponding to the primary table
 
-  public IndexDiscoverBase(AbstractDbGroupScan inScan, ScanPrel inScanPrel) {
+  public IndexDiscoverBase(AbstractDbGroupScan inScan, DrillScanRelBase inScanPrel) {
     scan = inScan;
-    scanPrel = inScanPrel;
+    scanRel = inScanPrel;
   }
 
   public AbstractDbGroupScan getOriginalScan() {
     return scan;
   }
 
-  public ScanPrel getOriginalScanPrel() {
-    return scanPrel;
+  public DrillScanRelBase getOriginalScanRel() {
+    return scanRel;
   }
 
   public IndexCollection getTableIndex(String tableName, String storageName, Collection<DrillIndexDefinition>  indexDefs ) {
@@ -59,7 +61,7 @@ public abstract class IndexDiscoverBase implements IndexDiscover {
       DrillIndexDescriptor indexDescriptor = new DrillIndexDescriptor(def);
       materializeIndex(storageName, indexDescriptor);
     }
-    return new DrillIndexCollection(getOriginalScanPrel(), idxSet);
+    return new DrillIndexCollection(getOriginalScanRel(), idxSet);
   }
 
   public void materializeIndex(String storageName, DrillIndexDescriptor index) {

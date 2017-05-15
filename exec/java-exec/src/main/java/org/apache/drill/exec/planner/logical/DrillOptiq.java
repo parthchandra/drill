@@ -94,12 +94,12 @@ public class DrillOptiq {
     return expr.accept(visitor);
   }
 
-  private static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
-    private final List<RelNode> inputs;
+  public static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
+    private final RelNode input;
     private final DrillParseContext context;
     private final List<RelDataTypeField> fieldList;
 
-    RexToDrill(DrillParseContext context, List<RelNode> inputs) {
+    public RexToDrill(DrillParseContext context, RelNode input) {
       super(true);
       this.context = context;
       this.inputs = inputs;
@@ -124,11 +124,14 @@ public class DrillOptiq {
       }
     }
 
+    protected RelNode getInput() {
+      return input;
+    }
+
     @Override
     public LogicalExpression visitInputRef(RexInputRef inputRef) {
       final int index = inputRef.getIndex();
-      final RelDataTypeField field = fieldList.get(index);
-      Preconditions.checkNotNull(field, "Unable to find field using input reference");
+      final RelDataTypeField field = getInput().getRowType().getFieldList().get(index);
       return FieldReference.getWithQuotedRef(field.getName());
     }
 
@@ -167,7 +170,7 @@ public class DrillOptiq {
             return FunctionCallFactory.createExpression(call.getOperator().getName().toLowerCase(),
                 ExpressionPosition.UNKNOWN, arg);
           case MINUS_PREFIX:
-            final RexBuilder builder = inputs.get(0).getCluster().getRexBuilder();
+            final RexBuilder builder = getInput().getCluster().getRexBuilder();
             final List<RexNode> operands = Lists.newArrayList();
             operands.add(builder.makeExactLiteral(new BigDecimal(-1)));
             operands.add(call.getOperands().get(0));

@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.index.IndexCollection;
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.physical.ScanPrel;
@@ -51,7 +52,7 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
   }
 
   @Override
-  public IndexCollection getSecondaryIndexCollection(ScanPrel prel) {
+  public IndexCollection getSecondaryIndexCollection(DrillScanRelBase scanrel) {
     return null;
   }
 

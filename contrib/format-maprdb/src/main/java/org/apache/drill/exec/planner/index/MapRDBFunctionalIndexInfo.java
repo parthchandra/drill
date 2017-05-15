@@ -37,20 +37,24 @@ public class MapRDBFunctionalIndexInfo implements FunctionalIndexInfo {
   // then we should map SchemaPath a.b to a set of SchemaPath, e.g. $1, $2
   private Map<SchemaPath, Set<SchemaPath>> columnToConvert;
 
-  //the map of expression to destination SchemaPath $N
+  // map of functional index expression to destination SchemaPath e.g. $N
   private Map<LogicalExpression, LogicalExpression> exprToConvert;
 
-  //SchemaPath involved in a functional index
+  //map of SchemaPath involved in a functional field
   private Map<LogicalExpression, Set<SchemaPath>> pathsInExpr;
 
   private Set<SchemaPath> newPathsForIndexedFunction;
+
+  private Set<SchemaPath> allPathsInFunction;
 
   public MapRDBFunctionalIndexInfo(IndexDescriptor indexDesc) {
     this.indexDesc = indexDesc;
     columnToConvert = Maps.newHashMap();
     exprToConvert = Maps.newHashMap();
     pathsInExpr = Maps.newHashMap();
+    //keep the order of new paths, it may be related to the naming policy
     newPathsForIndexedFunction = Sets.newLinkedHashSet();
+    allPathsInFunction = Sets.newHashSet();
     init();
   }
 
@@ -69,6 +73,7 @@ public class MapRDBFunctionalIndexInfo implements FunctionalIndexInfo {
           addTargetPathForOriginalPath(pathBeingCasted, functionalFieldPath);
           addPathInExpr(indexedExpr, pathBeingCasted);
           exprToConvert.put(indexedExpr, functionalFieldPath);
+          allPathsInFunction.add(pathBeingCasted);
         }
 
         count++;
@@ -135,7 +140,7 @@ public class MapRDBFunctionalIndexInfo implements FunctionalIndexInfo {
   /**
    * @return the map of indexed expression --> the involved schema paths in a indexed expression
    */
-  public Map<LogicalExpression, Set<SchemaPath>> getPathsInExpr() {
+  public Map<LogicalExpression, Set<SchemaPath>> getPathsInFunctionExpr() {
     return pathsInExpr;
   }
 
@@ -146,6 +151,10 @@ public class MapRDBFunctionalIndexInfo implements FunctionalIndexInfo {
 
   public Set<SchemaPath> allNewSchemaPaths() {
     return newPathsForIndexedFunction;
+  }
+
+  public Set<SchemaPath> allPathsInFunction() {
+    return allPathsInFunction;
   }
 
   public boolean supportEqualCharConvertToLike() {

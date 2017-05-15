@@ -20,16 +20,17 @@ package org.apache.drill.exec.planner.index;
 
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.Set;
 
 public class DrillIndexCollection extends AbstractIndexCollection {
-  private final ScanPrel scan;  // physical scan rel corresponding to the primary table
+  private final DrillScanRelBase scan;  // physical scan rel corresponding to the primary table
 
-  public DrillIndexCollection(ScanPrel prel,
+  public DrillIndexCollection(DrillScanRelBase scanRel,
                                Set<DrillIndexDescriptor> indexes) {
-    this.scan = prel;
+    this.scan = scanRel;
     for (IndexDescriptor index : indexes) {
       super.addIndex(index);
     }

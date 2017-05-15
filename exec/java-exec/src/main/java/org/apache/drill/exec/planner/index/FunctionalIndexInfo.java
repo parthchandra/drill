@@ -58,7 +58,7 @@ public interface FunctionalIndexInfo {
   /**
    * @return the map of indexed expression --> the involved schema paths in a indexed expression
    */
-  Map<LogicalExpression, Set<SchemaPath>> getPathsInExpr();
+  Map<LogicalExpression, Set<SchemaPath>> getPathsInFunctionExpr();
 
   /**
    * @return the map between indexed expression and to-be-converted target expression for scan in index
@@ -72,8 +72,12 @@ public interface FunctionalIndexInfo {
   Set<SchemaPath> allNewSchemaPaths();
 
   /**
+   * @return the set of all schemaPath exist in functional index fields
+   */
+  Set<SchemaPath> allPathsInFunction();
+  /**
    * Whether this implementation( may be different per storage) support rewrite rewriting varchar equality expression,
-   * e.g. cast(a.b as varchar(2)) = 'ca'  to LIKE expression cast(a.b as varchar(2) LIKE 'ca%'
+   * e.g. cast(a.b as varchar(2)) = 'ca'  to LIKE expression: cast(a.b as varchar(2) LIKE 'ca%'
    */
   boolean supportEqualCharConvertToLike();
 

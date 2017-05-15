@@ -15,155 +15,226 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.drill.exec.planner.index;
 
-import java.util.List;
-import java.util.Map;
-
+import com.google.common.base.Stopwatch;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.plan.volcano.RelSubset;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.exec.ops.OptimizerRulesContext;
+import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.logical.DrillFilterRel;
+import org.apache.drill.exec.planner.logical.DrillOptiq;
+import org.apache.drill.exec.planner.logical.DrillParseContext;
+import org.apache.drill.exec.planner.logical.DrillProjectRel;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
 import org.apache.drill.exec.planner.logical.partition.RewriteAsBinaryOperators;
-import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
-import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
-import org.apache.drill.exec.planner.physical.ScanPrel;
-import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexNode;
 
-import com.google.common.collect.Lists;
 
-public abstract class DbScanToIndexScanPrule extends Prule {
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+public class DbScanToIndexScanPrule extends Prule {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DbScanToIndexScanPrule.class);
+  final public MatchFunction match;
 
-  /**
-   * Selectivity threshold below which an index scan plan would be generated.
-   */
-  static final double INDEX_SELECTIVITY_THRESHOLD = 0.1;
+  public static final RelOptRule REL_FILTER_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(RelNode.class, RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class))),
+      "DbScanToIndexScanRule:Rel_Filter_Scan", new MatchPFS());
 
-  /**
-   * Return the index collection relevant for the underlying data source
-   * @param settings
-   * @param scan
-   */
-  public abstract IndexCollection getIndexCollection(PlannerSettings settings, ScanPrel scan);
+  public static final RelOptRule REL_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(RelNode.class, RelOptHelper.some(DrillFilterRel.class,
+          RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
+      "DbScanToIndexScanRule:Rel_Filter_Project_Scan", new MatchPFPS());
 
-  final OptimizerRulesContext optimizerContext;
+  public static final RelOptRule FILTER_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class)),
+      "DbScanToIndexScanRule:Filter_On_Scan", new MatchFS());
 
-  public DbScanToIndexScanPrule(RelOptRuleOperand operand, String id, OptimizerRulesContext optimizerContext) {
-    super(operand, id);
-    this.optimizerContext = optimizerContext;
+  public static final RelOptRule FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillFilterRel.class,
+          RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))),
+      "DbScanToIndexScanRule:Filter_Project_Scan", new MatchFPS());
+
+  private DbScanToIndexScanPrule(RelOptRuleOperand operand, String description, MatchFunction match) {
+    super(operand, description);
+    this.match = match;
   }
 
-  public static final Prule getFilterOnProject(OptimizerRulesContext optimizerRulesContext) {
-    return new DbScanToIndexScanPrule(
-        RelOptHelper.some(FilterPrel.class, RelOptHelper.some(ProjectPrel.class, RelOptHelper.any(ScanPrel.class))),
-        "DbScanToIndexScanPrule:Filter_On_Project",
-        optimizerRulesContext) {
+  @Override
+  public boolean matches(RelOptRuleCall call) {
+    if (getMatchIfRoot(call) != null) {
+      return true;
+    }
+    return match.match(call);
+  }
 
-      @Override
-      public IndexCollection getIndexCollection(PlannerSettings settings, ScanPrel scan) {
-        DbGroupScan groupScan = (DbGroupScan)scan.getGroupScan();
-        return groupScan.getSecondaryIndexCollection(scan);
-      }
+  @Override
+  public void onMatch(RelOptRuleCall call) {
+    if (getMatchIfRoot(call) != null) {
+      getMatchIfRoot(call).onMatch(call);
+      return;
+    }
+    doOnMatch(match.onMatch(call));
+  }
 
-      @Override
-      public boolean matches(RelOptRuleCall call) {
-        final ScanPrel scan = (ScanPrel) call.rel(2);
-        GroupScan groupScan = scan.getGroupScan();
-        if (groupScan instanceof DbGroupScan) {
-          DbGroupScan dbscan = ((DbGroupScan)groupScan);
-          //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
-          //no more trying index convert rule
-          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.isRestrictedScan());
+  private MatchFunction getMatchIfRoot(RelOptRuleCall call) {
+    List<RelNode> rels = call.getRelList();
+    if (call.getPlanner().getRoot().equals(call.rel(0))) {
+      if (rels.size() == 2) {
+        if ((rels.get(0) instanceof DrillFilterRel) && (rels.get(1) instanceof DrillScanRel)) {
+          return ((DbScanToIndexScanPrule)FILTER_SCAN).match;
         }
-        return false;
       }
-
-      @Override
-      public void onMatch(RelOptRuleCall call) {
-        final FilterPrel filter = (FilterPrel) call.rel(0);
-        final ProjectPrel project = (ProjectPrel) call.rel(1);
-        final ScanPrel scan = (ScanPrel) call.rel(2);
-        doOnMatch(call, filter, project, scan);
-      }
-    };
-  }
-
-  public static final Prule getFilterOnScan(OptimizerRulesContext optimizerRulesContext) {
-    return new DbScanToIndexScanPrule(
-        RelOptHelper.some(FilterPrel.class, RelOptHelper.any(ScanPrel.class)),
-        "DbScanToIndexScanPrule:Filter_On_Scan", optimizerRulesContext) {
-
-      @Override
-      public IndexCollection getIndexCollection(PlannerSettings settings, ScanPrel scan) {
-        DbGroupScan dbGroupScan = (DbGroupScan)scan.getGroupScan();
-        return dbGroupScan.getSecondaryIndexCollection(scan);
-      }
-
-      @Override
-      public boolean matches(RelOptRuleCall call) {
-        final ScanPrel scan = (ScanPrel) call.rel(1);
-        GroupScan groupScan = scan.getGroupScan();
-        if (groupScan instanceof DbGroupScan) {
-          DbGroupScan dbscan = ((DbGroupScan)groupScan);
-          //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
-          //no more trying index convert rule
-          return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.isRestrictedScan());
+      else if (rels.size() == 3) {
+        if ((rels.get(0) instanceof DrillFilterRel) && (rels.get(1) instanceof DrillProjectRel) && (rels.get(2) instanceof DrillScanRel)) {
+          return ((DbScanToIndexScanPrule)FILTER_PROJECT_SCAN).match;
         }
-        return false;
       }
-
-      @Override
-      public void onMatch(RelOptRuleCall call) {
-        final FilterPrel filter = (FilterPrel) call.rel(0);
-        final ScanPrel scan = (ScanPrel) call.rel(1);
-        doOnMatch(call, filter, null, scan);
-      }
-    };
+    }
+    return null;
   }
 
+  private interface MatchFunction {
+    boolean match(RelOptRuleCall call);
+    IndexPlanCallContext onMatch(RelOptRuleCall call);
+  }
 
-  protected void doOnMatch(RelOptRuleCall call, FilterPrel filter, ProjectPrel project, ScanPrel scan) {
-    final PlannerSettings settings = PrelUtil.getPlannerSettings(call.getPlanner());
-    final IndexCollection indexCollection = getIndexCollection(settings, scan);
+  private static abstract class AbstractMatchFunction implements MatchFunction {
+    boolean checkScan(DrillScanRel scanRel) {
+      GroupScan groupScan = scanRel.getGroupScan();
+      if (groupScan instanceof DbGroupScan) {
+        DbGroupScan dbscan = ((DbGroupScan) groupScan);
+        //if we already applied index convert rule, and this scan is indexScan or restricted scan already,
+        //no more trying index convert rule
+        return dbscan.supportsSecondaryIndex() && (!dbscan.isIndexScan()) && (!dbscan.isRestrictedScan());
+      }
+      return false;
+    }
+  }
+
+  private static class MatchFPS extends AbstractMatchFunction {
+
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = (DrillScanRel) call.rel(2);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillFilterRel filter = call.rel(0);
+      final DrillProjectRel project = call.rel(1);
+      final DrillScanRel scan = call.rel(2);
+      return new IndexPlanCallContext(call, null, filter, project, scan);
+    }
+
+  }
+
+  private static class MatchFS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(1);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillFilterRel filter = call.rel(0);
+      final DrillScanRel scan = call.rel(1);
+      return new IndexPlanCallContext(call, null, filter, null, scan);
+    }
+  }
+
+  private static class MatchPFS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(2);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      DrillProjectRel capProject = null;
+      if (call.rel(0) instanceof DrillProjectRel) {
+        capProject = call.rel(0);
+      }
+      final DrillFilterRel filter = call.rel(1);
+      final DrillScanRel scan = call.rel(2);
+      return new IndexPlanCallContext(call, capProject, filter, null, scan);
+    }
+  }
+
+  private static class MatchPFPS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(3);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      DrillProjectRel capProject = null;
+      if (call.rel(0) instanceof DrillProjectRel) {
+        capProject = call.rel(0);
+      }
+
+      final DrillFilterRel filter = call.rel(1);
+      final DrillProjectRel project = call.rel(2);
+      final DrillScanRel scan = call.rel(3);
+      return new IndexPlanCallContext(call, capProject, filter, project, scan);
+    }
+  }
+
+  protected void doOnMatch(IndexPlanCallContext indexContext) {
+
+    Stopwatch indexPlanTimer = Stopwatch.createStarted();
+    final PlannerSettings settings = PrelUtil.getPlannerSettings(indexContext.call.getPlanner());
+    final IndexCollection indexCollection = getIndexCollection(settings, indexContext.scan);
     if( indexCollection == null ) {
       return;
     }
 
-    RexBuilder builder = filter.getCluster().getRexBuilder();
+    RexBuilder builder = indexContext.filter.getCluster().getRexBuilder();
 
     RexNode condition = null;
-    if (project == null) {
-      condition = filter.getCondition();
+    if (indexContext.project == null) {
+      condition = indexContext.filter.getCondition();
     } else {
       // get the filter as if it were below the projection.
-      condition = RelOptUtil.pushFilterPastProject(filter.getCondition(), project);
+      condition = RelOptUtil.pushFilterPastProject(indexContext.filter.getCondition(), indexContext.project);
     }
 
     RewriteAsBinaryOperators visitor = new RewriteAsBinaryOperators(true, builder);
     condition = condition.accept(visitor);
 
     if (indexCollection.supportsIndexSelection()) {
-      processWithoutIndexSelection(call, settings, condition,
-          indexCollection, builder, filter, project, scan);
+      processWithoutIndexSelection(indexContext, settings, condition,
+          indexCollection, builder);
     } else {
-      processWithIndexSelection(call, settings, condition,
-          indexCollection, builder, filter, scan);
+      processWithIndexSelection(indexContext, settings, condition,
+          indexCollection, builder);
     }
+    indexPlanTimer.stop();
+    logger.debug("Index Plan took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
   }
-
-
+  /**
+   * Return the index collection relevant for the underlying data source
+   * @param settings
+   * @param scan
+   */
+  public IndexCollection getIndexCollection(PlannerSettings settings, DrillScanRel scan) {
+    DbGroupScan groupScan = (DbGroupScan)scan.getGroupScan();
+    return groupScan.getSecondaryIndexCollection(scan);
+  }
   /**
    *
    * @param inputRel  the rel node provide input for filter to operate upon
@@ -175,13 +246,13 @@ public abstract class DbScanToIndexScanPrule extends Prule {
   static private boolean conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
     IndexableExprMarker exprMarker = new IndexableExprMarker(inputRel);
     indexCondition.accept(exprMarker);
-    Map<RexNode, LogicalExpression>  mapRexExpr = exprMarker.getIndexableExpression();
-    List<LogicalExpression>infoCols = Lists.newArrayList();
+    Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
+    List<LogicalExpression> infoCols = Lists.newArrayList();
     infoCols.addAll(mapRexExpr.values());
     return indexDesc.allColumnsIndexed(infoCols);
   }
 
-  private IndexDescriptor selectIndexForNonCoveringPlan(ScanPrel scan, Iterable<IndexDescriptor> indexes) {
+  private IndexDescriptor selectIndexForNonCoveringPlan(DrillScanRel scan, Iterable<IndexDescriptor> indexes) {
     IndexDescriptor ret = null;
     int maxIndexedNum = 0;
     //XXX the implement here should make decision based on selectivity, for now, we pick the index cover
@@ -194,22 +265,20 @@ public abstract class DbScanToIndexScanPrule extends Prule {
     }
     return ret;
   }
+
   /**
    *
    */
   private void processWithoutIndexSelection(
-      RelOptRuleCall call,
+      IndexPlanCallContext indexContext,
       PlannerSettings settings,
       RexNode condition,
       IndexCollection collection,
-      RexBuilder builder,
-      FilterPrel filter,
-      ProjectPrel project,
-      ScanPrel scan) {
-    if (! (scan.getGroupScan() instanceof DbGroupScan) ) {
+      RexBuilder builder) {
+    if (! (indexContext.scan.getGroupScan() instanceof DbGroupScan) ) {
       return;
     }
-    IndexConditionInfo.Builder infoBuilder = IndexConditionInfo.newBuilder(condition, collection, builder, scan);
+    IndexConditionInfo.Builder infoBuilder = IndexConditionInfo.newBuilder(condition, collection, builder, indexContext.scan);
     IndexConditionInfo cInfo = infoBuilder.getCollectiveInfo();
 
     if (!cInfo.hasIndexCol) {
@@ -230,9 +299,9 @@ public abstract class DbScanToIndexScanPrule extends Prule {
 
     // get the list of covering and non-covering indexes for this collection
     for (IndexDescriptor indexDesc : collection) {
-      if(conditionIndexed(scan, indexCondition, indexDesc)) {
+      if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
         FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-        if (isCoveringIndex(scan, functionInfo)) {
+        if (isCoveringIndex(indexContext, functionInfo)) {
           coveringIndexes.add(functionInfo);
         } else {
           nonCoveringIndexes.add(indexDesc);
@@ -280,14 +349,14 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         //TODO: make sure the smallest selectivity of these indexes times rowcount smaller than broadcast threshold
 
         IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
-            call, project, scan, indexInfoMap, builder);
-      try {
-        planGen.go(filter, convert(scan, scan.getTraitSet()));
-      } catch (Exception e) {
-        logger.warn("Exception while trying to generate intersect index plan", e);
-        return;
-      }
-      //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
+            indexContext, indexInfoMap, builder);
+        try {
+          planGen.go();
+        } catch (Exception e) {
+          logger.warn("Exception while trying to generate intersect index plan", e);
+          return;
+        }
+        //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
         return;
       }
     }
@@ -298,10 +367,9 @@ public abstract class DbScanToIndexScanPrule extends Prule {
         IndexGroupScan idxScan = indexInfo.getIndexDesc().getIndexGroupScan();
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
 
-        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(call, indexInfo,
-            project, scan, idxScan, indexCondition, remainderCondition, builder);
+        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan, indexCondition, remainderCondition, builder);
 
-        planGen.go(filter, convert(scan, scan.getTraitSet()));
+        planGen.go();
         createdCovering = true;
       }
     } catch (Exception e) {
@@ -315,17 +383,17 @@ public abstract class DbScanToIndexScanPrule extends Prule {
 
     // Create non-covering index plans. First, check if the primary table scan supports creating a
     // restricted scan
-    GroupScan primaryTableScan = scan.getGroupScan();
+    GroupScan primaryTableScan = indexContext.scan.getGroupScan();
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
       try {
         if (nonCoveringIndexes.size() > 0) {
-          IndexDescriptor index = selectIndexForNonCoveringPlan(scan, nonCoveringIndexes);
+          IndexDescriptor index = selectIndexForNonCoveringPlan(indexContext.scan, nonCoveringIndexes);
           IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(call, index, project, scan, idxScan, indexCondition,
+          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index, idxScan, indexCondition,
               remainderCondition, builder);
-          planGen.go(filter, convert(scan, scan.getTraitSet()));
+          planGen.go();
         }
       } catch (Exception e) {
         logger.warn("Exception while trying to generate non-covering index access plan", e);
@@ -336,15 +404,14 @@ public abstract class DbScanToIndexScanPrule extends Prule {
   }
 
   private void processWithIndexSelection(
-      RelOptRuleCall call,
+      IndexPlanCallContext indexContext,
       PlannerSettings settings,
       RexNode condition,
       IndexCollection collection,
-      RexBuilder builder,
-      FilterPrel filter,
-      ScanPrel scan) {
+      RexBuilder builder)
+  {
 
-    IndexConditionInfo cInfo = IndexConditionInfo.newBuilder(condition, collection, builder, scan).getCollectiveInfo();
+    IndexConditionInfo cInfo = IndexConditionInfo.newBuilder(condition, collection, builder, indexContext.scan).getCollectiveInfo();
 
   }
 
@@ -352,17 +419,15 @@ public abstract class DbScanToIndexScanPrule extends Prule {
    * For a particular table scan for table T1 and an index on that table, find out if it is a covering index
    * @return
    */
-  private boolean isCoveringIndex(ScanPrel scan, FunctionalIndexInfo functionInfo) {
+  private boolean isCoveringIndex(IndexPlanCallContext indexContext, FunctionalIndexInfo functionInfo) {
     if(functionInfo.hasFunctional()) {
       //need info from full query
-      return queryCoveredByIndex(functionInfo);
+      return queryCoveredByIndex(indexContext, functionInfo);
     }
-    else {
-      DbGroupScan groupScan = (DbGroupScan) scan.getGroupScan();
-      List<LogicalExpression> tableCols = Lists.newArrayList();
-      tableCols.addAll(groupScan.getColumns());
-      return functionInfo.getIndexDesc().isCoveringIndex(tableCols);
-    }
+    DbGroupScan groupScan = (DbGroupScan) indexContext.scan.getGroupScan();
+    List<LogicalExpression> tableCols = Lists.newArrayList();
+    tableCols.addAll(groupScan.getColumns());
+    return functionInfo.getIndexDesc().isCoveringIndex(tableCols);
   }
 
   //this check queryCoveredByIndex is needed only when there is a function based index field.
@@ -375,11 +440,36 @@ public abstract class DbScanToIndexScanPrule extends Prule {
    * @param functionInfo
    * @return false if the query could not be covered by the index (should not create covering index plan)
    */
-  boolean queryCoveredByIndex(FunctionalIndexInfo functionInfo) {
+  boolean queryCoveredByIndex(IndexPlanCallContext indexContext,
+                              FunctionalIndexInfo functionInfo) {
     //for indexed functions, if relevant schemapaths are included in index(in indexed fields or non-indexed fields),
-    // we don't need to check the whole query
+    // check covering based on the local information we have:
+    //   if references to schema paths in functional indexes disappear beyond capProject
+
+    if (indexContext.capProject == null) {
+      if( !isFullQuery(indexContext)) {
+        return false;
+      }
+    }
+    //TODO: check capProject and other places to decide if this query is covered by functionInfo
     return false;
   }
 
+  private boolean isFullQuery(IndexPlanCallContext indexContext) {
+    RelNode rootInCall = indexContext.call.rel(0);
+    //check if the tip of the operator stack we have is also the top of the whole query, if yes, return true
+    if (indexContext.call.getPlanner().getRoot() instanceof RelSubset) {
+      final RelSubset rootSet = (RelSubset) indexContext.call.getPlanner().getRoot();
+      if (rootSet.getRelList().contains(rootInCall)) {
+        return true;
+      }
+    } else {
+      if (indexContext.call.getPlanner().getRoot().equals(rootInCall)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
 }

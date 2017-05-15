@@ -400,8 +400,30 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 /*
   @Test
-  public void TestCastCoveringPlan() throws Exception {
-    String query = "SELECT t.contact.phone AS `phone` FROM hbase.`index_test_primary` as t " +
+  public void TestCastVarCharCoveringPlan() throws Exception {
+    String query = "SELECT t._id as tid, cast(t.driverlicense as varchar(128)) as driverlicense FROM hbase.`index_test_primary` as t " +
+        " where cast(t.driverlicense as varchar(128))='100007423'";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"HashJoin"}
+    );
+
+    System.out.println("TestCastCoveringPlan Plan Verified!");
+
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("tid", "driverlicense").baselineValues("1012", "100007423")
+        .go();
+
+    return;
+  }
+
+  @Test
+  public void TestCastINTCoveringPlan() throws Exception {
+    String query = "SELECT t._id as tid, CAST(t.id.ssn as INT) as ssn, t.contact.phone AS `phone` FROM hbase.`index_test_primary` as t " +
         " where CAST(t.id.ssn as INT) = 100007423";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
@@ -415,7 +437,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
         .sqlQuery(query)
         .ordered()
-        .baselineColumns("phone").baselineValues("6500005471")
+        .baselineColumns("tid", "ssn", "phone").baselineValues("1012", 100007423, "6500005471")
         .go();
 
     return;
