@@ -235,7 +235,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     this.operatorContext = context;
 
     try {
-      table = indexFid == null ? formatPlugin.getJsonTableCache().getTable(tablePath.toString()) : MapRDB.getIndexTable(tablePath, indexFid, "");
+      table = formatPlugin.getJsonTableCache().getTable(tablePath, indexFid);
       table.setOption(TableOption.EXCLUDEID, !includeId);
       documentStream = table.find(condition, scannedFields);
       documentReaderIterators = documentStream.documentReaders().iterator();

@@ -52,7 +52,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
-import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TabletInfo;
 import com.mapr.db.impl.TabletInfoImpl;
@@ -115,13 +114,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     try {
       Configuration conf = new Configuration();
       Table t;
-      if (scanSpec.isSecondaryIndex()) {
-          t = MapRDB.getIndexTable(scanSpec.getPrimaryTablePath(),
-                                   scanSpec.getIndexFid(),
-                                   scanSpec.getIndexName());
-      } else {
-          t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName());
-      }
+      t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexFid());
       TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
@@ -131,7 +124,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), tabletInfo.getLocations()[0]);
       }
     } catch (Exception e) {
-      throw new DrillRuntimeException("Error getting region info for table: " + scanSpec.getTableName(), e);
+      throw new DrillRuntimeException("Error getting region info for table: " +
+        scanSpec.getTableName() + (scanSpec.getIndexFid() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
     }
   }
 
