@@ -38,6 +38,7 @@ import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.logical.DrillTable;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
@@ -58,8 +59,8 @@ import com.mapr.db.index.IndexFieldDesc;
 
 public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDiscover {
 
-  public MapRDBIndexDiscover(GroupScan inScan, ScanPrel prel) {
-    super((AbstractDbGroupScan) inScan, prel);
+  public MapRDBIndexDiscover(GroupScan inScan, DrillScanRelBase scanRel) {
+    super((AbstractDbGroupScan) inScan, scanRel);
   }
 
   @Override
@@ -90,7 +91,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         logger.error("No index found for table {}.", tableName);
         return null;
       }
-      return new DrillIndexCollection(getOriginalScanPrel(), idxSet);
+      return new DrillIndexCollection(getOriginalScanRel(), idxSet);
     } catch (DBException ex) {
       logger.error("Could not get table index from File system.", ex);
     }
@@ -180,7 +181,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         // set default width since it is not specified
         return
             Types.required(TypeProtos.MinorType.VARCHAR).toBuilder().setWidth(
-                getOriginalScanPrel().getCluster().getTypeFactory().createSqlType(SqlTypeName.VARCHAR).getPrecision()).build();
+                getOriginalScanRel().getCluster().getTypeFactory().createSqlType(SqlTypeName.VARCHAR).getPrecision()).build();
       case "LONG":
       case "BIGINT":
         return Types.required(TypeProtos.MinorType.BIGINT);

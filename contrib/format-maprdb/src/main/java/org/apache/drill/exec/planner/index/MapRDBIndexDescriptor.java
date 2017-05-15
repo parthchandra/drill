@@ -36,6 +36,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   protected final Object desc;
   protected final Set<LogicalExpression> allFields;
   protected final Set<LogicalExpression> indexedFields;
+  protected MapRDBFunctionalIndexInfo functionalInfo;
 
   public MapRDBIndexDescriptor(List<LogicalExpression> indexCols,
                                List<LogicalExpression> nonIndexCols,
@@ -79,7 +80,10 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   }
 
   public FunctionalIndexInfo getFunctionalInfo() {
-    return new MapRDBFunctionalIndexInfo(this);
+    if (this.functionalInfo == null) {
+      this.functionalInfo = new MapRDBFunctionalIndexInfo(this);
+    }
+    return this.functionalInfo;
   }
   /**
    * Search through a LogicalExpression, finding all internal schema path references and returning a decoded path.

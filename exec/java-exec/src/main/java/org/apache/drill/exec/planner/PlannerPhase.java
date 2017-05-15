@@ -179,6 +179,7 @@ public enum PlannerPhase {
     public RuleSet getRules(OptimizerRulesContext context, Collection<StoragePlugin> plugins) {
       return PlannerPhase.mergedRuleSets(
           PlannerPhase.getPhysicalRules(context),
+          getIndexRules(context),
           getStorageRules(context, plugins, this));
     }
   },
@@ -195,6 +196,7 @@ public enum PlannerPhase {
     public RuleSet getRules(OptimizerRulesContext context, Collection<StoragePlugin> plugins) {
       return PlannerPhase.mergedRuleSets(
           PlannerPhase.getPhysicalRulesSimpleOpt(context),
+          PlannerPhase.getIndexRules(context),
           getStorageRules(context, plugins, this));
     }
 
@@ -369,6 +371,21 @@ public enum PlannerPhase {
   }
 
   /**
+   *
+   */
+  static RuleSet getIndexRules(OptimizerRulesContext optimizerRulesContext) {
+    final ImmutableSet<RelOptRule> indexRules = ImmutableSet.<RelOptRule>builder()
+        .add(
+            DbScanToIndexScanPrule.REL_FILTER_SCAN,
+            DbScanToIndexScanPrule.REL_FILTER_PROJECT_SCAN
+            //DbScanToIndexScanRule.FILTER_PROJECT_SCAN,
+            //DbScanToIndexScanRule.FILTER_SCAN
+        )
+        .build();
+    return RuleSets.ofList(indexRules);
+  }
+
+  /**
    *   Get an immutable list of pruning rules that will be used post physical planning.
    */
   static RuleSet getPhysicalPruneScanRules(OptimizerRulesContext optimizerRulesContext) {
@@ -452,12 +469,11 @@ public enum PlannerPhase {
     ruleList.add(ExpandConversionRule.INSTANCE);
     ruleList.add(FilterPrule.INSTANCE);
     ruleList.add(LimitPrule.INSTANCE);
-
+/*
     if (ps.isIndexPlanningEnabled()) {
-      ruleList.add(DbScanToIndexScanPrule.getFilterOnProject(optimizerRulesContext));
-      ruleList.add(DbScanToIndexScanPrule.getFilterOnScan(optimizerRulesContext));
-    }
 
+    }
+*/
     return RuleSets.ofList(ImmutableSet.copyOf(ruleList));
   }
 
@@ -512,11 +528,6 @@ public enum PlannerPhase {
     // broadcast join enabled.
     if (ps.isNestedLoopJoinEnabled() && ps.isBroadcastJoinEnabled()) {
       ruleList.add(NestedLoopJoinPrule.INSTANCE);
-    }
-
-    if (ps.isIndexPlanningEnabled()) {
-      ruleList.add(DbScanToIndexScanPrule.getFilterOnProject(optimizerRulesContext));
-      ruleList.add(DbScanToIndexScanPrule.getFilterOnScan(optimizerRulesContext));
     }
 
     return RuleSets.ofList(ImmutableSet.copyOf(ruleList));

@@ -20,13 +20,11 @@ package org.apache.drill.exec.planner.index;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -37,11 +35,10 @@ import org.apache.calcite.util.Pair;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
-import org.apache.drill.exec.physical.impl.join.JoinUtils.JoinControl;
+import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
-import org.apache.drill.exec.planner.physical.JoinPruleBase;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
@@ -61,12 +58,10 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
 
   final Map<IndexDescriptor, IndexConditionInfo> indexInfoMap;
 
-  public IndexIntersectPlanGenerator(RelOptRuleCall call,
-                                     ProjectPrel origProject,
-                                     ScanPrel origScan,
+  public IndexIntersectPlanGenerator(IndexPlanCallContext indexContext,
                                      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap,
                                      RexBuilder builder) {
-    super(call, origProject, origScan, null, null, builder);
+    super(indexContext, null, null, builder);
     this.indexInfoMap = indexInfoMap;
   }
 
@@ -88,7 +83,7 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
             right, rightJoinKeys, builder);
 
     HashJoinPrel hjPrel;
-    hjPrel = new HashJoinPrel(origScan.getCluster(), origScan.getTraitSet(), left,
+    hjPrel = new HashJoinPrel(left.getCluster(), left.getTraitSet(), left,
         right, joinCondition, JoinRelType.INNER, false, isRowKeyJoin, htControl);
 
     if (isRowKeyJoin == true) {
@@ -222,7 +217,7 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
     RelNode lastRelNode;
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
     ScanPrel dbScan = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet(), restrictedGroupScan, dbscanRowType);
+        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), restrictedGroupScan, dbscanRowType);
     lastRelNode = dbScan;
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();
@@ -267,14 +262,14 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
   @Override
-  public RelNode convertChild(final FilterPrel filter, final RelNode input) throws InvalidRelException {
+  public RelNode convertChild(final RelNode filter, final RelNode input) throws InvalidRelException {
     Map<IndexDescriptor, RexNode> idxConditionMap = Maps.newLinkedHashMap();
     for(IndexDescriptor idx : indexInfoMap.keySet()) {
       idxConditionMap.put(idx, indexInfoMap.get(idx).indexCondition);
     }
 
     RelNode indexPlan = null;
-    RexNode remnant = filter.getCondition();
+    RexNode remnant = indexContext.filter.getCondition();
     for (Map.Entry<IndexDescriptor, RexNode> pair : idxConditionMap.entrySet()) {
       indexPlan = buildIntersectPlan(pair, indexPlan);
       remnant = indexInfoMap.get(pair.getKey()).remainderCondition;
@@ -288,6 +283,11 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
     Pair<RelNode, DbGroupScan> leftRelAndScan = buildRestrictedDBScan(remnant);
 
     RelNode finalRel = buildRowKeyJoin(leftRelAndScan.left, rangeDistRight, true, JoinControl.DEFAULT);
+    if ( capProject != null) {
+      ProjectPrel cap = new ProjectPrel(finalRel.getCluster(), finalRel.getTraitSet(),
+          finalRel, capProject.getProjects(), capProject.getRowType());
+      finalRel = cap;
+    }
 
     return finalRel;
   }

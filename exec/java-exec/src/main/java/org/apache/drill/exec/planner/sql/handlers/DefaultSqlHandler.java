@@ -468,6 +468,7 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
     Prel phyRelNode;
     try {
       final Stopwatch watch = Stopwatch.createStarted();
+
       final RelNode relNode = transform(PlannerType.VOLCANO, PlannerPhase.PHYSICAL, drel, traits, false);
       phyRelNode = (Prel) relNode.accept(new PrelFinalizer());
       // log externally as we need to finalize before traversing the tree.

@@ -62,14 +62,16 @@ public abstract class SubsetTransformer<T extends RelNode, E extends Exception> 
           continue;
         }
         transformedRels.add(newRel);
+        logger.trace("{}.convertChild to convert NODE {} ,AND {}", this.getClass().getSimpleName(), n, newRel);
         RelNode out = convertChild(n, newRel);
         if (out != null) {
           call.transformTo(out);
           transform = true;
         }
       }
+      logger.trace("{}.convertChild to start: candidateSet size {} ,transformedRels {} size {}",
+          this.getClass().getSimpleName(), ((RelSubset)candidateSet).getRelList().size(), transformedRels, transformedRels.size());
     }
-
 
     return transform;
   }

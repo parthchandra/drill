@@ -19,6 +19,7 @@ package org.apache.drill.exec.physical.base;
 
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.index.IndexCollection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -43,7 +44,7 @@ public interface DbGroupScan extends GroupScan {
    * Get the index collection associated with this table if any
    */
   @JsonIgnore
-  public IndexCollection getSecondaryIndexCollection(ScanPrel scan);
+  public IndexCollection getSecondaryIndexCollection(DrillScanRelBase scan);
 
   public List<SchemaPath> getColumns();
 

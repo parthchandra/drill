@@ -20,36 +20,25 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-
-import com.google.common.collect.Sets;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
-import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
-import org.apache.drill.exec.physical.impl.join.JoinUtils.JoinControl;
-import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
+import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
 import org.apache.drill.exec.planner.physical.Prel;
-import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
-import org.apache.drill.exec.planner.physical.DrillDistributionTrait.DistributionField;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
@@ -89,22 +78,20 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   // Ideally This functionInfo should be cached along with indexDesc.
   final protected FunctionalIndexInfo functionInfo;
 
-  public NonCoveringIndexPlanGenerator(RelOptRuleCall call,
+  public NonCoveringIndexPlanGenerator(IndexPlanCallContext indexContext,
                                        IndexDescriptor indexDesc,
-                                       ProjectPrel origProject,
-                                       ScanPrel origScan,
                                        IndexGroupScan indexGroupScan,
                                        RexNode indexCondition,
                                        RexNode remainderCondition,
                                        RexBuilder builder) {
-    super(call, origProject, origScan, indexCondition, remainderCondition, builder);
+    super(indexContext, indexCondition, remainderCondition, builder);
     this.indexGroupScan = indexGroupScan;
     this.indexDesc = indexDesc;
     this.functionInfo = indexDesc.getFunctionalInfo();
   }
 
   @Override
-  public RelNode convertChild(final FilterPrel filter, final RelNode input) throws InvalidRelException {
+  public RelNode convertChild(final RelNode filter, final RelNode input) throws InvalidRelException {
 
     if (indexGroupScan == null) {
       logger.error("Null indexgroupScan in NonCoveringIndexPlanGenerator.convertChild");
@@ -115,7 +102,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     RelDataType indexScanRowType = convertRowTypeForIndexScan(
         origScan, indexCondition, indexGroupScan, functionInfo);
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet(), indexGroupScan, indexScanRowType);
+        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexGroupScan, indexScanRowType);
     DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
 
     // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
@@ -166,7 +153,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     ScanPrel dbScan = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet(), restrictedGroupScan, dbscanRowType);
+        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), restrictedGroupScan, dbscanRowType);
     RelNode lastLeft = dbScan;
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();
@@ -218,7 +205,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         RelOptUtil.createEquiJoinCondition(convertedLeft, leftJoinKeys,
             convertedRight, rightJoinKeys, builder);
 
-    HashJoinPrel hjPrel = new HashJoinPrel(filter.getCluster(), leftTraits, convertedLeft,
+    HashJoinPrel hjPrel = new HashJoinPrel(indexContext.filter.getCluster(), leftTraits, convertedLeft,
         convertedRight, joinCondition, JoinRelType.INNER, false,
         true /* useful for join-restricted scans */, JoinControl.DEFAULT);
 
@@ -243,6 +230,12 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final ProjectPrel resetProjectPrel = new ProjectPrel(newRel.getCluster(), newRel.getTraitSet(),
         newRel, resetExprs, finalProjectRowType);
     newRel = resetProjectPrel;
+
+    if ( capProject != null) {
+      ProjectPrel cap = new ProjectPrel(capProject.getCluster(), newRel.getTraitSet(),
+          newRel, capProject.getProjects(), capProject.getRowType());
+      newRel = cap;
+    }
 
     RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
 

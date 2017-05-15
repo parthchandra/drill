@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,7 +27,9 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
@@ -38,49 +40,50 @@ import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.logical.DrillFilterRel;
+import org.apache.drill.exec.planner.logical.DrillProjectRel;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
-import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.Prel;
-import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
-import org.apache.drill.exec.planner.physical.ScanPrel;
-import org.apache.drill.exec.planner.physical.SubsetTransformer;
-import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.exec.planner.physical.SubsetTransformer;
 
-public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<FilterPrel, InvalidRelException> {
+public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNode, InvalidRelException>{
 
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexPlanGenerator.class);
 
-  final protected ProjectPrel origProject;
-  final protected ScanPrel origScan;
+  final protected DrillProjectRel origProject;
+  final protected DrillScanRel origScan;
+  final protected DrillProjectRel capProject;
+
   final protected RexNode indexCondition;
   final protected RexNode remainderCondition;
   final protected RexBuilder builder;
+  final protected IndexPlanCallContext indexContext;
 
-  public AbstractIndexPlanGenerator(RelOptRuleCall call,
-      ProjectPrel origProject,
-      ScanPrel origScan,
+  public AbstractIndexPlanGenerator(IndexPlanCallContext indexContext,
       RexNode indexCondition,
       RexNode remainderCondition,
       RexBuilder builder) {
-    super(call);
-    this.origProject = origProject;
-    this.origScan = origScan;
+    super(indexContext.call);
+    this.origProject = indexContext.project;
+    this.origScan = indexContext.scan;
+    this.capProject = indexContext.capProject;
     this.indexCondition = indexCondition;
     this.remainderCondition = remainderCondition;
+    this.indexContext = indexContext;
     this.builder = builder;
   }
 
   //This class provides the utility functions that don't rely on index(one or multiple) or final plan (covering or not),
   //but those helper functions that focus on serving building index plan (project-filter-indexscan)
 
-  public static int getRowKeyIndex(RelDataType rowType, ScanPrel origScan) {
+  public static int getRowKeyIndex(RelDataType rowType, DrillScanRel origScan) {
     List<String> fieldNames = rowType.getFieldNames();
     int idx = 0;
     for (String field : fieldNames) {
@@ -148,7 +151,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
    * @param idxScan
    * @return
    */
-  public static RelDataType convertRowTypeForIndexScan(ScanPrel origScan,
+  public static RelDataType convertRowTypeForIndexScan(DrillScanRel origScan,
                                                        RexNode indexCondition,
                                                        IndexGroupScan idxScan,
                                                        FunctionalIndexInfo functionInfo) {
@@ -245,4 +248,34 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<Filte
 
     return remap.rewriteWithMap(idxCondition, marker.getIndexableExpression());
   }
+
+  public RelTraitSet newTraitSet(RelTrait... traits) {
+    RelTraitSet set = indexContext.call.getPlanner().emptyTraitSet();
+    for (RelTrait t : traits) {
+      set = set.plus(t);
+    }
+    return set;
+  }
+
+  public abstract RelNode convertChild(RelNode current, RelNode child) throws InvalidRelException;
+
+  public void go() throws InvalidRelException {
+    RelNode top = indexContext.call.rel(0);
+    final RelNode input;
+    if (top instanceof DrillProjectRel) {
+      DrillProjectRel topProject = (DrillProjectRel) top;
+      input = topProject.getInput();
+    }
+    else if (top instanceof DrillFilterRel) {
+      DrillFilterRel topFilter = (DrillFilterRel)top;
+      input = topFilter.getInput();
+    }
+    else {
+      return;
+    }
+    RelTraitSet traits = input.getTraitSet().plus(Prel.DRILL_PHYSICAL);
+    RelNode convertedInput = Prule.convert(input, traits);
+    this.go(top, convertedInput);
+  }
+
 }

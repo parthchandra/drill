@@ -75,6 +75,11 @@ public class SimpleRexRemap {
     this.destExprMap = Maps.newHashMap();
   }
 
+  /**
+   * Set the map of src expression to target expression, expressions not in the map do not have assigned destinations
+   * @param exprMap
+   * @return
+   */
   public SimpleRexRemap setExpressionMap(Map<LogicalExpression, LogicalExpression>  exprMap) {
     destExprMap.putAll(exprMap);
     return this;
@@ -119,7 +124,13 @@ public class SimpleRexRemap {
     return expr;
   }
 
-  public RexNode rewriteWithMap(RexNode expr, Map<RexNode, LogicalExpression> mapRexToExpr) {
+  /**
+   *
+   * @param srcRex  the source RexNode to be rewritten
+   * @param mapRexToExpr a map of rex->logical expression to guide what rex to rewrite
+   * @return the RexNode after rewriting
+   */
+  public RexNode rewriteWithMap(RexNode srcRex, Map<RexNode, LogicalExpression> mapRexToExpr) {
     Map<RexNode, RexNode> destNodeMap = Maps.newHashMap();
     for(Map.Entry<RexNode, LogicalExpression> entry: mapRexToExpr.entrySet()) {
       LogicalExpression entryExpr = entry.getValue();
@@ -132,7 +143,7 @@ public class SimpleRexRemap {
 
     //Visit through the nodes, if destExprMap has an entry to provide substitute to replace a rexNode, replace the rexNode
     RexReplace replacer = new RexReplace(destNodeMap);
-    RexNode resultRex = expr.accept(replacer);
+    RexNode resultRex = srcRex.accept(replacer);
     return resultRex;
   }
 

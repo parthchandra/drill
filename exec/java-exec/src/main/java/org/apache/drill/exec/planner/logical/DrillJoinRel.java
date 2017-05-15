@@ -37,6 +37,7 @@ import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.common.logical.data.LogicalOperator;
 import org.apache.drill.common.logical.data.Project;
 import org.apache.drill.exec.planner.common.DrillJoinRelBase;
+import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.torel.ConversionContext;
 
 /**
@@ -48,11 +49,21 @@ public class DrillJoinRel extends DrillJoinRelBase implements DrillRel {
    * We do not throw InvalidRelException in Logical planning phase. It's up to the post-logical planning check or physical planning
    * to detect the unsupported join type, and throw exception.
    * */
+  private int joinControl = JoinControl.DEFAULT;
+
   public DrillJoinRel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
       JoinRelType joinType)  {
     super(cluster, traits, left, right, condition, joinType);
     assert traits.contains(DrillRel.DRILL_LOGICAL);
     RelOptUtil.splitJoinCondition(left, right, condition, leftKeys, rightKeys, filterNulls);
+  }
+
+  public DrillJoinRel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,
+                      JoinRelType joinType, int joinControl)  {
+    super(cluster, traits, left, right, condition, joinType);
+    assert traits.contains(DrillRel.DRILL_LOGICAL);
+    RelOptUtil.splitJoinCondition(left, right, condition, leftKeys, rightKeys, filterNulls);
+    this.joinControl = joinControl;
   }
 
   public DrillJoinRel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right, RexNode condition,

@@ -34,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.EndpointAffinity;
 import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
+import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.index.IndexCollection;
 import org.apache.drill.exec.planner.index.IndexDiscover;
 import org.apache.drill.exec.planner.index.IndexDiscoverFactory;
@@ -293,10 +294,13 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
   }
 
   @Override
-  public IndexCollection getSecondaryIndexCollection(ScanPrel prel) {
+  public IndexCollection getSecondaryIndexCollection(DrillScanRelBase scanRel) {
     IndexDiscover discover = IndexDiscoverFactory.getIndexDiscover(
-        getStorageConfig(), this, prel, MapRDBIndexDiscover.class);
+        getStorageConfig(), this, scanRel, MapRDBIndexDiscover.class);
 
+    if (discover == null) {
+      logger.error("Null IndexDiscover was found for {}!", scanRel);
+    }
     return discover.getTableIndex(getTableName());
   }
 
