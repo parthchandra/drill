@@ -28,6 +28,7 @@ import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.SaslMessage;
 import org.apache.drill.exec.proto.UserProtos.BitToUserHandshake;
+import org.apache.drill.exec.proto.UserProtos.CancelQueryWithSessionHandle;
 import org.apache.drill.exec.proto.UserProtos.CreatePreparedStatementReq;
 import org.apache.drill.exec.proto.UserProtos.CreatePreparedStatementResp;
 import org.apache.drill.exec.proto.UserProtos.GetCatalogsReq;
@@ -81,6 +82,8 @@ public class UserRpcConfig {
         .add(RpcType.RUN_QUERY_WITH_SESSION, RunQueryWithSessionHandle.class,
             RpcType.QUERY_HANDLE, QueryId.class) // user to bit
         .add(RpcType.CLOSE_SESSION, SessionHandle.class, RpcType.ACK, Ack.class) // user to bit
+        .add(RpcType.CANCEL_QUERY_WITH_SESSION, CancelQueryWithSessionHandle.class,
+            RpcType.ACK, Ack.class)
         .build();
   }
 
