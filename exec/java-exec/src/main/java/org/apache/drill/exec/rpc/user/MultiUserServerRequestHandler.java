@@ -29,6 +29,7 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult;
 import org.apache.drill.exec.proto.UserBitShared.UserCredentials;
+import org.apache.drill.exec.proto.UserProtos.CancelQueryWithSessionHandle;
 import org.apache.drill.exec.proto.UserProtos.NewSessionRequest;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle;
@@ -41,7 +42,6 @@ import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
 import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
 import org.apache.drill.exec.work.user.UserWorker;
-import org.apache.hadoop.yarn.webapp.hamlet.HamletSpec.P;
 
 import java.net.SocketAddress;
 import java.util.HashMap;
@@ -143,6 +143,23 @@ public class MultiUserServerRequestHandler implements RequestHandler<UserServer.
       }
       break;
     }
+
+    case RpcType.CANCEL_QUERY_WITH_SESSION_VALUE: {
+      final CancelQueryWithSessionHandle request;
+      try {
+        request = CancelQueryWithSessionHandle.PARSER.parseFrom(new ByteBufInputStream(pBody));
+      } catch (final InvalidProtocolBufferException e) {
+        throw new RpcException("Failure while decoding CancelQueryWithSessionHandle body.", e);
+      }
+
+      if (sessions.get(request.getSessionHandle()) == null) {
+        throw new RpcException("Unexpected message. Received a cancellation on query in non-existent session.");
+      }
+
+      sender.send(new Response(RpcType.ACK, worker.cancelQuery(request.getQueryId())));
+      break;
+    }
+
     default:
       throw new UnsupportedOperationException(
           String.format("MultiUserServerRequestHandler received rpc of unknown type. Type was %d.", rpcType));

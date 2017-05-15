@@ -21,14 +21,17 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserBitShared.QueryId;
 import org.apache.drill.exec.proto.UserBitShared.QueryResult.QueryState;
 import org.apache.drill.exec.proto.UserBitShared.QueryType;
+import org.apache.drill.exec.proto.UserProtos.CancelQueryWithSessionHandle;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.UserProtos.RunQueryWithSessionHandle;
 import org.apache.drill.exec.proto.UserProtos.SessionHandle;
 import org.apache.drill.exec.rpc.ConnectionThrottle;
+import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 
@@ -94,6 +97,16 @@ public class DrillSessionImpl implements DrillSession {
         resultsListener.queryCompleted(state);
       }
     };
+  }
+
+  @Override
+  public DrillRpcFuture<Ack> cancelQuery(final QueryId queryId) {
+    return connection.send(RpcType.CANCEL_QUERY_WITH_SESSION,
+        CancelQueryWithSessionHandle.newBuilder()
+            .setSessionHandle(sessionHandle)
+            .setQueryId(queryId)
+            .build(),
+        Ack.class);
   }
 
   public void close(boolean invokedDirectly) {

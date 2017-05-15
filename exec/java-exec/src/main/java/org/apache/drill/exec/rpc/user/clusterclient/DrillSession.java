@@ -18,6 +18,9 @@
 package org.apache.drill.exec.rpc.user.clusterclient;
 
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
+import org.apache.drill.exec.proto.UserBitShared.QueryId;
+import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 
 public interface DrillSession {
@@ -36,6 +39,13 @@ public interface DrillSession {
    * @param listener user results listener
    */
   void executeStatement(String sql, UserResultsListener listener);
+
+  /**
+   * Cancel query with the given query identifier.
+   *
+   * @param queryId query identifier
+   */
+  DrillRpcFuture<Ack> cancelQuery(QueryId queryId);
 
   /**
    * Release resources, and fail all {@link UserResultsListener listeners}
