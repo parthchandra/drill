@@ -19,10 +19,6 @@
 package org.apache.drill.exec.store.mapr.db;
 
 import java.util.concurrent.TimeUnit;
-
-import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.common.exceptions.DrillRuntimeException;
-
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -30,6 +26,11 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
+import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
+import org.apache.hadoop.fs.Path;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.ImmutablePair;
 
 @SuppressWarnings("deprecation")
 public class MapRDBTableCache {
@@ -39,7 +40,7 @@ public class MapRDBTableCache {
   public static final String FORMAT_MAPRDB_JSON_TABLE_CACHE_TIMEOUT = "format-maprdb.json.tableCache.expireTimeInMinutes";
   private static final int MIN_TABLE_CACHE_SIZE = 1;
   private static final int MIN_TABLE_CACHE_ENTRY_TIMEOUT = 10;
-  LoadingCache<String, Table> tableLoadingCache;
+  LoadingCache<Pair<Path, String>, Table> tableCache;
   private final boolean tableCachingEnabled;
 
   public MapRDBTableCache(DrillConfig config) {
@@ -48,38 +49,84 @@ public class MapRDBTableCache {
       final int tableCacheSize = Math.max((int) (config.getDouble(FORMAT_MAPRDB_JSON_TABLE_CACHE_SIZE)), MIN_TABLE_CACHE_SIZE);
       final int tableCacheExpiryTime = Math.max((int) (config.getDouble(FORMAT_MAPRDB_JSON_TABLE_CACHE_TIMEOUT)), MIN_TABLE_CACHE_ENTRY_TIMEOUT);
 
-      RemovalListener<String, Table> removalListener = new RemovalListener<String, Table>() {
-        public void onRemoval(RemovalNotification<String, Table> removal) {
+      RemovalListener<Pair<Path, String>, Table> removalListener = new RemovalListener<Pair<Path, String>, Table>() {
+        public void onRemoval(RemovalNotification<Pair<Path, String>, Table> removal) {
           Table table = removal.getValue();
           table.close(); // close the table
         }
       };
 
-      tableLoadingCache = CacheBuilder.newBuilder().
+      // Common table cache for primary and index tables. Key is Pair<tablePath, indexFid>
+      // For primary table, indexFid is null.
+      tableCache =  CacheBuilder.newBuilder().
         expireAfterAccess(tableCacheExpiryTime, TimeUnit.MINUTES).
         maximumSize(tableCacheSize).
-        removalListener(removalListener).build(new CacheLoader<String, Table>() {
+        removalListener(removalListener).build(new CacheLoader<Pair<Path, String>, Table>() {
+
         @Override
-        public Table load(String tableName) throws Exception {
-          return MapRDB.getTable(tableName);
+        public Table load(Pair<Path, String> key) throws Exception {
+          // key.Left is Path. key.Right is indexFid.
+          return key.getRight() == null ? MapRDB.getTable(key.getLeft()) : MapRDB.getIndexTable(key.getLeft(), key.getRight(), "");
         }});
 
       logger.debug("table cache created with size {} and expiryTimeInMin {} ", tableCacheSize, tableCacheExpiryTime);
     }
   }
 
-  public Table getTable(String tableName) throws DrillRuntimeException {
+
+  /**
+   * getTable given primary table path and index fid.
+   * returns Table for corresponding index table if indexFid is not null.
+   * returns Table for primary table if indexFid is null.
+   * @param tablePath primary table path
+   * @param indexFid  Fid of index table
+   */
+  public Table getTable(Path tablePath, String indexFid) throws DrillRuntimeException {
     try {
-      if (!tableCachingEnabled) {
-        return MapRDB.getTable(tableName);
+      if (tableCachingEnabled) {
+        return tableCache.get(new ImmutablePair<Path, String>(tablePath, indexFid));
       } else {
-        return tableLoadingCache.get(tableName);
+        return indexFid == null ? MapRDB.getTable(tablePath): MapRDB.getIndexTable(tablePath, indexFid, "");
       }
     } catch (Exception e) {
-      throw new DrillRuntimeException("Error getting table: " + tableName, e);
+      throw new DrillRuntimeException("Error getting table: " +
+        tablePath.toString()  + (indexFid == null ? "" : (", indexFid: " + indexFid)), e);
     }
   }
 
+  /**
+   * getTable given primary table name.
+   * returns Table for primary table with given name.
+   * @param tableName primary table path
+   */
+  public Table getTable(String tableName) {
+    return getTable(new Path(tableName), null);
+  }
+
+  /**
+   * getTable given primary table path.
+   * returns Table for primary table with given path.
+   * @param tablePath primary table path
+   */
+  public Table getTable(Path tablePath) {
+    return getTable(tablePath, null);
+  }
+
+  /**
+   * getTable given primary table name and index fid.
+   * returns Table for corresponding index table if indexFid is not null.
+   * returns Table for primary table if indexFid is null.
+   * @param tableName primary table name
+   * @param indexFid  Fid of index table
+   */
+  public Table getTable(String tableName, String indexFid) {
+    return getTable(new Path(tableName), indexFid);
+  }
+
+  /**
+   * closeTable
+   * @param table table to be closed.
+   */
   public void closeTable(Table table) {
     if (!tableCachingEnabled && table != null) {
       table.close();
