@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
@@ -55,6 +56,9 @@ public class DrillIndexDefinition implements IndexDefinition {
   @JsonProperty
   protected final List<LogicalExpression> rowKeyColumns;
 
+  @JsonProperty
+  protected final List<FieldDirection> indexColDirections;
+
   /**
    * indexName: name of the index that should be unique within the scope of a table
    */
@@ -67,6 +71,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final IndexDescriptor.IndexType indexType;
 
   public DrillIndexDefinition(List<LogicalExpression> indexCols,
+                              List<FieldDirection> indexColDirections,
                                  List<LogicalExpression> nonIndexCols,
                                  List<LogicalExpression> rowKeyColumns,
                                  String indexName,
@@ -80,6 +85,7 @@ public class DrillIndexDefinition implements IndexDefinition {
     this.indexType = type;
     this.allIndexColumns = Sets.newHashSet(indexColumns);
     this.allIndexColumns.addAll(nonIndexColumns);
+    this.indexColDirections = indexColDirections;
 
   }
 
@@ -204,6 +210,12 @@ public class DrillIndexDefinition implements IndexDefinition {
   @JsonProperty
   public List<LogicalExpression> getNonIndexColumns() {
     return this.nonIndexColumns;
+  }
+
+  @Override
+  @JsonProperty
+  public List<FieldDirection> getIndexColDirections() {
+    return this.indexColDirections;
   }
 
 }

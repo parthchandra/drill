@@ -19,6 +19,7 @@
 package org.apache.drill.exec.planner.index;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 
@@ -35,6 +36,18 @@ public interface IndexDefinition {
     NATIVE_SECONDARY_INDEX,
     EXTERNAL_SECONDARY_INDEX
   };
+
+  enum FieldDirection {
+    ASC("ASC"),
+    DESC("DESC"),
+    NONE("NONE");
+
+    public final String shortString;
+
+    FieldDirection(String shortString) {
+      this.shortString = shortString;
+    }
+  }
 
   /**
    * Check to see if the field name is an index column and if so return the ordinal position in the index
@@ -83,4 +96,6 @@ public interface IndexDefinition {
   List<LogicalExpression> getIndexColumns();
 
   List<LogicalExpression> getNonIndexColumns();
+
+  List<FieldDirection> getIndexColDirections();
 }
