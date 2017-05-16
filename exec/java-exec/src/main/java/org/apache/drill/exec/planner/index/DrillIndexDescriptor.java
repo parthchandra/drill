@@ -43,16 +43,17 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   private DrillTable table;
 
   public DrillIndexDescriptor(List<LogicalExpression> indexCols,
+                              List<FieldDirection> indexColDirections,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
-    super(indexCols, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexColDirections, nonIndexCols, rowKeyColumns, indexName, tableName, type);
   }
 
   public DrillIndexDescriptor(DrillIndexDefinition def) {
-    this(def.indexColumns, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
+    this(def.indexColumns, def.indexColDirections, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
         def.getTableName(), def.getIndexType());
   }
 

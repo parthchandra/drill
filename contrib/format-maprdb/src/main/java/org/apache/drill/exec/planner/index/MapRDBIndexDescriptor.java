@@ -39,13 +39,14 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   protected MapRDBFunctionalIndexInfo functionalInfo;
 
   public MapRDBIndexDescriptor(List<LogicalExpression> indexCols,
+                               List<FieldDirection> indexColDirections,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type,
                                Object desc) {
-    super(indexCols, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexColDirections, nonIndexCols, rowKeyColumns, indexName, tableName, type);
     this.desc = desc;
     this.indexedFields = ImmutableSet.copyOf(indexColumns);
     this.allFields = new ImmutableSet.Builder<LogicalExpression>()

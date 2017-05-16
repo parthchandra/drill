@@ -51,6 +51,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import org.apache.drill.exec.planner.index.IndexDefinition.FieldDirection;
+
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.db.exceptions.DBException;
@@ -266,6 +268,16 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     return listSchema;
   }
 
+  private List<FieldDirection> fieldDirection(Collection<IndexFieldDesc> descCollection) {
+    List<FieldDirection> listDirection = new ArrayList<>();
+    for (IndexFieldDesc field : descCollection) {
+      FieldDirection direction = (field.getSortOrder() == IndexFieldDesc.Order.Asc) ?
+          FieldDirection.ASC : (field.getSortOrder() == IndexFieldDesc.Order.Desc ? FieldDirection.DESC : FieldDirection.NONE);
+      listDirection.add(direction);
+    }
+    return listDirection;
+  }
+
   private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc)
       throws InvalidIndexDefinitionException {
     if (desc.isExternal()) {
@@ -276,9 +288,11 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
     List<LogicalExpression> indexFields = field2SchemaPath(desc.getIndexedFields());
     List<LogicalExpression> coveringFields = field2SchemaPath(desc.getCoveredFields());
+    List<FieldDirection> indexDirection = fieldDirection(desc.getIndexedFields());
     coveringFields.add(SchemaPath.getSimplePath("_id"));
     DrillIndexDescriptor idx = new MapRDBIndexDescriptor (
         indexFields,
+        indexDirection,
         coveringFields,
         null,
         desc.getIndexName(),
