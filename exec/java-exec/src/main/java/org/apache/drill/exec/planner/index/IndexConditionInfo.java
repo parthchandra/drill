@@ -113,7 +113,7 @@ public class IndexConditionInfo {
 
       RexNode initCondition = condition;
       for(IndexDescriptor index : indexes) {
-        List<SchemaPath> leadingColumns = new ArrayList<>();
+        List<LogicalExpression> leadingColumns = new ArrayList<>();
         if(initCondition.isAlwaysTrue()) {
           break;
         }
@@ -163,7 +163,7 @@ public class IndexConditionInfo {
      * @param condition
      * @return
      */
-    private IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
+    public IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
       // Use the same filter analyzer that is used for partitioning columns
       RewriteCombineBinaryOperators reverseVisitor =
           new RewriteCombineBinaryOperators(true, builder);

@@ -26,13 +26,11 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
-import org.apache.drill.exec.planner.cost.DrillCostBase.DrillCostFactory;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -47,7 +45,7 @@ public class IndexSelector  {
   private IndexConditionInfo.Builder builder;
   private RelOptPlanner planner;
   private List<IndexProperties> indexPropList;
-  private ScanPrel primaryTableScan;
+  private DrillScanRel primaryTableScan;
 
   public IndexSelector(RexNode indexCondition,
       IndexCollection collection,
@@ -55,7 +53,7 @@ public class IndexSelector  {
       RexBuilder rexBuilder,
       RelOptPlanner planner,
       double totalRows,
-      ScanPrel scan) {
+      DrillScanRel scan) {
     this.indexCondition = indexCondition;
     this.totalRows = totalRows;
     this.stats = stats;
@@ -83,15 +81,15 @@ public class IndexSelector  {
    */
   public void analyzePrefixMatches(IndexProperties indexProps) {
     RexNode initCondition = indexCondition.isAlwaysTrue() ? null : indexCondition;
-    Map<SchemaPath, RexNode> leadingPrefixMap = Maps.newHashMap();
-    List<SchemaPath> indexCols = indexProps.getIndexDesc().getIndexColumns();
+    Map<LogicalExpression, RexNode> leadingPrefixMap = Maps.newHashMap();
+    List<LogicalExpression> indexCols = indexProps.getIndexDesc().getIndexColumns();
 
     if (indexCols.size() > 0 && initCondition != null) {
       boolean prefix = true;
       int i=0;
       while (prefix && i < indexCols.size()) {
-        SchemaPath p = indexCols.get(i++);
-        List<SchemaPath> prefixCol = ImmutableList.of(p);
+        LogicalExpression p = indexCols.get(i++);
+        List<LogicalExpression> prefixCol = ImmutableList.of(p);
         IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
         if(info != null && info.hasIndexCol) {
           // the col had a match with one of the conditions; save the information about
@@ -215,18 +213,18 @@ public class IndexSelector  {
 
     private int numProjectedFields;
     private double totalRows;
-    private ScanPrel primaryTableScan = null;
+    private DrillScanRel primaryTableScan = null;
     private RelOptCost selfCost = null;
 
     public List<RexNode> leadingFilters = Lists.newArrayList();
-    public Map<SchemaPath, RexNode> leadingPrefixMap;
+    public Map<LogicalExpression, RexNode> leadingPrefixMap;
     public RexNode remainderFilter = null;
 
     public IndexProperties(IndexDescriptor indexDescriptor,
         boolean isCovering,
         int numProjectedFields,
         double totalRows,
-        ScanPrel primaryTableScan) {
+        DrillScanRel primaryTableScan) {
       this.indexDescriptor = indexDescriptor;
       this.isCovering = isCovering;
       this.numProjectedFields = numProjectedFields;
@@ -234,7 +232,7 @@ public class IndexSelector  {
       this.primaryTableScan = primaryTableScan;
     }
 
-    public void setProperties(Map<SchemaPath, RexNode> prefixMap,
+    public void setProperties(Map<LogicalExpression, RexNode> prefixMap,
         RexNode remainderFilter,
         Statistics stats) {
       this.remainderFilter = remainderFilter;
@@ -242,7 +240,7 @@ public class IndexSelector  {
 
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
       // the corresponding conditions
-      for (SchemaPath p : indexDescriptor.getIndexColumns()) {
+      for (LogicalExpression p : indexDescriptor.getIndexColumns()) {
         RexNode n;
         if ((n = leadingPrefixMap.get(p)) != null) {
           leadingFilters.add(n);
