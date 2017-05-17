@@ -17,23 +17,21 @@
  */
 package org.apache.drill.exec.util;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.io.BaseEncoding;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
+import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.util.DrillStringUtils;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-
-import org.apache.drill.common.exceptions.DrillRuntimeException;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.util.DrillStringUtils;
-import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.store.AbstractRecordReader;
-
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
-import com.google.common.io.BaseEncoding;
 
 /**
  * This class provided utility methods to encode and decode a set of user specified
@@ -125,7 +123,7 @@ public class EncodedSchemaPathSet {
       ImmutableList.Builder<SchemaPath> builder = new ImmutableList.Builder<SchemaPath>();
       for (String decodedString : decodedStrings) {
         if ("*".equals(decodedString)) {
-          builder.add(AbstractRecordReader.STAR_COLUMN);
+          builder.add(Utilities.STAR_COLUMN);
         } else {
           builder.add(SchemaPath.parseFrom(decodedString));
         }

@@ -17,13 +17,13 @@
  */
 package org.apache.drill.exec.physical.impl.join;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-
+import com.sun.codemodel.JExpr;
+import com.sun.codemodel.JExpression;
+import com.sun.codemodel.JVar;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.common.logical.data.NamedExpression;
@@ -43,14 +43,14 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.physical.impl.common.ChainedHashTable;
+import org.apache.drill.exec.physical.impl.common.Comparator;
 import org.apache.drill.exec.physical.impl.common.HashTable;
 import org.apache.drill.exec.physical.impl.common.HashTableConfig;
 import org.apache.drill.exec.physical.impl.common.HashTableStats;
 import org.apache.drill.exec.physical.impl.common.IndexPointer;
-import org.apache.drill.exec.physical.impl.common.Comparator;
 import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
 import org.apache.drill.exec.planner.common.JoinControl;
-import org.apache.drill.exec.record.AbstractRecordBatch;
+import org.apache.drill.exec.record.AbstractBinaryRecordBatch;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.ExpandableHyperContainer;
@@ -61,22 +61,14 @@ import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.AbstractContainerVector;
-import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.commons.lang3.tuple.Pair;
 
-import com.sun.codemodel.JExpr;
-import com.sun.codemodel.JExpression;
-import com.sun.codemodel.JVar;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements RowKeyJoin {
+public class HashJoinBatch extends AbstractBinaryRecordBatch<HashJoinPOP> implements RowKeyJoin {
   public static final long ALLOCATOR_INITIAL_RESERVATION = 1 * 1024 * 1024;
   public static final long ALLOCATOR_MAX_RESERVATION = 20L * 1000 * 1000 * 1000;
-
-  // Probe side record batch
-  private final RecordBatch left;
-
-  // Build side record batch
-  private final RecordBatch right;
 
   // Join type, INNER, LEFT, RIGHT or OUTER
   private final JoinRelType joinType;
@@ -86,7 +78,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
 
   private final List<Comparator> comparators;
 
-  private RowKeyJoinState rkJoinState = RowKeyJoinState.INITIAL;
+  private RowKeyJoin.RowKeyJoinState rkJoinState = RowKeyJoin.RowKeyJoinState.INITIAL;
 
   // Runtime generated class implementing HashJoinProbe interface
   private HashJoinProbe hashJoinProbe = null;
@@ -159,9 +151,6 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
   // indicates if we have previously returned an output batch
   boolean firstOutputBatch = true;
 
-  IterOutcome leftUpstream = IterOutcome.NONE;
-  IterOutcome rightUpstream = IterOutcome.NONE;
-
   private final HashTableStats htStats = new HashTableStats();
 
   public enum Metric implements MetricDef {
@@ -186,16 +175,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
 
   @Override
   protected void buildSchema() throws SchemaChangeException {
-    rightUpstream = next(right);
-    leftUpstream = next(left);
-
-    if (leftUpstream == IterOutcome.STOP || rightUpstream == IterOutcome.STOP) {
-      state = BatchState.STOP;
-      return;
-    }
-
-    if (leftUpstream == IterOutcome.OUT_OF_MEMORY || rightUpstream == IterOutcome.OUT_OF_MEMORY) {
-      state = BatchState.OUT_OF_MEMORY;
+    if (! prefetchFirstBatchFromBothSides()) {
       return;
     }
 
@@ -543,9 +523,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
 
   public HashJoinBatch(HashJoinPOP popConfig, FragmentContext context, RecordBatch left,
       RecordBatch right) throws OutOfMemoryException {
-    super(popConfig, context, true);
-    this.left = left;
-    this.right = right;
+    super(popConfig, context, true, left, right);
     joinType = popConfig.getJoinType();
     conditions = popConfig.getConditions();
     this.isRowKeyJoin = popConfig.isRowKeyJoin();
@@ -616,12 +594,12 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
   }
 
   @Override
-  public void setRowKeyJoinState(RowKeyJoinState newState) {
+  public void setRowKeyJoinState(RowKeyJoin.RowKeyJoinState newState) {
     this.rkJoinState = newState;
   }
 
   @Override
-  public RowKeyJoinState getRowKeyJoinState() {
+  public RowKeyJoin.RowKeyJoinState getRowKeyJoinState() {
     return rkJoinState;
   }
 

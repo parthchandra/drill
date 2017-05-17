@@ -26,6 +26,7 @@ import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.exec.work.foreman.SqlUnsupportedException;
 import org.apache.drill.exec.work.foreman.UnsupportedRelOperatorException;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.List;
@@ -583,7 +584,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test
-  public void testUnionAllRightEmptyBatch() throws Exception {
+  public void testUnionAllRightEmptyDataBatch() throws Exception {
     String rootSimple = FileUtils.getResourceAsFile("/store/json/booleanData.json").toURI().toString();
 
     String queryRightEmptyBatch = String.format(
@@ -603,7 +604,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test
-  public void testUnionAllLeftEmptyBatch() throws Exception {
+  public void testUnionAllLeftEmptyDataBatch() throws Exception {
     String rootSimple = FileUtils.getResourceAsFile("/store/json/booleanData.json").toURI().toString();
 
     final String queryLeftBatch = String.format(
@@ -624,7 +625,7 @@ public class TestUnionAll extends BaseTestQuery{
   }
 
   @Test
-  public void testUnionAllBothEmptyBatch() throws Exception {
+  public void testUnionAllBothEmptyDataBatch() throws Exception {
     String rootSimple = FileUtils.getResourceAsFile("/store/json/booleanData.json").toURI().toString();
     final String query = String.format(
         "select key from dfs_test.`%s` where 1 = 0 " +
@@ -635,7 +636,7 @@ public class TestUnionAll extends BaseTestQuery{
 
     final List<Pair<SchemaPath, TypeProtos.MajorType>> expectedSchema = Lists.newArrayList();
     final TypeProtos.MajorType majorType = TypeProtos.MajorType.newBuilder()
-        .setMinorType(TypeProtos.MinorType.INT)
+        .setMinorType(TypeProtos.MinorType.BIT) // field "key" is boolean type
         .setMode(TypeProtos.DataMode.OPTIONAL)
         .build();
     expectedSchema.add(Pair.of(SchemaPath.getSimplePath("key"), majorType));

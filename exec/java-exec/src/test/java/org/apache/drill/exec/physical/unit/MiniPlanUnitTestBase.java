@@ -49,9 +49,11 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static org.apache.drill.DrillTestWrapper.addToCombinedVectorResults;
 import static org.apache.drill.exec.physical.base.AbstractBase.INIT_ALLOCATION;
 import static org.apache.drill.exec.physical.base.AbstractBase.MAX_ALLOCATION;
 import static org.apache.drill.exec.physical.unit.TestMiniPlan.fs;
@@ -72,8 +74,9 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
   public static class MiniPlanTestBuilder {
     protected List<Map<String, Object>> baselineRecords;
     protected RecordBatch root;
-    protected boolean expectedZeroBatch;
-    protected BatchSchema expectedSchema;
+    protected Integer expectBatchNum = null;
+    protected BatchSchema expectSchema;
+    protected boolean expectZeroRow;
 
     /**
      * Specify the root operator for a MiniPlan.
@@ -90,8 +93,8 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
      * @param batchSchema
      * @return
      */
-    public MiniPlanTestBuilder expectedSchema(BatchSchema batchSchema) {
-      this.expectedSchema = batchSchema;
+    public MiniPlanTestBuilder expectSchema(BatchSchema batchSchema) {
+      this.expectSchema = batchSchema;
       return this;
     }
 
@@ -107,12 +110,12 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
 
       Map<String, Object> ret = new HashMap<>();
       int i = 0;
-      Preconditions.checkArgument(expectedSchema != null , "Expected schema should be set before specify baseline values.");
-      Preconditions.checkArgument(baselineValues.length == expectedSchema.getFieldCount(),
+      Preconditions.checkArgument(expectSchema != null , "Expected schema should be set before specify baseline values.");
+      Preconditions.checkArgument(baselineValues.length == expectSchema.getFieldCount(),
           "Must supply the same number of baseline values as columns in expected schema.");
 
-      for (MaterializedField field : expectedSchema) {
-        ret.put(SchemaPath.getSimplePath(field.getPath()).toExpr(), baselineValues[i]);
+      for (MaterializedField field : expectSchema) {
+        ret.put(SchemaPath.getSimplePath(field.getName()).toExpr(), baselineValues[i]);
         i++;
       }
 
@@ -122,11 +125,28 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
 
     /**
      * Specify one special case, where the operator tree should return 0 batch.
-     * @param expectedZeroBatch
+     * @param expectNullBatch
      * @return
      */
-    public MiniPlanTestBuilder expectZeroBatch(boolean expectedZeroBatch) {
-      this.expectedZeroBatch = expectedZeroBatch;
+    public MiniPlanTestBuilder expectNullBatch(boolean expectNullBatch) {
+      if (expectNullBatch) {
+        this.expectBatchNum = 0;
+      }
+      return this;
+    }
+
+    /**
+     * Specify the expected number of batches from operator tree.
+     * @param
+     * @return
+     */
+    public MiniPlanTestBuilder expectBatchNum(int expectBatchNum) {
+      this.expectBatchNum = expectBatchNum;
+      return this;
+    }
+
+    public MiniPlanTestBuilder expectZeroRow(boolean expectedZeroRow) {
+      this.expectZeroRow = expectedZeroRow;
       return this;
     }
 
@@ -134,16 +154,30 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
       final BatchIterator batchIterator = new BatchIterator(root);
 
       // verify case of zero batch.
-      if (expectedZeroBatch) {
+      if (expectBatchNum != null && expectBatchNum == 0) {
         if (batchIterator.iterator().hasNext()) {
-          throw new AssertionError("Expected zero batches from scan. But scan return at least 1 batch!");
+          throw new AssertionError("Expected zero batches from operator tree. But operators return at least 1 batch!");
         } else {
           return; // successful
         }
       }
+      Map<String, List<Object>> actualSuperVectors = new TreeMap();
 
-      Map<String, List<Object>> actualSuperVectors = DrillTestWrapper.addToCombinedVectorResults(batchIterator, expectedSchema);
-      Map<String, List<Object>> expectedSuperVectors = DrillTestWrapper.translateRecordListToHeapVectors(baselineRecords);
+      int actualBatchNum = DrillTestWrapper.addToCombinedVectorResults(batchIterator, expectSchema, actualSuperVectors);
+      if (expectBatchNum != null) {
+        if (expectBatchNum != actualBatchNum) {
+          throw new AssertionError(String.format("Expected %s batches from operator tree. But operators return %s batch!", expectBatchNum, actualBatchNum));
+        }
+      }
+      Map<String, List<Object>> expectedSuperVectors;
+      if (!expectZeroRow) {
+        expectedSuperVectors = DrillTestWrapper.translateRecordListToHeapVectors(baselineRecords);
+      } else {
+        expectedSuperVectors = new TreeMap<>();
+        for (MaterializedField field : expectSchema) {
+          expectedSuperVectors.put(SchemaPath.getSimplePath(field.getName()).toExpr(), new ArrayList<>());
+        }
+      }
       DrillTestWrapper.compareMergedVectors(expectedSuperVectors, actualSuperVectors);
     }
   }
@@ -224,7 +258,7 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
     }
 
     /**
-     * Set initial memory reservation used by this operator's allocator. Default is {@link PhysicalOpUnitTestBase#INIT_ALLOCATION}
+     * Set initial memory reservation used by this operator's allocator. Default is {@link org.apache.drill.exec.physical.base.AbstractBase#INIT_ALLOCATION}
      * @param initReservation
      * @return
      */
@@ -234,7 +268,7 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
     }
 
     /**
-     * Set max memory reservation used by this operator's allocator. Default is {@link PhysicalOpUnitTestBase#MAX_ALLOCATION}
+     * Set max memory reservation used by this operator's allocator. Default is {@link org.apache.drill.exec.physical.base.AbstractBase#MAX_ALLOCATION}
      * @param maxAllocation
      * @return
      */
@@ -369,7 +403,12 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
         readers = TestUtilities.getJsonReadersFromInputFiles(fs, inputPaths, fragContext, columnsToRead);
       }
 
-      RecordBatch scanBatch = new ScanBatch(null, fragContext, readers);
+      List<RecordReader> readerList = new ArrayList<>();
+      while(readers.hasNext()) {
+        readerList.add(readers.next());
+      }
+
+      RecordBatch scanBatch = new ScanBatch(null, fragContext, readerList);
       return scanBatch;
     }
   }
@@ -423,7 +462,7 @@ public class MiniPlanUnitTestBase extends PhysicalOpUnitTestBase {
         }
       }
 
-      RecordBatch scanBatch = new ScanBatch(null, fragContext, readers.iterator());
+      RecordBatch scanBatch = new ScanBatch(null, fragContext, readers);
       return scanBatch;
     }
   } // end of ParquetScanBuilder

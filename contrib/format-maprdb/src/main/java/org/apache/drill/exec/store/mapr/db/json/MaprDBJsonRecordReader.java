@@ -42,6 +42,7 @@ import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.util.EncodedSchemaPathSet;
+import org.apache.drill.exec.util.Utilities;
 import org.apache.drill.exec.vector.BaseValueVector;
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
 import org.apache.hadoop.fs.Path;
@@ -156,11 +157,11 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     Set<SchemaPath> encodedSchemaPathSet = Sets.newLinkedHashSet();
 
     if (disablePushdown) {
-      transformed.add(AbstractRecordReader.STAR_COLUMN);
+      transformed.add(Utilities.STAR_COLUMN);
       includeId = true;
     } else {
       if (isStarQuery()) {
-        transformed.add(AbstractRecordReader.STAR_COLUMN);
+        transformed.add(Utilities.STAR_COLUMN);
         includeId = true;
         if (isSkipQuery() && !disableCountOptimization) {
           // `SELECT COUNT(*)` query
@@ -196,7 +197,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
           // now we look at the fields which are part of encoded field set and either
           // add them to scanned set or clear the scanned set if all fields were requested.
           for (SchemaPath column : decodedSchemaPaths) {
-            if (column.equals(AbstractRecordReader.STAR_COLUMN)) {
+            if (column.equals(Utilities.STAR_COLUMN)) {
               includeId = true;
               scannedFieldsSet.clear();
               break;
