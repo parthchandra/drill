@@ -84,32 +84,45 @@ public class IndexSelector  {
     Map<LogicalExpression, RexNode> leadingPrefixMap = Maps.newHashMap();
     List<LogicalExpression> indexCols = indexProps.getIndexDesc().getIndexColumns();
 
-    if (indexCols.size() > 0 && initCondition != null) {
-      boolean prefix = true;
-      int i=0;
-      while (prefix && i < indexCols.size()) {
-        LogicalExpression p = indexCols.get(i++);
-        List<LogicalExpression> prefixCol = ImmutableList.of(p);
-        IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
-        if(info != null && info.hasIndexCol) {
-          // the col had a match with one of the conditions; save the information about
-          // indexcol --> condition mapping
-          leadingPrefixMap.put(p, info.indexCondition);
-          initCondition = info.remainderCondition;
-          if (initCondition.isAlwaysTrue()) {
-            // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
-            // we don't need to keep track of it for rest of the index selection
-            initCondition = null;
-            break;
+    if (indexCols.size() > 0) {
+      if (initCondition != null) { // check filter condition
+        if (!checkCollation()) {  // no collation requirement
+          boolean prefix = true;
+          int i=0;
+          while (prefix && i < indexCols.size()) {
+            LogicalExpression p = indexCols.get(i++);
+            List<LogicalExpression> prefixCol = ImmutableList.of(p);
+            IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
+            if(info != null && info.hasIndexCol) {
+              // the col had a match with one of the conditions; save the information about
+              // indexcol --> condition mapping
+              leadingPrefixMap.put(p, info.indexCondition);
+              initCondition = info.remainderCondition;
+              if (initCondition.isAlwaysTrue()) {
+                // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+                // we don't need to keep track of it for rest of the index selection
+                initCondition = null;
+                break;
+              }
+            } else {
+              prefix = false;
+            }
           }
-        } else {
-          prefix = false;
+        } else { // has collation requirement
+          // TODO:
         }
+      } else if (checkCollation()) { // no filter condition, only collation requirement
+        // TODO:
       }
     }
+
     logger.debug("Index {}: leading prefix map: {}, remainder condition: {}", indexProps.getIndexDesc().getIndexName(),
         leadingPrefixMap, initCondition);
     indexProps.setProperties(leadingPrefixMap, initCondition /* the remainder condition */, stats);
+  }
+
+  private boolean checkCollation() {
+    return false;
   }
 
   /**
