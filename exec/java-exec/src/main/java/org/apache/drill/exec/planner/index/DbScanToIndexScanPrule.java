@@ -270,6 +270,9 @@ public class DbScanToIndexScanPrule extends Prule {
       RexNode condition,
       IndexCollection collection,
       RexBuilder builder) {
+    double totalRows = 0;
+    double filterRows = totalRows;
+    DrillScanRel scan = indexContext.scan;
     if (! (indexContext.scan.getGroupScan() instanceof DbGroupScan) ) {
       return;
     }
@@ -284,6 +287,18 @@ public class DbScanToIndexScanPrule extends Prule {
     if (cInfo.indexCondition == null) {
       logger.debug("No conditions were found eligible for applying index lookup.");
       return;
+    }
+
+    if (scan.getGroupScan() instanceof DbGroupScan) {
+      // Initialize statistics
+      DbGroupScan dbScan = ((DbGroupScan) scan.getGroupScan());
+      dbScan.initializeStatistics(builder, settings);
+      totalRows = dbScan.getRowCount(null, scan);
+      filterRows = dbScan.getRowCount(condition, scan);
+      if (filterRows/(double)totalRows > Math.min(1.0, 2.0 * settings.getIndexSelectivityFactor())) {
+        // Generate full table scan only plans for selectivity > 2*index_selectivity_factor
+        return;
+      }
     }
 
     RexNode indexCondition = cInfo.indexCondition;
@@ -360,6 +375,8 @@ public class DbScanToIndexScanPrule extends Prule {
     try {
       for (FunctionalIndexInfo indexInfo : coveringIndexes) {
         IndexGroupScan idxScan = indexInfo.getIndexDesc().getIndexGroupScan();
+        //Copy primary table statistics to index table
+        idxScan.setStatistics(((DbGroupScan) scan.getGroupScan()).getStatistics());
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
 
         CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan,
@@ -374,6 +391,13 @@ public class DbScanToIndexScanPrule extends Prule {
     }
 
     if (createdCovering) {
+      // Force picking the index plan if selectivity less than index_selectivity_factor
+      if (totalRows!=0
+          && filterRows/totalRows < settings.getIndexSelectivityFactor()) {
+        // Generate index only plans for selectivity <= index_selectivity_factor
+        ((DbGroupScan)scan.getGroupScan()).setRowCount(null,
+            Statistics.ROWCOUNT_HUGE, Statistics.ROWCOUNT_HUGE);
+      }
       return;
     }
 
@@ -386,6 +410,8 @@ public class DbScanToIndexScanPrule extends Prule {
         if (nonCoveringIndexes.size() > 0) {
           IndexDescriptor index = selectIndexForNonCoveringPlan(indexContext.scan, nonCoveringIndexes);
           IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
+          //Copy primary table statistics to index table
+          idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index, idxScan, indexCondition,
               remainderCondition, builder, settings);
@@ -394,6 +420,13 @@ public class DbScanToIndexScanPrule extends Prule {
       } catch (Exception e) {
         logger.warn("Exception while trying to generate non-covering index access plan", e);
         return;
+      }
+      // Force picking the index plan if selectivity less than index_selectivity_factor
+      if (totalRows!=0 &&
+          filterRows/totalRows < settings.getIndexSelectivityFactor()) {
+        // Generate index only plans for selectivity <= index_selectivity_factor
+        ((DbGroupScan)scan.getGroupScan()).setRowCount(null,
+            Statistics.ROWCOUNT_HUGE, Statistics.ROWCOUNT_HUGE);
       }
     }
 
