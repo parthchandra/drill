@@ -21,10 +21,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.sun.tools.javac.util.Pair;
+
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.DrillTable;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.Collection;
 
@@ -58,7 +59,7 @@ public abstract class AbstractIndexGroupScan extends AbstractGroupScan implement
   }
 
   @Override
-  public double getRowCount(RexNode condition, ScanPrel scanPrel) {
+  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
     if(this.conditionRowCountPair.fst != null &&
         (this.conditionRowCountPair.fst == condition)) {
       return this.conditionRowCountPair.snd;

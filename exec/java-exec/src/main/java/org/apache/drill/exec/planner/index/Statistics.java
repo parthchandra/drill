@@ -18,7 +18,7 @@
 package org.apache.drill.exec.planner.index;
 
 import org.apache.calcite.rex.RexNode;
-import org.apache.drill.exec.planner.physical.ScanPrel;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 
 public interface Statistics {
 
@@ -30,5 +30,5 @@ public interface Statistics {
    *  @param condition - Filter specified as a {@link RexNode}
    *  @param scanPrel - The current scan physical rel
    */
-  double getRowCount(RexNode condition, ScanPrel scanPrel);
+  double getRowCount(RexNode condition, DrillScanRel scanRel);
 }

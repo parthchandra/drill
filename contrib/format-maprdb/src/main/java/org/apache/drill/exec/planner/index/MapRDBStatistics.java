@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rex.RexBuilder;
@@ -38,9 +39,9 @@ import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.Scan;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.hbase.HBaseRegexParser;
 import org.apache.drill.exec.store.mapr.db.json.JsonTableGroupScan;
 import org.apache.hadoop.hbase.HConstants;
@@ -86,18 +87,18 @@ public class MapRDBStatistics implements Statistics {
   public PlannerSettings getSettings() { return settings; }
 
   @Override
-  public double getRowCount(RexNode condition, ScanPrel scanPrel) {
+  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
     GroupScan scan;
     Preconditions.checkNotNull(builder, "Unable to getRowCount: Statistics not initialized properly(builder)");
     Preconditions.checkNotNull(settings, "Unable to getRowCount: Statistics not initialized properly(settings)");
-    if (scanPrel.getGroupScan() instanceof DbGroupScan) {
-      String conditionAsStr = convertRexToString(condition, scanPrel);
-      scan = scanPrel.getGroupScan();
+    if (scanRel.getGroupScan() instanceof DbGroupScan) {
+      String conditionAsStr = convertRexToString(condition, scanRel);
+      scan = scanRel.getGroupScan();
       if (statsCache.get(conditionAsStr) != null) {
         return statsCache.get(conditionAsStr);
       }
-      IndexCollection indexes = ((DbGroupScan)scan).getSecondaryIndexCollection(scanPrel);
-      return computeRowCount(condition, indexes, scanPrel);
+      IndexCollection indexes = ((DbGroupScan)scan).getSecondaryIndexCollection(scanRel);
+      return computeRowCount(condition, indexes, scanRel);
     } else {
       return ROWCOUNT_UNKNOWN;
     }
@@ -117,23 +118,23 @@ public class MapRDBStatistics implements Statistics {
     return ROWCOUNT_UNKNOWN;
   }
 
-  private double computeRowCount(RexNode condition, IndexCollection indexes, ScanPrel scanPrel) {
+  private double computeRowCount(RexNode condition, IndexCollection indexes, DrillScanRel scanRel) {
     double totalRows, selectivity;
     JsonTableGroupScan jTabGrpScan;
     Map<IndexDescriptor, IndexConditionInfo> leadingKeyIdxConditionMap;
     Map<IndexDescriptor, IndexConditionInfo> idxConditionMap;
-    String conditionAsStr = convertRexToString(condition, scanPrel);
+    String conditionAsStr = convertRexToString(condition, scanRel);
     if (statsCache.get(conditionAsStr) != null) {
       return statsCache.get(conditionAsStr);
     }
     IndexCollection keyRepIndexes = rowKeyRepIndexes(indexes);
-    if (scanPrel.getGroupScan() instanceof JsonTableGroupScan) {
-      jTabGrpScan = (JsonTableGroupScan) scanPrel.getGroupScan();
+    if (scanRel.getGroupScan() instanceof JsonTableGroupScan) {
+      jTabGrpScan = (JsonTableGroupScan) scanRel.getGroupScan();
     } else {
       return ROWCOUNT_UNKNOWN;
     }
     IndexConditionInfo.Builder infoBuilder = IndexConditionInfo.newBuilder(condition,
-        keyRepIndexes, builder, scanPrel);
+        keyRepIndexes, builder, scanRel);
     idxConditionMap = infoBuilder.getIndexConditionMap();
     leadingKeyIdxConditionMap = infoBuilder.getLeadingKeyIndexConditionMap();
 
@@ -143,29 +144,29 @@ public class MapRDBStatistics implements Statistics {
       // original condition everywhere else (cache store/lookups)
       RexNode preProcIdxCondition = preProcessCondition(idxCondition);
       QueryCondition queryCondition = jTabGrpScan.convertToQueryCondition(
-          convertToLogicalExpression(preProcIdxCondition, scanPrel));
-      double rowCount = jTabGrpScan.getEstimatedRowCount(queryCondition, idx, scanPrel);
-      addToCache(idxCondition, rowCount, jTabGrpScan, scanPrel);
+          convertToLogicalExpression(preProcIdxCondition, scanRel));
+      double rowCount = jTabGrpScan.getEstimatedRowCount(queryCondition, idx, scanRel);
+      addToCache(idxCondition, rowCount, jTabGrpScan, scanRel);
     }
     // Get total rows in the table
-    totalRows = jTabGrpScan.getRowCount(null, scanPrel);
+    totalRows = jTabGrpScan.getRowCount(null, scanRel);
     // Add the row count for index conditions on all indexes. Stats are only computed for leading keys but
     // index conditions can be pushed and would be required for access path costing
     RexNode idxRemCondition = null;
     for (IndexDescriptor idx : idxConditionMap.keySet()) {
       RexNode idxCondition = idxConditionMap.get(idx).indexCondition;
       idxRemCondition = idxConditionMap.get(idx).remainderCondition;
-      double rowCount = totalRows * computeSelectivity(idxCondition, totalRows, scanPrel);
-      addToCache(idxCondition, rowCount, jTabGrpScan, scanPrel);
+      double rowCount = totalRows * computeSelectivity(idxCondition, totalRows, scanRel);
+      addToCache(idxCondition, rowCount, jTabGrpScan, scanRel);
     }
     // Add the rowCount for non-pushable predicates
     if (idxRemCondition != null && !idxRemCondition.isAlwaysTrue()) {
-      double rowCount = totalRows * computeSelectivity(idxRemCondition, totalRows, scanPrel);
-      addToCache(idxRemCondition, rowCount, jTabGrpScan, scanPrel);
+      double rowCount = totalRows * computeSelectivity(idxRemCondition, totalRows, scanRel);
+      addToCache(idxRemCondition, rowCount, jTabGrpScan, scanRel);
     }
     // Add the rowCount for the complete condition
-    double rowCount = totalRows * computeSelectivity(condition, totalRows, scanPrel);
-    addToCache(condition, rowCount, jTabGrpScan, scanPrel);
+    double rowCount = totalRows * computeSelectivity(condition, totalRows, scanRel);
+    addToCache(condition, rowCount, jTabGrpScan, scanRel);
     return statsCache.get(conditionAsStr);
   }
 
@@ -173,15 +174,15 @@ public class MapRDBStatistics implements Statistics {
    * Also add the QueryCondition->RexNode condition mapping.
    */
   private void addToCache(RexNode condition, double rowcount, JsonTableGroupScan jTabGrpScan,
-      ScanPrel scanPrel) {
+      DrillScanRel scanRel) {
     if (condition != null) {
-      String conditionAsStr = convertRexToString(condition, scanPrel);
+      String conditionAsStr = convertRexToString(condition, scanRel);
       if (statsCache.get(conditionAsStr) == null) {
         statsCache.put(conditionAsStr, rowcount);
         logger.debug("StatsCache:<{}, {}>",conditionAsStr, rowcount);
       }
       QueryCondition queryCondition =
-          jTabGrpScan.convertToQueryCondition(convertToLogicalExpression(condition, scanPrel));
+          jTabGrpScan.convertToQueryCondition(convertToLogicalExpression(condition, scanRel));
       if (queryCondition != null) {
         String queryConditionAsStr = queryCondition.toString();
         if (conditionRexNodeMap.get(queryConditionAsStr) == null) {
@@ -194,9 +195,9 @@ public class MapRDBStatistics implements Statistics {
     }
   }
 
-  /*private String convertRexToString(RexNode condition, ScanPrel scanPrel) {
+  /*private String convertRexToString(RexNode condition, DrillScanRel scanRel) {
     LogicalExpression expr = DrillOptiq.toDrill(
-        new DrillParseContext(PrelUtil.getPlannerSettings(scanPrel.getCluster())), scanPrel, condition);
+        new DrillParseContext(PrelUtil.getPlannerSettings(scanRel.getCluster())), scanRel, condition);
     return expr.toString();
   }*/
   /*
@@ -205,17 +206,17 @@ public class MapRDBStatistics implements Statistics {
    * expressions may differ in the RexInputRef positions but otherwise the same.
    * e.g. $1 = 'CA' projection (State, Country) , $2 = 'CA' projection (Country, State)
    */
-  private String convertRexToString(RexNode condition, ScanPrel scanPrel) {
+  private String convertRexToString(RexNode condition, DrillScanRel scanRel) {
     StringBuilder sb = new StringBuilder();
     if (condition.getKind() == SqlKind.AND) {
       boolean first = true;
       for(RexNode pred : RelOptUtil.conjunctions(condition)) {
         if (first) {
-          sb.append(convertRexToString(pred, scanPrel));
+          sb.append(convertRexToString(pred, scanRel));
           first = false;
         } else {
           sb.append(" " + SqlKind.AND.toString() + " ");
-          sb.append(convertRexToString(pred, scanPrel));
+          sb.append(convertRexToString(pred, scanRel));
         }
       }
       return sb.toString();
@@ -223,17 +224,17 @@ public class MapRDBStatistics implements Statistics {
       boolean first = true;
       for(RexNode pred : RelOptUtil.disjunctions(condition)) {
         if (first) {
-          sb.append(convertRexToString(pred, scanPrel));
+          sb.append(convertRexToString(pred, scanRel));
           first = false;
         } else {
           sb.append(" " + SqlKind.OR.toString() + " ");
-          sb.append(convertRexToString(pred, scanPrel));
+          sb.append(convertRexToString(pred, scanRel));
         }
       }
       return sb.toString();
     } else {
       HashMap<String, String> inputRefMapping = new HashMap<>();
-      getInputRefMapping(condition, scanPrel, inputRefMapping);
+      getInputRefMapping(condition, scanRel, inputRefMapping);
       if (inputRefMapping.keySet().size() > 0) {
         //Found input ref - replace it
         String replCondition = condition.toString();
@@ -250,9 +251,9 @@ public class MapRDBStatistics implements Statistics {
         for (RexNode op : ((RexCall) condition).getOperands()) {
           if (op instanceof RexInputRef) {
             inputRef = op.toString();
-            inputColumn = scanPrel.getRowType().getFieldNames().get(op.hashCode());
+            inputColumn = scanRel.getRowType().getFieldNames().get(op.hashCode());
           } else {
-            convertRexToString(op, scanPrel);
+            convertRexToString(op, scanRel);
           }
         }
         return condition.toString().replace(inputRef, inputColumn);
@@ -261,15 +262,15 @@ public class MapRDBStatistics implements Statistics {
     }
   }
 
-  private void getInputRefMapping(RexNode condition, ScanPrel scanPrel,
+  private void getInputRefMapping(RexNode condition, DrillScanRel scanRel,
       HashMap<String, String> mapping) {
     if (condition instanceof RexCall) {
       for (RexNode op : ((RexCall) condition).getOperands()) {
-        getInputRefMapping(op, scanPrel, mapping);
+        getInputRefMapping(op, scanRel, mapping);
       }
     } else if (condition instanceof RexInputRef) {
       mapping.put(condition.toString(),
-          scanPrel.getRowType().getFieldNames().get(condition.hashCode()));
+          scanRel.getRowType().getFieldNames().get(condition.hashCode()));
     }
   }
 
@@ -416,9 +417,9 @@ public class MapRDBStatistics implements Statistics {
   /* Compute the selectivity of the given rowCondition. Retrieve the selectivity
    * for index conditions from the cache
    */
-  private double computeSelectivity(RexNode condition, double totalRows, ScanPrel scanPrel) {
+  private double computeSelectivity(RexNode condition, double totalRows, DrillScanRel scanRel) {
     double selectivity;
-    String conditionAsStr = convertRexToString(condition, scanPrel);
+    String conditionAsStr = convertRexToString(condition, scanRel);
     if (statsCache.get(conditionAsStr) != null) {
       selectivity = statsCache.get(conditionAsStr)/totalRows;
       logger.debug("computeSelectivity: Cache HIT: Found {} -> {}", conditionAsStr, selectivity);
@@ -426,12 +427,12 @@ public class MapRDBStatistics implements Statistics {
     } else if (condition.getKind() == SqlKind.AND) {
       selectivity = 1.0;
       for(RexNode pred : RelOptUtil.conjunctions(condition)) {
-        selectivity *= computeSelectivity(pred, totalRows, scanPrel);
+        selectivity *= computeSelectivity(pred, totalRows, scanRel);
       }
     } else if (condition.getKind() == SqlKind.OR) {
       selectivity = 0.0;
       for(RexNode pred : RelOptUtil.disjunctions(condition)) {
-        selectivity += computeSelectivity(pred, totalRows, scanPrel);
+        selectivity += computeSelectivity(pred, totalRows, scanRel);
       }
     } else {
       selectivity = RelMdUtil.guessSelectivity(condition);
@@ -445,7 +446,7 @@ public class MapRDBStatistics implements Statistics {
 
   private IndexCollection rowKeyRepIndexes(IndexCollection indexes) {
     Iterator<IndexDescriptor> iterator = indexes.iterator();
-    Map<SchemaPath, Boolean> rowKeyCols = new HashMap<>();
+    Map<LogicalExpression, Boolean> rowKeyCols = new HashMap<>();
     while (iterator.hasNext()) {
       IndexDescriptor index = iterator.next();
       // If index has columns - the first column is the leading column for the index
@@ -460,10 +461,10 @@ public class MapRDBStatistics implements Statistics {
     return indexes;
   }
 
-  private LogicalExpression convertToLogicalExpression(RexNode condition, ScanPrel scanPrel) {
+  private LogicalExpression convertToLogicalExpression(RexNode condition, DrillScanRel scanRel) {
     LogicalExpression conditionExp = null;
     try {
-      conditionExp = DrillOptiq.toDrill(new DrillParseContext(settings), scanPrel, condition);
+      conditionExp = DrillOptiq.toDrill(new DrillParseContext(settings), scanRel, condition);
     } catch (ClassCastException e) {
       return null;
     }

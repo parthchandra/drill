@@ -42,8 +42,8 @@ import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.index.IndexDescriptor;
 import org.apache.drill.exec.planner.index.MapRDBIndexDescriptor;
 import org.apache.drill.exec.planner.index.MapRDBStatistics;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -64,11 +64,13 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
+import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TabletInfo;
 import com.mapr.db.impl.TabletInfoImpl;
 import com.mapr.db.index.IndexDesc;
 import com.mapr.db.index.IndexFieldDesc;
+
 import org.ojai.store.QueryCondition;
 
 @JsonTypeName("maprdb-json-scan")
@@ -340,12 +342,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    * @param index, to use for generating the estimate
    * @return row count post filtering
    */
-  public double getEstimatedRowCount(QueryCondition condition, IndexDescriptor index, ScanPrel scanPrel) {
+  public double getEstimatedRowCount(QueryCondition condition, IndexDescriptor index, DrillScanRel scanRel) {
     if (condition == null) {
       return Statistics.ROWCOUNT_UNKNOWN;
     }
     return getEstimatedRowCountInternal(condition,
-        (IndexDesc)((MapRDBIndexDescriptor)index).getOriginalDesc(), scanPrel);
+        (IndexDesc)((MapRDBIndexDescriptor)index).getOriginalDesc(), scanRel);
   }
 
   /**
@@ -354,7 +356,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    * @param index, to use for generating the estimate
    * @return row count post filtering
    */
-  private double getEstimatedRowCountInternal(QueryCondition condition, IndexDesc index, ScanPrel scanPrel) {
+  private double getEstimatedRowCountInternal(QueryCondition condition, IndexDesc index, DrillScanRel scanRel) {
     // double totalRows = getRowCount(null, scanPrel);
     // Get the index table and use the DB API to get the estimated number of rows
     Table primaryTable;
@@ -399,13 +401,13 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    */
   @Override
   @JsonIgnore
-  public double getRowCount(RexNode condition, ScanPrel scanPrel) {
+  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
     // Do not use statistics if row count is forced. Forced rowcounts take precedence over stats
     if (forcedRowCountMap.get(condition) != null) {
       return forcedRowCountMap.get(condition);
     }
     if (condition != null) {
-      return stats.getRowCount(condition, scanPrel);
+      return stats.getRowCount(condition, scanRel);
     } else {
       return tableStats.getNumRows();
     }
