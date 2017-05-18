@@ -60,7 +60,7 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
   }
 
   private Double getSelectivity(DrillScanRel rel, RexNode predicate) {
-    double ROWCOUNT_UNKNOWN = -1;
+    /*double ROWCOUNT_UNKNOWN = -1;
     GroupScan scan = rel.getGroupScan();
     if (scan instanceof DbGroupScan) {
       double filterRows = ((DbGroupScan) scan).getRowCount(predicate, rel);
@@ -68,7 +68,7 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
       if (filterRows != ROWCOUNT_UNKNOWN) {
         return filterRows/totalRows;
       }
-    }
+    }*/
     return super.getSelectivity(rel, predicate);
   }
 }

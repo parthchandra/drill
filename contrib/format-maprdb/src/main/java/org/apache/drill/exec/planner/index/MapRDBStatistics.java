@@ -109,7 +109,7 @@ public class MapRDBStatistics implements Statistics {
   }
 
   public boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context) {
-    GroupScan scan;
+    /*GroupScan scan;
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
       String conditionAsStr = convertRexToString(condition, scanRel);
       scan = scanRel.getGroupScan();
@@ -118,7 +118,7 @@ public class MapRDBStatistics implements Statistics {
         populateRowCount(condition, indexes, scanRel, context);
         return true;
       }
-    }
+    }*/
     return false;
   }
 
