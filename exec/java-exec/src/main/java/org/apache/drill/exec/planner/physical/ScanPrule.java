@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.planner.physical;
 
-import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -31,10 +30,15 @@ public class ScanPrule extends Prule{
 
   public ScanPrule() {
     super(RelOptHelper.any(DrillScanRel.class), "Prel.ScanPrule");
-
   }
+
   @Override
   public void onMatch(RelOptRuleCall call) {
+    // if full table scan is disabled, don't generate the physical scan
+    if (PrelUtil.getPlannerSettings(call.getPlanner()).isDisableFullTableScan()) {
+      return;
+    }
+
     final DrillScanRel scan = (DrillScanRel) call.rel(0);
 
     GroupScan groupScan = scan.getGroupScan();
