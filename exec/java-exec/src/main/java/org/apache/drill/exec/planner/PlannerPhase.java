@@ -374,6 +374,11 @@ public enum PlannerPhase {
    *
    */
   static RuleSet getIndexRules(OptimizerRulesContext optimizerRulesContext) {
+    final PlannerSettings ps = optimizerRulesContext.getPlannerSettings();
+    if (!ps.isIndexPlanningEnabled()) {
+      return RuleSets.ofList(ImmutableSet.<RelOptRule>builder().build());
+    }
+
     final ImmutableSet<RelOptRule> indexRules = ImmutableSet.<RelOptRule>builder()
         .add(
             DbScanToIndexScanPrule.REL_FILTER_SCAN,
