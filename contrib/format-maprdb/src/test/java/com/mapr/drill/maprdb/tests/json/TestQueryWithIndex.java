@@ -42,4 +42,19 @@ public class TestQueryWithIndex extends BaseJsonTest {
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
   }
 
+  @Test
+  public void testSelectWithHashedIndex() throws Exception {
+    final String sql = "SELECT\n"
+        + "  _id, t.name.last\n"
+        + "FROM\n"
+        + "  hbase.`drill_test_table_with_hashed_index` t\n"
+        + "WHERE t.name.last = 'Harris2345'";
+    runSQLAndVerifyCount(sql, 1);
+
+    // plan test
+    final String[] expectedPlan = {"indexName=testhashedindex"};
+    final String[] excludedPlan = {};
+
+    PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
+  }
 }
