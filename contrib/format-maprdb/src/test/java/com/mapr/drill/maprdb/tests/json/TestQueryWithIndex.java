@@ -32,7 +32,7 @@ public class TestQueryWithIndex extends BaseJsonTest {
         + "  _id, t.name.last\n"
         + "FROM\n"
         + "  hbase.`drill_test_table_with_index` t\n"
-        + "WHERE t.name.last = 'Russel'";
+        + "WHERE t.name.last = 'Harris2345'";
     runSQLAndVerifyCount(sql, 1);
 
     // plan test

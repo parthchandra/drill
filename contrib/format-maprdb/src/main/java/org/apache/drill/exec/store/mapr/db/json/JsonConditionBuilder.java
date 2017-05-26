@@ -251,7 +251,7 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
       IndexFieldDesc[] indexedFields = groupScan.getIndexedFields();
       return new JsonScanSpec(groupScan.getTableName(),
                               groupScan.getIndexDesc(),
-                              cond);
+                              cond.build());
     }
 
     return null;
