@@ -202,11 +202,7 @@ public class MaprDBTestsSuite {
       for (int i = 0; i < 10000; ++ i) {
     	  table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user" + i + "\", \"age\":" + i + ", \"name\": {\"first\":\"Sam" + i + "\", \"last\":\"Harris" + i + "\"}}"));
       }
-      //table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user001\", \"age\":43, \"name\": {\"first\":\"Sam\", \"last\":\"Harris\"}}"));
-      //table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user002\", \"age\":12, \"name\": {\"first\":\"Leon\", \"last\":\"Russel\"}}"));
-      //table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user003\", \"age\":87, \"name\": {\"first\":\"David\", \"last\":\"Bowie\"}}"));
-      //table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user004\", \"age\":56, \"name\": {\"first\":\"Bob\", \"last\":\"Dylan\"}}"));
-      //table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user005\", \"age\":54, \"name\": {\"first\":\"David\", \"last\":\"Ackert\"}}"));
+
       table.flush();
 
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
