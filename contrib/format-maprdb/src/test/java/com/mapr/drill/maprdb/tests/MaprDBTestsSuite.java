@@ -60,6 +60,8 @@ public class MaprDBTestsSuite {
   private static final String TMP_BUSINESS_TABLE = "/tmp/business";
 
   private static final String TMP_TABLE_WITH_INDEX = "/tmp/drill_test_table_with_index";
+  
+  private static final String TMP_TABLE_WITH_HASHED_INDEX = "/tmp/drill_test_table_with_hashed_index";
 
   private static final boolean IS_DEBUG = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
@@ -78,6 +80,7 @@ public class MaprDBTestsSuite {
 
           admin = MapRDB.newAdmin();
           createTableWithIndex();
+          createTableWithHashedIndex();
           createBusinessTable();
 
           // Sleep to allow table data to be flushed to tables.
@@ -207,9 +210,38 @@ public class MaprDBTestsSuite {
 
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
     }
-
   }
 
+  @SuppressWarnings("deprecation")
+  public static void createTableWithHashedIndex() throws Exception {
+    if (admin.tableExists(TMP_TABLE_WITH_HASHED_INDEX)) {
+      admin.deleteTable(TMP_TABLE_WITH_HASHED_INDEX);
+    }
+    try (Table table = admin.createTable(TMP_TABLE_WITH_HASHED_INDEX)) {
+
+      // create index
+      TestCluster.runCommand(
+          "maprcli table index add"
+          + " -path " + table.getPath()
+          + " -index testhashedindex"
+          + " -indexedfields '\"name.last\":1'"
+          + " -nonindexedfields '\"age\":1'"
+          + " -hashed true"
+          + " -numhashpartitions 5");
+      // FIXME: refresh the index schema, without this the puts are not getting propagated to indexes
+      DBTests.admin().getTableIndexes(table.getPath(), true);
+
+      // insert data
+      for (int i = 0; i < 10000; ++ i) {
+    	  table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user" + i + "\", \"age\":" + i + ", \"name\": {\"first\":\"Sam" + i + "\", \"last\":\"Harris" + i + "\"}}"));
+      }
+
+      table.flush();
+
+      DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
+    }
+  }
+  
   public static void createBusinessTable() throws IOException {
     if (admin.tableExists(TMP_BUSINESS_TABLE)) {
       admin.deleteTable(TMP_BUSINESS_TABLE);
@@ -232,6 +264,9 @@ public class MaprDBTestsSuite {
       }
       if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
         admin.deleteTable(TMP_TABLE_WITH_INDEX);
+      }
+      if (admin.tableExists(TMP_TABLE_WITH_HASHED_INDEX)) {
+        admin.deleteTable(TMP_TABLE_WITH_HASHED_INDEX);
       }
     }
   }
