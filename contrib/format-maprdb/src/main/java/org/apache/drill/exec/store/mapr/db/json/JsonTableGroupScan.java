@@ -120,9 +120,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexFid());
       MetaTable metaTable = t.getMetaTable();
       QueryCondition scanSpecCondition = scanSpec.getCondition();
-      //if (scanSpecCondition != null) {
-      //  scanSpecCondition.build();
-      //}
       List<? extends ScanRange> scanRanges = metaTable.getScanRanges(scanSpecCondition);
       
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
@@ -131,7 +128,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       for (ScanRange range : scanRanges) {
         TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) range;
         regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), range.getLocations()[0]);
-        //System.err.println("Scan Range: startkey = " + tabletInfoImpl.getStartRow() + " stoprow = " + tabletInfoImpl.getStopRow());
       }
     } catch (Exception e) {
       throw new DrillRuntimeException("Error getting region info for table: " +
