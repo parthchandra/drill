@@ -29,7 +29,6 @@ import org.ojai.store.QueryCondition.Op;
 
 import com.google.common.collect.ImmutableList;
 import com.mapr.db.MapRDB;
-import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.index.IndexFieldDesc;
 
 public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void, RuntimeException> implements DrillHBaseConstants {
@@ -252,7 +251,7 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
       IndexFieldDesc[] indexedFields = groupScan.getIndexedFields();
       return new JsonScanSpec(groupScan.getTableName(),
                               groupScan.getIndexDesc(),
-                              ((ConditionImpl)cond).setPartitionKeys(indexedFields).build());
+                              cond);
     }
 
     return null;

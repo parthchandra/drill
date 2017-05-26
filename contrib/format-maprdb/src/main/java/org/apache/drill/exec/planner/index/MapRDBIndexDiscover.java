@@ -81,6 +81,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       Set<DrillIndexDescriptor> idxSet = new HashSet<>();
       Collection<IndexDesc> indexes = admin().getTableIndexes(new Path(tableName));
       for (IndexDesc idx : indexes) {
+        System.err.println("JJS Found index " + idx.getIndexFid() + " is hashed =" + idx.isHashed());
         DrillIndexDescriptor hbaseIdx = buildIndexDescriptor(tableName, idx);
         if (hbaseIdx == null) {
           //not able to build a valid index based on the index info from MFS

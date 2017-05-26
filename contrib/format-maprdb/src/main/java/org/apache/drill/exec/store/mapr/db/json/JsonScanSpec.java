@@ -133,8 +133,7 @@ public class JsonScanSpec {
   @SuppressWarnings("deprecation")
   public void mergeScanSpec(String functionName, JsonScanSpec scanSpec) {
     if (this.condition != null && scanSpec.getCondition() != null) {
-      QueryCondition newCond = ((ConditionImpl)MapRDB.newCondition())
-          .setPartitionKeys(((ConditionImpl)this.condition).getPartitionKeys());
+      QueryCondition newCond = MapRDB.newCondition();
       switch (functionName) {
       case "booleanAnd":
         newCond.and();
