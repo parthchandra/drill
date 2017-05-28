@@ -71,12 +71,11 @@ public class IndexSelector  {
   }
 
   /**
-   * This method take an index descriptor and starting from the first column, checks
+   * This method analyzes an index's columns and starting from the first column, checks
    * which part of the filter condition matches that column.  This process continues with
    * subsequent columns.  The goal is to identify the portion of the filter condition that
    * match the prefix columns.  If there are additional conditions that don't match prefix
    * columns, that condition is set as a remainder condition.
-   * @param index
    * @param indexProps
    */
   public void analyzePrefixMatches(IndexProperties indexProps) {

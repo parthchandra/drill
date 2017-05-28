@@ -20,8 +20,6 @@ package org.apache.drill.exec.planner.index;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.AbstractIndexGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillTable;
@@ -69,13 +67,10 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
         logger.error("The Groupscan from table {} is not an IndexGroupScan", idxTable.toString());
         return null;
       }
-      if (scan instanceof AbstractIndexGroupScan) {
-        ((AbstractIndexGroupScan)scan).convertColumns(idxTable);
-      }
       return (IndexGroupScan)scan;
     }
     catch(IOException e) {
-      logger.error("Error in getIndexGroupScan: [{}]", e.getStackTrace());
+      logger.error("Error in getIndexGroupScan ", e);
     }
     return null;
   }
