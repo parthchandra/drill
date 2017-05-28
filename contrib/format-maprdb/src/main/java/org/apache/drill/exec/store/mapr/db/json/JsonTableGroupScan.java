@@ -426,6 +426,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   @Override
   @JsonIgnore
+  public List<SchemaPath> getColumns() {
+    return columns;
+  }
+
+  @Override
+  @JsonIgnore
   public PartitionFunction getRangePartitionFunction(List<FieldReference> refList) {
     return new JsonTableRangePartitionFunction(refList, scanSpec.getTableName());
   }

@@ -19,24 +19,14 @@
 package org.apache.drill.exec.planner.index;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
-import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.drill.common.expression.CastExpression;
-import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
-import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -46,13 +36,10 @@ import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Generate a covering index plan that is equivalent to the original plan.
@@ -79,7 +66,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     super(indexContext, indexCondition, remainderCondition, builder, settings);
     this.indexGroupScan = indexGroupScan;
     this.functionInfo = functionInfo;
-    this.indexDesc = this.functionInfo.getIndexDesc();
+    this.indexDesc = functionInfo.getIndexDesc();
   }
 
   private RelDataType rewriteFunctionalRowType(RelDataType origRowType, FunctionalIndexInfo functionInfo) {
@@ -190,6 +177,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         this.functionInfo));
 
     RelDataType newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(origScan, indexContext, functionInfo);
+
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
         origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexGroupScan,
         newRowType);
@@ -247,7 +235,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     finalRel = Prule.convert(finalRel, finalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
 
-    logger.trace("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original disgest {}, new digest {}.",
+    logger.trace("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original digest {}, new digest {}.",
         finalRel.toString(), origScan.toString(), capProject==null?indexContext.filter.getDigest(): capProject.getDigest(), finalRel.getDigest());
     return finalRel;
   }

@@ -65,5 +65,9 @@ public interface IndexGroupScan extends GroupScan {
   public void setStatistics(Statistics statistics);
 
   @JsonIgnore
-  void setColumns(List<SchemaPath> columns);
+  public void setColumns(List<SchemaPath> columns);
+
+  @JsonIgnore
+  public List<SchemaPath> getColumns();
+
 }
