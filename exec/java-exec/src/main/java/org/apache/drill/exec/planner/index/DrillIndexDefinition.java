@@ -19,18 +19,17 @@ package org.apache.drill.exec.planner.index;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
+
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationImpl;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.types.TypeProtos;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 public class DrillIndexDefinition implements IndexDefinition {
@@ -57,7 +56,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final List<LogicalExpression> rowKeyColumns;
 
   @JsonProperty
-  protected final List<FieldDirection> indexColDirections;
+  protected final List<RelFieldCollation> indexFieldCollations;
 
   /**
    * indexName: name of the index that should be unique within the scope of a table
@@ -71,7 +70,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final IndexDescriptor.IndexType indexType;
 
   public DrillIndexDefinition(List<LogicalExpression> indexCols,
-                              List<FieldDirection> indexColDirections,
+                                 List<RelFieldCollation> indexFieldCollations,
                                  List<LogicalExpression> nonIndexCols,
                                  List<LogicalExpression> rowKeyColumns,
                                  String indexName,
@@ -85,7 +84,7 @@ public class DrillIndexDefinition implements IndexDefinition {
     this.indexType = type;
     this.allIndexColumns = Sets.newHashSet(indexColumns);
     this.allIndexColumns.addAll(nonIndexColumns);
-    this.indexColDirections = indexColDirections;
+    this.indexFieldCollations = indexFieldCollations;
 
   }
 
@@ -214,8 +213,14 @@ public class DrillIndexDefinition implements IndexDefinition {
 
   @Override
   @JsonProperty
-  public List<FieldDirection> getIndexColDirections() {
-    return this.indexColDirections;
+  public List<RelFieldCollation> getIndexFieldCollations() {
+    return this.indexFieldCollations;
+  }
+
+  @Override
+  @JsonIgnore
+  public RelCollation getCollation() {
+    return RelCollationImpl.of(indexFieldCollations);
   }
 
 }

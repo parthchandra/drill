@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -37,13 +38,13 @@ public abstract class AbstractIndexDescriptor extends DrillIndexDefinition imple
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexDescriptor .class);
 
   public AbstractIndexDescriptor(List<LogicalExpression> indexCols,
-                                 List<FieldDirection> indexColDirections,
+                                 List<RelFieldCollation> indexFieldCollations,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
-    super(indexCols, indexColDirections, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexFieldCollations, nonIndexCols, rowKeyColumns, indexName, tableName, type);
   }
 
   @Override
