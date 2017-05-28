@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.CommonTokenStream;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.ExpressionPosition;
 import org.apache.drill.common.expression.FunctionCallFactory;
@@ -40,7 +41,6 @@ import org.apache.drill.exec.physical.base.AbstractDbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.logical.DrillTable;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.dfs.DrillFileSystem;
 import org.apache.drill.exec.store.dfs.FileSelection;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -50,8 +50,6 @@ import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import org.apache.drill.exec.planner.index.IndexDefinition.FieldDirection;
 
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
@@ -268,14 +266,24 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     return listSchema;
   }
 
-  private List<FieldDirection> fieldDirection(Collection<IndexFieldDesc> descCollection) {
-    List<FieldDirection> listDirection = new ArrayList<>();
+  private List<RelFieldCollation> getFieldCollations(Collection<IndexFieldDesc> descCollection) {
+    List<RelFieldCollation> fieldCollations = new ArrayList<>();
+    int i=0;
     for (IndexFieldDesc field : descCollection) {
-      FieldDirection direction = (field.getSortOrder() == IndexFieldDesc.Order.Asc) ?
-          FieldDirection.ASC : (field.getSortOrder() == IndexFieldDesc.Order.Desc ? FieldDirection.DESC : FieldDirection.NONE);
-      listDirection.add(direction);
+      RelFieldCollation.Direction direction = (field.getSortOrder() == IndexFieldDesc.Order.Asc) ?
+          RelFieldCollation.Direction.ASCENDING : (field.getSortOrder() == IndexFieldDesc.Order.Desc ?
+              RelFieldCollation.Direction.DESCENDING : null);
+      if (direction != null) {
+        // assume null direction of NULLS LAST for now until MapR-DB adds that to the APIs
+        RelFieldCollation.NullDirection nulldir = RelFieldCollation.NullDirection.LAST;
+        RelFieldCollation c = new RelFieldCollation(i++, direction, nulldir);
+        fieldCollations.add(c);
+      } else {
+        // if the direction is not present for a field, no need to examine remaining fields
+        break;
+      }
     }
-    return listDirection;
+    return fieldCollations;
   }
 
   private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc)
@@ -288,11 +296,11 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
     List<LogicalExpression> indexFields = field2SchemaPath(desc.getIndexedFields());
     List<LogicalExpression> coveringFields = field2SchemaPath(desc.getCoveredFields());
-    List<FieldDirection> indexDirection = fieldDirection(desc.getIndexedFields());
+    List<RelFieldCollation> indexFieldCollations = getFieldCollations(desc.getIndexedFields());
     coveringFields.add(SchemaPath.getSimplePath("_id"));
     DrillIndexDescriptor idx = new MapRDBIndexDescriptor (
         indexFields,
-        indexDirection,
+        indexFieldCollations,
         coveringFields,
         null,
         desc.getIndexName(),

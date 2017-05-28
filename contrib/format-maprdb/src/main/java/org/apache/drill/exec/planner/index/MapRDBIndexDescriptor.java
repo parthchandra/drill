@@ -23,8 +23,10 @@ import java.util.List;
 import java.util.Set;
 
 import com.google.common.collect.Lists;
+
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.expr.CloneVisitor;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -49,14 +51,14 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   protected MapRDBFunctionalIndexInfo functionalInfo;
 
   public MapRDBIndexDescriptor(List<LogicalExpression> indexCols,
-                               List<FieldDirection> indexColDirections,
+                               List<RelFieldCollation> indexFieldCollations,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type,
                                Object desc) {
-    super(indexCols, indexColDirections, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexFieldCollations, nonIndexCols, rowKeyColumns, indexName, tableName, type);
     this.desc = desc;
     this.indexedFields = ImmutableSet.copyOf(indexColumns);
     this.allFields = new ImmutableSet.Builder<LogicalExpression>()
