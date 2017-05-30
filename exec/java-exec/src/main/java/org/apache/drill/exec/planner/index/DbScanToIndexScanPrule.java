@@ -20,11 +20,13 @@ package org.apache.drill.exec.planner.index;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.volcano.RelSubset;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -33,17 +35,18 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.common.DrillRelNode;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
 import org.apache.drill.exec.planner.logical.partition.RewriteAsBinaryOperators;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.Prule;
-
 
 import java.util.List;
 import java.util.Map;
@@ -55,22 +58,32 @@ public class DbScanToIndexScanPrule extends Prule {
   final public MatchFunction match;
 
   public static final RelOptRule REL_FILTER_SCAN = new DbScanToIndexScanPrule(
-      RelOptHelper.some(RelNode.class, RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class))),
-      "DbScanToIndexScanRule:Rel_Filter_Scan", new MatchPFS());
+      RelOptHelper.some(DrillRelNode.class, RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class))),
+      "DbScanToIndexScanPrule:Rel_Filter_Scan", new MatchPFS());
 
-  public static final RelOptRule REL_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
-      RelOptHelper.some(RelNode.class, RelOptHelper.some(DrillFilterRel.class,
-          RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
-      "DbScanToIndexScanRule:Rel_Filter_Project_Scan", new MatchPFPS());
+  public static final RelOptRule PROJECT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
+         RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
+     "DbScanToIndexScanPrule:Project_Filter_Project_Scan", new MatchPFPS());
+
+  public static final RelOptRule SORT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+     RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillFilterRel.class,
+        RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
+    "DbScanToIndexScanPrule:Sort_Filter_Project_Scan", new MatchSFPS());
+
+  public static final RelOptRule SORT_PROJECT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
+          RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))))),
+      "DbScanToIndexScanPrule:Sort_Project_Filter_Project_Scan", new MatchSPFPS());
 
   public static final RelOptRule FILTER_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class)),
-      "DbScanToIndexScanRule:Filter_On_Scan", new MatchFS());
+      "DbScanToIndexScanPrule:Filter_On_Scan", new MatchFS());
 
   public static final RelOptRule FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillFilterRel.class,
           RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))),
-      "DbScanToIndexScanRule:Filter_Project_Scan", new MatchFPS());
+      "DbScanToIndexScanPrule:Filter_Project_Scan", new MatchFPS());
 
   private DbScanToIndexScanPrule(RelOptRuleOperand operand, String description, MatchFunction match) {
     super(operand, description);
@@ -166,12 +179,15 @@ public class DbScanToIndexScanPrule extends Prule {
 
     public IndexPlanCallContext onMatch(RelOptRuleCall call) {
       DrillProjectRel capProject = null;
+      DrillSortRel sort = null;
       if (call.rel(0) instanceof DrillProjectRel) {
         capProject = call.rel(0);
+      } else if (call.rel(0) instanceof DrillSortRel) {
+        sort = call.rel(0);
       }
       final DrillFilterRel filter = call.rel(1);
       final DrillScanRel scan = call.rel(2);
-      return new IndexPlanCallContext(call, capProject, filter, null, scan);
+      return new IndexPlanCallContext(call, sort, capProject, filter, null, scan);
     }
   }
 
@@ -182,15 +198,42 @@ public class DbScanToIndexScanPrule extends Prule {
     }
 
     public IndexPlanCallContext onMatch(RelOptRuleCall call) {
-      DrillProjectRel capProject = null;
-      if (call.rel(0) instanceof DrillProjectRel) {
-        capProject = call.rel(0);
-      }
-
+      final DrillProjectRel capProject = call.rel(0);
       final DrillFilterRel filter = call.rel(1);
       final DrillProjectRel project = call.rel(2);
       final DrillScanRel scan = call.rel(3);
-      return new IndexPlanCallContext(call, capProject, filter, project, scan);
+      return new IndexPlanCallContext(call, null, capProject, filter, project, scan);
+    }
+  }
+
+  private static class MatchSFPS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(3);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillSortRel sort = call.rel(0);
+      final DrillFilterRel filter = call.rel(1);
+      final DrillProjectRel project = call.rel(2);
+      final DrillScanRel scan = call.rel(3);
+      return new IndexPlanCallContext(call, sort, null, filter, project, scan);
+    }
+  }
+
+  private static class MatchSPFPS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(4);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillSortRel sort = call.rel(0);
+      final DrillProjectRel capProject = call.rel(1);
+      final DrillFilterRel filter = call.rel(2);
+      final DrillProjectRel project = call.rel(3);
+      final DrillScanRel scan = call.rel(4);
+      return new IndexPlanCallContext(call, sort, capProject, filter, project, scan);
     }
   }
 
@@ -217,11 +260,10 @@ public class DbScanToIndexScanPrule extends Prule {
     condition = condition.accept(visitor);
 
     if (indexCollection.supportsIndexSelection()) {
-      processWithoutIndexSelection(indexContext, settings, condition,
-          indexCollection, builder);
-    } else {
       processWithIndexSelection(indexContext, settings, condition,
           indexCollection, builder);
+    } else {
+      throw new UnsupportedOperationException("Index collection must support index selection");
     }
     indexPlanTimer.stop();
     logger.debug("Index Plan took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
@@ -269,7 +311,7 @@ public class DbScanToIndexScanPrule extends Prule {
   /**
    *
    */
-  private void processWithoutIndexSelection(
+  private void processWithIndexSelection(
       IndexPlanCallContext indexContext,
       PlannerSettings settings,
       RexNode condition,
@@ -309,50 +351,62 @@ public class DbScanToIndexScanPrule extends Prule {
     RexNode indexCondition = cInfo.indexCondition;
     RexNode remainderCondition = cInfo.remainderCondition;
 
-    List<FunctionalIndexInfo> coveringIndexes = Lists.newArrayList();
+    List<IndexDescriptor> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
 
-    IndexSelector selector = new IndexSelector(indexCondition, collection,
-        ((DbGroupScan) scan.getGroupScan()).getStatistics(),
-        builder,
-        indexContext.call.getPlanner(),
-        totalRows,
-        scan);
-
-
-    // get the list of covering and non-covering indexes for this collection
-    for (IndexDescriptor indexDesc : collection) {
-      if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
-        FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-        if (isCoveringIndex(indexContext, functionInfo)) {
-          coveringIndexes.add(functionInfo);
-        } else {
-          nonCoveringIndexes.add(indexDesc);
-        }
-
-        selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
-            indexContext.project != null ? indexContext.project.getRowType().getFieldCount() :
-              scan.getRowType().getFieldCount());
-
-      }
+    RelCollation collation = null;
+    if (indexContext.sort != null) {
+      collation = indexContext.sort.getCollation();
     }
 
-    /******Commented out temporarily until testing issues are resolved************/
-    // selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
+    if (settings.isCostBasedIndexSelectionEnabled()) {
+      IndexSelector selector = new IndexSelector(indexCondition,
+          collation,
+          collection,
+          ((DbGroupScan) scan.getGroupScan()).getStatistics(),
+          builder,
+          indexContext.call.getPlanner(),
+          totalRows,
+          scan);
 
+      for (IndexDescriptor indexDesc : collection) {
+        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
+          FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+          selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
+              indexContext.project != null ? indexContext.project.getRowType().getFieldCount() :
+                scan.getRowType().getFieldCount());
+        }
+      }
+
+      // get the candidate indexes based on selection
+      selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
+
+    } else {
+      // get the list of covering and non-covering indexes for this collection
+      for (IndexDescriptor indexDesc : collection) {
+        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
+          FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+          if (isCoveringIndex(indexContext, functionInfo)) {
+            coveringIndexes.add(indexDesc);
+          } else {
+            nonCoveringIndexes.add(indexDesc);
+          }
+        }
+      }
+    }
 
     if (logger.isDebugEnabled()) {
       StringBuffer strBuf = new StringBuffer();
       strBuf.append("Split  indexes:");
       if (coveringIndexes.size() > 0) {
-        for (FunctionalIndexInfo coveringIdxInfo : coveringIndexes) {
-          strBuf.append(coveringIdxInfo.getIndexDesc().getIndexName()).append(",");
+        for (IndexDescriptor indexDesc : coveringIndexes) {
+          strBuf.append(indexDesc.getIndexName()).append(",");
         }
       }
       if(nonCoveringIndexes.size() > 0) {
         strBuf.append("non-covering indexes:");
-        for (IndexDescriptor coveringIdx : nonCoveringIndexes) {
-          strBuf.append(coveringIdx.getIndexName()).append(",");
+        for (IndexDescriptor indexDesc : nonCoveringIndexes) {
+          strBuf.append(indexDesc.getIndexName()).append(",");
         }
       }
       logger.debug(strBuf.toString());
@@ -395,8 +449,9 @@ public class DbScanToIndexScanPrule extends Prule {
 
     boolean createdCovering = false;
     try {
-      for (FunctionalIndexInfo indexInfo : coveringIndexes) {
-        IndexGroupScan idxScan = indexInfo.getIndexDesc().getIndexGroupScan();
+      for (IndexDescriptor indexDesc : coveringIndexes) {
+        IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
+        FunctionalIndexInfo indexInfo = indexDesc.getFunctionalInfo();
         //Copy primary table statistics to index table
         idxScan.setStatistics(((DbGroupScan) scan.getGroupScan()).getStatistics());
         logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
@@ -437,18 +492,6 @@ public class DbScanToIndexScanPrule extends Prule {
         return;
       }
     }
-  }
-
-  private void processWithIndexSelection(
-      IndexPlanCallContext indexContext,
-      PlannerSettings settings,
-      RexNode condition,
-      IndexCollection collection,
-      RexBuilder builder)
-  {
-
-    IndexConditionInfo cInfo = IndexConditionInfo.newBuilder(condition, collection, builder, indexContext.scan).getCollectiveInfo();
-
   }
 
   /**

@@ -127,6 +127,7 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       PlannerSettings.MAX_CANDIDATE_INDEXES_PER_TABLE,
       PlannerSettings.INDEX_IO_COST_FACTOR,
       PlannerSettings.DISABLE_FULL_TABLE_SCAN,
+      PlannerSettings.COST_BASED_INDEX_SEL,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,
