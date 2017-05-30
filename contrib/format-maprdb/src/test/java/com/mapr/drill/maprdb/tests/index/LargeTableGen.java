@@ -27,9 +27,9 @@ import org.ojai.DocumentStream;
 import org.ojai.json.Json;
 
 import com.mapr.db.Admin;
-import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TableDescriptor;
+import com.mapr.db.impl.MapRDBImpl;
 import com.mapr.db.impl.TableDescriptorImpl;
 import com.mapr.db.tests.utils.DBTests;
 import com.mapr.fs.utils.ssh.TestCluster;
@@ -66,7 +66,7 @@ public class LargeTableGen extends LargeTableGenBase {
 
   Table createOrGetTable(String tableName, int recordNum) {
     if (admin.tableExists(tableName)) {
-      return MapRDB.getTable(tableName);
+      return MapRDBImpl.getTable(tableName);
       //admin.deleteTable(tableName);
     }
     else {

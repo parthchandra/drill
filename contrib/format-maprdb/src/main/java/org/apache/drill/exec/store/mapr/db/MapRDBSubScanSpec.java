@@ -19,13 +19,14 @@ package org.apache.drill.exec.store.mapr.db;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.mapr.db.index.IndexDesc;
 import com.mapr.fs.jni.MapRConstants;
 import com.mapr.org.apache.hadoop.hbase.util.Bytes;
 
 public class MapRDBSubScanSpec {
 
   protected String tableName;
-  protected String indexFid;
+  protected IndexDesc indexDesc;
   protected String regionServer;
   protected byte[] startRow;
   protected byte[] stopRow;
@@ -33,7 +34,7 @@ public class MapRDBSubScanSpec {
 
   @JsonCreator
   public MapRDBSubScanSpec(@JsonProperty("tableName") String tableName,
-                           @JsonProperty("indexFid") String indexFid,
+                           @JsonProperty("indexDesc") IndexDesc indexDesc,
                            @JsonProperty("regionServer") String regionServer,
                            @JsonProperty("startRow") byte[] startRow,
                            @JsonProperty("stopRow") byte[] stopRow,
@@ -43,7 +44,7 @@ public class MapRDBSubScanSpec {
       throw new IllegalArgumentException("The parameters 'serializedFilter' or 'filterString' cannot be specified at the same time.");
     }
     this.tableName = tableName;
-    this.indexFid = indexFid;
+    this.indexDesc = indexDesc;
     this.regionServer = regionServer;
     this.startRow = startRow;
     this.stopRow = stopRow;
@@ -58,8 +59,8 @@ public class MapRDBSubScanSpec {
     return tableName;
   }
 
-  public String getIndexFid() {
-    return indexFid;
+  public IndexDesc getIndexDesc() {
+    return indexDesc;
   }
 
   public MapRDBSubScanSpec setTableName(String tableName) {

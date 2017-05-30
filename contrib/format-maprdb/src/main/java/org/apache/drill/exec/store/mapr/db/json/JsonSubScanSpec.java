@@ -28,9 +28,10 @@ import org.ojai.store.QueryCondition;
 import org.ojai.store.QueryCondition.Op;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.IdCodec;
+import com.mapr.db.impl.MapRDBImpl;
+import com.mapr.db.index.IndexDesc;
 
 /**
  * This class is a helper extension of {@link MapRDBSubScanSpec} class and does not
@@ -40,12 +41,11 @@ public class JsonSubScanSpec extends MapRDBSubScanSpec {
 
   protected QueryCondition condition;
 
-  @SuppressWarnings("deprecation")
-  public JsonSubScanSpec(String tableName, String indexFid, String regionServer,
+  public JsonSubScanSpec(String tableName, IndexDesc indexDesc, String regionServer,
                          byte[] startRow, byte[] stopRow, QueryCondition cond) {
-    super(tableName, indexFid, regionServer, null, null, null, null);
+    super(tableName, indexDesc, regionServer, null, null, null, null);
 
-    this.condition = MapRDB.newCondition().and();
+    this.condition = MapRDBImpl.newCondition().and();
 
     if (cond != null) {
       this.condition.condition(cond);
