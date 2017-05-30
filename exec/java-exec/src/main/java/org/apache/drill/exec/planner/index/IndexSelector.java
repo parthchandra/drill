@@ -24,8 +24,11 @@ import java.util.Map;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.util.Util;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -40,6 +43,7 @@ public class IndexSelector  {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexSelector.class);
 
   private RexNode indexCondition;
+  private RelCollation requiredCollation;
   private double totalRows;
   private Statistics stats;         // a Statistics instance that will be used to get estimated rowcount for filter conditions
   private IndexConditionInfo.Builder builder;
@@ -48,6 +52,7 @@ public class IndexSelector  {
   private DrillScanRel primaryTableScan;
 
   public IndexSelector(RexNode indexCondition,
+      RelCollation requiredCollation,
       IndexCollection collection,
       Statistics stats,
       RexBuilder rexBuilder,
@@ -55,6 +60,7 @@ public class IndexSelector  {
       double totalRows,
       DrillScanRel scan) {
     this.indexCondition = indexCondition;
+    this.requiredCollation = requiredCollation;
     this.totalRows = totalRows;
     this.stats = stats;
     this.builder =
@@ -82,6 +88,7 @@ public class IndexSelector  {
     RexNode initCondition = indexCondition.isAlwaysTrue() ? null : indexCondition;
     Map<LogicalExpression, RexNode> leadingPrefixMap = Maps.newHashMap();
     List<LogicalExpression> indexCols = indexProps.getIndexDesc().getIndexColumns();
+    boolean satisfiesCollation = false;
 
     if (indexCols.size() > 0) {
       if (initCondition != null) { // check filter condition
@@ -108,20 +115,39 @@ public class IndexSelector  {
             }
           }
         } else { // has collation requirement
-          // TODO:
+
         }
       } else if (checkCollation()) { // no filter condition, only collation requirement
-        // TODO:
+        // compare collation of the index with the required collation
+        List<RelFieldCollation> indexFieldCollations = indexProps.getIndexDesc().getCollation().getFieldCollations();
+        List<RelFieldCollation> requiredFieldCollations =
+            convertRequiredCollation(indexProps.getIndexDesc(), requiredCollation.getFieldCollations());
+        if (Util.startsWith(indexFieldCollations, requiredFieldCollations)) {
+          satisfiesCollation = true;
+        }
       }
     }
 
     logger.debug("Index {}: leading prefix map: {}, remainder condition: {}", indexProps.getIndexDesc().getIndexName(),
         leadingPrefixMap, initCondition);
-    indexProps.setProperties(leadingPrefixMap, initCondition /* the remainder condition */, stats);
+    indexProps.setProperties(leadingPrefixMap, satisfiesCollation, initCondition /* the remainder condition */, stats);
   }
 
   private boolean checkCollation() {
-    return false;
+    return requiredCollation != null;
+  }
+
+
+  /**
+   * Convert the required field collations that are in terms of the original plan into the one
+   * that is specific to a particular index
+   * @param required
+   * @return
+   */
+  private List<RelFieldCollation> convertRequiredCollation(IndexDescriptor indexDesc,
+      List<RelFieldCollation> required) {
+    // TODO: implement
+    return required;
   }
 
   /**
@@ -194,6 +220,12 @@ public class IndexSelector  {
         }
       }
 
+      if (o1.satisfiesCollation() && !o2.satisfiesCollation()) {
+        return -1;  // index with collation is ranked higher (better) than one without collation
+      } else if (o2.satisfiesCollation() && !o1.satisfiesCollation()) {
+        return 1;
+      }
+
       DrillCostBase cost1 = (DrillCostBase)(o1.getSelfCost(planner));
       DrillCostBase cost2 = (DrillCostBase)(o2.getSelfCost(planner));
 
@@ -245,9 +277,11 @@ public class IndexSelector  {
     }
 
     public void setProperties(Map<LogicalExpression, RexNode> prefixMap,
+        boolean satisfiesCollation,
         RexNode remainderFilter,
         Statistics stats) {
       this.remainderFilter = remainderFilter;
+      this.satisfiesCollation = satisfiesCollation;
       leadingPrefixMap = prefixMap;
 
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
@@ -293,6 +327,10 @@ public class IndexSelector  {
 
     public RexNode getRemainderFilter() {
       return remainderFilter;
+    }
+
+    public boolean satisfiesCollation() {
+      return satisfiesCollation;
     }
 
     public RelOptCost getSelfCost(RelOptPlanner planner) {

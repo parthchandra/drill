@@ -22,11 +22,13 @@ import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
 
 import java.util.Set;
 
 public class IndexPlanCallContext {
   final public RelOptRuleCall call;
+  final public DrillSortRel sort;
   final public DrillProjectRel capProject;
   final public DrillFilterRel filter;
   final public DrillProjectRel project;
@@ -39,7 +41,17 @@ public class IndexPlanCallContext {
                        DrillFilterRel filter,
                        DrillProjectRel project,
                        DrillScanRel scan) {
+    this(call, null, capProject, filter, project, scan);
+  }
+
+  IndexPlanCallContext(RelOptRuleCall call,
+      DrillSortRel sort,
+      DrillProjectRel capProject,
+      DrillFilterRel filter,
+      DrillProjectRel project,
+      DrillScanRel scan) {
     this.call = call;
+    this.sort = sort;
     this.capProject = capProject;
     this.filter = filter;
     this.project = project;
