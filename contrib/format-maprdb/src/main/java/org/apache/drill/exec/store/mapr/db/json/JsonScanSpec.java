@@ -26,24 +26,23 @@ import org.ojai.store.QueryCondition;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.ConditionNode.RowkeyRange;
+import com.mapr.db.impl.MapRDBImpl;
 import com.mapr.db.index.IndexDesc;
-import com.mapr.db.index.IndexFieldDesc;
 
 public class JsonScanSpec {
-	protected String tableName;
+  protected String tableName;
   protected IndexDesc indexDesc;
-	protected QueryCondition condition;
+  protected QueryCondition condition;
 
-	@JsonCreator
-	public JsonScanSpec(@JsonProperty("tableName") String tableName,
+  @JsonCreator
+  public JsonScanSpec(@JsonProperty("tableName") String tableName,
                       @JsonProperty("indexDesc") IndexDesc indexDesc,
-	                    @JsonProperty("condition") QueryCondition condition) {
-	  this.tableName = tableName;
-         this.indexDesc = indexDesc;
-	  this.condition = condition;
+                      @JsonProperty("condition") QueryCondition condition) {
+    this.tableName = tableName;
+    this.indexDesc = indexDesc;
+    this.condition = condition;
   }
 
   public String getTableName() {
@@ -107,33 +106,9 @@ public class JsonScanSpec {
     return (this.indexDesc == null) ? null : this.indexDesc.getIndexName();
   }
 
-  @JsonIgnore
-  public String getIndexFid() {
-    return (this.indexDesc == null) ? null : this.indexDesc.getIndexFid();
-  }
-
-  @JsonIgnore
-  public IndexFieldDesc[] getIndexedFields() {
-    if (this.indexDesc == null) {
-      return null;
-    }
-
-    List<IndexFieldDesc> indexedFields = indexDesc.getIndexedFields();
-    int size = indexedFields.size();
-
-    if (size == 0) {
-      return null;
-    }
-
-    IndexFieldDesc[] a = new IndexFieldDesc[size];
-    indexedFields.toArray(a);
-    return a;
-  }
-
-  @SuppressWarnings("deprecation")
   public void mergeScanSpec(String functionName, JsonScanSpec scanSpec) {
     if (this.condition != null && scanSpec.getCondition() != null) {
-      QueryCondition newCond = MapRDB.newCondition();
+      QueryCondition newCond = MapRDBImpl.newCondition();
       switch (functionName) {
       case "booleanAnd":
         newCond.and();
@@ -158,7 +133,7 @@ public class JsonScanSpec {
 
   @Override
   public String toString() {
-    String fidInfo = (getIndexFid() != null)? ", indexName=" + getIndexName() : "";
+    String fidInfo = (getIndexDesc() != null)? ", indexName=" + getIndexName() : "";
     return "JsonScanSpec [tableName=" + tableName
         + ", condition=" + (condition == null ? null : condition.toString())
         + fidInfo

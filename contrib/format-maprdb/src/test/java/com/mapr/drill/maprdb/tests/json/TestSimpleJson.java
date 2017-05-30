@@ -39,14 +39,13 @@ import org.ojai.Document;
 import org.ojai.DocumentStream;
 import org.ojai.json.Json;
 
-import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
+import com.mapr.db.impl.MapRDBImpl;
 import com.mapr.db.tests.utils.DBTests;
 import com.mapr.drill.maprdb.tests.MaprDBTestsSuite;
 import com.mapr.tests.annotations.ClusterTest;
 
 @Category(ClusterTest.class)
-@SuppressWarnings("deprecation")
 public class TestSimpleJson extends BaseJsonTest {
 
   private static final String SCHEMA = "hbase.root";
@@ -137,7 +136,7 @@ public class TestSimpleJson extends BaseJsonTest {
         + "WHERE\n"
         + " name = 'Sprint'");
 
-    final Document queryResult = MapRDB.newDocument();
+    final Document queryResult = MapRDBImpl.newDocument();
     SingleRowListener listener = new SingleRowListener() {
       @Override
       protected void rowArrived(QueryDataBatch result) {

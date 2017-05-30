@@ -17,6 +17,8 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
+import static com.mapr.db.rowcol.DBValueBuilderImpl.KeyValueBuilder;
+
 import org.apache.drill.common.expression.FunctionCall;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
@@ -39,9 +41,7 @@ import org.ojai.types.OTime;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.mapr.db.rowcol.KeyValueBuilder;
 
-@SuppressWarnings("deprecation")
 class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpression, RuntimeException> {
 
   private String functionName;

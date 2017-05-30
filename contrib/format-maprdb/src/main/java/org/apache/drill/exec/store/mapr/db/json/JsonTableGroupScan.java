@@ -167,7 +167,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     try {
       Configuration conf = new Configuration();
       Table t;
-      t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexFid());
+      t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexDesc());
       MetaTable metaTable = t.getMetaTable();
       QueryCondition scanSpecCondition = scanSpec.getCondition();
       List<? extends ScanRange> scanRanges = metaTable.getScanRanges(scanSpecCondition);
@@ -181,7 +181,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       }
     } catch (Exception e) {
       throw new DrillRuntimeException("Error getting region info for table: " +
-        scanSpec.getTableName() + (scanSpec.getIndexFid() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
+        scanSpec.getTableName() + (scanSpec.getIndexDesc() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
     }
   }
 
@@ -190,7 +190,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     JsonScanSpec spec = scanSpec;
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
         spec.getTableName(),
-        spec.getIndexFid(),
+        spec.getIndexDesc(),
         regionsToScan.get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
@@ -304,10 +304,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   public IndexDesc getIndexDesc() {
     return scanSpec.getIndexDesc();
-  }
-
-  public IndexFieldDesc[] getIndexedFields() {
-    return scanSpec.getIndexedFields();
   }
 
   public boolean isDisablePushdown() {

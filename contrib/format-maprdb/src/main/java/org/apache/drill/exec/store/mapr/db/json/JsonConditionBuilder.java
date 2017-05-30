@@ -28,8 +28,7 @@ import org.ojai.store.QueryCondition;
 import org.ojai.store.QueryCondition.Op;
 
 import com.google.common.collect.ImmutableList;
-import com.mapr.db.MapRDB;
-import com.mapr.db.index.IndexFieldDesc;
+import com.mapr.db.impl.MapRDBImpl;
 
 public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void, RuntimeException> implements DrillHBaseConstants {
 //  private final static org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JsonConditionBuilder.class);
@@ -177,7 +176,6 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
     }
   }
 
-  @SuppressWarnings("deprecation")
   private JsonScanSpec createJsonScanSpec(FunctionCall call,
       CompareFunctionsProcessor processor) {
     String functionName = processor.getFunctionName();
@@ -187,68 +185,67 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
     QueryCondition cond = null;
     switch (functionName) {
     case "equal":
-      cond = MapRDB.newCondition();
+      cond = MapRDBImpl.newCondition();
       setIsCondition(cond, field.getAsUnescapedPath(), Op.EQUAL, fieldValue);
       break;
 
     case "not_equal":
-      cond = MapRDB.newCondition();
+      cond = MapRDBImpl.newCondition();
       setIsCondition(cond, field.getAsUnescapedPath(), Op.NOT_EQUAL, fieldValue);
       break;
 
     case "less_than":
-      cond = MapRDB.newCondition();
+      cond = MapRDBImpl.newCondition();
       setIsCondition(cond, field.getAsUnescapedPath(), Op.LESS, fieldValue);
       break;
 
     case "less_than_or_equal_to":
-      cond = MapRDB.newCondition();
+      cond = MapRDBImpl.newCondition();
       setIsCondition(cond, field.getAsUnescapedPath(), Op.LESS_OR_EQUAL, fieldValue);
       break;
 
     case "greater_than":
-      cond = MapRDB.newCondition();
+      cond = MapRDBImpl.newCondition();
       setIsCondition(cond, field.getAsUnescapedPath(), Op.GREATER, fieldValue);
       break;
 
     case "greater_than_or_equal_to":
-      cond = MapRDB.newCondition();
+      cond = MapRDBImpl.newCondition();
       setIsCondition(cond, field.getAsUnescapedPath(), Op.GREATER_OR_EQUAL, fieldValue);
       break;
 
     case "isnull":
-      cond = MapRDB.newCondition().notExists(field.getAsUnescapedPath());
+      cond = MapRDBImpl.newCondition().notExists(field.getAsUnescapedPath());
       break;
 
     case "isnotnull":
-      cond = MapRDB.newCondition().exists(field.getAsUnescapedPath());
+      cond = MapRDBImpl.newCondition().exists(field.getAsUnescapedPath());
       break;
 
     case "istrue":
-      cond = MapRDB.newCondition().is(field.getAsUnescapedPath(), Op.EQUAL, true);
+      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.EQUAL, true);
       break;
 
     case "isnotfalse":
-      cond = MapRDB.newCondition().is(field.getAsUnescapedPath(), Op.NOT_EQUAL, false);
+      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.NOT_EQUAL, false);
       break;
 
     case "isfalse":
-      cond = MapRDB.newCondition().is(field.getAsUnescapedPath(), Op.EQUAL, false);
+      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.EQUAL, false);
       break;
 
     case "isnottrue":
-      cond = MapRDB.newCondition().is(field.getAsUnescapedPath(), Op.NOT_EQUAL, true);
+      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.NOT_EQUAL, true);
       break;
 
     case "like":
-      cond = MapRDB.newCondition().like(field.getAsUnescapedPath(), fieldValue.getString());
+      cond = MapRDBImpl.newCondition().like(field.getAsUnescapedPath(), fieldValue.getString());
       break;
 
     default:
     }
 
     if (cond != null) {
-      IndexFieldDesc[] indexedFields = groupScan.getIndexedFields();
       return new JsonScanSpec(groupScan.getTableName(),
                               groupScan.getIndexDesc(),
                               cond.build());

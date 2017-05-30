@@ -28,12 +28,6 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.collect.Lists;
-import com.mapr.db.MetaTable;
-import com.mapr.db.impl.MapRDBImpl;
-import com.mapr.db.index.IndexDesc;
-import com.mapr.db.scan.ScanRange;
-
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.PathSegment;
@@ -51,14 +45,10 @@ import org.apache.drill.exec.util.EncodedSchemaPathSet;
 import org.apache.drill.exec.vector.BaseValueVector;
 import org.apache.drill.exec.vector.complex.impl.VectorContainerWriter;
 import org.apache.hadoop.fs.Path;
-import org.ojai.Document;
 import org.ojai.DocumentReader;
 import org.ojai.DocumentStream;
-import org.ojai.DocumentListener;
 import org.ojai.FieldPath;
 import org.ojai.FieldSegment;
-import org.ojai.annotation.API;
-import org.ojai.exceptions.OjaiException;
 import org.ojai.store.QueryCondition;
 import org.ojai.util.FieldProjector;
 import org.slf4j.Logger;
@@ -69,12 +59,17 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.mapr.db.MetaTable;
 import com.mapr.db.Table;
 import com.mapr.db.Table.TableOption;
 import com.mapr.db.exceptions.DBException;
 import com.mapr.db.impl.IdCodec;
+import com.mapr.db.impl.MapRDBImpl;
+import com.mapr.db.index.IndexDesc;
 import com.mapr.db.ojai.DBDocumentReaderBase;
+import com.mapr.db.scan.ScanRange;
 import com.mapr.db.util.ByteBufs;
 
 import io.netty.buffer.DrillBuf;
@@ -93,7 +88,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private FieldPath[] scannedFields;
 
   private final Path tablePath;
-  private final String indexFid;
+  private final IndexDesc indexDesc;
   private OperatorContext operatorContext;
   protected VectorContainerWriter vectorWriter;
   private DrillBuf buffer;
@@ -179,7 +174,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     tablePath = new Path(Preconditions.checkNotNull(subScanSpec, "MapRDB reader needs a sub-scan spec").getTableName());
     this.subScanSpec = subScanSpec;
     this.formatPlugin = formatPlugin;
-    indexFid = subScanSpec.getIndexFid();
+    indexDesc = subScanSpec.getIndexDesc();
     projectWholeDocument = false;
     includeId = false;
     idOnly    = false;
@@ -317,7 +312,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     this.operatorContext = context;
 
     try {
-      table = formatPlugin.getJsonTableCache().getTable(tablePath, indexFid);
+      table = formatPlugin.getJsonTableCache().getTable(tablePath, indexDesc);
       table.setOption(TableOption.EXCLUDEID, !includeId);
 
       final MetaTable metaTable = table.getMetaTable();
