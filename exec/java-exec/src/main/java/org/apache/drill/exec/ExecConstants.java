@@ -71,6 +71,7 @@ public interface ExecConstants {
   String SPILL_FILESYSTEM = "drill.exec.spill.fs";
   String SPILL_DIRS = "drill.exec.spill.directories";
 
+  String EXECUTOR_THREADPOOL_KEEPALIVE_TIME = "drill.exec.threadpool.keepalivetime";
   // External Sort Boot configuration
 
   String EXTERNAL_SORT_TARGET_SPILL_BATCH_SIZE = "drill.exec.sort.external.spill.batch.size";

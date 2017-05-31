@@ -86,7 +86,8 @@ public class BootStrapContext implements AutoCloseable {
     // Note that metrics are stored in a static instance
     this.metrics = DrillMetrics.getRegistry();
     this.allocator = RootAllocatorFactory.newRoot(config);
-    this.executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 60L, TimeUnit.SECONDS,
+    final long keepAliveTime = config.getLong(ExecConstants.EXECUTOR_THREADPOOL_KEEPALIVE_TIME);
+    this.executor = new ThreadPoolExecutor(0, Integer.MAX_VALUE, keepAliveTime, TimeUnit.SECONDS,
         new SynchronousQueue<Runnable>(),
         new NamedThreadFactory("drill-executor-")) {
       @Override
