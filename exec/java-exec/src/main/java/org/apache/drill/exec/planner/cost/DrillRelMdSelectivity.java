@@ -28,6 +28,8 @@ import org.apache.calcite.util.BuiltInMethod;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.exec.planner.physical.PrelUtil;
 
 import java.util.List;
 
@@ -60,15 +62,18 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
   }
 
   private Double getSelectivity(DrillScanRel rel, RexNode predicate) {
-    /*double ROWCOUNT_UNKNOWN = -1;
+    double ROWCOUNT_UNKNOWN = -1;
+    PlannerSettings settings = PrelUtil.getPlannerSettings(rel.getCluster().getPlanner());
     GroupScan scan = rel.getGroupScan();
-    if (scan instanceof DbGroupScan) {
+    if (!settings.isDisableScanStatistics()
+      && scan instanceof DbGroupScan) {
       double filterRows = ((DbGroupScan) scan).getRowCount(predicate, rel);
       double totalRows = ((DbGroupScan) scan).getRowCount(null, rel);
-      if (filterRows != ROWCOUNT_UNKNOWN) {
+      if (filterRows != ROWCOUNT_UNKNOWN &&
+          totalRows != ROWCOUNT_UNKNOWN && totalRows != 0) {
         return filterRows/totalRows;
       }
-    }*/
+    }
     return super.getSelectivity(rel, predicate);
   }
 }

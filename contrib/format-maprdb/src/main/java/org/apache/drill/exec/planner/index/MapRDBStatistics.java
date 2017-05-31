@@ -56,6 +56,7 @@ import java.util.Map;
 
 public class MapRDBStatistics implements Statistics {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBStatistics.class);
+  double tableCostPrefFactor = 1.0;
   /*
    * The computed statistics are cached in <statsCache> so that any subsequent calls are returned
    * from the cache. The <statsCache> is a map of <RexNode, Rowcount>. The <RexNode> does not have
@@ -76,12 +77,27 @@ public class MapRDBStatistics implements Statistics {
     conditionRexNodeMap = new HashMap<>();
   }
 
+  public double getTableCostPrefFactor() {
+    return tableCostPrefFactor;
+  }
+
   @Override
-  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
+  public double getRowCount(RexNode condition, DrillScanRel scanRel, boolean isTableScan) {
+    double costFactor = 1.0;
+    PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
+    if (isTableScan) {
+      costFactor = tableCostPrefFactor;
+    }
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
-      String conditionAsStr = convertRexToString(condition, scanRel);
-      if (statsCache.get(conditionAsStr) != null) {
-        return statsCache.get(conditionAsStr);
+      if (condition == null) {
+        if (statsCache.get(null)!= null) {
+          return costFactor * statsCache.get(null);
+        }
+      } else {
+        String conditionAsStr = convertRexToString(condition, scanRel);
+        if (statsCache.get(conditionAsStr) != null) {
+          return costFactor * statsCache.get(conditionAsStr);
+        }
       }
     }
     return ROWCOUNT_UNKNOWN;
@@ -89,28 +105,38 @@ public class MapRDBStatistics implements Statistics {
 
   /** Returns the number of rows satisfying the given FILTER condition
    *  @param condition - FILTER specified as a {@link QueryCondition}
-   *  @return approximate rows satisfying the filter
+   *  @param isTableScan - Whether the rowcounts are requested by an TableScan
+   * @return approximate rows satisfying the filter
    */
-  public double getRowCount(QueryCondition condition) {
+  public double getRowCount(QueryCondition condition, boolean isTableScan) {
+    double costFactor = 1.0;
+    // For table scan multiply the rowcounts with the planner.fts_cost_factor to make
+    // index scans less costly and bias towards index plans.
+    if (isTableScan) {
+      costFactor = tableCostPrefFactor;
+    }
     if (condition != null
         && conditionRexNodeMap.get(condition.toString()) != null) {
       String rexConditionAsString = conditionRexNodeMap.get(condition.toString());
       if (statsCache.get(rexConditionAsString) != null) {
-        return statsCache.get(rexConditionAsString);
+        return costFactor * statsCache.get(rexConditionAsString);
       }
     } else if (condition == null
         // We have full table rows mapping i.e. <NULL> QueryCondition, <NULL> RexNode pair
         && conditionRexNodeMap.get(condition) == null) {
       if (statsCache.get(null) != null) {
-        return statsCache.get(null);
+        return costFactor * statsCache.get(null);
       }
     }
     return ROWCOUNT_UNKNOWN;
   }
 
   public boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context) {
-    /*GroupScan scan;
-    if (scanRel.getGroupScan() instanceof DbGroupScan) {
+    GroupScan scan;
+    PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
+    tableCostPrefFactor = settings.getTableCostPrefFactor();
+    if (!settings.isDisableScanStatistics()
+      && scanRel.getGroupScan() instanceof DbGroupScan) {
       String conditionAsStr = convertRexToString(condition, scanRel);
       scan = scanRel.getGroupScan();
       if (statsCache.get(conditionAsStr) == null) {
@@ -118,7 +144,7 @@ public class MapRDBStatistics implements Statistics {
         populateRowCount(condition, indexes, scanRel, context);
         return true;
       }
-    }*/
+    }
     return false;
   }
 
@@ -147,6 +173,8 @@ public class MapRDBStatistics implements Statistics {
         keyRepIndexes, builder, scanRel);
     idxConditionMap = infoBuilder.getIndexConditionMap();
     leadingKeyIdxConditionMap = infoBuilder.getLeadingKeyIndexConditionMap();
+    // Get total rows in the table
+    totalRows = jTabGrpScan.getEstimatedRowCount(null, null, scanRel);
 
     for (IndexDescriptor idx : leadingKeyIdxConditionMap.keySet()) {
       RexNode idxCondition = leadingKeyIdxConditionMap.get(idx).indexCondition;
@@ -167,11 +195,11 @@ public class MapRDBStatistics implements Statistics {
 
       QueryCondition queryCondition = jTabGrpScan.convertToQueryCondition(
           convertToLogicalExpression(preProcIdxCondition, newRowType, settings, builder));
-      double rowCount = jTabGrpScan.getEstimatedRowCount(queryCondition, idx, scanRel);
+      // Cap rows at total rows in case of issues with DB APIs
+      double rowCount = Math.min(jTabGrpScan.getEstimatedRowCount(queryCondition, idx, scanRel),
+          totalRows);
       addToCache(idxCondition, idx, context, rowCount, jTabGrpScan, scanRel, newRowType);
     }
-    // Get total rows in the table
-    totalRows = jTabGrpScan.getRowCount(null, scanRel);
     /* Add the row count for index conditions on all indexes. Stats are only computed for leading
      * keys but index conditions can be pushed and would be required for access path costing
      */
@@ -182,6 +210,10 @@ public class MapRDBStatistics implements Statistics {
       candIdx = idx;
       RexNode idxCondition = idxConditionMap.get(idx).indexCondition;
       idxRemCondition = idxConditionMap.get(idx).remainderCondition;
+      // Ignore conditions which always evaluate to true
+      if (idxCondition.isAlwaysTrue()) {
+        continue;
+      }
       FunctionalIndexInfo functionInfo = idx.getFunctionalInfo();
       if (functionInfo.hasFunctional()) {
         newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(scanRel, context, functionInfo);
@@ -200,8 +232,7 @@ public class MapRDBStatistics implements Statistics {
     double rowCount = totalRows * computeSelectivity(condition, totalRows, scanRel);
     addToCache(condition, null, null, rowCount, jTabGrpScan, scanRel, scanRel.getRowType());
     // Add the full table rows while we are at it - represented by <NULL> RexNode, <NULL> QueryCondition
-    addToCache(null, null, null, jTabGrpScan.getRowCount(null, scanRel), jTabGrpScan, scanRel,
-        scanRel.getRowType());
+    addToCache(null, null, null, totalRows, jTabGrpScan, scanRel, scanRel.getRowType());
     return statsCache.get(conditionAsStr);
   }
 

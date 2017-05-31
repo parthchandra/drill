@@ -297,10 +297,10 @@ public class IndexSelector  {
 
       // compute the estimated row count by calling the statistics APIs
       for (RexNode filter : leadingFilters) {
-        leadingSel *= (stats.getRowCount(filter, primaryTableScan))/totalRows;
+        leadingSel *= (stats.getRowCount(filter, primaryTableScan, false))/totalRows;
       }
       if (remainderFilter != null) {
-        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan);
+        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan, false);
       }
 
     }

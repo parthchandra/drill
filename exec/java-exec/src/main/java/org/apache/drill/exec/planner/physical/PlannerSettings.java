@@ -84,6 +84,7 @@ public class PlannerSettings implements Context{
   public static final BooleanValidator INDEX_FORCE_SORT_NONCOVERING = new BooleanValidator("planner.index_force_sort_noncovering", false);
   public static final BooleanValidator INDEX_USE_HASHJOIN_NONCOVERING = new BooleanValidator("planner.index_use_hashjoin_noncovering", false);
   public static final RangeDoubleValidator INDEX_SELECTIVITY_FACTOR = new RangeDoubleValidator("planner.index_selectivity_factor", 0.0, 1.0, 0.8);
+  public static final RangeDoubleValidator TABLE_COST_PREF_FACTOR = new RangeDoubleValidator("planner.fts_cost_factor", 0.0, Double.MAX_VALUE, 1.0);
   public static final RangeDoubleValidator INDEX_COVERING_NONCOVERING_FACTOR = new RangeDoubleValidator("planner.index_covering_to_noncovering_factor", 0.0, Double.MAX_VALUE, 100.0);
   public static final RangeLongValidator MAX_CANDIDATE_INDEXES_PER_TABLE = new RangeLongValidator("planner.max_candidate_indexes_per_table", 0, 100, 5);
   public static final RangeDoubleValidator INDEX_IO_COST_FACTOR = new RangeDoubleValidator("planner.index_io_cost_factor", 0, Double.MAX_VALUE, 1.0d);
@@ -113,7 +114,7 @@ public class PlannerSettings implements Context{
   public static final String PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING_THRESHOLD_KEY = "planner.store.parquet.rowgroup.filter.pushdown.threshold";
   public static final PositiveLongValidator PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING_THRESHOLD = new PositiveLongValidator(PARQUET_ROWGROUP_FILTER_PUSHDOWN_PLANNING_THRESHOLD_KEY,
       Long.MAX_VALUE, 10000);
-
+  public static final BooleanValidator DISABLE_SCAN_STATS = new BooleanValidator("planner.disable_scan_statistics", true);
 
   public OptionManager options = null;
   public FunctionImplementationRegistry functionImplementationRegistry = null;
@@ -309,6 +310,14 @@ public class PlannerSettings implements Context{
 
   public boolean isCostBasedIndexSelectionEnabled() {
     return options.getOption(COST_BASED_INDEX_SEL);
+  }
+
+  public boolean isDisableScanStatistics() {
+    return options.getOption(DISABLE_SCAN_STATS);
+  }
+
+  public double getTableCostPrefFactor() {
+    return options.getOption(TABLE_COST_PREF_FACTOR);
   }
 
   @Override

@@ -30,7 +30,7 @@ public interface Statistics {
    *  @param condition - Filter specified as a {@link RexNode}
    *  @param scanRel - The current scan rel
    */
-  double getRowCount(RexNode condition, DrillScanRel scanRel);
+  double getRowCount(RexNode condition, DrillScanRel scanRel, boolean isIndexScan);
 
   boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context);
 }
