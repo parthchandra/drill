@@ -64,6 +64,7 @@ public interface ExecConstants {
   String SPOOLING_BUFFER_MEMORY = "drill.exec.buffer.spooling.size";
   String BATCH_PURGE_THRESHOLD = "drill.exec.sort.purge.threshold";
 
+  String EXECUTOR_THREADPOOL_KEEPALIVE_TIME = "drill.exec.threadpool.keepalivetime";
   // External Sort Boot configuration
 
   String EXTERNAL_SORT_TARGET_SPILL_BATCH_SIZE = "drill.exec.sort.external.spill.batch.size";
