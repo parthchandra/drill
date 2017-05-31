@@ -128,6 +128,8 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       PlannerSettings.INDEX_IO_COST_FACTOR,
       PlannerSettings.DISABLE_FULL_TABLE_SCAN,
       PlannerSettings.COST_BASED_INDEX_SEL,
+      PlannerSettings.DISABLE_SCAN_STATS,
+      PlannerSettings.TABLE_COST_PREF_FACTOR,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,
