@@ -19,8 +19,10 @@
 package org.apache.drill.exec.planner.index;
 
 import com.google.common.collect.Lists;
-
+import com.google.common.collect.Maps;
 import org.apache.calcite.rel.type.RelDataType;
+
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
@@ -40,6 +42,8 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Generate a covering index plan that is equivalent to the original plan.
@@ -123,9 +127,9 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
   /**
-   *
    *A RexNode forest with two RexNode for expressions "cast(a.q as int) * 2, b+c, concat(a.q, " world")"
    * on Scan RowType('a', 'b', 'c') will be like this:
+   *
    *          (0)Call:"*"                                       Call:"concat"
    *           /         \                                    /           \
    *    (1)Call:CAST     2            Call:"+"        (5)Call:ITEM     ' world'
@@ -133,9 +137,6 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
    * (2)Call:ITEM  TYPE:INT       (3)$1    (4)$2       $0    'q'
    *   /      \
    *  $0     'q'
-   *
-   * Class PathInExpr is to recursively analyze a RexNode trees with a map of indexed expression collected from indexDescriptor,
-   * e.g. Map 'cast(a.q as int)' -> '$0' means the expression 'cast(a.q as int)' is named as '$0' in index table
    *
    * So for above expressions, when visiting the RexNode trees using PathInExpr, we could mark indexed expressions in the trees,
    * as shown in the diagram above are the node (1),
@@ -159,9 +160,41 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     if (!functionInfo.hasFunctional()) {
       return toRewriteRex;
     }
+    RexToExpression.RexToDrillExt rexToDrill = new RexToExpression.RexToDrillExt(parseContext, project, scan);
+    LogicalExpression expr = toRewriteRex.accept(rexToDrill);
 
-    //TODO: functional index case
-    return toRewriteRex;
+    final Map<LogicalExpression, Set<SchemaPath>> exprPathMap = functionInfo.getPathsInFunctionExpr();
+    PathInExpr exprSearch = new PathInExpr(exprPathMap);
+    expr.accept(exprSearch, null);
+    Set<LogicalExpression> remainderPaths = exprSearch.getRemainderPaths();
+
+    //now build the rex->logical expression map for SimpleRexRemap
+    //left out schema paths
+    Map<LogicalExpression, Set<RexNode>> exprToRex = rexToDrill.getMapExprToRex();
+    final Map<RexNode, LogicalExpression> mapRexExpr = Maps.newHashMap();
+    for (LogicalExpression leftExpr: remainderPaths) {
+      if (exprToRex.containsKey(leftExpr)) {
+        Set<RexNode> rexs = exprToRex.get(leftExpr);
+        for (RexNode rex: rexs) {
+          mapRexExpr.put(rex, leftExpr);
+        }
+      }
+    }
+
+    //functional expressions e.g. cast(a.b as int)
+    for (LogicalExpression functionExpr: functionInfo.getExprMap().keySet()) {
+      if (exprToRex.containsKey(functionExpr)) {
+        Set<RexNode> rexs = exprToRex.get(functionExpr);
+        for (RexNode rex: rexs) {
+          mapRexExpr.put(rex, functionExpr);
+        }
+      }
+
+    }
+
+    SimpleRexRemap remap = new SimpleRexRemap(origScan, newRowType, builder);
+    remap.setExpressionMap(functionInfo.getExprMap());
+    return remap.rewriteWithMap(toRewriteRex, mapRexExpr);
   }
 
   @Override
