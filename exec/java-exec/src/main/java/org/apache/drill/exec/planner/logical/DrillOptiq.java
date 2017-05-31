@@ -100,7 +100,7 @@ public class DrillOptiq {
     return expr.accept(visitor);
   }
 
-  private static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
+  public static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
     private final RelDataType rowType;
     private final RexBuilder builder;
     private final DrillParseContext context;

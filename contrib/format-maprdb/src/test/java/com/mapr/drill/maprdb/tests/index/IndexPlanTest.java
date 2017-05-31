@@ -399,7 +399,7 @@ public class IndexPlanTest extends BaseJsonTest {
     }
     return;
   }
-/*
+
   @Test
   public void TestCastVarCharCoveringPlan() throws Exception {
     String query = "SELECT t._id as tid, cast(t.driverlicense as varchar(128)) as driverlicense FROM hbase.`index_test_primary` as t " +
@@ -443,7 +443,7 @@ public class IndexPlanTest extends BaseJsonTest {
 
     return;
   }
-*/
+
   @Test
   public void TestCastNonCoveringPlan() throws Exception {
     String query = "SELECT t.id.ssn AS `ssn` FROM hbase.`index_test_primary` as t " +

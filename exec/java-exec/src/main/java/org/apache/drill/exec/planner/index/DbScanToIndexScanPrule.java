@@ -19,6 +19,7 @@ package org.apache.drill.exec.planner.index;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -28,10 +29,13 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
+import org.apache.drill.exec.planner.logical.DrillOptiq;
+import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
@@ -43,6 +47,7 @@ import org.apache.drill.exec.planner.physical.Prule;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public class DbScanToIndexScanPrule extends Prule {
@@ -482,8 +487,50 @@ public class DbScanToIndexScanPrule extends Prule {
         return false;
       }
     }
-    //TODO: check capProject and other places to decide if this query is covered by functionInfo
-    return false;
+
+    DrillParseContext parserContext =
+        new DrillParseContext(PrelUtil.getPlannerSettings(indexContext.call.rel(0).getCluster()));
+
+    Set<LogicalExpression> exprs = Sets.newHashSet();
+    if (indexContext.capProject != null) {
+      if (indexContext.project == null) {
+        for (RexNode rex : indexContext.capProject.getProjects()) {
+          LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
+          exprs.add(expr);
+        }
+      } else {
+        //we have underneath project, so we have to do more to convert expressions
+        for (RexNode rex : indexContext.capProject.getProjects()) {
+          LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.project, indexContext.scan, rex);
+          exprs.add(expr);
+        }
+      }
+    }
+    else {//capProject == null
+      if (indexContext.project != null) {
+        for (RexNode rex : indexContext.project.getProjects()) {
+          LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
+          exprs.add(expr);
+        }
+      }
+    }
+
+    Map<LogicalExpression, Set<SchemaPath>> exprPathMap = functionInfo.getPathsInFunctionExpr();
+    PathInExpr exprSearch = new PathInExpr(exprPathMap);
+
+    for(LogicalExpression expr: exprs) {
+      if(expr.accept(exprSearch, null) == false) {
+        return false;
+      }
+    }
+    //if we come to here, paths in indexed function expressions are covered in capProject.
+    //now we check other paths.
+
+    //check the leftout paths (appear in capProject other than functional index expression) are covered by other index fields or not
+    List<LogicalExpression> leftPaths = Lists.newArrayList(exprSearch.getRemainderPaths());
+
+    indexContext.leftOutPathsInFunctions = exprSearch.getRemainderPathsInFunctions();
+    return functionInfo.getIndexDesc().isCoveringIndex(leftPaths);
   }
 
   private boolean isFullQuery(IndexPlanCallContext indexContext) {
