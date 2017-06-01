@@ -26,6 +26,7 @@ import org.apache.drill.PlanTestBase;
 import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -45,6 +46,7 @@ public class StatisticsTest extends IndexPlanTest {
    */
 
   @Test
+  @Ignore("Currently untested; re-enable after stats/costing integration complete")
   public void testFilters() throws Exception {
     String query;
     String explain = "explain plan including all attributes for ";
