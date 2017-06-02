@@ -22,13 +22,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.Sets;
 
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelCollationImpl;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class DrillIndexDefinition implements IndexDefinition {
@@ -55,7 +57,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final List<LogicalExpression> rowKeyColumns;
 
   @JsonProperty
-  protected final List<RelFieldCollation> indexFieldCollations;
+  protected final CollationContext indexCollationContext;
 
   /**
    * indexName: name of the index that should be unique within the scope of a table
@@ -69,7 +71,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final IndexDescriptor.IndexType indexType;
 
   public DrillIndexDefinition(List<LogicalExpression> indexCols,
-                                 List<RelFieldCollation> indexFieldCollations,
+                                 CollationContext indexCollationContext,
                                  List<LogicalExpression> nonIndexCols,
                                  List<LogicalExpression> rowKeyColumns,
                                  String indexName,
@@ -83,7 +85,7 @@ public class DrillIndexDefinition implements IndexDefinition {
     this.indexType = type;
     this.allIndexColumns = Sets.newHashSet(indexColumns);
     this.allIndexColumns.addAll(nonIndexColumns);
-    this.indexFieldCollations = indexFieldCollations;
+    this.indexCollationContext = indexCollationContext;
 
   }
 
@@ -211,15 +213,18 @@ public class DrillIndexDefinition implements IndexDefinition {
   }
 
   @Override
-  @JsonProperty
-  public List<RelFieldCollation> getIndexFieldCollations() {
-    return this.indexFieldCollations;
+  @JsonIgnore
+  public RelCollation getCollation() {
+    if (indexCollationContext != null) {
+      return RelCollations.of(indexCollationContext.relFieldCollations);
+    }
+    return null;
   }
 
   @Override
   @JsonIgnore
-  public RelCollation getCollation() {
-    return RelCollationImpl.of(indexFieldCollations);
+  public Map<SchemaPath, RelFieldCollation> getCollationMap() {
+    return indexCollationContext.collationMap;
   }
 
 }

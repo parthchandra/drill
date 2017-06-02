@@ -38,17 +38,17 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   private DrillTable table;
 
   public DrillIndexDescriptor(List<LogicalExpression> indexCols,
-                              List<RelFieldCollation> indexFieldCollations,
+                               CollationContext indexCollationContext,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
-    super(indexCols, indexFieldCollations, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
   }
 
   public DrillIndexDescriptor(DrillIndexDefinition def) {
-    this(def.indexColumns, def.indexFieldCollations, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
+    this(def.indexColumns, def.indexCollationContext, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
         def.getTableName(), def.getIndexType());
   }
 
