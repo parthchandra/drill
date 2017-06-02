@@ -23,8 +23,7 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
@@ -39,6 +38,7 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -57,6 +57,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
   final protected DrillProjectRel origProject;
   final protected DrillScanRel origScan;
   final protected DrillProjectRel capProject;
+  final protected DrillSortRel origSort;
 
   final protected RexNode indexCondition;
   final protected RexNode remainderCondition;
@@ -73,6 +74,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     this.origProject = indexContext.project;
     this.origScan = indexContext.scan;
     this.capProject = indexContext.capProject;
+    this.origSort = indexContext.sort;
     this.indexCondition = indexCondition;
     this.remainderCondition = remainderCondition;
     this.indexContext = indexContext;
@@ -185,6 +187,9 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     else if (top instanceof DrillFilterRel) {
       DrillFilterRel topFilter = (DrillFilterRel)top;
       input = topFilter.getInput();
+    } else if (top instanceof DrillSortRel) {
+      DrillSortRel topSort = (DrillSortRel)top;
+      input = topSort.getInput();
     }
     else {
       return;

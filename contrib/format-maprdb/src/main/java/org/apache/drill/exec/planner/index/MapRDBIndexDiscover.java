@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.antlr.runtime.ANTLRStringStream;
@@ -51,6 +52,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 
+import com.google.common.collect.Maps;
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.db.exceptions.DBException;
@@ -251,6 +253,8 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
           throw new InvalidIndexDefinitionException("cast function definition not recognized: " + functionDef);
         }
         return castFunctionSQLSyntax(fieldName, tokens[2]);
+      } else {
+        throw new InvalidIndexDefinitionException("function {} is not supported for indexing" + functionDef);
       }
     }
     //else it is a schemaPath
@@ -274,8 +278,8 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
           RelFieldCollation.Direction.ASCENDING : (field.getSortOrder() == IndexFieldDesc.Order.Desc ?
               RelFieldCollation.Direction.DESCENDING : null);
       if (direction != null) {
-        // assume null direction of NULLS LAST for now until MapR-DB adds that to the APIs
-        RelFieldCollation.NullDirection nulldir = RelFieldCollation.NullDirection.LAST;
+        // assume null direction of NULLS UNSPECIFIED for now until MapR-DB adds that to the APIs
+        RelFieldCollation.NullDirection nulldir = RelFieldCollation.NullDirection.UNSPECIFIED;
         RelFieldCollation c = new RelFieldCollation(i++, direction, nulldir);
         fieldCollations.add(c);
       } else {
@@ -284,6 +288,24 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       }
     }
     return fieldCollations;
+  }
+
+  private CollationContext buildCollationContext(List<LogicalExpression> indexFields,
+      List<RelFieldCollation> indexFieldCollations) {
+    assert indexFieldCollations.size() <= indexFields.size();
+    Map<SchemaPath, RelFieldCollation> collationMap = Maps.newHashMap();
+    for (int i = 0; i < indexFieldCollations.size(); i++) {
+      if (indexFields.get(i) instanceof SchemaPath) {
+        SchemaPath p = (SchemaPath)indexFields.get(i);
+        collationMap.put(p, indexFieldCollations.get(i));
+      } else {
+        // currently, only collation maps with SchemaPath as the key is supported
+        collationMap.clear();
+        break;
+      }
+    }
+    CollationContext collationContext = new CollationContext(collationMap, indexFieldCollations);
+    return collationContext;
   }
 
   private DrillIndexDescriptor buildIndexDescriptor(String tableName, IndexDesc desc)
@@ -296,11 +318,16 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
     List<LogicalExpression> indexFields = field2SchemaPath(desc.getIndexedFields());
     List<LogicalExpression> coveringFields = field2SchemaPath(desc.getCoveredFields());
-    List<RelFieldCollation> indexFieldCollations = getFieldCollations(desc.getIndexedFields());
     coveringFields.add(SchemaPath.getSimplePath("_id"));
+    CollationContext collationContext = null;
+    if (!desc.isHashed()) { // hash index has no collation property
+      List<RelFieldCollation> indexFieldCollations = getFieldCollations(desc.getIndexedFields());
+      collationContext = buildCollationContext(indexFields, indexFieldCollations);
+    }
+
     DrillIndexDescriptor idx = new MapRDBIndexDescriptor (
         indexFields,
-        indexFieldCollations,
+        collationContext,
         coveringFields,
         null,
         desc.getIndexName(),

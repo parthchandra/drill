@@ -38,13 +38,13 @@ public abstract class AbstractIndexDescriptor extends DrillIndexDefinition imple
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexDescriptor .class);
 
   public AbstractIndexDescriptor(List<LogicalExpression> indexCols,
-                                 List<RelFieldCollation> indexFieldCollations,
+                               CollationContext indexCollationContext,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
-    super(indexCols, indexFieldCollations, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
   }
 
   @Override

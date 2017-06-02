@@ -21,9 +21,11 @@ package org.apache.drill.exec.planner.index;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 // Interface used to define an index,
 public interface IndexDefinition {
@@ -84,8 +86,8 @@ public interface IndexDefinition {
 
   List<LogicalExpression> getNonIndexColumns();
 
-  List<RelFieldCollation> getIndexFieldCollations();
-
   RelCollation getCollation();
+
+  Map<SchemaPath, RelFieldCollation> getCollationMap();
 
 }
