@@ -33,6 +33,7 @@ import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.UnsupportedCallbackException;
 import javax.security.auth.login.LoginException;
 import javax.security.sasl.AuthorizeCallback;
+import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
@@ -94,6 +95,7 @@ public class KerberosFactory implements AuthenticatorFactory {
   @Override
   public SaslServer createSaslServer(final UserGroupInformation ugi, final Map<String, ?> properties)
       throws SaslException {
+    final String qopValue = properties.containsKey(Sasl.QOP) ? properties.get(Sasl.QOP).toString() : "auth";
     try {
       final String primaryName = ugi.getShortUserName();
       final String instanceName = new HadoopKerberosName(ugi.getUserName()).getHostName();
@@ -106,7 +108,7 @@ public class KerberosFactory implements AuthenticatorFactory {
                   new KerberosServerCallbackHandler());
         }
       });
-      logger.trace("GSSAPI SaslServer created.");
+      logger.trace("GSSAPI SaslServer created with QOP {}.", qopValue);
       return saslServer;
     } catch (final UndeclaredThrowableException e) {
       final Throwable cause = e.getCause();
@@ -114,11 +116,13 @@ public class KerberosFactory implements AuthenticatorFactory {
       if (cause instanceof SaslException) {
         throw (SaslException) cause;
       } else {
-        throw new SaslException("Unexpected failure trying to authenticate using Kerberos", cause);
+        throw new SaslException(String.format("Unexpected failure trying to authenticate using Kerberos with QOP %s",
+            qopValue), cause);
       }
     } catch (final IOException | InterruptedException e) {
       logger.debug("Authentication failed.", e);
-      throw new SaslException("Unexpected failure trying to authenticate using Kerberos", e);
+      throw new SaslException(String.format("Unexpected failure trying to authenticate using Kerberos with QOP %s",
+          qopValue), e);
     }
   }
 
@@ -130,6 +134,8 @@ public class KerberosFactory implements AuthenticatorFactory {
     final String parts[] = KerberosUtil.splitPrincipalIntoParts(servicePrincipal);
     final String serviceName = parts[0];
     final String serviceHostName = parts[1];
+    final String qopValue = properties.containsKey(Sasl.QOP) ? properties.get(Sasl.QOP).toString() : "auth";
+
     // ignore parts[2]; GSSAPI gets the realm info from the ticket
     try {
       final SaslClient saslClient = ugi.doAs(new PrivilegedExceptionAction<SaslClient>() {
@@ -147,20 +153,20 @@ public class KerberosFactory implements AuthenticatorFactory {
               });
         }
       });
-      logger.debug("GSSAPI SaslClient created to authenticate to {} running on {}",
-          serviceName, serviceHostName);
+      logger.debug("GSSAPI SaslClient created to authenticate to {} running on {} with QOP value {}",
+          serviceName, serviceHostName, qopValue);
       return saslClient;
     } catch (final UndeclaredThrowableException e) {
       logger.debug("Authentication failed.", e);
-      throw new SaslException(String.format("Unexpected failure trying to authenticate to %s using GSSAPI",
-          serviceHostName), e.getCause());
+      throw new SaslException(String.format("Unexpected failure trying to authenticate to %s using GSSAPI with QOP %s",
+          serviceHostName, qopValue), e.getCause());
     } catch (final IOException | InterruptedException e) {
       logger.debug("Authentication failed.", e);
       if (e instanceof SaslException) {
         throw (SaslException) e;
       }
-      throw new SaslException(String.format("Unexpected failure trying to authenticate to %s using GSSAPI",
-          serviceHostName), e);
+      throw new SaslException(String.format("Unexpected failure trying to authenticate to %s using GSSAPI with QOP %s",
+          serviceHostName, qopValue), e);
     }
   }
 

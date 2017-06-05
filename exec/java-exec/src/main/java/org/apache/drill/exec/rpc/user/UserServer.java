@@ -44,8 +44,10 @@ import org.apache.drill.exec.rpc.BasicServer;
 import org.apache.drill.exec.rpc.OutOfMemoryHandler;
 import org.apache.drill.exec.rpc.OutboundRpcMessage;
 import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
+import org.apache.drill.exec.rpc.RpcConstants;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.rpc.UserClientConnection;
 import org.apache.drill.exec.rpc.security.ServerAuthenticationHandler;
 import org.apache.drill.exec.rpc.security.plain.PlainFactory;
 import org.apache.drill.exec.rpc.user.UserServer.BitToUserConnection;
@@ -78,6 +80,9 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
         eventLoopGroup);
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
     this.userWorker = worker;
+
+    // Initialize Singleton instance of UserRpcMetrics.
+    ((UserRpcMetrics)UserRpcMetrics.getInstance()).initialize(config.isEncryptionEnabled(), allocator);
   }
 
   @Override
@@ -89,47 +94,6 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     default:
       throw new UnsupportedOperationException();
     }
-  }
-
-  /**
-   * Interface for getting user session properties and interacting with user connection. Separating this interface from
-   * {@link AbstractRemoteConnection} implementation for user connection:
-   * <p><ul>
-   *   <li> Connection is passed to Foreman and Screen operators. Instead passing this interface exposes few details.
-   *   <li> Makes it easy to have wrappers around user connection which can be helpful to tap the messages and data
-   *        going to the actual client.
-   * </ul>
-   */
-  public interface UserClientConnection {
-    /**
-     * @return User session object.
-     */
-    UserSession getSession();
-
-    /**
-     * Send query result outcome to client. Outcome is returned through <code>listener</code>
-     * @param listener
-     * @param result
-     */
-    void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result);
-
-    /**
-     * Send query data to client. Outcome is returned through <code>listener</code>
-     * @param listener
-     * @param result
-     */
-    void sendData(RpcOutcomeListener<Ack> listener, QueryWritableBatch result);
-
-    /**
-     * Returns the {@link ChannelFuture} which will be notified when this
-     * channel is closed.  This method always returns the same future instance.
-     */
-    ChannelFuture getChannelClosureFuture();
-
-    /**
-     * @return Return the client node address.
-     */
-    SocketAddress getRemoteAddress();
   }
 
   /**
@@ -149,7 +113,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     }
 
     void disableReadTimeout() {
-      getChannel().pipeline().remove(BasicServer.TIMEOUT_HANDLER);
+      getChannel().pipeline().remove(RpcConstants.TIMEOUT_HANDLER);
     }
 
     void setHandshake(final UserToBitHandshake inbound) {
@@ -186,6 +150,10 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
       if (config.getImpersonationManager() != null && targetName != null) {
         config.getImpersonationManager().replaceUserOnSession(targetName, session);
       }
+
+      // Increase the corresponding connection counter.
+      // For older clients we call this method directly.
+      incConnectionCounter();
     }
 
     @Override
@@ -236,6 +204,16 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     public void close() {
       cleanup();
       super.close();
+    }
+
+    @Override
+    public void incConnectionCounter() {
+      UserRpcMetrics.getInstance().addConnectionCount();
+    }
+
+    @Override
+    public void decConnectionCounter() {
+      UserRpcMetrics.getInstance().decConnectionCount();
     }
   }
 
@@ -295,7 +273,16 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
           }
 
           final boolean clientSupportsSasl = inbound.hasSaslSupport() &&
-              (inbound.getSaslSupport().ordinal() >= SaslSupport.SASL_AUTH.ordinal());
+              (inbound.getSaslSupport().ordinal() > SaslSupport.UNKNOWN_SASL_SUPPORT.ordinal());
+
+          final int saslSupportOrdinal = (clientSupportsSasl) ? inbound.getSaslSupport().ordinal()
+                                                              : SaslSupport.UNKNOWN_SASL_SUPPORT.ordinal();
+
+          if (saslSupportOrdinal <= SaslSupport.SASL_AUTH.ordinal() && config.isEncryptionEnabled()) {
+            throw new UserAuthenticationException("The server doesn't allow client without encryption support." +
+                " Please upgrade your client or talk to your system administrator.");
+          }
+
           if (!clientSupportsSasl) { // for backward compatibility < 1.10
             final String userName = inbound.getCredentials().getUserName();
             if (logger.isTraceEnabled()) {
@@ -335,8 +322,13 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
             }
           }
 
-          // mention server's authentication capabilities
+          // Offer all the configured mechanisms to client. If certain mechanism doesn't support encryption
+          // like PLAIN, those should fail during the SASL handshake negotiation.
           respBuilder.addAllAuthenticationMechanisms(config.getAuthProvider().getAllFactoryNames());
+
+          // set the encrypted flag in handshake message. For older clients this field is optional so will be ignored
+          respBuilder.setEncrypted(connection.isEncryptionEnabled());
+          respBuilder.setMaxWrappedSize(connection.getMaxWrappedSize());
 
           // for now, this means PLAIN credentials will be sent over twice
           // (during handshake and during sasl exchange)
