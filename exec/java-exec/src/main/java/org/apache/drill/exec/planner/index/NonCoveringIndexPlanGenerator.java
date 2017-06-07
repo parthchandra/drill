@@ -54,6 +54,7 @@ import org.apache.calcite.rex.RexNode;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 
 /**
@@ -167,11 +168,12 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     RelTraitSet restrictedScanTraitSet = origScanTraitSet.plus(Prel.DRILL_PHYSICAL);
 
     // Create the collation traits for restricted scan based on the index columns under the
-    // conditions that (a) the index actually has collation property (e.g hash indexes don't)
-    // and (b) if an explicit sort operation is not enforced
-    if (indexDesc.getCollation() != null &&
-         !settings.isIndexForceSortNonCovering()) {
-      RelCollation collationTrait = buildCollationTraits(indexDesc, indexScanRowType, dbscanRowType);
+    // conditions that (a) there is a sort requirement, (b) the index actually has collation
+    // property (e.g hash indexes don't) and (c) if an explicit sort operation is not enforced
+    if (indexContext.sort != null &&
+        indexDesc.getCollation() != null &&
+        !settings.isIndexForceSortNonCovering()) {
+      RelCollation collationTrait = buildCollationTraits(indexDesc, indexCondition, indexScanRowType, dbscanRowType);
       if (restrictedScanTraitSet.contains(RelCollationTraitDef.INSTANCE)) { // replace existing trait
         restrictedScanTraitSet = restrictedScanTraitSet.replace(collationTrait);
       } else {  // add new one
@@ -278,6 +280,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
   private RelCollation buildCollationTraits(IndexDescriptor indexDesc,
+      RexNode indexCondition,
       RelDataType indexScanRowType,
       RelDataType restrictedScanRowType) {
 
@@ -288,6 +291,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     assert collationMap != null : "Invalid collation map for index";
 
     List<RelFieldCollation> fieldCollations = Lists.newArrayList();
+    Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newHashMap();
 
     // for each index field that is projected from the indexScan, find the corresponding
     // field in the restricted scan's row type and keep track of the ordinal # in the
@@ -300,12 +304,24 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
           FieldReference ref = FieldReference.getWithQuotedRef(f1.getName());
           RelFieldCollation origCollation = collationMap.get(ref);
           if (origCollation != null) {
-            RelFieldCollation fc = new RelFieldCollation(j, origCollation.direction,
-                origCollation.nullDirection);
-            fieldCollations.add(fc);
+            RelFieldCollation fc = new RelFieldCollation(origCollation.getFieldIndex(),
+                origCollation.direction, origCollation.nullDirection);
+            rsScanCollationMap.put(j, fc);
           }
         }
       }
+    }
+
+    if (rsScanCollationMap.size() > 0) {
+      for (int j = 0; j < rsFields.size(); j++) {
+        RelFieldCollation fc = rsScanCollationMap.get(j);
+        if (fc != null) {
+          fieldCollations.add(fc);
+        }
+      }
+      // check the field collations based on the index conditions also
+      // FindFiltersForCollation finder = new FindFiltersForCollation(fieldCollations);
+      // fieldCollations = finder.analyze(indexCondition);
     }
 
     final RelCollation collation = RelCollations.of(fieldCollations);
@@ -313,3 +329,4 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
 }
+
