@@ -91,8 +91,13 @@ public class DrillOptiq {
     public RexToDrill(DrillParseContext context, RelNode input) {
       super(true);
       this.context = context;
-      this.rowType = input.getRowType();
-      this.builder = input.getCluster().getRexBuilder();
+      if (input != null) {
+        this.rowType = input.getRowType();
+        this.builder = input.getCluster().getRexBuilder();
+      } else {
+        this.rowType = null;
+        this.builder = null;
+      }
     }
 
     public RexToDrill(DrillParseContext context, RelDataType rowType, RexBuilder builder) {
