@@ -485,4 +485,73 @@ public class IndexPlanTest extends BaseJsonTest {
 */
     return;
   }
+
+  @Test
+  public void TestCoveringPlanSortRemoved() throws Exception {
+    String query = "SELECT t.`contact`.`phone` as phone FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn <'100000003' order by t.id.ssn";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("phone").baselineValues("6500008069")
+        .baselineColumns("phone").baselineValues("6500001411")
+        .baselineColumns("phone").baselineValues("6500001595")
+        .go();
+  }
+
+  @Test
+  public void TestCoveringPlanSortNotRemoved() throws Exception {
+    String query = "SELECT t.`contact`.`phone` as phone FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn <'100000003' order by t.contact.phone";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"RowkeyJoin"}
+    );
+    try {
+      test(sliceTargetSmall);
+      PlanTestBase.testPlanMatchingPatterns(query,
+          new String[]{"SingleMergeExchange(.*[\n\r])+.* Sort(.*[\n\r])+.*HashToRandomExchange",
+              ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+          new String[]{"RowkeyJoin"}
+      );
+    }finally {
+      test(sliceTargetDefault);
+    }
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("phone").baselineValues("6500001411")
+        .baselineColumns("phone").baselineValues("6500001595")
+        .baselineColumns("phone").baselineValues("6500008069")
+        .go();
+  }
+
+  @Test
+  public void TestCoveringPlanSortRemovedWithSimpleFields() throws Exception {
+    String query = "SELECT t.driverlicense as l FROM hbase.`index_test_primary` as t " +
+        " where t.driverlicense < 100000003 order by t.driverlicense";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("l").baselineValues(100000000l)
+        .baselineColumns("l").baselineValues(100000001l)
+        .baselineColumns("l").baselineValues(100000002l)
+        .go();
+  }
+  //select t.driverlicense as l from dfs.tmp.`index_test_primary` as t  where t.driverlicense < 100000003 order by t.driverlicense;
+
 }

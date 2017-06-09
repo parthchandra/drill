@@ -19,6 +19,7 @@ package org.apache.drill.exec.planner.physical;
 
 import java.util.List;
 
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.drill.exec.planner.logical.DrillRel;
 import org.apache.drill.exec.planner.logical.DrillSortRel;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
@@ -54,9 +55,14 @@ public class SortPrule extends Prule{
 
     DrillDistributionTrait hashDistribution =
         new DrillDistributionTrait(DrillDistributionTrait.DistributionType.HASH_DISTRIBUTED, ImmutableList.copyOf(getDistributionField(sort)));
-
-    final RelTraitSet traits = sort.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(hashDistribution);
-
+    final RelTraitSet traits;
+    if (! input.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE).satisfies(sort.getCollation()) ) {
+      //if there is satisfied collation underneath, do not hash distributed
+      traits = sort.getTraitSet().plus(Prel.DRILL_PHYSICAL);
+    }
+    else {
+      traits = sort.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(hashDistribution);
+    }
     final RelNode convertedInput = convert(input, traits);
 
     if(isSingleMode(call)){
@@ -64,12 +70,11 @@ public class SortPrule extends Prule{
     }else{
       RelNode exch = new SingleMergeExchangePrel(sort.getCluster(), sort.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(DrillDistributionTrait.SINGLETON), convertedInput, sort.getCollation());
       call.transformTo(exch);  // transform logical "sort" into "SingleMergeExchange".
-
     }
 
   }
 
-  private List<DistributionField> getDistributionField(DrillSortRel rel) {
+  public static List<DistributionField> getDistributionField(DrillSortRel rel) {
     List<DistributionField> distFields = Lists.newArrayList();
 
     for (RelFieldCollation relField : rel.getCollation().getFieldCollations()) {

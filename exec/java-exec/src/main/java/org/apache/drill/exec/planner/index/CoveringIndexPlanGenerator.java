@@ -18,10 +18,16 @@
 
 package org.apache.drill.exec.planner.index;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationImpl;
+import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.type.RelDataType;
 
 import org.apache.drill.common.expression.LogicalExpression;
@@ -32,12 +38,16 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
+import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
+import org.apache.drill.exec.planner.physical.ProjectPrule;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
@@ -47,6 +57,9 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.exec.planner.physical.SingleMergeExchangePrel;
+import org.apache.drill.exec.planner.physical.SortPrel;
+import org.apache.drill.exec.planner.physical.SortPrule;
 
 import java.util.List;
 import java.util.Map;
@@ -204,6 +217,41 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     return remap.rewriteWithMap(toRewriteRex, mapRexExpr);
   }
 
+  private RelCollation buildCollation(List<RexNode> projectRexs, RelNode input) {
+    //if leading fields of index are here, add them to RelCollation
+    List<RelFieldCollation> newFields = Lists.newArrayList();
+    if (!functionInfo.hasFunctional()) {
+      Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
+      DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
+      int idx=0;
+      for(RexNode rex : projectRexs) {
+        projectExprs.put(DrillOptiq.toDrill(parserContext, input, rex), idx);
+        idx++;
+      }
+      int idxFieldCount = 0;
+      for (LogicalExpression expr : indexDesc.getIndexColumns()) {
+        if (!projectExprs.containsKey(expr)) {
+          break;
+        }
+        RelFieldCollation.Direction dir = indexDesc.getCollation().getFieldCollations().get(idxFieldCount).direction;
+        if ( dir == null) {
+          break;
+        }
+        newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
+            RelFieldCollation.NullDirection.UNSPECIFIED));
+      }
+      idxFieldCount++;
+    }
+    return RelCollationImpl.of(newFields);
+  }
+
+  private boolean toRemoveSort(DrillSortRel sort, RelCollation inputCollation) {
+    if ( inputCollation.satisfies(sort.getCollation())) {
+      return true;
+    }
+    return false;
+  }
+
   @Override
   public RelNode convertChild(final RelNode filter, final RelNode input) throws InvalidRelException {
 
@@ -238,7 +286,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     ProjectPrel indexProjectPrel = null;
     if (origProject != null) {
-      indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexFilterPrel.getTraitSet(),
+      RelCollation collation = buildCollation(origProject.getProjects(), indexScanPrel);
+      indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexScanPrel.getTraitSet().plus(collation),
           indexFilterPrel, origProject.getProjects(), origProject.getRowType());
     }
     RelNode finalRel;
@@ -256,7 +305,20 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     if ( capProject != null) {
-      ProjectPrel cap = new ProjectPrel(capProject.getCluster(), finalRel.getTraitSet(),
+
+      final Map<Integer, Integer> collationMap = ProjectPrule.getCollationMap(capProject);
+      RelCollation newCollation = null;
+
+      if ( origProject != null) {//so we already built collation there
+        RelCollation collation = finalRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        newCollation = ProjectPrule.convertRelCollation(collation, collationMap);
+      }
+      else {
+        newCollation = buildCollation(capProject.getProjects(), indexScanPrel);
+      }
+
+      ProjectPrel cap = new ProjectPrel(capProject.getCluster(),
+          newCollation==null?finalRel.getTraitSet() : finalRel.getTraitSet().plus(newCollation),
           finalRel, capProject.getProjects(), capProject.getRowType());
 
       if (functionInfo.hasFunctional()) {
@@ -273,6 +335,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
           RexNode newRex = rewriteFunctionalRex(parseContxt, null, origScan, projectRex, newRowType, functionInfo);
           newProjects.add(newRex);
         }
+
         ProjectPrel rewrittenProject = new ProjectPrel(newProject.getCluster(), newProject.getTraitSet(),
             indexFilterPrel, newProjects, newProject.getRowType());
 
@@ -282,9 +345,44 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       finalRel = cap;
     }
 
+    if (indexContext.sort != null) {
+      DrillSortRel rel = indexContext.sort;
+      DrillDistributionTrait hashDistribution =
+          new DrillDistributionTrait(DrillDistributionTrait.DistributionType.HASH_DISTRIBUTED,
+              ImmutableList.copyOf(SortPrule.getDistributionField(rel)));
+
+      if ( !toRemoveSort(indexContext.sort, finalRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE))) {
+        //create sort's prel, also let us add distribution trait as SortPrule will do
+        final RelTraitSet traits = rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(hashDistribution);
+        RelNode convertedInput = Prule.convert(finalRel, traits);
+        //final RelNode convertedInput = Prule.convert(rel.getInput(), traits);
+
+        if (Prule.isSingleMode(indexContext.call)) {
+          indexContext.call.transformTo(convertedInput);
+        } else {
+          RelNode exch = new SingleMergeExchangePrel(rel.getCluster(),
+              rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(DrillDistributionTrait.SINGLETON),
+              convertedInput, rel.getCollation());
+          indexContext.call.transformTo(exch);  // transform logical "sort" into "SingleMergeExchange".
+        }
+      }
+      else {
+        //we are going to remove sort
+        logger.debug("Not generating SortPrel since we have the required collation");
+
+        RelTraitSet traits = finalRel.getTraitSet().plus(rel.getCollation()).plus(Prel.DRILL_PHYSICAL);
+        RelNode convertedInput = Prule.convert(finalRel, traits);
+        RelNode exch = new SingleMergeExchangePrel(finalRel.getCluster(),
+            traits.replace(DrillDistributionTrait.SINGLETON),
+            convertedInput,//finalRel,//
+            indexContext.sort.getCollation());
+        finalRel = exch;
+      }
+    }
+
     finalRel = Prule.convert(finalRel, finalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
 
-    logger.trace("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original digest {}, new digest {}.",
+    logger.debug("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original digest {}, new digest {}.",
         finalRel.toString(), origScan.toString(), capProject==null?indexContext.filter.getDigest(): capProject.getDigest(), finalRel.getDigest());
     return finalRel;
   }
