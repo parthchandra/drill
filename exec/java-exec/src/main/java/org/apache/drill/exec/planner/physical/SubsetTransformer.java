@@ -55,22 +55,35 @@ public abstract class SubsetTransformer<T extends RelNode, E extends Exception> 
 
     boolean transform = false;
     Set<RelNode> transformedRels = Sets.newHashSet();
+    Set<RelTraitSet> traitSets = Sets.newHashSet();
+
+    //1, get all the target traitsets from candidateSet's rel list,
     for (RelNode rel : ((RelSubset)candidateSet).getRelList()) {
       if (isPhysical(rel)) {
-        RelNode newRel = RelOptRule.convert(candidateSet, rel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
-        if(transformedRels.contains(newRel)) {
-          continue;
-        }
-        transformedRels.add(newRel);
-        logger.trace("{}.convertChild to convert NODE {} ,AND {}", this.getClass().getSimpleName(), n, newRel);
-        RelNode out = convertChild(n, newRel);
-        if (out != null) {
-          call.transformTo(out);
-          transform = true;
+        final RelTraitSet relTraitSet = rel.getTraitSet();
+        if ( !traitSets.contains(relTraitSet) ) {
+          traitSets.add(relTraitSet);
+          logger.trace("{}.convertChild get traitSet {}", this.getClass().getSimpleName(), relTraitSet);
         }
       }
-      logger.trace("{}.convertChild to start: candidateSet size {} ,transformedRels {} size {}",
-          this.getClass().getSimpleName(), ((RelSubset)candidateSet).getRelList().size(), transformedRels, transformedRels.size());
+    }
+
+    //2, convert the candidateSet to targeted taitSets
+    for (RelTraitSet traitSet: traitSets) {
+      RelNode newRel = RelOptRule.convert(candidateSet, traitSet);
+      if(transformedRels.contains(newRel)) {
+        continue;
+      }
+      transformedRels.add(newRel);
+
+      logger.trace("{}.convertChild to convert NODE {} ,AND {}", this.getClass().getSimpleName(), n, newRel);
+      RelNode out = convertChild(n, newRel);
+
+      //RelNode out = convertChild(n, rel);
+      if (out != null) {
+        call.transformTo(out);
+        transform = true;
+      }
     }
 
     return transform;
