@@ -92,6 +92,7 @@ public class BaseTestQuery extends ExecTest {
     {
       put(ExecConstants.SYS_STORE_PROVIDER_LOCAL_ENABLE_WRITE, "false");
       put(ExecConstants.HTTP_ENABLE, "false");
+      put(ExecConstants.SSL_USE_HADOOP_CONF, "false");
     }
   };
 
@@ -215,7 +216,8 @@ public class BaseTestQuery extends ExecTest {
       TestUtilities.makeDfsTmpSchemaImmutable(pluginRegistry);
     }
 
-    client = QueryTestUtil.createClient(config,  serviceSet, MAX_WIDTH_PER_NODE, properties);
+    DrillConfig clientConfig = DrillConfig.forClient(properties);
+    client = QueryTestUtil.createClient(clientConfig,  serviceSet, MAX_WIDTH_PER_NODE, properties);
   }
 
   /**
@@ -231,7 +233,8 @@ public class BaseTestQuery extends ExecTest {
       client = null;
     }
 
-    client = QueryTestUtil.createClient(config, serviceSet, MAX_WIDTH_PER_NODE, properties);
+    DrillConfig clientConfig = DrillConfig.forClient(properties);
+    client = QueryTestUtil.createClient(clientConfig, serviceSet, MAX_WIDTH_PER_NODE, properties);
   }
 
   /*
