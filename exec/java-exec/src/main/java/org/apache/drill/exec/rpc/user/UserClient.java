@@ -27,9 +27,11 @@ import java.util.concurrent.Executor;
 import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 
+import io.netty.channel.ChannelPipeline;
 import org.apache.drill.common.KerberosUtil;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
+import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
@@ -102,6 +104,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
   // these are used for authentication
   private volatile List<String> serverAuthMechanisms = null;
   private volatile boolean authComplete = true;
+  private SSLConfig sslConfig;
 
   public UserClient(String clientName, DrillConfig config, boolean supportComplexTypes,
       BufferAllocator allocator, EventLoopGroup eventLoopGroup, Executor eventExecutor) {
@@ -115,6 +118,10 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
     this.clientName = clientName;
     this.allocator = allocator;
     this.supportComplexTypes = supportComplexTypes;
+  }
+
+  @Override protected void setupSSL(ChannelPipeline pipe) {
+    super.setupSSL(pipe);
   }
 
   public RpcEndpointInfos getServerInfos() {
@@ -153,6 +160,12 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
     if (properties.containsKey(DrillProperties.TEST_SASL_LEVEL)) {
       hsBuilder.setSaslSupport(SaslSupport.valueOf(
           Integer.parseInt(properties.getProperty(DrillProperties.TEST_SASL_LEVEL))));
+    }
+
+    try {
+      this.sslConfig = new SSLConfig(properties); // throws exception
+    } catch (DrillException e) {
+      throw new NonTransientRpcException(e.getMessage());
     }
 
     connect(hsBuilder.build(), endpoint).checkedGet();

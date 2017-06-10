@@ -100,6 +100,8 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
             ch.closeFuture().addListener(getCloseHandler(ch, connection));
 
             final ChannelPipeline pipe = ch.pipeline();
+            // Make sure that the SSL handler is the first handler in the pipeline so everything is encrypted
+            setupSSL(pipe);
 
             pipe.addLast(RpcConstants.PROTOCOL_DECODER, getDecoder(connection.getAllocator()));
             pipe.addLast(RpcConstants.MESSAGE_DECODER, new RpcDecoder("c-" + rpcConfig.getName()));
@@ -118,6 +120,12 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
     // if(TransportCheck.SUPPORTS_EPOLL){
     // b.option(EpollChannelOption.SO_REUSEPORT, true); //
     // }
+  }
+
+  // Adds a SSL handler if enabled. Required only for client and server communications, so
+  // a real implementation is only available for UserServer
+  protected void setupSSL(ChannelPipeline pipe) {
+    // Do nothing
   }
 
   @Override
