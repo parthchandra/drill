@@ -367,8 +367,8 @@ public class DrillClient implements Closeable, ConnectionThrottle {
     DrillbitEndpoint endpoint;
 
     while (triedEndpointIndex < connectTriesVal) {
-      client = new UserClient(clientName, config, supportComplexTypes, allocator, eventLoopGroup, executor);
       endpoint = endpoints.get(triedEndpointIndex);
+      client = new UserClient(clientName, config, supportComplexTypes, allocator, eventLoopGroup, executor, endpoint);
       logger.debug("Connecting to server {}:{}", endpoint.getAddress(), endpoint.getUserPort());
 
       if (!properties.containsKey(DrillProperties.SERVICE_HOST)) {
