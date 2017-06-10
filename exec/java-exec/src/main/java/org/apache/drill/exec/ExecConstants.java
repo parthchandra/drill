@@ -142,6 +142,16 @@ public interface ExecConstants {
   String USE_LOGIN_PRINCIPAL = "drill.exec.security.bit.auth.use_login_principal";
   String USER_ENCRYPTION_SASL_ENABLED = "drill.exec.security.user.encryption.sasl.enabled";
   String USER_ENCRYPTION_SASL_MAX_WRAPPED_SIZE = "drill.exec.security.user.encryption.sasl.max_wrapped_size";
+
+  String USER_SSL_ENABLED = "drill.exec.security.user.encryption.ssl.enabled";
+  String USER_SSL_KEYSTORE_TYPE = "javax.net.ssl.keyStoreType"; // valid values are jks(default), jceks, pkcs12
+  String USER_SSL_KEYSTORE_PATH = HTTP_KEYSTORE_PATH;     // path to keystore. default : $JRE_HOME/lib/security/keystore.jks
+  String USER_SSL_KEYSTORE_PASSWORD = HTTP_KEYSTORE_PASSWORD; // default: changeit
+  String USER_SSL_TRUSTSTORE_TYPE = "javax.net.ssl.trustStoreType"; // valid values are jks(default), jceks, pkcs12
+  String USER_SSL_TRUSTSTORE_PATH = HTTP_TRUSTSTORE_PATH; // path to keystore. default : $JRE_HOME/lib/security/cacerts.jks
+  String USER_SSL_TRUSTSTORE_PASSWORD = HTTP_TRUSTSTORE_PASSWORD; // default: changeit
+  String USER_SSL_PROTOCOL = "drill.exec.security.user.encryption.ssl.protocol"; // valid values are SSL, SSLV2, SSLV3, TLS, TLSV1, TLSv1.1, TLSv1.2(default)
+  String USER_SSL_KEY_PASSWORD = "drill.exec.security.user.encryption.ssl.keyPassword"; //
   String BIT_ENCRYPTION_SASL_ENABLED = "drill.exec.security.bit.encryption.sasl.enabled";
   String BIT_ENCRYPTION_SASL_MAX_WRAPPED_SIZE = "drill.exec.security.bit.encryption.sasl.max_wrapped_size";
 
