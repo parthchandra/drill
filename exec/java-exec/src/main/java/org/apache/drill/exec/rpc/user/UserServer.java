@@ -21,9 +21,15 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.UUID;
 
+import javax.net.ssl.SSLEngine;
 import javax.security.sasl.SaslException;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.ssl.SslHandler;
 import org.apache.drill.common.config.DrillProperties;
+import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.ssl.SSLConfig;
 import org.apache.drill.exec.exception.DrillbitStartupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
@@ -53,8 +59,10 @@ import org.apache.drill.exec.rpc.security.plain.PlainFactory;
 import org.apache.drill.exec.rpc.user.UserServer.BitToUserConnection;
 import org.apache.drill.exec.rpc.user.security.UserAuthenticationException;
 import org.apache.drill.exec.server.BootStrapContext;
+import org.apache.drill.exec.ssl.SSLConfigBuilder;
 import org.apache.drill.exec.work.user.UserWorker;
 import org.apache.hadoop.security.HadoopKerberosName;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
 
 import com.google.protobuf.MessageLite;
@@ -70,7 +78,11 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserServer.class);
   private static final String SERVER_NAME = "Apache Drill Server";
 
+  private final BootStrapContext bootStrapContext;
+  private final BufferAllocator allocator;
   private final UserConnectionConfig config;
+  private final SSLConfig sslConfig;
+  private Channel sslChannel;
   private final UserWorker userWorker;
 
   public UserServer(BootStrapContext context, BufferAllocator allocator, EventLoopGroup eventLoopGroup,
@@ -78,11 +90,65 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     super(UserRpcConfig.getMapping(context.getConfig(), context.getExecutor()),
         allocator.getAsByteBufAllocator(),
         eventLoopGroup);
+    this.bootStrapContext = context;
+    this.allocator = allocator;
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
+    this.sslChannel = null;
+    try {
+      this.sslConfig = new SSLConfigBuilder()
+          .config(bootStrapContext.getConfig())
+          .mode(SSLFactory.Mode.SERVER)
+          .initializeSSLContext(true)
+          .validateKeyStore(true)
+          .build();
+    } catch (DrillException e) {
+      throw new DrillbitStartupException(e.getMessage(), e.getCause());
+    }
     this.userWorker = worker;
 
     // Initialize Singleton instance of UserRpcMetrics.
     ((UserRpcMetrics)UserRpcMetrics.getInstance()).initialize(config.isEncryptionEnabled(), allocator);
+  }
+
+  @Override
+  protected void setupSSL(ChannelPipeline pipe) {
+    if (sslConfig.isUserSslEnabled()) {
+
+      SSLEngine sslEngine = sslConfig.createSSLEngine(allocator, null, 0);
+      sslEngine.setUseClientMode(false);
+
+      // No need for client side authentication (HTTPS like behaviour)
+      sslEngine.setNeedClientAuth(false);
+
+      // set Security property jdk.certpath.disabledAlgorithms  to disable specific ssl algorithms
+      sslEngine.setEnabledProtocols(sslEngine.getEnabledProtocols());
+
+      // set Security property jdk.tls.disabledAlgorithms to disable specific cipher suites
+      sslEngine.setEnabledCipherSuites(sslEngine.getEnabledCipherSuites());
+      sslEngine.setEnableSessionCreation(true);
+
+      // Add SSL handler into pipeline
+      pipe.addFirst(RpcConstants.SSL_HANDLER, new SslHandler(sslEngine));
+      logger.debug("SSL communication between client and server is enabled.");
+    }
+    logger.debug(sslConfig.toString());
+  }
+  @Override
+  protected boolean isSslEnabled() {
+    return sslConfig.isUserSslEnabled();
+  }
+
+  @Override
+  public void setSslChannel(Channel c) {
+    sslChannel = c;
+    return;
+  }
+
+  @Override
+  protected void closeSSL(){
+    if(isSslEnabled() && sslChannel != null){
+      sslChannel.close();
+    }
   }
 
   @Override

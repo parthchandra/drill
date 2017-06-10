@@ -1,0 +1,325 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.drill.exec.ssl;
+
+import com.google.common.base.Preconditions;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.ssl.SSLFactory;
+
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.text.MessageFormat;
+
+public abstract class SSLConfig {
+
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfig.class);
+
+  public static final String DEFAULT_SSL_PROVIDER = "JDK"; // JDK or OPENSSL
+  public static final String DEFAULT_SSL_PROTOCOL = "TLSv1.2";
+  public static final int DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS = 10 * 1000; // 10 seconds
+
+  protected final boolean httpsEnabled;
+  protected final DrillConfig config;
+  protected final Configuration hadoopConfig;
+
+  // Either the Netty SSL context or the JDK SSL context will be initialized
+  // The JDK SSL context is use iff the useSystemTrustStore setting is enabled.
+  protected SslContext nettySslContext;
+  protected SSLContext jdkSSlContext;
+
+  private static final boolean isWindows = System.getProperty("os.name").toLowerCase().indexOf("win") >= 0;
+  private static final boolean isMacOs = System.getProperty("os.name").toLowerCase().indexOf("mac") >= 0;
+
+  public static final String HADOOP_SSL_CONF_TPL_KEY = "hadoop.ssl.{0}.conf";
+  public static final String HADOOP_SSL_KEYSTORE_LOCATION_TPL_KEY = "ssl.{0}.keystore.location";
+  public static final String HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY = "ssl.{0}.keystore.password";
+  public static final String HADOOP_SSL_KEYSTORE_TYPE_TPL_KEY = "ssl.{0}.keystore.type";
+  public static final String HADOOP_SSL_KEYSTORE_KEYPASSWORD_TPL_KEY =
+      "ssl.{0}.keystore.keypassword";
+  public static final String HADOOP_SSL_TRUSTSTORE_LOCATION_TPL_KEY = "ssl.{0}.truststore.location";
+  public static final String HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY = "ssl.{0}.truststore.password";
+  public static final String HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY = "ssl.{0}.truststore.type";
+
+  public SSLConfig(DrillConfig config, Configuration hadoopConfig, SSLFactory.Mode mode)
+      throws DrillException {
+
+    this.config = config;
+    httpsEnabled =
+        config.hasPath(ExecConstants.HTTP_ENABLE_SSL) && config.getBoolean(ExecConstants.HTTP_ENABLE_SSL);
+    // For testing we will mock up a hadoop configuration, however for regular use, we find the actual hadoop config.
+    boolean enableHadoopConfig = config.getBoolean(ExecConstants.SSL_USE_HADOOP_CONF);
+    if (enableHadoopConfig && this instanceof SSLConfigServer) {
+      if (hadoopConfig == null) {
+        this.hadoopConfig = new Configuration(); // get hadoop configuration
+      } else {
+        this.hadoopConfig = hadoopConfig;
+      }
+      String hadoopSSLConfigFile =
+          this.hadoopConfig.get(resolveHadoopPropertyName(HADOOP_SSL_CONF_TPL_KEY, mode));
+      logger.debug("Using Hadoop configuration for SSL");
+      logger.debug("Hadoop SSL configuration file: {}", hadoopSSLConfigFile);
+      this.hadoopConfig.addResource(hadoopSSLConfigFile);
+    } else {
+      this.hadoopConfig = null;
+    }
+  }
+
+  protected String getConfigParam(String name, String hadoopName) {
+    String value = "";
+    if (hadoopConfig != null) {
+      value = getHadoopConfigParam(hadoopName);
+    }
+    if (value.isEmpty() && config.hasPath(name)) {
+      value = config.getString(name);
+    }
+    value = value.trim();
+    return value;
+  }
+
+  protected String getHadoopConfigParam(String name) {
+    Preconditions.checkArgument(this.hadoopConfig != null);
+    String value = "";
+    value = hadoopConfig.get(name, "");
+    value = value.trim();
+    return value;
+  }
+
+  protected String getConfigParamWithDefault(String name, String defaultValue) {
+    String value = "";
+    if (config.hasPath(name)) {
+      value = config.getString(name);
+    }
+    if (value.isEmpty()) {
+      value = defaultValue;
+    }
+    value = value.trim();
+    return value;
+  }
+
+  protected String resolveHadoopPropertyName(String nameTemplate, SSLFactory.Mode mode) {
+    return MessageFormat.format(nameTemplate, mode.toString().toLowerCase());
+  }
+
+  public abstract void validateKeyStore() throws DrillException;
+
+  public abstract SslContext initSslContext() throws DrillException;
+
+  public abstract SSLContext initSSLContext() throws DrillException;
+
+  public abstract boolean isUserSslEnabled();
+
+  public abstract boolean isHttpsEnabled();
+
+  public abstract String getKeyStoreType();
+
+  public abstract String getKeyStorePath();
+
+  public abstract String getKeyStorePassword();
+
+  public abstract String getKeyPassword();
+
+  public abstract String getTrustStoreType();
+
+  public abstract boolean hasTrustStorePath();
+
+  public abstract String getTrustStorePath();
+
+  public abstract boolean hasTrustStorePassword();
+
+  public abstract String getTrustStorePassword();
+
+  public abstract String getProtocol();
+
+  public abstract SslProvider getProvider();
+
+  public abstract int getHandshakeTimeout();
+
+  public abstract SSLFactory.Mode getMode();
+
+  public abstract boolean disableHostVerification();
+
+  public abstract boolean disableCertificateVerification();
+
+  public abstract boolean useSystemTrustStore();
+
+  public abstract boolean isSslValid();
+
+  public SslContext getNettySslContext() {
+    return nettySslContext;
+  }
+
+  public TrustManagerFactory initializeTrustManagerFactory() throws DrillException {
+    TrustManagerFactory tmf;
+    KeyStore ts = null;
+    //Support Windows/MacOs system trust store
+    try {
+      String trustStoreType = getTrustStoreType();
+      if ((isWindows || isMacOs) && useSystemTrustStore()) {
+        // This is valid for MS-Windows and MacOs
+        logger.debug("Initializing System truststore.");
+        ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
+        ts.load(null, null);
+      } else if (!getTrustStorePath().isEmpty()) {
+          // if truststore is not provided then we will use the default. Note that the default depends on
+          // the TrustManagerFactory that in turn depends on the Security Provider.
+          // Use null as the truststore which will result in the default truststore being picked up
+          logger.debug("Initializing truststore {}.", getTrustStorePath());
+          ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
+          InputStream tsStream = new FileInputStream(getTrustStorePath());
+          ts.load(tsStream, getTrustStorePassword().toCharArray());
+      } else {
+        logger.debug("Initializing default truststore.");
+      }
+      if (disableCertificateVerification()) {
+        tmf = InsecureTrustManagerFactory.INSTANCE;
+      } else {
+        tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      }
+      tmf.init(ts);
+    } catch (Exception e) {
+      // Catch any SSL initialization Exceptions here and abort.
+      throw new DrillException(
+          new StringBuilder()
+              .append("Exception while initializing the truststore: [")
+              .append(e.getMessage())
+              .append("]. ")
+              .toString());
+    }
+    return tmf;
+  }
+
+  public KeyManagerFactory initializeKeyManagerFactory() throws DrillException {
+    KeyManagerFactory kmf;
+    String keyStorePath = getKeyStorePath();
+    String keyStorePassword = getKeyStorePassword();
+    String keyStoreType = getKeyStoreType();
+    try {
+      if (keyStorePath.isEmpty()) {
+        throw new DrillException("No Keystore provided.");
+      }
+      KeyStore ks =
+          KeyStore.getInstance(!keyStoreType.isEmpty() ? keyStoreType : KeyStore.getDefaultType());
+      //initialize the key manager factory
+      // Will throw an exception if the file is not found/accessible.
+      InputStream ksStream = new FileInputStream(keyStorePath);
+      // A key password CANNOT be null or an empty string.
+      if (keyStorePassword.isEmpty()) {
+        throw new DrillException("The Keystore password cannot be empty.");
+      }
+      ks.load(ksStream, keyStorePassword.toCharArray());
+      // Empty Keystore. (Remarkably, it is possible to do this).
+      if (ks.size() == 0) {
+        throw new DrillException("The Keystore has no entries.");
+      }
+      kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+      kmf.init(ks, getKeyPassword().toCharArray());
+
+    } catch (Exception e) {
+      throw new DrillException(
+          new StringBuilder()
+              .append("Exception while initializing the keystore: [")
+              .append(e.getMessage())
+              .append("]. ")
+              .toString());
+    }
+    return kmf;
+  }
+
+  public void initContext() throws DrillException {
+    if ((isWindows || isMacOs) && useSystemTrustStore()) {
+      initSSLContext();
+      logger.debug("Initialized Windows SSL context using JDK.");
+    } else {
+      initSslContext();
+      logger.debug("Initialized SSL context.");
+    }
+    return;
+  }
+
+  public SSLEngine createSSLEngine(BufferAllocator allocator, String peerHost, int peerPort) {
+    SSLEngine engine;
+    if ((isWindows || isMacOs) && useSystemTrustStore()) {
+      if (peerHost != null) {
+        engine = jdkSSlContext.createSSLEngine(peerHost, peerPort);
+        logger.debug("Initializing Windows SSLEngine with hostname verification.");
+      } else {
+        engine = jdkSSlContext.createSSLEngine();
+        logger.debug("Initializing Windows SSLEngine with no hostname verification.");
+      }
+    } else {
+      if (peerHost != null) {
+        engine = nettySslContext.newEngine(allocator.getAsByteBufAllocator(), peerHost, peerPort);
+        logger.debug("Initializing SSLEngine with hostname verification.");
+      } else {
+        engine = nettySslContext.newEngine(allocator.getAsByteBufAllocator());
+        logger.debug("Initializing SSLEngine with no hostname verification.");
+      }
+    }
+    return engine;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("SSL is ")
+        .append(isUserSslEnabled()?"":" not ")
+        .append("enabled.\n");
+    sb.append("HTTPS is ")
+        .append(isHttpsEnabled()?"":" not ")
+        .append("enabled.\n");
+    if(isUserSslEnabled() || isHttpsEnabled()) {
+      sb.append("SSL Configuration :")
+          .append("OS:").append(System.getProperty("os.name"))
+          .append("\n\tUsing system trust store: ").append(useSystemTrustStore())
+          .append("\n\tprotocol: ").append(getProtocol())
+          .append("\n\tkeyStoreType: ").append(getKeyStoreType())
+          .append("\n\tkeyStorePath: ").append(getKeyStorePath())
+          .append("\n\tkeyStorePassword: ").append(getPrintablePassword(getKeyStorePassword()))
+          .append("\n\tkeyPassword: ").append(getPrintablePassword(getKeyPassword()))
+          .append("\n\ttrustStoreType: ").append(getTrustStoreType())
+          .append("\n\ttrustStorePath: ").append(getTrustStorePath())
+          .append("\n\ttrustStorePassword: ").append(getPrintablePassword(getTrustStorePassword()))
+          .append("\n\thandshakeTimeout: ").append(getHandshakeTimeout())
+          .append("\n\tdisableHostVerification: ").append(disableHostVerification())
+          .append("\n\tdisableCertificateVerification: ").append(disableCertificateVerification())
+      ;
+    }
+    return sb.toString();
+  }
+
+  private String getPrintablePassword(String password) {
+    StringBuilder sb = new StringBuilder();
+    if(password == null || password.length()<2 ){
+      return password;
+    }
+    sb.append(password.charAt(0)).append("****").append(password.charAt(password.length()-1));
+    return sb.toString();
+  }
+}
