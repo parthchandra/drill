@@ -23,13 +23,23 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import javax.net.ssl.SSLEngine;
 import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelPipeline;
+import io.netty.handler.ssl.SslHandler;
+import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GenericFutureListener;
 import org.apache.drill.common.KerberosUtil;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
+import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
@@ -55,6 +65,7 @@ import org.apache.drill.exec.proto.UserProtos.UserToBitHandshake;
 import org.apache.drill.exec.rpc.AbstractClientConnection;
 import org.apache.drill.exec.rpc.Acks;
 import org.apache.drill.exec.rpc.BasicClient;
+import org.apache.drill.exec.rpc.ConnectionMultiListener;
 import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.NonTransientRpcException;
 import org.apache.drill.exec.rpc.OutOfMemoryHandler;
@@ -62,8 +73,10 @@ import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
 import org.apache.drill.exec.rpc.Response;
 import org.apache.drill.exec.rpc.ResponseSender;
 import org.apache.drill.exec.rpc.RpcConnectionHandler;
+import org.apache.drill.exec.rpc.RpcConstants;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.rpc.SSLConfig;
 import org.apache.drill.exec.rpc.security.AuthStringUtil;
 import org.apache.drill.exec.rpc.security.AuthenticationOutcomeListener;
 import org.apache.drill.exec.rpc.security.AuthenticatorFactory;
@@ -102,9 +115,12 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
   // these are used for authentication
   private volatile List<String> serverAuthMechanisms = null;
   private volatile boolean authComplete = true;
+  private SSLConfig sslConfig;
+  private Channel sslChannel;
 
   public UserClient(String clientName, DrillConfig config, boolean supportComplexTypes,
-      BufferAllocator allocator, EventLoopGroup eventLoopGroup, Executor eventExecutor) {
+      BufferAllocator allocator, EventLoopGroup eventLoopGroup, Executor eventExecutor)
+      throws NonTransientRpcException {
     super(
         UserRpcConfig.getMapping(config, eventExecutor),
         allocator.getAsByteBufAllocator(),
@@ -115,6 +131,56 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
     this.clientName = clientName;
     this.allocator = allocator;
     this.supportComplexTypes = supportComplexTypes;
+    this.sslChannel = null;
+    try {
+      this.sslConfig = new SSLConfig(config, false); // throws exception
+    } catch (DrillException e) {
+      throw new NonTransientRpcException(e.getMessage());
+    }
+
+  }
+
+  @Override
+  protected void setupSSL(ChannelPipeline pipe, ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener) {
+    if (sslConfig.isSslEnabled()) {
+
+      SSLEngine sslEngine = sslConfig.getSslContext().createSSLEngine();
+      sslEngine.setUseClientMode(true);
+
+      // set Security property jdk.certpath.disabledAlgorithms  to disable specific ssl algorithms
+      sslEngine.setEnabledProtocols(sslEngine.getEnabledProtocols());
+
+      // set Security property jdk.tls.disabledAlgorithms to disable specific cipher suites
+      sslEngine.setEnabledCipherSuites(sslEngine.getEnabledCipherSuites());
+      sslEngine.setEnableSessionCreation(true);
+
+      // Add SSL handler into pipeline
+      SslHandler sslHandler = new SslHandler(sslEngine);
+      sslHandler.setHandshakeTimeoutMillis(sslConfig.getHandshakeTimeout());
+
+      // Add a listener for SSL Handshake complete. The Drill client handshake will be enabled only
+      // after this is done.
+      sslHandler.handshakeFuture().addListener(sslHandshakeListener);
+      pipe.addFirst(RpcConstants.SSL_HANDLER, sslHandler);
+    }
+  }
+
+  @Override
+  protected boolean isSslEnabled() {
+    return sslConfig.isSslEnabled();
+  }
+
+  @Override
+  public void setSslChannel(Channel c) {
+    sslChannel = c;
+    return;
+  }
+
+  @Override
+  protected void closeSSL(){
+    if(isSslEnabled() && sslChannel != null){
+      sslChannel.close();
+    }
   }
 
   public RpcEndpointInfos getServerInfos() {
@@ -155,7 +221,17 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
           Integer.parseInt(properties.getProperty(DrillProperties.TEST_SASL_LEVEL))));
     }
 
-    connect(hsBuilder.build(), endpoint).checkedGet();
+    if(sslConfig.isSslEnabled()) {
+      try {
+        connect(hsBuilder.build(), endpoint).checkedGet(sslConfig.getHandshakeTimeout(), TimeUnit.MILLISECONDS);
+      } catch (TimeoutException e) {
+        throw new NonTransientRpcException(
+            "Connecting to the server timed out. This is sometimes due to a mismatch in the SSL configuration between client and server.",
+            e);
+      }
+    } else{
+      connect(hsBuilder.build(), endpoint).checkedGet();
+    }
 
     // Check if client needs encryption and server is not configured for encryption.
     final boolean clientNeedsEncryption = properties.containsKey(DrillProperties.SASL_ENCRYPT)
