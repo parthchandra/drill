@@ -41,6 +41,11 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 
+/**
+ * A visitor class that analyzes a filter condition (typically an index condition)
+ * and a supplied input collation and determines what the output collation would be
+ * after applying the filter.
+ */
 public class FindFiltersForCollation extends RexVisitorImpl<Boolean> {
 
   // input field collations before analysis
@@ -100,7 +105,7 @@ public class FindFiltersForCollation extends RexVisitorImpl<Boolean> {
     if (collationFilterMap.size() > 0) {
       boolean previousIsEquality = true;
       RelFieldCollation c;
-      for (int i = 0; i < fieldCollations.size(); i++) {
+      for (int i = 0; i < fieldCollations.size() && previousIsEquality; i++) {
         c = fieldCollations.get(i);
         List<RexNode> exprs = collationFilterMap.get(c);
         if (exprs.size() == 0) {
@@ -156,10 +161,19 @@ public class FindFiltersForCollation extends RexVisitorImpl<Boolean> {
   public Boolean visitCall(RexCall call) {
     SqlOperator op = call.getOperator();
     SqlKind kind = op.getKind();
+
     if (kind == SqlKind.AND) {
       for (RexNode n : call.getOperands()) {
         n.accept(this);
       }
+    } else if (kind == SqlKind.CAST) {
+      // For the filter analyzer itself, if the Project has not been pushed
+      // down below the Filter, then CAST is present in the filter condition.
+      // Return True for such case since CAST exprs are valid for collation.
+      // Otherwise, filter is only referencing output of the Project and we won't
+      // hit this else condition (i.e filter will have $0, $1 etc which would be
+      // visited by visitInputRef()).
+      return true;
     } else if (allowedComparisons.contains(kind)) {
       List<RexNode> ops = call.getOperands();
       boolean left = ops.get(0).accept(this);
