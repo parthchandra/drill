@@ -552,6 +552,52 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("l").baselineValues(100000002l)
         .go();
   }
-  //select t.driverlicense as l from dfs.tmp.`index_test_primary` as t  where t.driverlicense < 100000003 order by t.driverlicense;
+
+  @Test
+  public void TestNonCoveringPlanSortRemoved() throws Exception {
+    String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        " where t.driverlicense < 100000003 order by t.driverlicense";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    String query2 = "SELECT t.name.fname as fname FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn < '100000003' order by t.id.ssn";
+    PlanTestBase.testPlanMatchingPatterns(query2,
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    //simple field, driverlicense
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("phone").baselineValues("6500008069")
+        .baselineColumns("phone").baselineValues("6500001411")
+        .baselineColumns("phone").baselineValues("6500001595")
+        .go();
+
+    //query on field of item expression(having capProject), non-simple field t.id.ssn
+    testBuilder()
+        .sqlQuery(query2)
+        .ordered()
+        .baselineColumns("fname").baselineValues("VcFahj")
+        .baselineColumns("fname").baselineValues("WbKVK")
+        .baselineColumns("fname").baselineValues("vSAEsyFN")
+        .go();
+
+    test(sliceTargetSmall);
+    try {
+      PlanTestBase.testPlanMatchingPatterns(query2,
+          new String[]{"SingleMergeExchange(.*[\n\r])+.*"
+              + "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+          new String[]{"Sort"}
+      );
+    } finally {
+      test(sliceTargetDefault);
+    }
+  }
 
 }
