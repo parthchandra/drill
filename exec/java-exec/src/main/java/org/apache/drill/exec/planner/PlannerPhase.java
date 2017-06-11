@@ -409,6 +409,7 @@ public enum PlannerPhase {
             DbScanToIndexScanPrule.SORT_FILTER_PROJECT_SCAN,
             DbScanToIndexScanPrule.SORT_PROJECT_FILTER_PROJECT_SCAN,
             DbScanToIndexScanPrule.PROJECT_FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.SORT_PROJECT_FILTER_SCAN,
             DbScanToIndexScanPrule.FILTER_PROJECT_SCAN,
             DbScanToIndexScanPrule.FILTER_SCAN
         )

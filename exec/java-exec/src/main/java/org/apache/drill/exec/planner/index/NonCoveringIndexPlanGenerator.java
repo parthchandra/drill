@@ -23,15 +23,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.calcite.plan.RelOptUtil;
-import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.JoinControl;
-import org.apache.drill.exec.planner.logical.DrillSortRel;
-import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
@@ -58,9 +55,6 @@ import org.apache.calcite.rex.RexNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.apache.drill.exec.planner.physical.SingleMergeExchangePrel;
-import org.apache.drill.exec.planner.physical.SortPrule;
-
 
 /**
  * Generate a non-covering index plan that is equivalent to the original plan. The non-covering plan consists
@@ -220,7 +214,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
 
       //build collation in project
-      collation = buildCollation(leftProjectExprs, dbScan, functionInfo);
+      collation = buildCollationLowerProject(leftProjectExprs, dbScan, functionInfo);
 
       final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet().plus(collation),
           leftIndexFilterPrel == null ? dbScan : leftIndexFilterPrel, leftProjectExprs, leftProjectRowType);
@@ -287,7 +281,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         newCollation = ProjectPrule.convertRelCollation(collationAdded, collationMap);
       }
       else {
-        newCollation = buildCollation(capProject.getProjects(), newRel, functionInfo);
+        newCollation = buildCollationUpperProject(capProject.getProjects(), newRel, functionInfo, null);
       }
       ProjectPrel cap = new ProjectPrel(capProject.getCluster(),
           (newCollation==null?capProject.getTraitSet() : capProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
@@ -346,9 +340,6 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
           fieldCollations.add(fc);
         }
       }
-      // check the field collations based on the index conditions also
-      // FindFiltersForCollation finder = new FindFiltersForCollation(fieldCollations);
-      // fieldCollations = finder.analyze(indexCondition);
     }
 
     final RelCollation collation = RelCollations.of(fieldCollations);

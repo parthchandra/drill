@@ -18,6 +18,7 @@
 package org.apache.drill.exec.planner.index;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -75,6 +76,11 @@ public class DbScanToIndexScanPrule extends Prule {
       RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
           RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))))),
       "DbScanToIndexScanPrule:Sort_Project_Filter_Project_Scan", new MatchSPFPS());
+
+  public static final RelOptRule SORT_PROJECT_FILTER_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
+          RelOptHelper.any(DrillScanRel.class)))),
+      "DbScanToIndexScanPrule:Sort_Project_Filter_Scan", new MatchSPFS());
 
   public static final RelOptRule FILTER_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class)),
@@ -241,6 +247,21 @@ public class DbScanToIndexScanPrule extends Prule {
     }
   }
 
+  private static class MatchSPFS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(3);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillSortRel sort = call.rel(0);
+      final DrillProjectRel capProject = call.rel(1);
+      final DrillFilterRel filter = call.rel(2);
+      final DrillScanRel scan = call.rel(3);
+      return new IndexPlanCallContext(call, sort, capProject, filter, null, scan);
+    }
+  }
+
   protected void doOnMatch(IndexPlanCallContext indexContext) {
 
     Stopwatch indexPlanTimer = Stopwatch.createStarted();
@@ -296,6 +317,31 @@ public class DbScanToIndexScanPrule extends Prule {
     List<LogicalExpression> infoCols = Lists.newArrayList();
     infoCols.addAll(mapRexExpr.values());
     return indexDesc.allColumnsIndexed(infoCols);
+  }
+
+  private boolean isConditionPrefix(IndexDescriptor indexDesc, RexNode initCondition, IndexConditionInfo.Builder infoBuilder) {
+    List<LogicalExpression> indexCols = indexDesc.getIndexColumns();
+    boolean prefix = true;
+    if (indexCols.size() > 0 && initCondition != null) {
+      int i=0;
+      while (prefix && i < indexCols.size()) {
+        LogicalExpression p = indexCols.get(i++);
+        List<LogicalExpression> prefixCol = ImmutableList.of(p);
+        IndexConditionInfo info = infoBuilder.indexConditionRelatedToFields(prefixCol, initCondition);
+        if(info != null && info.hasIndexCol) {
+          initCondition = info.remainderCondition;
+          if (initCondition.isAlwaysTrue()) {
+            // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+            // we don't need to keep track of it for rest of the index selection
+            initCondition = null;
+            break;
+          }
+        } else {
+          prefix = false;
+        }
+      }
+    }
+    return prefix;
   }
 
   private IndexDescriptor selectIndexForNonCoveringPlan(DrillScanRel scan, Iterable<IndexDescriptor> indexes) {
@@ -388,7 +434,8 @@ public class DbScanToIndexScanPrule extends Prule {
     } else {
       // get the list of covering and non-covering indexes for this collection
       for (IndexDescriptor indexDesc : collection) {
-        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
+        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc) &&
+            isConditionPrefix(indexDesc, indexCondition, infoBuilder)) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           if (isCoveringIndex(indexContext, functionInfo)) {
             coveringIndexes.add(indexDesc);
