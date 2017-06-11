@@ -81,7 +81,8 @@ public class IndexPlanTest extends BaseJsonTest {
             "personal.income", "",
             "driverlicense", "",
             "$CAST(id.ssn@INT)", "contact.phone",
-            "$CAST(driverlicense@STRING)",""
+            "$CAST(driverlicense@STRING)","",
+            "address.state,personal.age,driverlicense", "name.fname"
         };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
   }
@@ -636,6 +637,48 @@ public class IndexPlanTest extends BaseJsonTest {
        .ordered()
        .baselineColumns("cnt").baselineValues(3L)
        .go();
+  }
+
+  @Test  // leading prefix of index has Equality conditions and ORDER BY last column; Sort SHOULD be dropped
+  public void TestCoveringPlanSortPrefix_1() throws Exception {
+    String query = "SELECT t.driverlicense FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age = 35 and t.driverlicense < 100008000 order by t.driverlicense";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+      .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+      .optionSettingQueriesForBaseline(noIndexPlan)
+      .unOrdered()
+      .sqlQuery(query)
+      .sqlBaselineQuery(query)
+      .build()
+      .run();
+  }
+
+  @Test  // leading prefix of index has Non-Equality conditions and ORDER BY last column; Sort SHOULD NOT be dropped
+  public void TestCoveringPlanSortPrefix_2() throws Exception {
+    String query = "SELECT t.driverlicense FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.driverlicense < 100008000 order by t.driverlicense";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+      .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+      .optionSettingQueriesForBaseline(noIndexPlan)
+      .unOrdered()
+      .sqlQuery(query)
+      .sqlBaselineQuery(query)
+      .build()
+      .run();
   }
 
 }
