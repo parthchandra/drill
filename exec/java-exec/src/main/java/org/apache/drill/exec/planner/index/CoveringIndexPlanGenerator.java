@@ -217,41 +217,6 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     return remap.rewriteWithMap(toRewriteRex, mapRexExpr);
   }
 
-  private RelCollation buildCollation(List<RexNode> projectRexs, RelNode input) {
-    //if leading fields of index are here, add them to RelCollation
-    List<RelFieldCollation> newFields = Lists.newArrayList();
-    if (!functionInfo.hasFunctional()) {
-      Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
-      DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
-      int idx=0;
-      for(RexNode rex : projectRexs) {
-        projectExprs.put(DrillOptiq.toDrill(parserContext, input, rex), idx);
-        idx++;
-      }
-      int idxFieldCount = 0;
-      for (LogicalExpression expr : indexDesc.getIndexColumns()) {
-        if (!projectExprs.containsKey(expr)) {
-          break;
-        }
-        RelFieldCollation.Direction dir = indexDesc.getCollation().getFieldCollations().get(idxFieldCount).direction;
-        if ( dir == null) {
-          break;
-        }
-        newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
-            RelFieldCollation.NullDirection.UNSPECIFIED));
-      }
-      idxFieldCount++;
-    }
-    return RelCollationImpl.of(newFields);
-  }
-
-  private boolean toRemoveSort(DrillSortRel sort, RelCollation inputCollation) {
-    if ( inputCollation.satisfies(sort.getCollation())) {
-      return true;
-    }
-    return false;
-  }
-
   @Override
   public RelNode convertChild(final RelNode filter, final RelNode input) throws InvalidRelException {
 
@@ -286,7 +251,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     ProjectPrel indexProjectPrel = null;
     if (origProject != null) {
-      RelCollation collation = buildCollation(origProject.getProjects(), indexScanPrel);
+      RelCollation collation = buildCollation(origProject.getProjects(), indexScanPrel, functionInfo);
       indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexScanPrel.getTraitSet().plus(collation),
           indexFilterPrel, origProject.getProjects(), origProject.getRowType());
     }
@@ -314,7 +279,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         newCollation = ProjectPrule.convertRelCollation(collation, collationMap);
       }
       else {
-        newCollation = buildCollation(capProject.getProjects(), indexScanPrel);
+        newCollation = buildCollation(capProject.getProjects(), indexScanPrel, functionInfo);
       }
 
       ProjectPrel cap = new ProjectPrel(capProject.getCluster(),
@@ -346,38 +311,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     if (indexContext.sort != null) {
-      DrillSortRel rel = indexContext.sort;
-      DrillDistributionTrait hashDistribution =
-          new DrillDistributionTrait(DrillDistributionTrait.DistributionType.HASH_DISTRIBUTED,
-              ImmutableList.copyOf(SortPrule.getDistributionField(rel)));
-
-      if ( !toRemoveSort(indexContext.sort, finalRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE))) {
-        //create sort's prel, also let us add distribution trait as SortPrule will do
-        final RelTraitSet traits = rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(hashDistribution);
-        RelNode convertedInput = Prule.convert(finalRel, traits);
-        //final RelNode convertedInput = Prule.convert(rel.getInput(), traits);
-
-        if (Prule.isSingleMode(indexContext.call)) {
-          indexContext.call.transformTo(convertedInput);
-        } else {
-          RelNode exch = new SingleMergeExchangePrel(rel.getCluster(),
-              rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(DrillDistributionTrait.SINGLETON),
-              convertedInput, rel.getCollation());
-          indexContext.call.transformTo(exch);  // transform logical "sort" into "SingleMergeExchange".
-        }
-      }
-      else {
-        //we are going to remove sort
-        logger.debug("Not generating SortPrel since we have the required collation");
-
-        RelTraitSet traits = finalRel.getTraitSet().plus(rel.getCollation()).plus(Prel.DRILL_PHYSICAL);
-        RelNode convertedInput = Prule.convert(finalRel, traits);
-        RelNode exch = new SingleMergeExchangePrel(finalRel.getCluster(),
-            traits.replace(DrillDistributionTrait.SINGLETON),
-            convertedInput,//finalRel,//
-            indexContext.sort.getCollation());
-        finalRel = exch;
-      }
+      finalRel = getSortNode(indexContext, finalRel);
     }
 
     finalRel = Prule.convert(finalRel, finalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL));

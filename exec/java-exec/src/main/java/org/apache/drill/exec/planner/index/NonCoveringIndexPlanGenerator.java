@@ -30,11 +30,14 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.JoinControl;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
+import org.apache.drill.exec.planner.physical.ProjectPrule;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.RowKeyJoinPrel;
 import org.apache.drill.exec.planner.physical.ScanPrel;
@@ -55,6 +58,8 @@ import org.apache.calcite.rex.RexNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import org.apache.drill.exec.planner.physical.SingleMergeExchangePrel;
+import org.apache.drill.exec.planner.physical.SortPrule;
 
 
 /**
@@ -168,16 +173,16 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     RelTraitSet restrictedScanTraitSet = origScanTraitSet.plus(Prel.DRILL_PHYSICAL);
 
     // Create the collation traits for restricted scan based on the index columns under the
-    // conditions that (a) there is a sort requirement, (b) the index actually has collation
-    // property (e.g hash indexes don't) and (c) if an explicit sort operation is not enforced
-    if (indexContext.sort != null &&
-        indexDesc.getCollation() != null &&
-        !settings.isIndexForceSortNonCovering()) {
-      RelCollation collationTrait = buildCollationTraits(indexDesc, indexCondition, indexScanRowType, dbscanRowType);
+    // conditions that (a) the index actually has collation property (e.g hash indexes don't)
+    // and (b) if an explicit sort operation is not enforced
+    RelCollation collation = null;
+    if (indexDesc.getCollation() != null &&
+         !settings.isIndexForceSortNonCovering()) {
+      collation = buildCollationTraits(indexDesc, indexScanRowType, dbscanRowType);
       if (restrictedScanTraitSet.contains(RelCollationTraitDef.INSTANCE)) { // replace existing trait
-        restrictedScanTraitSet = restrictedScanTraitSet.replace(collationTrait);
+        restrictedScanTraitSet = restrictedScanTraitSet.replace(collation);
       } else {  // add new one
-        restrictedScanTraitSet = restrictedScanTraitSet.plus(collationTrait);
+        restrictedScanTraitSet = restrictedScanTraitSet.plus(collation);
       }
     }
 
@@ -198,6 +203,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       lastLeft = leftIndexFilterPrel;
     }
     RelDataType origRowType = origProject == null ? origScan.getRowType() : origProject.getRowType();
+
     if (origProject != null) {// then we also  don't need a project
       // new Project's rowtype is original Project's rowtype [plus rowkey if rowkey is not in original rowtype]
       List<RelDataTypeField> origProjFields = origRowType.getFieldList();
@@ -212,7 +218,11 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       }
 
       final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
-      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+
+      //build collation in project
+      collation = buildCollation(leftProjectExprs, dbScan, functionInfo);
+
+      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet().plus(collation),
           leftIndexFilterPrel == null ? dbScan : leftIndexFilterPrel, leftProjectExprs, leftProjectRowType);
       lastLeft = leftIndexProjectPrel;
     }
@@ -221,7 +231,6 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final RelNode convertedLeft = Prule.convert(lastLeft, leftTraits);
 
     // find the rowkey column on the left side of join
-    // TODO: is there a shortcut way to do this ?
     final int leftRowKeyIdx = getRowKeyIndex(convertedLeft.getRowType(), origScan);
     final int rightRowKeyIdx = 0; // only rowkey field is being projected from right side
 
@@ -236,12 +245,14 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     RelNode newRel;
     if (settings.isIndexUseHashJoinNonCovering()) {
+      //for hash join, collation will be cleared
       HashJoinPrel hjPrel = new HashJoinPrel(topRel.getCluster(), leftTraits, convertedLeft,
           convertedRight, joinCondition, JoinRelType.INNER, false,
           true /* useful for join-restricted scans */, JoinControl.DEFAULT);
       newRel = hjPrel;
     } else {
-      RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(topRel.getCluster(), leftTraits,
+      //if there is collation, add to rowkey join
+      RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(topRel.getCluster(), leftTraits.plus(collation),
           convertedLeft, convertedRight, joinCondition, JoinRelType.INNER);
       newRel = rjPrel;
     }
@@ -262,14 +273,31 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       resetExprs.add(RexInputRef.of(idx, newRel.getRowType()));
     }
 
+    //rewrite the collation for this projectPrel
     final ProjectPrel resetProjectPrel = new ProjectPrel(newRel.getCluster(), newRel.getTraitSet(),
         newRel, resetExprs, finalProjectRowType);
     newRel = resetProjectPrel;
 
     if ( capProject != null) {
-      ProjectPrel cap = new ProjectPrel(capProject.getCluster(), newRel.getTraitSet(),
+      final Map<Integer, Integer> collationMap = ProjectPrule.getCollationMap(capProject);
+      RelCollation newCollation = null;
+
+      if ( origProject != null) {//so we already built collation there
+        RelCollation collationAdded = newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        newCollation = ProjectPrule.convertRelCollation(collationAdded, collationMap);
+      }
+      else {
+        newCollation = buildCollation(capProject.getProjects(), newRel, functionInfo);
+      }
+      ProjectPrel cap = new ProjectPrel(capProject.getCluster(),
+          (newCollation==null?capProject.getTraitSet() : capProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
           newRel, capProject.getProjects(), capProject.getRowType());
       newRel = cap;
+    }
+
+    //whether to remove sort
+    if (indexContext.sort != null) {
+      newRel = getSortNode(indexContext, newRel);
     }
 
     RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
@@ -280,7 +308,6 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
   private RelCollation buildCollationTraits(IndexDescriptor indexDesc,
-      RexNode indexCondition,
       RelDataType indexScanRowType,
       RelDataType restrictedScanRowType) {
 
