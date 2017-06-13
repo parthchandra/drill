@@ -384,9 +384,9 @@ public enum PlannerPhase {
             DbScanToIndexScanPrule.REL_FILTER_SCAN,
             DbScanToIndexScanPrule.SORT_FILTER_PROJECT_SCAN,
             DbScanToIndexScanPrule.SORT_PROJECT_FILTER_PROJECT_SCAN,
-            DbScanToIndexScanPrule.PROJECT_FILTER_PROJECT_SCAN
-            //DbScanToIndexScanRule.FILTER_PROJECT_SCAN,
-            //DbScanToIndexScanRule.FILTER_SCAN
+            DbScanToIndexScanPrule.PROJECT_FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.FILTER_SCAN
         )
         .build();
     return RuleSets.ofList(indexRules);
