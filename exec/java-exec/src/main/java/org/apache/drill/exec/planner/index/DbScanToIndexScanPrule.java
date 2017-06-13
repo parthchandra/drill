@@ -59,7 +59,7 @@ public class DbScanToIndexScanPrule extends Prule {
 
   public static final RelOptRule REL_FILTER_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillRelNode.class, RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class))),
-      "DbScanToIndexScanPrule:Rel_Filter_Scan", new MatchPFS());
+      "DbScanToIndexScanPrule:Rel_Filter_Scan", new MatchRelFS());
 
   public static final RelOptRule PROJECT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
@@ -171,10 +171,14 @@ public class DbScanToIndexScanPrule extends Prule {
     }
   }
 
-  private static class MatchPFS extends AbstractMatchFunction {
+  private static class MatchRelFS extends AbstractMatchFunction {
     public boolean match(RelOptRuleCall call) {
-      final DrillScanRel scan = call.rel(2);
-      return checkScan(scan);
+      if (call.rel(0) instanceof DrillProjectRel ||
+          call.rel(0) instanceof DrillSortRel) {
+        final DrillScanRel scan = call.rel(2);
+        return checkScan(scan);
+      }
+      return false;
     }
 
     public IndexPlanCallContext onMatch(RelOptRuleCall call) {

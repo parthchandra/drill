@@ -600,4 +600,42 @@ public class IndexPlanTest extends BaseJsonTest {
     }
   }
 
+  @Test  // 2 table join, each table has local predicate on top-level column
+  public void TestCoveringPlanJoin_1() throws Exception {
+    String query = "SELECT count(*) as cnt FROM hbase.`index_test_primary` as t1 " +
+        " inner join hbase.`index_test_primary` as t2 on t1.driverlicense = t2.driverlicense " +
+        " where t1.driverlicense < 100000003 and t2.driverlicense < 100000003" ;
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=",
+                      ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("cnt").baselineValues(3L)
+        .go();
+  }
+
+  @Test  // 2 table join, each table has local predicate on nested column
+  public void TestCoveringPlanJoin_2() throws Exception {
+    String query = "SELECT count(*) as cnt FROM hbase.`index_test_primary` as t1 " +
+        " inner join hbase.`index_test_primary` as t2 on t1.contact.phone = t2.contact.phone " +
+        " where t1.id.ssn < '100000003' and t2.id.ssn < '100000003' ";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=",
+                      ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{}
+    );
+
+    testBuilder()
+       .sqlQuery(query)
+       .ordered()
+       .baselineColumns("cnt").baselineValues(3L)
+       .go();
+  }
+
 }
