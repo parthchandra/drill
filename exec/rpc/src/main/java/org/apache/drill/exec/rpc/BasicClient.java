@@ -69,6 +69,8 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
   private final Parser<HR> handshakeParser;
 
   private final IdlePingHandler pingHandler;
+  private final ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener =
+      new ConnectionMultiListener.SSLHandshakeListener();
 
   public BasicClient(RpcConfig rpcMapping, ByteBufAllocator alloc, EventLoopGroup eventLoopGroup, T handshakeType,
                      Class<HR> responseClass, Parser<HR> handshakeParser) {
@@ -101,7 +103,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
             final ChannelPipeline pipe = ch.pipeline();
             // Make sure that the SSL handler is the first handler in the pipeline so everything is encrypted
-            setupSSL(pipe);
+            setupSSL(pipe, sslHandshakeListener);
 
             pipe.addLast(RpcConstants.PROTOCOL_DECODER, getDecoder(connection.getAllocator()));
             pipe.addLast(RpcConstants.MESSAGE_DECODER, new RpcDecoder("c-" + rpcConfig.getName()));
@@ -124,8 +126,12 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   // Adds a SSL handler if enabled. Required only for client and server communications, so
   // a real implementation is only available for UserServer
-  protected void setupSSL(ChannelPipeline pipe) {
+  protected void setupSSL(ChannelPipeline pipe, ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener) {
     // Do nothing
+  }
+
+  protected boolean isSslEnabled() {
+    return false;
   }
 
   @Override
@@ -187,6 +193,13 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
     return super.send(connection, rpcType, protobufBody, clazz, dataBodies);
   }
 
+  public <SEND extends MessageLite, RECEIVE extends MessageLite> void send(
+      RpcOutcomeListener<RECEIVE> listener, SEND protobufBody, boolean allowInEventLoop,
+      ByteBuf... dataBodies) {
+    super.send(listener, connection, handshakeType, protobufBody, (Class<RECEIVE>) responseClass,
+        allowInEventLoop, dataBodies);
+  }
+
   // the command itself must be "run" by the caller (to avoid calling inEventLoop)
   protected <M extends MessageLite> RpcCommand<M, CC>
   getInitialCommand(final RpcCommand<M, CC> command) {
@@ -195,15 +208,23 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   protected void connectAsClient(RpcConnectionHandler<CC> connectionListener, HS handshakeValue,
                                  String host, int port) {
-    ConnectionMultiListener cml = new ConnectionMultiListener(connectionListener, handshakeValue);
+    ConnectionMultiListener cml;
+    ConnectionMultiListener.Builder builder =
+        ConnectionMultiListener.newBuilder(connectionListener, handshakeValue, this);
+    if (isSslEnabled()) {
+      cml = builder.enableHandshake().enableSSL().build();
+      sslHandshakeListener.setParent(cml);
+    } else {
+      cml = builder.enableHandshake().enablePlain().build();
+    }
     b.connect(host, port).addListener(cml.connectionHandler);
   }
 
-  private class ConnectionMultiListener {
+  private class ConnectionMultiListener_ {
     private final RpcConnectionHandler<CC> l;
     private final HS handshakeValue;
 
-    public ConnectionMultiListener(RpcConnectionHandler<CC> l, HS handshakeValue) {
+    public ConnectionMultiListener_(RpcConnectionHandler<CC> l, HS handshakeValue) {
       assert l != null;
       assert handshakeValue != null;
 

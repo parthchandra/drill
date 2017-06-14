@@ -19,13 +19,9 @@ package org.apache.drill.exec.rpc.user;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.security.KeyStore;
 import java.util.UUID;
 
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.TrustManagerFactory;
 import javax.security.sasl.SaslException;
 
 import io.netty.channel.ChannelPipeline;
@@ -55,6 +51,7 @@ import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
 import org.apache.drill.exec.rpc.RpcConstants;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
+import org.apache.drill.exec.rpc.SSLConfig;
 import org.apache.drill.exec.rpc.UserClientConnection;
 import org.apache.drill.exec.rpc.security.ServerAuthenticationHandler;
 import org.apache.drill.exec.rpc.security.plain.PlainFactory;
@@ -91,7 +88,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     this.bootStrapContext = context;
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
     try {
-      this.sslConfig = new SSLConfig(bootStrapContext); // throws startup exception
+      this.sslConfig = new SSLConfig(bootStrapContext.getConfig()); // throws startup exception
     } catch (DrillException e) {
       throw new DrillbitStartupException(e.getMessage(), e.getCause());
     }
