@@ -24,28 +24,32 @@ Installing OpenSSL -
 Set up the certificate
     Generate a private key
 
-        openssl genrsa -des3 -out drillCppTestServer.pem 1024
+        openssl genrsa -des3 -out drillTestServerKey.pem 1024
 
     Generate Certificate signing request
 
-        openssl req -new -key drillCppTestServer.pem -out drillCppTestServer.csr
+        openssl req -new -key drillTestServerKey.pem -out drillTestServer.csr
 
     Sign certificate with private key
 
-        openssl x509 -req -days 3650 -in drillCppTestServer.csr -signkey drillCppTestServer.pem -out drillCppTestCert.pem
+        openssl x509 -req -days 3650 -in drillTestServer.csr -signkey drillTestServerKey.pem -out drillTestCert.pem
 
     Remove password requirement (needed for example)
 
-        cp drillCppTestServer.pem drillCppTestServer.safe.pem
-        openssl rsa -in drillCppTestServer.safe.pem -out drillCppTestServer.pem
+        cp drillTestServerKey.pem drillTestServerKey.safe.pem
+        openssl rsa -in drillTestServerKey.safe.pem -out drillTestServerKey.pem
 
     Generate dhparam file
+
         openssl dhparam -out dh512.pem 512
 
+    [For use in JAVA environments] Export to pkcs12 format
+
+        openssl pkcs12 -export -out drillTestCert.p12 -inkey drillTestServerKey.pem -in drillTestCert.pem 
 
     This will provide :
-        drillCppTestServer.pem - Server private key
-        drillCppTestCert.pem - Client, Certificate Chain File
+        drillTestServerKey.pem - Server private key
+        drillTestCert.pem - Client, Certificate Chain File
         dh512.pem - Diffie-Hellman parameters
 
 Running CMake 
