@@ -214,11 +214,10 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
     if (isSslEnabled()) {
       cml = builder.enableHandshake().enableSSL().build();
       sslHandshakeListener.setParent(cml);
-      b.connect(host, port).addListener(cml.sslConnectionHandler);
     } else {
       cml = builder.enableHandshake().enablePlain().build();
-      b.connect(host, port).addListener(cml.connectionHandler);
     }
+    b.connect(host, port).addListener(cml.connectionHandler);
   }
 
   private class ConnectionMultiListener_ {

@@ -202,7 +202,7 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
     }
 
     public Builder enableSSL() {
-      cml.handshakeSendHandler = cml.new HandshakeSendHandler();
+      cml.connectionHandler = cml.new ConnectionHandler();
       cml.sslConnectionHandler = cml.new SSLConnectionHandler();
       return this;
     }
@@ -218,6 +218,7 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
     }
 
     public ConnectionMultiListener build() {
+      //always enable handshake
       if (cml.handshakeSendHandler == null) {
         enableHandshake();
       }
