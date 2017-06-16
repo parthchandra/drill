@@ -84,12 +84,25 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
 
   @Override
   public boolean allColumnsIndexed(Collection<LogicalExpression> columns) {
+    return columnsIndexed(columns, true);
+  }
+
+  @Override
+  public boolean someColumnsIndexed(Collection<LogicalExpression> columns) {
+    return columnsIndexed(columns, false);
+  }
+
+  private boolean columnsIndexed(Collection<LogicalExpression> columns, boolean allColsIndexed) {
     DecodePathinExpr decodeExpr = new DecodePathinExpr();
     List<LogicalExpression> decodedCols = Lists.newArrayList();
     for(LogicalExpression expr : columns) {
       decodedCols.add(expr.accept(decodeExpr, null));
     }
-    return columnsInIndexFields(decodedCols, indexedFields);
+    if (allColsIndexed) {
+      return columnsInIndexFields(decodedCols, indexedFields);
+    } else {
+      return someColumnsInIndexFields(decodedCols, indexedFields);
+    }
   }
 
   public FunctionalIndexInfo getFunctionalInfo() {
