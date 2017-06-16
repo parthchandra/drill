@@ -91,6 +91,11 @@ public class DbScanToIndexScanPrule extends Prule {
           RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))),
       "DbScanToIndexScanPrule:Filter_Project_Scan", new MatchFPS());
 
+  public enum ConditionIndexed {
+    NONE,
+    PARTIAL,
+    FULL}
+
   private DbScanToIndexScanPrule(RelOptRuleOperand operand, String description, MatchFunction match) {
     super(operand, description);
     this.match = match;
@@ -310,13 +315,23 @@ public class DbScanToIndexScanPrule extends Prule {
    * @return If all indexable expressions involved in this condition are in the indexed fields of
    * the single IndexDescriptor, return true
    */
-  static private boolean conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
+  static private ConditionIndexed conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
+    return conditionIndexedHelper(inputRel, indexCondition, indexDesc);
+  }
+
+  static private ConditionIndexed conditionIndexedHelper(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
     IndexableExprMarker exprMarker = new IndexableExprMarker(inputRel);
     indexCondition.accept(exprMarker);
     Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
     List<LogicalExpression> infoCols = Lists.newArrayList();
     infoCols.addAll(mapRexExpr.values());
-    return indexDesc.allColumnsIndexed(infoCols);
+    if (indexDesc.allColumnsIndexed(infoCols)) {
+      return ConditionIndexed.FULL;
+    } else if (indexDesc.someColumnsIndexed(infoCols)) {
+      return ConditionIndexed.PARTIAL;
+    } else {
+      return ConditionIndexed.NONE;
+    }
   }
 
   private boolean isConditionPrefix(IndexDescriptor indexDesc, RexNode initCondition, IndexConditionInfo.Builder infoBuilder) {
@@ -342,20 +357,6 @@ public class DbScanToIndexScanPrule extends Prule {
       }
     }
     return prefix;
-  }
-
-  private IndexDescriptor selectIndexForNonCoveringPlan(DrillScanRel scan, Iterable<IndexDescriptor> indexes) {
-    IndexDescriptor ret = null;
-    int maxIndexedNum = 0;
-    //XXX the implement here should make decision based on selectivity, for now, we pick the index cover
-    //the most index fields.
-    for(IndexDescriptor index: indexes) {
-      if(index.getIndexColumns().size() > maxIndexedNum) {
-        maxIndexedNum = index.getIndexColumns().size();
-        ret = index;
-      }
-    }
-    return ret;
   }
 
   /**
@@ -420,21 +421,19 @@ public class DbScanToIndexScanPrule extends Prule {
           scan);
 
       for (IndexDescriptor indexDesc : collection) {
-        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
+        if (conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
               indexContext.project != null ? indexContext.project.getRowType().getFieldCount() :
-                scan.getRowType().getFieldCount());
+                  scan.getRowType().getFieldCount());
         }
       }
-
       // get the candidate indexes based on selection
       selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
-
     } else {
       // get the list of covering and non-covering indexes for this collection
       for (IndexDescriptor indexDesc : collection) {
-        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc) &&
+        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE &&
             isConditionPrefix(indexDesc, indexCondition, infoBuilder)) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           if (isCoveringIndex(indexContext, functionInfo)) {
@@ -465,7 +464,7 @@ public class DbScanToIndexScanPrule extends Prule {
     //Not a single covering index plan or non-covering index plan is sufficient.
     // either 1) there is no usable index at all, 2) or the chop of original condition to
     // indexCondition + remainderCondition is not working for any single index.
-    if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() == 0) {
+    if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() > 1) {
       Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = infoBuilder.getIndexConditionMap();
 
       //no usable index
@@ -528,14 +527,14 @@ public class DbScanToIndexScanPrule extends Prule {
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
       try {
-        if (nonCoveringIndexes.size() > 0) {
-          IndexDescriptor index = selectIndexForNonCoveringPlan(indexContext.scan, nonCoveringIndexes);
-          IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
+        for (IndexDescriptor index : nonCoveringIndexes) {
+          IndexGroupScan idxScan = index.getIndexGroupScan();
           //Copy primary table statistics to index table
           idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
           logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index, idxScan, indexCondition,
-              remainderCondition, builder, settings);
+
+          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index,
+              idxScan, indexCondition, remainderCondition, builder, settings);
           planGen.go();
         }
       } catch (Exception e) {

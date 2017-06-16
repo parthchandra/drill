@@ -65,6 +65,13 @@ public interface IndexDefinition {
   boolean allColumnsIndexed(Collection<LogicalExpression> columns);
 
   /**
+   * Check if this index has some columns specified in the supplied list of columns indexed
+   * @param columns
+   * @return True if some fields are indexed, False if none of the fields are indexed
+   */
+  boolean someColumnsIndexed(Collection<LogicalExpression> columns);
+
+  /**
    * Get the list of columns (typically 1 column) that constitute the row key (primary key)
    * @return
    */

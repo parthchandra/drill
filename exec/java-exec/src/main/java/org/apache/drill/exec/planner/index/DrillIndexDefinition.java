@@ -105,6 +105,11 @@ public class DrillIndexDefinition implements IndexDefinition {
     return columnsInIndexFields(columns, indexColumns);
   }
 
+  @Override
+  public boolean someColumnsIndexed(Collection<LogicalExpression> columns) {
+    return someColumnsInIndexFields(columns, indexColumns);
+  }
+
   boolean castIsCompatible(CastExpression castExpr, Collection<LogicalExpression> indexFields) {
     for(LogicalExpression indexExpr : indexFields) {
       if(indexExpr.getClass() != castExpr.getClass()) {
@@ -142,6 +147,27 @@ public class DrillIndexDefinition implements IndexDefinition {
       }
     }
     return true;//indexFields.containsAll(columns);
+  }
+
+  protected boolean someColumnsInIndexFields(Collection<LogicalExpression> columns,
+      Collection<LogicalExpression> indexFields) {
+    boolean some = false;
+    //we need to do extra check, so we could allow the case when query condition expression is not identical with indexed fields
+    //and they still could use the index either by implicit cast or the difference is allowed, e.g. width of varchar
+    for (LogicalExpression col : columns) {
+      if (col instanceof CastExpression) {
+        if (!castIsCompatible((CastExpression) col, indexFields)) {
+          return false;
+        }
+      }
+      else {
+        if (indexFields.contains(col)) {
+          some = true;
+          break;
+        }
+      }
+    }
+    return some;
   }
 
   @Override
