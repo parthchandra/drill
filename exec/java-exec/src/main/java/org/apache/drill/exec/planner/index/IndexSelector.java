@@ -25,15 +25,16 @@ import java.util.Map;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.rel.RelCollation;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.util.Util;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -43,30 +44,25 @@ public class IndexSelector  {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexSelector.class);
 
   private RexNode indexCondition;
-  private RelCollation requiredCollation;
   private double totalRows;
   private Statistics stats;         // a Statistics instance that will be used to get estimated rowcount for filter conditions
   private IndexConditionInfo.Builder builder;
-  private RelOptPlanner planner;
   private List<IndexProperties> indexPropList;
   private DrillScanRel primaryTableScan;
+  private IndexPlanCallContext indexContext;
 
   public IndexSelector(RexNode indexCondition,
-      RelCollation requiredCollation,
+      IndexPlanCallContext indexContext,
       IndexCollection collection,
-      Statistics stats,
       RexBuilder rexBuilder,
-      RelOptPlanner planner,
-      double totalRows,
-      DrillScanRel scan) {
+      double totalRows) {
     this.indexCondition = indexCondition;
-    this.requiredCollation = requiredCollation;
+    this.indexContext = indexContext;
     this.totalRows = totalRows;
-    this.stats = stats;
+    this.stats = ((DbGroupScan) (indexContext.scan).getGroupScan()).getStatistics();
     this.builder =
-        IndexConditionInfo.newBuilder(indexCondition, collection, rexBuilder, scan);
-    this.planner = planner;
-    this.primaryTableScan = scan;
+        IndexConditionInfo.newBuilder(indexCondition, collection, rexBuilder, indexContext.scan);
+    this.primaryTableScan = indexContext.scan;
     this.indexPropList = Lists.newArrayList();
   }
 
@@ -92,39 +88,30 @@ public class IndexSelector  {
 
     if (indexCols.size() > 0) {
       if (initCondition != null) { // check filter condition
-        if (!checkCollation()) {  // no collation requirement
-          boolean prefix = true;
-          int i=0;
-          while (prefix && i < indexCols.size()) {
-            LogicalExpression p = indexCols.get(i++);
-            List<LogicalExpression> prefixCol = ImmutableList.of(p);
-            IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
-            if(info != null && info.hasIndexCol) {
-              // the col had a match with one of the conditions; save the information about
-              // indexcol --> condition mapping
-              leadingPrefixMap.put(p, info.indexCondition);
-              initCondition = info.remainderCondition;
-              if (initCondition.isAlwaysTrue()) {
-                // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
-                // we don't need to keep track of it for rest of the index selection
-                initCondition = null;
-                break;
-              }
-            } else {
-              prefix = false;
+        boolean prefix = true;
+        int i=0;
+        while (prefix && i < indexCols.size()) {
+          LogicalExpression p = indexCols.get(i++);
+          List<LogicalExpression> prefixCol = ImmutableList.of(p);
+          IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
+          if(info != null && info.hasIndexCol) {
+            // the col had a match with one of the conditions; save the information about
+            // indexcol --> condition mapping
+            leadingPrefixMap.put(p, info.indexCondition);
+            initCondition = info.remainderCondition;
+            if (initCondition.isAlwaysTrue()) {
+              // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+              // we don't need to keep track of it for rest of the index selection
+              initCondition = null;
+              break;
             }
+          } else {
+            prefix = false;
           }
-        } else { // has collation requirement
-
         }
-      } else if (checkCollation()) { // no filter condition, only collation requirement
-        // compare collation of the index with the required collation
-        List<RelFieldCollation> indexFieldCollations = indexProps.getIndexDesc().getCollation().getFieldCollations();
-        List<RelFieldCollation> requiredFieldCollations =
-            convertRequiredCollation(indexProps.getIndexDesc(), requiredCollation.getFieldCollations());
-        if (Util.startsWith(indexFieldCollations, requiredFieldCollations)) {
-          satisfiesCollation = true;
-        }
+      }
+      if (requiredCollation()) {
+        satisfiesCollation = buildAndCheckCollation(indexProps);
       }
     }
 
@@ -133,22 +120,50 @@ public class IndexSelector  {
     indexProps.setProperties(leadingPrefixMap, satisfiesCollation, initCondition /* the remainder condition */, stats);
   }
 
-  private boolean checkCollation() {
-    return requiredCollation != null;
+  private boolean requiredCollation() {
+    if (indexContext.sort != null && indexContext.sort.getCollationList().size() > 0) {
+      return true;
+    }
+    return false;
   }
 
+  private boolean buildAndCheckCollation(IndexProperties indexProps) {
+    IndexDescriptor indexDesc = indexProps.getIndexDesc();
+    FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+    Map<Integer, List<RexNode>> collationFilterMap = null;
 
-  /**
-   * Convert the required field collations that are in terms of the original plan into the one
-   * that is specific to a particular index
-   * @param required
-   * @return
-   */
-  private List<RelFieldCollation> convertRequiredCollation(IndexDescriptor indexDesc,
-      List<RelFieldCollation> required) {
-    // TODO: implement
-    return required;
+    RelCollation inputCollation;
+    // for the purpose of collation we can assume that a covering index scan would provide
+    // the collation property that would be relevant for non-covering as well
+    ScanPrel indexScanPrel =
+        IndexPlanUtils.buildCoveringIndexScan(indexContext.scan, indexDesc.getIndexGroupScan(), indexContext, indexDesc);
+    inputCollation = indexScanPrel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+    if (indexCondition != null) {
+      FindFiltersForCollation finder = new FindFiltersForCollation(indexScanPrel);
+      collationFilterMap = finder.analyze(indexCondition);
+    }
+
+    // we don't create collation for Filter because it will inherit the child's collation
+
+    if (indexContext.lowerProject != null) {
+      inputCollation =
+          IndexPlanUtils.buildCollationLowerProject(indexContext.lowerProject.getProjects(), indexScanPrel, functionInfo);
+    }
+
+    if (indexContext.upperProject != null) {
+      inputCollation =
+          IndexPlanUtils.buildCollationUpperProject(indexContext.upperProject.getProjects(), inputCollation,
+              functionInfo, collationFilterMap);
+    }
+
+    if ( (inputCollation != null) && inputCollation.satisfies(indexContext.sort.getCollation())) {
+      return true;
+    }
+
+    return false;
+
   }
+
 
   /**
    * Run the index selection algorithm and return the top N indexes
@@ -156,7 +171,9 @@ public class IndexSelector  {
   public void getCandidateIndexes(List<IndexDescriptor> coveringIndexes,
       List<IndexDescriptor> nonCoveringIndexes) {
 
-    logger.debug("Analyzing indexes for prefix matches");
+    RelOptPlanner planner = indexContext.call.getPlanner();
+
+    logger.info("Analyzing indexes for prefix matches");
     // analysis phase
     for (IndexProperties p : indexPropList) {
       analyzePrefixMatches(p);
@@ -168,7 +185,7 @@ public class IndexSelector  {
       Collections.sort(indexPropList, new IndexComparator(planner));
     }
 
-    logger.debug("The top ranked indexes are: ");
+    logger.info("The top ranked indexes are: ");
 
     int count = 0;
 
@@ -177,13 +194,13 @@ public class IndexSelector  {
       IndexProperties index = indexPropList.get(i);
       if (index.isCovering()) {
         coveringIndexes.add(index.getIndexDesc());
-        logger.debug("name: {}, covering: true, leadingSelectivity: {}, cost: {}",
+        logger.info("name: {}, covering: true, leadingSelectivity: {}, cost: {}",
             index.getIndexDesc().getIndexName(), index.getLeadingSelectivity(),
             index.getSelfCost(planner));
         count++;
       } else {
         nonCoveringIndexes.add(indexPropList.get(i).getIndexDesc());
-        logger.debug("name: {}, covering: false, leadingSelectivity: {}, cost: {}",
+        logger.info("name: {}, covering: false, leadingSelectivity: {}, cost: {}",
             index.getIndexDesc().getIndexName(), index.getLeadingSelectivity(),
             index.getSelfCost(planner));
         count++;
@@ -232,7 +249,11 @@ public class IndexSelector  {
       if (cost1.isLt(cost2)) {
         return -1;
       } else if (cost1.isEqWithEpsilon(cost2)) {
-        // TODO: if costs are same, use a rule based criteria
+        if (o1.numLeadingFilters() > o2.numLeadingFilters()) {
+          return -1;
+        } else if (o2.numLeadingFilters() < o2.numLeadingFilters()) {
+          return 1;
+        }
         return 0;
       } else {
         return 1;
@@ -253,7 +274,6 @@ public class IndexSelector  {
     private boolean satisfiesCollation = false; // whether index satisfies collation
     private boolean isCovering = false;         // whether index is covering
     private double  indexSize;                  // size in bytes of the selected part of index
-    private int numMatchingConjuncts = 0;       // number of matching conjuncts
 
     private int numProjectedFields;
     private double totalRows;
@@ -339,6 +359,10 @@ public class IndexSelector  {
       }
       selfCost = indexDescriptor.getCost(this, planner, numProjectedFields, primaryTableScan.getGroupScan());
       return selfCost;
+    }
+
+    public int numLeadingFilters() {
+      return leadingFilters.size();
     }
 
   }

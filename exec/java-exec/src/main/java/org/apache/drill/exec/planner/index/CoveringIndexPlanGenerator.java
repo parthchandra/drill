@@ -24,13 +24,9 @@ import com.google.common.collect.Maps;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
@@ -43,7 +39,6 @@ import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
-import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -78,40 +73,6 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     this.indexGroupScan = indexGroupScan;
     this.functionInfo = functionInfo;
     this.indexDesc = functionInfo.getIndexDesc();
-  }
-
-  boolean pathOnlyInIndexedFunction(SchemaPath path) {
-    return true;
-  }
-  /**
-   * For IndexGroupScan, if a column is only appeared in the should-be-renamed function,
-   * this column is to-be-replaced column, we replace that column(schemaPath) from 'a.b'
-   * to '$1' in the list of SchemaPath.
-   * @param paths
-   * @param functionInfo functional index information that may impact rewrite
-   * @return
-   */
-  private List<SchemaPath> rewriteFunctionColumn(List<SchemaPath> paths, FunctionalIndexInfo functionInfo) {
-    if (!functionInfo.hasFunctional()) {
-      return paths;
-    }
-
-    List<SchemaPath> newPaths = Lists.newArrayList(paths);
-    for (int i=0; i<paths.size(); ++i) {
-      SchemaPath newPath = functionInfo.getNewPath(paths.get(i));
-      if(newPath == null) {
-        continue;
-      }
-
-      //if this path only in indexed function, we are safe to replace it
-      if(pathOnlyInIndexedFunction(paths.get(i))) {
-        newPaths.set(i, newPath);
-      }
-      else {//we should not replace this column, instead we add a new "$N" field.
-        newPaths.add(newPath);
-      }
-    }
-    return newPaths;
   }
 
   /**
@@ -208,30 +169,15 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       return null;
     }
 
-    indexGroupScan.setColumns(
-        rewriteFunctionColumn(((DbGroupScan)origScan.getGroupScan()).getColumns(),
-        this.functionInfo));
+    ScanPrel indexScanPrel =
+        IndexPlanUtils.buildCoveringIndexScan(origScan, indexGroupScan, indexContext, indexDesc);
 
-    RelDataType newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(origScan, indexContext, functionInfo);
-
-    RelTraitSet indexScanTraitSet = origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL);
-
-    // Create the collation traits for index scan based on the index columns under the
-    // condition that the index actually has collation property (e.g hash indexes don't)
-    if (indexDesc.getCollation() != null) {
-      RelCollation collationTrait = buildCollationIndexScan(indexDesc, newRowType);
-      indexScanTraitSet = indexScanTraitSet.plus(collationTrait);
-    }
-
-    ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
-        indexScanTraitSet, indexGroupScan,
-        newRowType);
+    RelDataType newRowType = indexScanPrel.getRowType();
 
     RexNode newIndexCondition =
         rewriteFunctionalCondition(indexCondition, newRowType, functionInfo);
 
     // build collation for filter
-    RelCollation indexScanCollation = indexScanPrel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
     RelTraitSet indexFilterTraitSet = indexScanPrel.getTraitSet();
     Map<Integer, List<RexNode>> collationFilterMap = null;
     FindFiltersForCollation finder = new FindFiltersForCollation(indexScanPrel);
@@ -242,7 +188,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     ProjectPrel indexProjectPrel = null;
     if (origProject != null) {
-      RelCollation collation = buildCollationLowerProject(origProject.getProjects(), indexScanPrel, functionInfo);
+      RelCollation collation = IndexPlanUtils.buildCollationLowerProject(origProject.getProjects(), indexScanPrel, functionInfo);
       indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexFilterTraitSet.plus(collation),
           indexFilterPrel, origProject.getProjects(), origProject.getRowType());
     }
@@ -260,17 +206,18 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       finalRel = indexFilterPrel;
     }
 
-    if ( capProject != null) {
-      RelCollation newCollation = null;
-        newCollation = buildCollationUpperProject(capProject.getProjects(), finalRel, functionInfo, collationFilterMap);
+    if ( upperProject != null) {
+      RelCollation inputCollation = finalRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+      RelCollation newCollation =
+          IndexPlanUtils.buildCollationUpperProject(upperProject.getProjects(), inputCollation, functionInfo, collationFilterMap);
 
-      ProjectPrel cap = new ProjectPrel(capProject.getCluster(),
+      ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
           newCollation==null?finalRel.getTraitSet() : finalRel.getTraitSet().plus(newCollation),
-          finalRel, capProject.getProjects(), capProject.getRowType());
+          finalRel, upperProject.getProjects(), upperProject.getRowType());
 
       if (functionInfo.hasFunctional()) {
-        //if there is functional index field, then a rewrite may be needed in capProject/indexProject
-        //merge capProject with indexProjectPrel(from origProject) if both exist,
+        //if there is functional index field, then a rewrite may be needed in upperProject/indexProject
+        //merge upperProject with indexProjectPrel(from origProject) if both exist,
         ProjectPrel newProject = cap;
         if (indexProjectPrel != null) {
           newProject = (ProjectPrel) DrillMergeProjectRule.replace(newProject, indexProjectPrel);
@@ -299,42 +246,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     finalRel = Prule.convert(finalRel, finalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
 
     logger.debug("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original digest {}, new digest {}.",
-        finalRel.toString(), origScan.toString(), capProject==null?indexContext.filter.getDigest(): capProject.getDigest(), finalRel.getDigest());
+        finalRel.toString(), origScan.toString(), upperProject==null?indexContext.filter.getDigest(): upperProject.getDigest(), finalRel.getDigest());
     return finalRel;
-  }
-
-  /**
-   * Build the collation property for the index scan
-   * @param indexDesc
-   * @param indexScanRowType
-   * @return the output RelCollation
-   */
-  private RelCollation buildCollationIndexScan(IndexDescriptor indexDesc,
-      RelDataType indexScanRowType) {
-
-    final List<RelDataTypeField> indexFields = indexScanRowType.getFieldList();
-
-    // The collationMap has SchemaPath as key.  This works fine for top level JSON fields.  For
-    // nested JSON fields e.g a.b.c, the Project above the Scan will create an ITEM expr to produce
-    // the field, so the RelCollation property has to be build separately for that Project.
-    final Map<SchemaPath, RelFieldCollation> collationMap = indexDesc.getCollationMap();
-
-    assert collationMap != null : "Invalid collation map for index";
-
-    List<RelFieldCollation> fieldCollations = Lists.newArrayList();
-
-    for (int i = 0; i < indexScanRowType.getFieldCount(); i++) {
-      RelDataTypeField f1 = indexFields.get(i);
-      FieldReference ref = FieldReference.getWithQuotedRef(f1.getName());
-      RelFieldCollation origCollation = collationMap.get(ref);
-      if (origCollation != null) {
-        RelFieldCollation fc = new RelFieldCollation(origCollation.getFieldIndex(),
-            origCollation.direction, origCollation.nullDirection);
-        fieldCollations.add(fc);
-      }
-    }
-    final RelCollation collation = RelCollations.of(fieldCollations);
-    return collation;
   }
 
 }

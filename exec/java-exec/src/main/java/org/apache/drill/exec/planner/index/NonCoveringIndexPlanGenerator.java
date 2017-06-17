@@ -24,7 +24,6 @@ import java.util.Map;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
@@ -41,8 +40,6 @@ import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataType;
@@ -54,7 +51,6 @@ import org.apache.calcite.rex.RexNode;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 /**
  * Generate a non-covering index plan that is equivalent to the original plan. The non-covering plan consists
@@ -172,7 +168,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     RelCollation collation = null;
     if (indexDesc.getCollation() != null &&
          !settings.isIndexForceSortNonCovering()) {
-      collation = buildCollationTraits(indexDesc, indexScanRowType, dbscanRowType);
+      collation = IndexPlanUtils.buildCollationNonCoveringIndexScan(indexDesc, indexScanRowType, dbscanRowType);
       if (restrictedScanTraitSet.contains(RelCollationTraitDef.INSTANCE)) { // replace existing trait
         restrictedScanTraitSet = restrictedScanTraitSet.replace(collation);
       } else {  // add new one
@@ -214,7 +210,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
 
       //build collation in project
-      collation = buildCollationLowerProject(leftProjectExprs, dbScan, functionInfo);
+      collation = IndexPlanUtils.buildCollationLowerProject(leftProjectExprs, dbScan, functionInfo);
 
       final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet().plus(collation),
           leftIndexFilterPrel == null ? dbScan : leftIndexFilterPrel, leftProjectExprs, leftProjectRowType);
@@ -272,8 +268,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         newRel, resetExprs, finalProjectRowType);
     newRel = resetProjectPrel;
 
-    if ( capProject != null) {
-      final Map<Integer, Integer> collationMap = ProjectPrule.getCollationMap(capProject);
+    if ( upperProject != null) {
+      final Map<Integer, Integer> collationMap = ProjectPrule.getCollationMap(upperProject);
       RelCollation newCollation = null;
 
       if ( origProject != null) {//so we already built collation there
@@ -281,11 +277,12 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         newCollation = ProjectPrule.convertRelCollation(collationAdded, collationMap);
       }
       else {
-        newCollation = buildCollationUpperProject(capProject.getProjects(), newRel, functionInfo, null);
+        RelCollation inputCollation = newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        newCollation = IndexPlanUtils.buildCollationUpperProject(upperProject.getProjects(), inputCollation, functionInfo, null);
       }
-      ProjectPrel cap = new ProjectPrel(capProject.getCluster(),
-          (newCollation==null?capProject.getTraitSet() : capProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
-          newRel, capProject.getProjects(), capProject.getRowType());
+      ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
+          (newCollation==null?upperProject.getTraitSet() : upperProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
+          newRel, upperProject.getProjects(), upperProject.getRowType());
       newRel = cap;
     }
 
@@ -299,51 +296,6 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     logger.trace("NonCoveringIndexPlanGenerator got finalRel {} from origScan {}",
         finalRel.toString(), origScan.toString());
     return finalRel;
-  }
-
-  private RelCollation buildCollationTraits(IndexDescriptor indexDesc,
-      RelDataType indexScanRowType,
-      RelDataType restrictedScanRowType) {
-
-    final List<RelDataTypeField> indexFields = indexScanRowType.getFieldList();
-    final List<RelDataTypeField> rsFields = restrictedScanRowType.getFieldList();
-    final Map<SchemaPath, RelFieldCollation> collationMap = indexDesc.getCollationMap();
-
-    assert collationMap != null : "Invalid collation map for index";
-
-    List<RelFieldCollation> fieldCollations = Lists.newArrayList();
-    Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newHashMap();
-
-    // for each index field that is projected from the indexScan, find the corresponding
-    // field in the restricted scan's row type and keep track of the ordinal # in the
-    // restricted scan's row type.
-    for (int i = 0; i < indexScanRowType.getFieldCount(); i++) {
-      RelDataTypeField f1 = indexFields.get(i);
-      for (int j = 0; j < rsFields.size(); j++) {
-        RelDataTypeField f2 = rsFields.get(j);
-        if (f1.getName().equals(f2.getName())) {
-          FieldReference ref = FieldReference.getWithQuotedRef(f1.getName());
-          RelFieldCollation origCollation = collationMap.get(ref);
-          if (origCollation != null) {
-            RelFieldCollation fc = new RelFieldCollation(origCollation.getFieldIndex(),
-                origCollation.direction, origCollation.nullDirection);
-            rsScanCollationMap.put(j, fc);
-          }
-        }
-      }
-    }
-
-    if (rsScanCollationMap.size() > 0) {
-      for (int j = 0; j < rsFields.size(); j++) {
-        RelFieldCollation fc = rsScanCollationMap.get(j);
-        if (fc != null) {
-          fieldCollations.add(fc);
-        }
-      }
-    }
-
-    final RelCollation collation = RelCollations.of(fieldCollations);
-    return collation;
   }
 
 }
