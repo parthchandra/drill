@@ -297,9 +297,9 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
     Pair<RelNode, DbGroupScan> leftRelAndScan = buildRestrictedDBScan(remnant);
 
     RelNode finalRel = buildRowKeyJoin(leftRelAndScan.left, rangeDistRight, true, JoinControl.DEFAULT);
-    if ( capProject != null) {
+    if ( upperProject != null) {
       ProjectPrel cap = new ProjectPrel(finalRel.getCluster(), finalRel.getTraitSet(),
-          finalRel, capProject.getProjects(), capProject.getRowType());
+          finalRel, upperProject.getProjects(), upperProject.getRowType());
       finalRel = cap;
     }
 

@@ -54,6 +54,7 @@ import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.Prule;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -70,7 +71,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
 
   final protected DrillProjectRel origProject;
   final protected DrillScanRel origScan;
-  final protected DrillProjectRel capProject;
+  final protected DrillProjectRel upperProject;
   final protected DrillSortRel origSort;
 
   final protected RexNode indexCondition;
@@ -85,9 +86,9 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
       RexBuilder builder,
       PlannerSettings settings) {
     super(indexContext.call);
-    this.origProject = indexContext.project;
+    this.origProject = indexContext.lowerProject;
     this.origScan = indexContext.scan;
-    this.capProject = indexContext.capProject;
+    this.upperProject = indexContext.upperProject;
     this.origSort = indexContext.sort;
     this.indexCondition = indexCondition;
     this.remainderCondition = remainderCondition;
@@ -154,117 +155,6 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     RelNode convertedRight = Prule.convert(rightPrel, rightTraits);
 
     return convertedRight;
-  }
-
-  /**
-   * Build collation property for the 'lower' project, the one closer to the Scan
-   * @param projectRexs
-   * @param input
-   * @param indexInfo
-   * @return the output RelCollation
-   */
-  protected RelCollation buildCollationLowerProject(List<RexNode> projectRexs, RelNode input, FunctionalIndexInfo indexInfo) {
-    //if leading fields of index are here, add them to RelCollation
-    List<RelFieldCollation> newFields = Lists.newArrayList();
-    if (!indexInfo.hasFunctional()) {
-      Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
-      DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
-      int idx=0;
-      for(RexNode rex : projectRexs) {
-        projectExprs.put(DrillOptiq.toDrill(parserContext, input, rex), idx);
-        idx++;
-      }
-      int idxFieldCount = 0;
-      for (LogicalExpression expr : indexInfo.getIndexDesc().getIndexColumns()) {
-        if (!projectExprs.containsKey(expr)) {
-          break;
-        }
-        RelFieldCollation.Direction dir = indexInfo.getIndexDesc().getCollation().getFieldCollations().get(idxFieldCount).direction;
-        if ( dir == null) {
-          break;
-        }
-        newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
-            RelFieldCollation.NullDirection.UNSPECIFIED));
-      }
-      idxFieldCount++;
-    } else {
-      // TODO: handle functional index
-    }
-
-    return RelCollations.of(newFields);
-  }
-
-  /**
-   * Build collation property for the 'upper' project, the one above the filter
-   * @param projectRexs
-   * @param input
-   * @param indexInfo
-   * @param collationFilterMap
-   * @return the output RelCollation
-   */
-  protected RelCollation buildCollationUpperProject(List<RexNode> projectRexs,
-      RelNode input, FunctionalIndexInfo indexInfo,
-      Map<Integer, List<RexNode>> collationFilterMap) {
-    List<RelFieldCollation> outputFieldCollations = Lists.newArrayList();
-    RelCollation inputCollation = input.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-    if (inputCollation != null) {
-      List<RelFieldCollation> inputFieldCollations = inputCollation.getFieldCollations();
-      if (!indexInfo.hasFunctional()) {
-        for (int projectExprIdx = 0; projectExprIdx < projectRexs.size(); projectExprIdx++) {
-          RexNode n = projectRexs.get(projectExprIdx);
-          if (n instanceof RexInputRef) {
-            RexInputRef ref = (RexInputRef)n;
-            boolean eligibleForCollation = true;
-            int maxIndex = getIndexFromCollation(ref.getIndex(), inputFieldCollations);
-            if (maxIndex < 0) {
-              eligibleForCollation = false;
-              continue;
-            }
-            // check if the prefix has equality conditions
-            for (int i = 0; i < maxIndex; i++) {
-              int fieldIdx = inputFieldCollations.get(i).getFieldIndex();
-              List<RexNode> conditions = collationFilterMap.get(fieldIdx);
-              if ((conditions == null || conditions.size() == 0) &&
-                  i < maxIndex-1) {
-                // if an intermediate column has no filter condition, it would select all values
-                // of that column, so a subsequent column cannot be eligible for collation
-                eligibleForCollation = false;
-                break;
-              } else {
-                for (RexNode r : conditions) {
-                  if (!(r.getKind() == SqlKind.EQUALS)) {
-                    eligibleForCollation = false;
-                    break;
-                  }
-                }
-              }
-            }
-            // for every projected expr, if it is eligible for collation, get the
-            // corresponding field collation from the input
-            if (eligibleForCollation) {
-              for (RelFieldCollation c : inputFieldCollations) {
-                if (ref.getIndex() == c.getFieldIndex()) {
-                  RelFieldCollation outFieldCollation = new RelFieldCollation(projectExprIdx, c.getDirection(), c.nullDirection);
-                  outputFieldCollations.add(outFieldCollation);
-                }
-              }
-            }
-          }
-        }
-      } else {
-        // TODO: handle functional index
-      }
-    }
-    return RelCollations.of(outputFieldCollations);
-  }
-
-  protected int getIndexFromCollation(int refIndex, List<RelFieldCollation> inputFieldCollations) {
-    for (int i=0; i < inputFieldCollations.size(); i++) {
-      if (refIndex == inputFieldCollations.get(i).getFieldIndex()) {
-        return i;
-      }
-    }
-    return -1;
   }
 
   /**

@@ -27,7 +27,6 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.volcano.RelSubset;
-import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -279,11 +278,11 @@ public class DbScanToIndexScanPrule extends Prule {
     RexBuilder builder = indexContext.filter.getCluster().getRexBuilder();
 
     RexNode condition = null;
-    if (indexContext.project == null) {
+    if (indexContext.lowerProject == null) {
       condition = indexContext.filter.getCondition();
     } else {
       // get the filter as if it were below the projection.
-      condition = RelOptUtil.pushFilterPastProject(indexContext.filter.getCondition(), indexContext.project);
+      condition = RelOptUtil.pushFilterPastProject(indexContext.filter.getCondition(), indexContext.lowerProject);
     }
 
     RewriteAsBinaryOperators visitor = new RewriteAsBinaryOperators(true, builder);
@@ -296,7 +295,7 @@ public class DbScanToIndexScanPrule extends Prule {
       throw new UnsupportedOperationException("Index collection must support index selection");
     }
     indexPlanTimer.stop();
-    logger.debug("Index Plan took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
+    logger.info("Index Planning took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
   }
   /**
    * Return the index collection relevant for the underlying data source
@@ -378,12 +377,12 @@ public class DbScanToIndexScanPrule extends Prule {
     IndexConditionInfo cInfo = infoBuilder.getCollectiveInfo();
 
     if (!cInfo.hasIndexCol) {
-      logger.debug("No index columns are projected from the scan..continue.");
+      logger.info("No index columns are projected from the scan..continue.");
       return;
     }
 
     if (cInfo.indexCondition == null) {
-      logger.debug("No conditions were found eligible for applying index lookup.");
+      logger.info("No conditions were found eligible for applying index lookup.");
       return;
     }
 
@@ -405,27 +404,19 @@ public class DbScanToIndexScanPrule extends Prule {
     List<IndexDescriptor> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
 
-    RelCollation collation = null;
-    if (indexContext.sort != null) {
-      collation = indexContext.sort.getCollation();
-    }
-
     if (settings.isCostBasedIndexSelectionEnabled()) {
       IndexSelector selector = new IndexSelector(indexCondition,
-          collation,
+          indexContext,
           collection,
-          ((DbGroupScan) scan.getGroupScan()).getStatistics(),
           builder,
-          indexContext.call.getPlanner(),
-          totalRows,
-          scan);
+          totalRows);
 
       for (IndexDescriptor indexDesc : collection) {
         if (conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
-              indexContext.project != null ? indexContext.project.getRowType().getFieldCount() :
-                  scan.getRowType().getFieldCount());
+              indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
+                scan.getRowType().getFieldCount());
         }
       }
       // get the candidate indexes based on selection
@@ -504,7 +495,7 @@ public class DbScanToIndexScanPrule extends Prule {
         FunctionalIndexInfo indexInfo = indexDesc.getFunctionalInfo();
         //Copy primary table statistics to index table
         idxScan.setStatistics(((DbGroupScan) scan.getGroupScan()).getStatistics());
-        logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
+        logger.info("Generating covering index plan for query condition {}", indexCondition.toString());
 
         CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan,
             indexCondition, remainderCondition, builder, settings);
@@ -531,10 +522,9 @@ public class DbScanToIndexScanPrule extends Prule {
           IndexGroupScan idxScan = index.getIndexGroupScan();
           //Copy primary table statistics to index table
           idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
-          logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-
+          logger.info("Generating non-covering index plan for query condition {}", indexCondition.toString());
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index,
-              idxScan, indexCondition, remainderCondition, builder, settings);
+            idxScan, indexCondition, remainderCondition, builder, settings);
           planGen.go();
         }
       } catch (Exception e) {
@@ -575,7 +565,7 @@ public class DbScanToIndexScanPrule extends Prule {
     // check covering based on the local information we have:
     //   if references to schema paths in functional indexes disappear beyond capProject
 
-    if (indexContext.capProject == null) {
+    if (indexContext.upperProject == null) {
       if( !isFullQuery(indexContext)) {
         return false;
       }
@@ -585,23 +575,23 @@ public class DbScanToIndexScanPrule extends Prule {
         new DrillParseContext(PrelUtil.getPlannerSettings(indexContext.call.rel(0).getCluster()));
 
     Set<LogicalExpression> exprs = Sets.newHashSet();
-    if (indexContext.capProject != null) {
-      if (indexContext.project == null) {
-        for (RexNode rex : indexContext.capProject.getProjects()) {
+    if (indexContext.upperProject != null) {
+      if (indexContext.lowerProject == null) {
+        for (RexNode rex : indexContext.upperProject.getProjects()) {
           LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
           exprs.add(expr);
         }
       } else {
         //we have underneath project, so we have to do more to convert expressions
-        for (RexNode rex : indexContext.capProject.getProjects()) {
-          LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.project, indexContext.scan, rex);
+        for (RexNode rex : indexContext.upperProject.getProjects()) {
+          LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.lowerProject, indexContext.scan, rex);
           exprs.add(expr);
         }
       }
     }
     else {//capProject == null
-      if (indexContext.project != null) {
-        for (RexNode rex : indexContext.project.getProjects()) {
+      if (indexContext.lowerProject != null) {
+        for (RexNode rex : indexContext.lowerProject.getProjects()) {
           LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
           exprs.add(expr);
         }

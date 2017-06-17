@@ -29,9 +29,9 @@ import java.util.Set;
 public class IndexPlanCallContext {
   final public RelOptRuleCall call;
   final public DrillSortRel sort;
-  final public DrillProjectRel capProject;
+  final public DrillProjectRel upperProject;
   final public DrillFilterRel filter;
-  final public DrillProjectRel project;
+  final public DrillProjectRel lowerProject;
   final public DrillScanRel scan;
 
   public Set<LogicalExpression> leftOutPathsInFunctions;
@@ -52,9 +52,9 @@ public class IndexPlanCallContext {
       DrillScanRel scan) {
     this.call = call;
     this.sort = sort;
-    this.capProject = capProject;
+    this.upperProject = capProject;
     this.filter = filter;
-    this.project = project;
+    this.lowerProject = project;
     this.scan = scan;
   }
 
