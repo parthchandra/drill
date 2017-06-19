@@ -39,7 +39,6 @@ import org.apache.drill.exec.planner.index.IndexCollection;
 import org.apache.drill.exec.planner.index.IndexDiscover;
 import org.apache.drill.exec.planner.index.IndexDiscoverFactory;
 import org.apache.drill.exec.planner.index.MapRDBIndexDiscover;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;

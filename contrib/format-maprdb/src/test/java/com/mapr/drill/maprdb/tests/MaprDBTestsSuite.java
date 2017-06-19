@@ -17,12 +17,12 @@
  */
 package com.mapr.drill.maprdb.tests;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.drill.exec.server.DrillbitContext;
+import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.hbase.HBaseTestsSuite;
 import org.apache.hadoop.conf.Configuration;
@@ -31,20 +31,14 @@ import org.junit.BeforeClass;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
-import org.ojai.Document;
-import org.ojai.DocumentStream;
-import org.ojai.json.Json;
 
 import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
-import com.mapr.db.Table;
-import com.mapr.db.tests.utils.DBTests;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBFilterPushDown;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBSimple;
 import com.mapr.drill.maprdb.tests.index.IndexPlanTest;
 import com.mapr.drill.maprdb.tests.json.TestQueryWithIndex;
 import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
-import com.mapr.fs.utils.ssh.TestCluster;
 
 @RunWith(Suite.class)
 @SuiteClasses({
@@ -117,23 +111,24 @@ public class MaprDBTestsSuite {
     return;
   }
 
-    @AfterClass
+  @AfterClass
   public static void cleanupTests() throws Exception {
     synchronized (MaprDBTestsSuite.class) {
       if (initCount.decrementAndGet() == 0) {
         HBaseTestsSuite.tearDownCluster();
-        deleteJsonTables();
         admin.close();
       }
     }
   }
 
-  private static volatile boolean pluginCreated;
+  private static volatile boolean pluginsUpdated;
 
   public static Configuration createPluginAndGetConf(DrillbitContext ctx) throws Exception {
-    if (!pluginCreated) {
+    if (!pluginsUpdated) {
       synchronized (MaprDBTestsSuite.class) {
-        if (!pluginCreated) {
+        if (!pluginsUpdated) {
+          StoragePluginRegistry pluginRegistry = ctx.getStorage();
+
           String pluginConfStr = "{" +
               "  \"type\": \"file\"," +
               "  \"enabled\": true," +
@@ -143,6 +138,11 @@ public class MaprDBTestsSuite {
               "      \"location\": \"/tmp\"," +
               "      \"writable\": false," +
               "      \"defaultInputFormat\": \"maprdb\"" +
+              "    }," +
+              "    \"tmp\": {" +
+              "      \"location\": \"/tmp\"," +
+              "      \"writable\": true," +
+              "      \"defaultInputFormat\": \"parquet\"" +
               "    }," +
               "    \"root\": {" +
               "      \"location\": \"/\"," +
@@ -157,6 +157,9 @@ public class MaprDBTestsSuite {
               "      \"readAllNumbersAsDouble\": false," +
               "      \"enablePushdown\": true" +
               "    }," +
+              "   \"parquet\": {" +
+              "      \"type\": \"parquet\"" +
+              "    }," +
               "   \"streams\": {" +
               "      \"type\": \"streams\"" +
               "    }" +
@@ -165,7 +168,7 @@ public class MaprDBTestsSuite {
 
           FileSystemConfig pluginConfig = ctx.getLpPersistence().getMapper().readValue(pluginConfStr, FileSystemConfig.class);
           // create the plugin with "hbase" name so that we can run HBase unit tests against them
-          ctx.getStorage().createOrUpdate("hbase", pluginConfig, true);
+          pluginRegistry.createOrUpdate("hbase", pluginConfig, true);
         }
       }
     }

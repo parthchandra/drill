@@ -72,6 +72,7 @@ import com.mapr.db.index.IndexDesc;
 import com.mapr.db.index.IndexFieldDesc;
 import com.mapr.db.scan.ScanRange;
 
+@SuppressWarnings("deprecation")
 @JsonTypeName("maprdb-json-scan")
 public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JsonTableGroupScan.class);
@@ -175,7 +176,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     return newScan;
   }
 
-  @SuppressWarnings("deprecation")
   private void init() {
     logger.debug("Getting tablet locations");
     try {
