@@ -101,9 +101,10 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test
   public void CTASTestTable() throws Exception {
-    String ctasQuery = "CREATE TABLE dfs_test.tmp.`backup_index_test_primary` " +
+    String ctasQuery = "CREATE TABLE hbase.tmp.`backup_index_test_primary` " +
         "AS SELECT * FROM hbase.`index_test_primary` as t ";
     test(ctasQuery);
+    test("DROP TABLE IF EXISTS hbase.tmp.`backup_index_test_primary`");
   }
 
   @Test

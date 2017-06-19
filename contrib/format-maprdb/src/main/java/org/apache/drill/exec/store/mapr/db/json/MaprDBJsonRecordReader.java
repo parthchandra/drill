@@ -60,7 +60,6 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.Table.TableOption;
 import com.mapr.db.exceptions.DBException;
@@ -229,7 +228,6 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   }
 
   @Override
-  @SuppressWarnings("deprecation")
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
     this.vectorWriter = new VectorContainerWriter(output, unionEnabled);
     this.operatorContext = context;

@@ -23,10 +23,10 @@ import java.util.List;
 import java.util.Set;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.expr.CloneVisitor;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -41,6 +41,7 @@ import org.apache.drill.exec.util.EncodedSchemaPathSet;
 import org.apache.drill.common.expression.LogicalExpression;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
@@ -73,18 +74,15 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   }
 
   @Override
-  public boolean isCoveringIndex(List<LogicalExpression> columns) {
-    DecodePathinExpr decodeExpr = new DecodePathinExpr();
-    List<LogicalExpression> decodedCols = Lists.newArrayList();
-    for(LogicalExpression expr : columns) {
-      decodedCols.add(expr.accept(decodeExpr, null));
-    }
+  public boolean isCoveringIndex(List<LogicalExpression> expressions) {
+    List<LogicalExpression> decodedCols = new DecodePathinExpr().parseExpressions(expressions);
     return columnsInIndexFields(decodedCols, allFields);
   }
 
   @Override
-  public boolean allColumnsIndexed(Collection<LogicalExpression> columns) {
-    return columnsIndexed(columns, true);
+  public boolean allColumnsIndexed(Collection<LogicalExpression> expressions) {
+    List<LogicalExpression> decodedCols = new DecodePathinExpr().parseExpressions(expressions);
+    return columnsInIndexFields(decodedCols, indexedFields);
   }
 
   @Override
@@ -92,12 +90,8 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
     return columnsIndexed(columns, false);
   }
 
-  private boolean columnsIndexed(Collection<LogicalExpression> columns, boolean allColsIndexed) {
-    DecodePathinExpr decodeExpr = new DecodePathinExpr();
-    List<LogicalExpression> decodedCols = Lists.newArrayList();
-    for(LogicalExpression expr : columns) {
-      decodedCols.add(expr.accept(decodeExpr, null));
-    }
+  private boolean columnsIndexed(Collection<LogicalExpression> expressions, boolean allColsIndexed) {
+    List<LogicalExpression> decodedCols = new DecodePathinExpr().parseExpressions(expressions);
     if (allColsIndexed) {
       return columnsInIndexFields(decodedCols, indexedFields);
     } else {
@@ -111,16 +105,28 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
     }
     return this.functionalInfo;
   }
+
   /**
    * Search through a LogicalExpression, finding all internal schema path references and returning a decoded path.
    */
   private class DecodePathinExpr extends CloneVisitor {
+    Set<SchemaPath> schemaPathSet = Sets.newHashSet();
+    
+    public List<LogicalExpression> parseExpressions(Collection<LogicalExpression> expressions) {
+      for(LogicalExpression expr : expressions) {
+        expr.accept(this, null);
+      }
+      return new ImmutableList.Builder<LogicalExpression>()
+          .addAll(schemaPathSet)
+          .build();
+    }
 
     @Override
     public LogicalExpression visitSchemaPath(SchemaPath path, Void value) {
       List<SchemaPath> paths = Lists.newArrayList();
       paths.add(path);
-      return EncodedSchemaPathSet.decode(paths).iterator().next();
+      schemaPathSet.addAll(EncodedSchemaPathSet.decode(paths));
+      return null;
     }
   }
   @Override

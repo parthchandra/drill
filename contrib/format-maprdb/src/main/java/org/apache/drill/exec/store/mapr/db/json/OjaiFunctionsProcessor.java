@@ -27,13 +27,12 @@ import org.apache.drill.common.expression.ValueExpressions.LongExpression;
 import org.apache.drill.common.expression.ValueExpressions.QuotedString;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 
-import org.ojai.FieldPath;
 import org.ojai.Value;
 import org.ojai.store.QueryCondition;
 
 import com.google.common.collect.ImmutableMap;
-import com.mapr.db.MapRDB;
 import com.mapr.db.impl.ConditionImpl;
+import com.mapr.db.impl.MapRDBImpl;
 
 import java.nio.ByteBuffer;
 
@@ -147,7 +146,7 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final SchemaPath schemaPath = getSchemaPathArg(call.args.get(0));
       final String relOp = getStringArg(call.args.get(1));
       final long size = getLongArg(call.args.get(2));
-      queryCond = MapRDB.newCondition()
+      queryCond = MapRDBImpl.newCondition()
           .sizeOf(schemaPath.getAsUnescapedPath(), STRING_TO_RELOP.get(relOp), size)
           .build();
       break;
@@ -159,7 +158,7 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final SchemaPath schemaPath = getSchemaPathArg(call.args.get(0));
       final int typeCode = getIntArg(call.args.get(1));
       final Value.Type typeValue = Value.Type.valueOf(typeCode);
-      queryCond = MapRDB.newCondition();
+      queryCond = MapRDBImpl.newCondition();
       if (functionName.equals("ojai_typeof")) {
         queryCond.typeOf(schemaPath.getAsUnescapedPath(), typeValue);
       } else {
@@ -175,10 +174,10 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final SchemaPath schemaPath = getSchemaPathArg(call.args.get(0));
       final String regex = getStringArg(call.args.get(1));
       if (functionName.equals("ojai_matches")) {
-        queryCond = MapRDB.newCondition()
+        queryCond = MapRDBImpl.newCondition()
             .matches(schemaPath.getAsUnescapedPath(), regex);
       } else {
-        queryCond = MapRDB.newCondition()
+        queryCond = MapRDBImpl.newCondition()
             .notMatches(schemaPath.getAsUnescapedPath(), regex);
       }
       queryCond.build();

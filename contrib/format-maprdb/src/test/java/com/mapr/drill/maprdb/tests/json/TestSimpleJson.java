@@ -21,6 +21,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 
+import java.io.InputStream;
+
 import org.apache.drill.PlanTestBase;
 import org.apache.drill.SingleRowListener;
 import org.apache.drill.exec.exception.SchemaChangeException;
@@ -28,55 +30,95 @@ import org.apache.drill.exec.proto.UserBitShared.QueryType;
 import org.apache.drill.exec.record.RecordBatchLoader;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.util.VectorUtil;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.ojai.Document;
+import org.ojai.DocumentStream;
+import org.ojai.json.Json;
 
 import com.mapr.db.MapRDB;
+import com.mapr.db.Table;
+import com.mapr.db.tests.utils.DBTests;
+import com.mapr.drill.maprdb.tests.MaprDBTestsSuite;
 import com.mapr.tests.annotations.ClusterTest;
 
 @Category(ClusterTest.class)
 @SuppressWarnings("deprecation")
 public class TestSimpleJson extends BaseJsonTest {
 
+  private static final String SCHEMA = "hbase.root";
+  private static final String TABLE_NAME = "business";
+  private static final String JSON_FILE_URL = "/com/mapr/drill/json/business.json";
+
+  private static boolean tableCreated = false;
+  private static String tablePath;
+
+  @BeforeClass
+  public static void setup_TestSimpleJson() throws Exception {
+    try (Table table = DBTests.createOrReplaceTable(TABLE_NAME);
+         InputStream in = MaprDBTestsSuite.getJsonStream(JSON_FILE_URL);
+         DocumentStream stream = Json.newDocumentStream(in)) {
+      tableCreated = true;
+      tablePath = table.getPath().toUri().getPath();
+
+      for (Document document : stream) {
+       table.insert(document, "business_id");
+     }
+     table.flush();
+   }
+  }
+
+  @AfterClass
+  public static void cleanup_TestEncodedFieldPaths() throws Exception {
+    if (tableCreated) {
+      DBTests.deleteTables(TABLE_NAME);
+    }
+  }
+
+  private static String format(String sql) {
+    return String.format(sql, SCHEMA, tablePath);
+  }
+
   @Test
   public void testSelectStar() throws Exception {
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  *\n"
         + "FROM\n"
-        + "  hbase.`business` business";
+        + "  %s.`%s` business");
     runSQLAndVerifyCount(sql, 10);
   }
 
   @Test
   public void testSelectId() throws Exception {
     setColumnWidths(new int[] {23});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id\n"
         + "FROM\n"
-        + "  hbase.`business` business";
+        + "  %s.`%s` business");
     runSQLAndVerifyCount(sql, 10);
   }
 
   @Test
   public void testKVGen() throws Exception {
     setColumnWidths(new int[] {21, 10, 6});
-    final String sql = "select _id, t.parking[0].`key` K, t.parking[0].`value` V from"
-        + " (select _id, kvgen(b.attributes.Parking) as parking from hbase.business b)"
-        + " as t where t.parking[0].`key` = 'garage' AND t.parking[0].`value` = true";
+    final String sql = format("select _id, t.parking[0].`key` K, t.parking[0].`value` V from"
+        + " (select _id, kvgen(b.attributes.Parking) as parking from %s.`%s` b)"
+        + " as t where t.parking[0].`key` = 'garage' AND t.parking[0].`value` = true");
     runSQLAndVerifyCount(sql, 1);
   }
 
   @Test
   public void testPushdownDisabled() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  table(hbase.`business`(type => 'maprdb', enablePushdown => false)) business\n"
+        + "  table(%s.`%s`(type => 'maprdb', enablePushdown => false)) business\n"
         + "WHERE\n"
-        + " name <> 'Sprint'"
-        ;
+        + " name <> 'Sprint'");
     runSQLAndVerifyCount(sql, 9);
 
     final String[] expectedPlan = {"condition=null", "columns=\\[`\\*`\\]"};
@@ -88,13 +130,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushdownStringEqual() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, business.hours.Monday.`open`, categories[1], years[2], full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " name = 'Sprint'"
-        ;
+        + " name = 'Sprint'");
 
     final Document queryResult = MapRDB.newDocument();
     SingleRowListener listener = new SingleRowListener() {
@@ -132,13 +173,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushdownStringLike() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " name LIKE 'S%'"
-        ;
+        + " name LIKE 'S%%'");
     runSQLAndVerifyCount(sql, 3);
 
     final String[] expectedPlan = {"condition=\\(name MATCHES \"\\^\\\\\\\\QS\\\\\\\\E\\.\\*\\$\"\\)"};
@@ -150,13 +190,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushdownStringNotEqual() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " name <> 'Sprint'"
-        ;
+        + " name <> 'Sprint'");
     runSQLAndVerifyCount(sql, 9);
 
     final String[] expectedPlan = {"condition=\\(name != \"Sprint\"\\)", "columns=\\[`name`, `_id`, `categories`, `full_address`\\]"};
@@ -168,13 +207,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushdownLongEqual() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " zip = 85260"
-        ;
+        + " zip = 85260");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(zip = \\{\"\\$numberLong\":85260\\}\\)"};
@@ -186,15 +224,14 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testCompositePredicate() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
         + " zip = 85260\n"
         + " OR\n"
-        + " city = 'Las Vegas'"
-        ;
+        + " city = 'Las Vegas'");
     runSQLAndVerifyCount(sql, 4);
 
     final String[] expectedPlan = {"condition=\\(\\(zip = \\{\"\\$numberLong\":85260\\}\\) or \\(city = \"Las Vegas\"\\)\\)"};
@@ -206,13 +243,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPruneScanRange() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " _id = 'jFTZmywe7StuZ2hEjxyA'"
-        ;
+        + " _id = 'jFTZmywe7StuZ2hEjxyA'");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(_id = \"jFTZmywe7StuZ2hEjxyA\"\\)"};
@@ -222,17 +258,17 @@ public class TestSimpleJson extends BaseJsonTest {
   }
 
   @Test
+  @Ignore("Bug 27981")
   public void testPruneScanRangeAndPushDownCondition() throws Exception {
     // XXX/TODO:
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, categories, full_address\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
         + " _id = 'jFTZmywe7StuZ2hEjxyA' AND\n"
-        + " name = 'Subway'"
-        ;
+        + " name = 'Subway'");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(\\(_id = \"jFTZmywe7StuZ2hEjxyA\"\\) and \\(name = \"Subway\"\\)\\)"};
@@ -244,13 +280,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushDownOnSubField1() throws Exception {
     setColumnWidths(new int[] {25, 120, 20});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, b.attributes.Ambience.touristy attributes\n"
         + "FROM\n"
-        + "  hbase.`business` b\n"
+        + "  %s.`%s` b\n"
         + "WHERE\n"
-        + " b.`attributes.Ambience.casual` = false"
-        ;
+        + " b.`attributes.Ambience.casual` = false");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(attributes.Ambience.casual = false\\)"};
@@ -262,13 +297,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushDownOnSubField2() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, b.attributes.Attire attributes\n"
         + "FROM\n"
-        + "  hbase.`business` b\n"
+        + "  %s.`%s` b\n"
         + "WHERE\n"
-        + " b.`attributes.Attire` = 'casual'"
-        ;
+        + " b.`attributes.Attire` = 'casual'");
     runSQLAndVerifyCount(sql, 4);
 
     final String[] expectedPlan = {"condition=\\(attributes.Attire = \"casual\"\\)"};
@@ -280,13 +314,12 @@ public class TestSimpleJson extends BaseJsonTest {
   public void testPushDownIsNull() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
 
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, attributes\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " business.`attributes.Ambience.casual` IS NULL"
-        ;
+        + " business.`attributes.Ambience.casual` IS NULL");
     runSQLAndVerifyCount(sql, 7);
 
     final String[] expectedPlan = {"condition=\\(attributes.Ambience.casual = null\\)"};
@@ -299,13 +332,12 @@ public class TestSimpleJson extends BaseJsonTest {
   public void testPushDownIsNotNull() throws Exception {
     setColumnWidths(new int[] {25, 75, 75, 50});
 
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, b.attributes.Parking\n"
         + "FROM\n"
-        + "  hbase.`business` b\n"
+        + "  %s.`%s` b\n"
         + "WHERE\n"
-        + " b.`attributes.Ambience.casual` IS NOT NULL"
-        ;
+        + " b.`attributes.Ambience.casual` IS NOT NULL");
     runSQLAndVerifyCount(sql, 3);
 
     final String[] expectedPlan = {"condition=\\(attributes.Ambience.casual != null\\)"};
@@ -317,13 +349,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushDownOnSubField3() throws Exception {
     setColumnWidths(new int[] {25, 40, 40, 40});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, b.attributes.`Accepts Credit Cards` attributes\n"
         + "FROM\n"
-        + "  hbase.`business` b\n"
+        + "  %s.`%s` b\n"
         + "WHERE\n"
-        + " b.`attributes.Accepts Credit Cards` IS NULL"
-        ;
+        + " b.`attributes.Accepts Credit Cards` IS NULL");
     runSQLAndVerifyCount(sql, 3);
 
     final String[] expectedPlan = {"condition=\\(attributes.Accepts Credit Cards = null\\)"};
@@ -334,13 +365,12 @@ public class TestSimpleJson extends BaseJsonTest {
 
   @Test
   public void testPushDownLong() throws Exception {
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  *\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " stars > 4.0"
-        ;
+        + " stars > 4.0");
     runSQLAndVerifyCount(sql, 2);
 
     final String[] expectedPlan = {"condition=\\(stars > 4\\)"};
@@ -351,14 +381,13 @@ public class TestSimpleJson extends BaseJsonTest {
 
   @Test
   public void testPushDownSubField4() throws Exception {
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  *\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
         + " business.`attributes.Good For.lunch` = true AND"
-        + " stars > 4.1"
-        ;
+        + " stars > 4.1");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(\\(attributes.Good For.lunch = true\\) and \\(stars > 4.1\\)\\)"};
@@ -370,13 +399,12 @@ public class TestSimpleJson extends BaseJsonTest {
 
   @Test
   public void testPushDownSubField5() throws Exception {
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  *\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " business.`hours.Tuesday.open` < TIME '10:30:00'"
-        ;
+        + " business.`hours.Tuesday.open` < TIME '10:30:00'");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(hours.Tuesday.open < \\{\"\\$time\":\"10:30:00\"\\}\\)"};
@@ -387,13 +415,12 @@ public class TestSimpleJson extends BaseJsonTest {
 
   @Test
   public void testPushDownSubField6() throws Exception {
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  *\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " business.`hours.Sunday.close` > TIME '20:30:00'"
-        ;
+        + " business.`hours.Sunday.close` > TIME '20:30:00'");
     runSQLAndVerifyCount(sql, 3);
 
     final String[] expectedPlan = {"condition=\\(hours.Sunday.close > \\{\"\\$time\":\"20:30:00\"\\}\\)"};
@@ -405,13 +432,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushDownSubField7() throws Exception {
     setColumnWidths(new int[] {25, 40, 25, 45});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, start_date, last_update\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " business.`start_date` = DATE '2012-07-14'"
-        ;
+        + " business.`start_date` = DATE '2012-07-14'");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=\\(start_date = \\{\"\\$dateDay\":\"2012-07-14\"\\}\\)"};
@@ -423,13 +449,12 @@ public class TestSimpleJson extends BaseJsonTest {
   @Test
   public void testPushDownSubField8() throws Exception {
     setColumnWidths(new int[] {25, 40, 25, 45});
-    final String sql = "SELECT\n"
+    final String sql = format("SELECT\n"
         + "  _id, name, start_date, last_update\n"
         + "FROM\n"
-        + "  hbase.`business` business\n"
+        + "  %s.`%s` business\n"
         + "WHERE\n"
-        + " business.`last_update` = TIMESTAMP '2012-10-20 07:42:46'"
-        ;
+        + " business.`last_update` = TIMESTAMP '2012-10-20 07:42:46'");
     runSQLAndVerifyCount(sql, 1);
 
     final String[] expectedPlan = {"condition=null"};
