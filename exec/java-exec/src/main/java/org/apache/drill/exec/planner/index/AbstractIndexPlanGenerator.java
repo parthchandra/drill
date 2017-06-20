@@ -42,7 +42,9 @@ import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
@@ -62,6 +64,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.exec.planner.physical.SingleMergeExchangePrel;
+import org.apache.drill.exec.planner.physical.SortPrel;
 import org.apache.drill.exec.planner.physical.SortPrule;
 import org.apache.drill.exec.planner.physical.SubsetTransformer;
 
@@ -146,12 +149,18 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     List<FieldReference> rangeDistRefList = Lists.newArrayList();
     rangeDistRefList.add(rangeDistRef);
 
-    final DrillDistributionTrait distRangeRight = new DrillDistributionTrait(
-        DrillDistributionTrait.DistributionType.RANGE_DISTRIBUTED,
-        ImmutableList.copyOf(rangeDistFields),
-        origDbGroupScan.getRangePartitionFunction(rangeDistRefList));
+    final DrillDistributionTrait distRight;
+    if (IndexPlanUtils.scanIsPartition(origDbGroupScan)) {
+      distRight = new DrillDistributionTrait(
+          DrillDistributionTrait.DistributionType.RANGE_DISTRIBUTED,
+          ImmutableList.copyOf(rangeDistFields),
+          origDbGroupScan.getRangePartitionFunction(rangeDistRefList));
+    }
+    else {
+      distRight = DrillDistributionTrait.SINGLETON;
+    }
 
-    RelTraitSet rightTraits = newTraitSet(distRangeRight).plus(Prel.DRILL_PHYSICAL);
+    RelTraitSet rightTraits = newTraitSet(distRight).plus(Prel.DRILL_PHYSICAL);
     RelNode convertedRight = Prule.convert(rightPrel, rightTraits);
 
     return convertedRight;
@@ -204,21 +213,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
         new DrillDistributionTrait(DrillDistributionTrait.DistributionType.HASH_DISTRIBUTED,
             ImmutableList.copyOf(SortPrule.getDistributionField(rel)));
 
-    if ( !toRemoveSort(indexContext.sort, newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE))) {
-      //create sort's prel, also let us add distribution trait as SortPrule will do
-      final RelTraitSet traits = rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(hashDistribution);
-      RelNode convertedInput = Prule.convert(newRel, traits);
-
-      if (Prule.isSingleMode(indexContext.call)) {
-        indexContext.call.transformTo(convertedInput);
-      } else {
-        RelNode exch = new SingleMergeExchangePrel(rel.getCluster(),
-            rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(DrillDistributionTrait.SINGLETON),
-            convertedInput, rel.getCollation());
-        indexContext.call.transformTo(exch);  // transform logical "sort" into "SingleMergeExchange".
-      }
-    }
-    else {
+    if ( toRemoveSort(indexContext.sort, newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE))) {
       //we are going to remove sort
       logger.debug("Not generating SortPrel since we have the required collation");
 
@@ -230,8 +225,17 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
           indexContext.sort.getCollation());
       newRel = exch;
     }
+    else {
+      SortPrel sortPrel = new SortPrel(rel.getCluster(),
+          rel.getTraitSet().replace(Prel.DRILL_PHYSICAL).plus(DrillDistributionTrait.SINGLETON).plus(rel.getCollation()),
+          Prule.convert(newRel, newRel.getTraitSet().replace(Prel.DRILL_PHYSICAL)),
+          rel.getCollation());
+      newRel = sortPrel;
+    }
     return newRel;
   }
+
+
 
   public abstract RelNode convertChild(RelNode current, RelNode child) throws InvalidRelException;
 

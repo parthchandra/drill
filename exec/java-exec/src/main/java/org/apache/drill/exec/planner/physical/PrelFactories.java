@@ -42,7 +42,7 @@ public class PrelFactories {
                                  List<? extends RexNode> childExprs, List<String> fieldNames) {
       final RelOptCluster cluster = child.getCluster();
       final RelDataType rowType = RexUtil.createStructType(cluster.getTypeFactory(), childExprs, fieldNames);
-      final RelNode project = new ProjectPrel(cluster, child.getTraitSet(), child, childExprs, rowType);
+      final RelNode project = new ProjectPrel(cluster, child.getTraitSet().plus(Prel.DRILL_PHYSICAL), child, childExprs, rowType);
 
       return project;
     }

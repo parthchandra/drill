@@ -34,10 +34,13 @@ import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ScanPrel;
@@ -243,6 +246,11 @@ public class IndexPlanUtils {
     return collation;
   }
 
+  public static boolean scanIsPartition(GroupScan scan) {
+    return (scan.getMaxParallelizationWidth() > 1
+        || scan.getDistributionAffinity() == DistributionAffinity.HARD);
+  }
+
   public static ScanPrel buildCoveringIndexScan(DrillScanRel origScan,
       IndexGroupScan indexGroupScan,
       IndexPlanCallContext indexContext,
@@ -253,9 +261,11 @@ public class IndexPlanUtils {
         rewriteFunctionColumn(((DbGroupScan)origScan.getGroupScan()).getColumns(),
             functionInfo));
 
+    DrillDistributionTrait partition = scanIsPartition(origScan.getGroupScan())?
+        DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
     RelDataType newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(origScan, indexContext, functionInfo);
 
-    RelTraitSet indexScanTraitSet = origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL);
+    RelTraitSet indexScanTraitSet = origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition);
 
     // Create the collation traits for index scan based on the index columns under the
     // condition that the index actually has collation property (e.g hash indexes don't)
