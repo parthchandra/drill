@@ -22,6 +22,7 @@ import com.mapr.security.maprsasl.MaprSaslProvider;
 import org.apache.drill.exec.rpc.security.AuthenticatorFactory;
 import org.apache.drill.exec.rpc.security.FastSaslServerFactory;
 import org.apache.drill.exec.rpc.security.FastSaslClientFactory;
+import org.apache.drill.exec.rpc.security.SecurityConfiguration;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -62,7 +63,7 @@ public class MapRSaslFactory implements AuthenticatorFactory {
 
   @Override
   public UserGroupInformation createAndLoginUser(final Map<String, ?> properties) throws IOException {
-    final Configuration conf = new Configuration();
+    final Configuration conf = new SecurityConfiguration();
     conf.set(CommonConfigurationKeys.HADOOP_SECURITY_AUTHENTICATION,
         "CUSTOM");
     conf.set("hadoop.login", "maprsasl");
