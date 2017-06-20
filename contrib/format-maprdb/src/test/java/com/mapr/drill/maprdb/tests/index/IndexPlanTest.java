@@ -530,17 +530,6 @@ public class IndexPlanTest extends BaseJsonTest {
         new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
         new String[]{"RowkeyJoin"}
     );
-    try {
-      test(sliceTargetSmall);
-      PlanTestBase.testPlanMatchingPatterns(query,
-          new String[]{"SingleMergeExchange(.*[\n\r])+.* Sort(.*[\n\r])+.*HashToRandomExchange",
-              ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
-          new String[]{"RowkeyJoin"}
-      );
-    }finally {
-      test(sliceTargetDefault);
-      test(defaultFTSFactor);
-    }
 
     testBuilder()
         .sqlQuery(query)

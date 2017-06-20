@@ -39,6 +39,7 @@ import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
+
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -172,10 +173,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     ScanPrel indexScanPrel =
         IndexPlanUtils.buildCoveringIndexScan(origScan, indexGroupScan, indexContext, indexDesc);
 
-    RelDataType newRowType = indexScanPrel.getRowType();
-
     RexNode newIndexCondition =
-        rewriteFunctionalCondition(indexCondition, newRowType, functionInfo);
+        rewriteFunctionalCondition(indexCondition, indexScanPrel.getRowType(), functionInfo);
 
     // build collation for filter
     RelTraitSet indexFilterTraitSet = indexScanPrel.getTraitSet();
@@ -226,7 +225,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         List<RexNode> newProjects = Lists.newArrayList();
         DrillParseContext parseContxt = new DrillParseContext(PrelUtil.getPlannerSettings(newProject.getCluster()));
         for(RexNode projectRex: newProject.getProjects()) {
-          RexNode newRex = rewriteFunctionalRex(parseContxt, null, origScan, projectRex, newRowType, functionInfo);
+          RexNode newRex = rewriteFunctionalRex(parseContxt, null, origScan, projectRex, indexScanPrel.getRowType(), functionInfo);
           newProjects.add(newRex);
         }
 
