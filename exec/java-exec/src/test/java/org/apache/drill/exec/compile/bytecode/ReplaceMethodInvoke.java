@@ -55,7 +55,7 @@ public class ReplaceMethodInvoke {
     Files.write(output, new File("/src/scratch/bytes/S.class"));
     check(output);
 
-    final DrillConfig c = DrillConfig.forClient();
+    final DrillConfig c = DrillConfig.forClient(null);
     final SystemOptionManager m = new SystemOptionManager(PhysicalPlanReaderTestFactory.defaultLogicalPlanPersistence(c), new LocalPersistentStoreProvider(c), c);
     m.init();
     try (QueryClassLoader ql = new QueryClassLoader(DrillConfig.create(), m)) {
