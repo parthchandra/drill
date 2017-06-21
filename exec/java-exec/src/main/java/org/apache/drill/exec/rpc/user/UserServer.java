@@ -24,6 +24,7 @@ import java.util.UUID;
 import javax.net.ssl.SSLEngine;
 import javax.security.sasl.SaslException;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.drill.common.config.DrillProperties;
@@ -78,6 +79,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   private final BootStrapContext bootStrapContext;
   private final UserConnectionConfig config;
   private final SSLConfig sslConfig;
+  private Channel sslChannel;
   private final UserWorker userWorker;
 
   public UserServer(BootStrapContext context, BufferAllocator allocator, EventLoopGroup eventLoopGroup,
@@ -87,8 +89,9 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
         eventLoopGroup);
     this.bootStrapContext = context;
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
+    this.sslChannel = null;
     try {
-      this.sslConfig = new SSLConfig(bootStrapContext.getConfig()); // throws startup exception
+      this.sslConfig = new SSLConfig(bootStrapContext.getConfig(), true); // throws startup exception
     } catch (DrillException e) {
       throw new DrillbitStartupException(e.getMessage(), e.getCause());
     }
@@ -108,15 +111,32 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
       // No need for client side authentication (HTTPS like behaviour)
       sslEngine.setNeedClientAuth(false);
 
-      // set jdk.certpath.disabledAlgorithms  to disable specific ssl algorithms
+      // set Security property jdk.certpath.disabledAlgorithms  to disable specific ssl algorithms
       sslEngine.setEnabledProtocols(sslEngine.getEnabledProtocols());
 
-      // set jdk.tls.disabledAlgorithms to disable specific cipher suites
+      // set Security property jdk.tls.disabledAlgorithms to disable specific cipher suites
       sslEngine.setEnabledCipherSuites(sslEngine.getEnabledCipherSuites());
       sslEngine.setEnableSessionCreation(true);
 
       // Add SSL handler into pipeline
       pipe.addFirst("SSL", new SslHandler(sslEngine));
+    }
+  }
+  @Override
+  protected boolean isSslEnabled() {
+    return sslConfig.isSslEnabled();
+  }
+
+  @Override
+  public void setSslChannel(Channel c) {
+    sslChannel = c;
+    return;
+  }
+
+  @Override
+  protected void closeSSL(){
+    if(isSslEnabled() && sslChannel != null){
+      sslChannel.close();
     }
   }
 

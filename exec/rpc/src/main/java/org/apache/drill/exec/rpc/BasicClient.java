@@ -20,6 +20,7 @@ package org.apache.drill.exec.rpc;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -125,13 +126,22 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
   }
 
   // Adds a SSL handler if enabled. Required only for client and server communications, so
-  // a real implementation is only available for UserServer
+  // a real implementation is only available for UserClient
   protected void setupSSL(ChannelPipeline pipe, ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener) {
     // Do nothing
   }
 
   protected boolean isSslEnabled() {
     return false;
+  }
+
+  // Save the SslChannel after the SSL handshake so it can be closed later
+  public void setSslChannel(Channel c) {
+    return;
+  }
+
+  protected void closeSSL() {
+    return;
   }
 
   @Override
@@ -220,107 +230,6 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
     b.connect(host, port).addListener(cml.connectionHandler);
   }
 
-  private class ConnectionMultiListener_ {
-    private final RpcConnectionHandler<CC> l;
-    private final HS handshakeValue;
-
-    public ConnectionMultiListener_(RpcConnectionHandler<CC> l, HS handshakeValue) {
-      assert l != null;
-      assert handshakeValue != null;
-
-      this.l = l;
-      this.handshakeValue = handshakeValue;
-    }
-
-    public final ConnectionHandler connectionHandler = new ConnectionHandler();
-    public final HandshakeSendHandler handshakeSendHandler = new HandshakeSendHandler();
-
-    /**
-     * Manages connection establishment outcomes.
-     */
-    private class ConnectionHandler implements GenericFutureListener<ChannelFuture> {
-
-      @Override
-      public void operationComplete(ChannelFuture future) throws Exception {
-        boolean isInterrupted = false;
-
-        // We want to wait for at least 120 secs when interrupts occur. Establishing a connection fails/succeeds quickly,
-        // So there is no point propagating the interruption as failure immediately.
-        long remainingWaitTimeMills = 120000;
-        long startTime = System.currentTimeMillis();
-        // logger.debug("Connection operation finished.  Success: {}", future.isSuccess());
-        while(true) {
-          try {
-            future.get(remainingWaitTimeMills, TimeUnit.MILLISECONDS);
-            if (future.isSuccess()) {
-              SocketAddress remote = future.channel().remoteAddress();
-              SocketAddress local = future.channel().localAddress();
-              setAddresses(remote, local);
-              // send a handshake on the current thread. This is the only time we will send from within the event thread.
-              // We can do this because the connection will not be backed up.
-              send(handshakeSendHandler, connection, handshakeType, handshakeValue, responseClass, true);
-            } else {
-              l.connectionFailed(FailureType.CONNECTION, new RpcException("General connection failure."));
-            }
-            // logger.debug("Handshake queued for send.");
-            break;
-          } catch (final InterruptedException interruptEx) {
-            remainingWaitTimeMills -= (System.currentTimeMillis() - startTime);
-            startTime = System.currentTimeMillis();
-            isInterrupted = true;
-            if (remainingWaitTimeMills < 1) {
-              l.connectionFailed(FailureType.CONNECTION, interruptEx);
-              break;
-            }
-            // Ignore the interrupt and continue to wait until we elapse remainingWaitTimeMills.
-          } catch (final Exception ex) {
-            logger.error("Failed to establish connection", ex);
-            l.connectionFailed(FailureType.CONNECTION, ex);
-            break;
-          }
-        }
-
-        if (isInterrupted) {
-          // Preserve evidence that the interruption occurred so that code higher up on the call stack can learn of the
-          // interruption and respond to it if it wants to.
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
-
-    /**
-     * manages handshake outcomes.
-     */
-    private class HandshakeSendHandler implements RpcOutcomeListener<HR> {
-
-      @Override
-      public void failed(RpcException ex) {
-        logger.debug("Failure while initiating handshake", ex);
-        l.connectionFailed(FailureType.HANDSHAKE_COMMUNICATION, ex);
-      }
-
-      @Override
-      public void success(HR value, ByteBuf buffer) {
-        // logger.debug("Handshake received. {}", value);
-        try {
-          validateHandshake(value);
-          finalizeConnection(value, connection);
-          l.connectionSucceeded(connection);
-          // logger.debug("Handshake completed succesfully.");
-        } catch (Exception ex) {
-          logger.debug("Failure while validating handshake", ex);
-          l.connectionFailed(FailureType.HANDSHAKE_VALIDATION, ex);
-        }
-      }
-
-      @Override
-      public void interrupted(final InterruptedException ex) {
-        logger.warn("Interrupted while waiting for handshake response", ex);
-        l.connectionFailed(FailureType.HANDSHAKE_COMMUNICATION, ex);
-      }
-    }
-  }
-
   private class ClientHandshakeHandler extends AbstractHandshakeHandler<HR> {
 
     private final CC connection;
@@ -347,6 +256,10 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   public void close() {
     logger.debug("Closing client");
+
+    if(isSslEnabled()) {
+      closeSSL();
+    }
 
     if (connection != null) {
       connection.close();

@@ -23,6 +23,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import org.apache.drill.common.exceptions.DrillException;
 import org.slf4j.Logger;
 
 import java.net.SocketAddress;
@@ -178,7 +179,13 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
 
     @Override public void operationComplete(Future<Channel> future) throws Exception {
       if(parent != null){
-        parent.sslConnectionHandler.operationComplete(future);
+        Channel c = future.get(); // Ensure any exceptions are thrown.
+        if(future.isSuccess()) {
+          parent.sslConnectionHandler.operationComplete(future);
+          parent.parent.setSslChannel(c);
+        } else {
+          throw new DrillException("SSL handshake failed.", future.cause());
+        }
       } else {
         throw new RpcException("RPC Setup error. SSL handshake complete handler is not set up.");
       }

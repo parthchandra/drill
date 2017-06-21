@@ -21,6 +21,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -112,6 +113,19 @@ public abstract class BasicServer<T extends EnumLite, SC extends ServerConnectio
   // a real implementation is only available for UserServer
   protected void setupSSL(ChannelPipeline pipe) {
     // Do nothing
+  }
+
+  protected boolean isSslEnabled() {
+    return false;
+  }
+
+  // Save the SslChannel after the SSL handshake so it can be closed later
+  public void setSslChannel(Channel c) {
+    return;
+  }
+
+  protected void closeSSL() {
+    return;
   }
 
   private class LoggingReadTimeoutHandler extends ReadTimeoutHandler {
@@ -211,6 +225,9 @@ public abstract class BasicServer<T extends EnumLite, SC extends ServerConnectio
       long elapsed = watch.elapsed(MILLISECONDS);
       if (elapsed > 500) {
         logger.info("closed eventLoopGroup " + eventLoopGroup + " in " + elapsed + " ms");
+      }
+      if(isSslEnabled()) {
+        closeSSL();
       }
     } catch (final InterruptedException | ExecutionException e) {
       logger.warn("Failure while shutting down {}. ", this.getClass().getName(), e);
