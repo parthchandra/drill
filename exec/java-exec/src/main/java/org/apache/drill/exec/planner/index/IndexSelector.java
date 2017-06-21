@@ -138,22 +138,19 @@ public class IndexSelector  {
     ScanPrel indexScanPrel =
         IndexPlanUtils.buildCoveringIndexScan(indexContext.scan, indexDesc.getIndexGroupScan(), indexContext, indexDesc);
     inputCollation = indexScanPrel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-    if (indexCondition != null) {
-      FindFiltersForCollation finder = new FindFiltersForCollation(indexScanPrel);
-      collationFilterMap = finder.analyze(indexCondition);
-    }
 
     // we don't create collation for Filter because it will inherit the child's collation
 
     if (indexContext.lowerProject != null) {
       inputCollation =
-          IndexPlanUtils.buildCollationLowerProject(indexContext.lowerProject.getProjects(), indexScanPrel, functionInfo);
+          IndexPlanUtils.buildCollationProject(indexContext.lowerProject.getProjects(), null,
+              indexScanPrel, functionInfo,indexContext);
     }
 
     if (indexContext.upperProject != null) {
       inputCollation =
-          IndexPlanUtils.buildCollationUpperProject(indexContext.upperProject.getProjects(), inputCollation,
-              functionInfo, collationFilterMap);
+          IndexPlanUtils.buildCollationProject(indexContext.upperProject.getProjects(), indexContext.lowerProject,
+              indexContext.scan, functionInfo, indexContext);
     }
 
     if ( (inputCollation != null) && inputCollation.satisfies(indexContext.sort.getCollation())) {

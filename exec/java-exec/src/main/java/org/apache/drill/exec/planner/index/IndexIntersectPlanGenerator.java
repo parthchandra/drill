@@ -163,8 +163,8 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
 
     FunctionalIndexInfo functionInfo = getFunctionalIndexInfo(index);
     IndexGroupScan indexScan = index.getIndexGroupScan();
-    RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(origScan, condition,
-        indexScan, functionInfo);
+    RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(
+        origScan, indexContext.origMarker, indexScan, functionInfo);
     DrillDistributionTrait partition = IndexPlanUtils.scanIsPartition(origScan.getGroupScan())?
         DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
 

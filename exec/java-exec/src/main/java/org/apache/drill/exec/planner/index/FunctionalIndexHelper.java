@@ -105,6 +105,7 @@ public class FunctionalIndexHelper {
     return segs[0];
   }
 
+
   /**
    * For IndexScan in non-covering case, rowType to return contains only row_key('_id') of primary table.
    * so the rowType for IndexScan should be converted from [Primary_table.row_key, primary_table.indexed_col]
@@ -112,12 +113,12 @@ public class FunctionalIndexHelper {
    * This will impact the columns of scan, the rowType of ScanRel
    *
    * @param origScan
-   * @param indexCondition
+   * @param idxMarker  the IndexableExprMarker that has analyzed original index condition on top of index scan
    * @param idxScan
    * @return
    */
   public static RelDataType convertRowTypeForIndexScan(DrillScanRel origScan,
-                                                       RexNode indexCondition,
+                                                       IndexableExprMarker idxMarker,
                                                        IndexGroupScan idxScan,
                                                        FunctionalIndexInfo functionInfo) {
     RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
@@ -134,9 +135,6 @@ public class FunctionalIndexHelper {
         typeFactory.createSqlType(SqlTypeName.ANY));
     fields.add(rowkey_primary);
 
-    //then add indexed cols
-    IndexableExprMarker idxMarker = new IndexableExprMarker(origScan);
-    indexCondition.accept(idxMarker);
     Map<RexNode, LogicalExpression> idxExprMap = idxMarker.getIndexableExpression();
 
     for (LogicalExpression indexedExpr : idxExprMap.values()) {

@@ -24,6 +24,7 @@ import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.DrillSortRel;
 
+import java.util.List;
 import java.util.Set;
 
 public class IndexPlanCallContext {
@@ -35,6 +36,9 @@ public class IndexPlanCallContext {
   final public DrillScanRel scan;
 
   public Set<LogicalExpression> leftOutPathsInFunctions;
+
+  public IndexableExprMarker origMarker;
+  public List<LogicalExpression> sortExprs;
 
   IndexPlanCallContext(RelOptRuleCall call,
                        DrillProjectRel capProject,

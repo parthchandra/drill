@@ -108,7 +108,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
     RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(
-        origScan, indexCondition, indexGroupScan, functionInfo);
+        origScan, indexContext.origMarker, indexGroupScan, functionInfo);
 
     DrillDistributionTrait partition = IndexPlanUtils.scanIsPartition(origScan.getGroupScan())?
         DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
@@ -221,7 +221,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
 
       //build collation in project
-      collation = IndexPlanUtils.buildCollationLowerProject(leftProjectExprs, dbScan, functionInfo);
+      collation = IndexPlanUtils.buildCollationProject(leftProjectExprs, null, dbScan, functionInfo, indexContext);
 
       final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(),
           collation != null ? dbScan.getTraitSet().plus(collation) : dbScan.getTraitSet(),
@@ -290,11 +290,11 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         newCollation = ProjectPrule.convertRelCollation(collationAdded, collationMap);
       }
       else {
-        RelCollation inputCollation = newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-        newCollation = IndexPlanUtils.buildCollationUpperProject(upperProject.getProjects(), inputCollation, functionInfo, null);
+        newCollation = IndexPlanUtils.buildCollationProject(upperProject.getProjects(), origProject, origScan,
+            functionInfo, indexContext);
       }
       ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
-          (newCollation==null?upperProject.getTraitSet() : upperProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
+          (newCollation==null?upperProject.getTraitSet().plus(Prel.DRILL_PHYSICAL) : upperProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
           newRel, upperProject.getProjects(), upperProject.getRowType());
       newRel = cap;
     }

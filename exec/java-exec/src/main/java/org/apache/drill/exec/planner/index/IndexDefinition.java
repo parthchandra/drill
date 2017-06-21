@@ -95,6 +95,6 @@ public interface IndexDefinition {
 
   RelCollation getCollation();
 
-  Map<SchemaPath, RelFieldCollation> getCollationMap();
+  Map<LogicalExpression, RelFieldCollation> getCollationMap();
 
 }
