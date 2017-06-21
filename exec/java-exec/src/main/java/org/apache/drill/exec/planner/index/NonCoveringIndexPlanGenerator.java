@@ -28,6 +28,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.JoinControl;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
@@ -163,6 +164,11 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       logger.error("Null restricted groupscan in NonCoveringIndexPlanGenerator.convertChild");
       return null;
     }
+    // Set left side (restricted scan) row count as rows returned from right side (index scan)
+    DrillScanRel rightIdxRel = new DrillScanRel(origScan.getCluster(), origScan.getTraitSet(),
+        origScan.getTable(), origScan.getRowType(), origScan.getColumns());
+    double rightIdxRowCount = indexGroupScan.getRowCount(indexCondition, rightIdxRel);
+    restrictedGroupScan.setRowCount(null, rightIdxRowCount, rightIdxRowCount);
 
     RelTraitSet origScanTraitSet = origScan.getTraitSet();
     RelTraitSet restrictedScanTraitSet = origScanTraitSet.plus(Prel.DRILL_PHYSICAL);

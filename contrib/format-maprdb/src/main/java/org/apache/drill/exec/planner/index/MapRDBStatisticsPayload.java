@@ -17,23 +17,33 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import org.apache.calcite.rex.RexNode;
-import org.apache.drill.exec.planner.logical.DrillScanRel;
+public class MapRDBStatisticsPayload implements StatisticsPayload {
 
-public interface Statistics {
+  final double rowCount;
 
-  double ROWCOUNT_UNKNOWN = -1;
-  //HUGE is same as DrillCostBase.HUGE
-  double ROWCOUNT_HUGE = Double.MAX_VALUE;
-  double AVG_ROWSIZE_UNKNOWN = -1;
+  final double avgRowSize;
 
-  /** Returns the statistics given the specified filter condition
-   *  @param condition - Filter specified as a {@link RexNode}
-   *  @param scanRel - The current scan rel
-   */
-  double getRowCount(RexNode condition, DrillScanRel scanRel, boolean isIndexScan);
+  public MapRDBStatisticsPayload(double rowCount, double avgRowSize) {
+    this.rowCount = rowCount;
+    this.avgRowSize = avgRowSize;
+  }
 
-  double getAvgRowSize(RexNode condition, DrillScanRel scanRel, boolean isIndexScan);
+  @Override
+  public String toString() {
+    return "MapRDBStatisticsPayload{" +
+        "rowCount=" + rowCount +
+        ", avgRowSize=" + avgRowSize +
+        '}';
+  }
 
-  boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context);
+  @Override
+  public double getRowCount() {
+    return rowCount;
+  }
+
+  @Override
+  public double getAvgRowSize() {
+    return avgRowSize;
+  }
+
 }

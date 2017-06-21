@@ -221,7 +221,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
 
   @Override
   public double getRowCount(RexNode condition, DrillScanRel scanRel) {
-    throw new UnsupportedOperationException("getRowCount() not implemented for BinaryTableGroupScan");
+    return Statistics.ROWCOUNT_UNKNOWN;
   }
 
   @Override
