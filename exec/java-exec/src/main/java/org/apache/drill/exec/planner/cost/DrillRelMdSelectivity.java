@@ -62,7 +62,7 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
   }
 
   private Double getSelectivity(DrillScanRel rel, RexNode predicate) {
-    double ROWCOUNT_UNKNOWN = -1;
+    double ROWCOUNT_UNKNOWN = -1.0;
     PlannerSettings settings = PrelUtil.getPlannerSettings(rel.getCluster().getPlanner());
     GroupScan scan = rel.getGroupScan();
     if (!settings.isDisableScanStatistics()
@@ -70,7 +70,7 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
       double filterRows = ((DbGroupScan) scan).getRowCount(predicate, rel);
       double totalRows = ((DbGroupScan) scan).getRowCount(null, rel);
       if (filterRows != ROWCOUNT_UNKNOWN &&
-          totalRows != ROWCOUNT_UNKNOWN && totalRows != 0) {
+          totalRows != ROWCOUNT_UNKNOWN && totalRows > 0) {
         return filterRows/totalRows;
       }
     }

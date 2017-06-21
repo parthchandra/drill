@@ -57,13 +57,14 @@ import java.util.Map;
 public class MapRDBStatistics implements Statistics {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBStatistics.class);
   double tableCostPrefFactor = 1.0;
+  double rowKeyJoinBackIOFactor = 1.0;
   /*
    * The computed statistics are cached in <statsCache> so that any subsequent calls are returned
    * from the cache. The <statsCache> is a map of <RexNode, Rowcount>. The <RexNode> does not have
    * a comparator so it is converted to a String for serving as a Map key. This may result in
    * logically equivalent conditions considered differently e.g. sal<10 OR sal>100, sal>100 OR sal<10
    */
-  private Map<String, Double> statsCache;
+  private Map<String, StatisticsPayload> statsCache;
   /*
    * The mapping between <QueryCondition> and <RexNode> is kept in <conditionRexNodeMap>. This mapping
    * is useful to obtain rowCount for condition specified as <QueryCondition> required during physical
@@ -81,26 +82,50 @@ public class MapRDBStatistics implements Statistics {
     return tableCostPrefFactor;
   }
 
+  public double getRowKeyJoinBackIOFactor() {
+    return rowKeyJoinBackIOFactor;
+  }
+
   @Override
   public double getRowCount(RexNode condition, DrillScanRel scanRel, boolean isTableScan) {
     double costFactor = 1.0;
-    PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
     if (isTableScan) {
       costFactor = tableCostPrefFactor;
     }
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
       if (condition == null) {
         if (statsCache.get(null)!= null) {
-          return costFactor * statsCache.get(null);
+          return costFactor * statsCache.get(null).getRowCount();
         }
       } else {
         String conditionAsStr = convertRexToString(condition, scanRel);
         if (statsCache.get(conditionAsStr) != null) {
-          return costFactor * statsCache.get(conditionAsStr);
+          return costFactor * statsCache.get(conditionAsStr).getRowCount();
         }
       }
     }
     return ROWCOUNT_UNKNOWN;
+  }
+
+  @Override
+  public double getAvgRowSize(RexNode condition, DrillScanRel scanRel, boolean isTableScan) {
+    if (scanRel.getGroupScan() instanceof DbGroupScan) {
+      if (condition == null) {
+        if (isTableScan) {
+          if (statsCache.get(null) != null) {
+            return statsCache.get(null).getAvgRowSize();
+          }
+        } else {
+          return computeIdxRowSizeForNullCondition();
+        }
+      } else {
+        String conditionAsStr = convertRexToString(condition, scanRel);
+        if (statsCache.get(conditionAsStr) != null) {
+          return statsCache.get(conditionAsStr).getAvgRowSize();
+        }
+      }
+    }
+    return AVG_ROWSIZE_UNKNOWN;
   }
 
   /** Returns the number of rows satisfying the given FILTER condition
@@ -118,53 +143,101 @@ public class MapRDBStatistics implements Statistics {
     if (condition != null
         && conditionRexNodeMap.get(condition.toString()) != null) {
       String rexConditionAsString = conditionRexNodeMap.get(condition.toString());
-      if (statsCache.get(rexConditionAsString) != null) {
-        return costFactor * statsCache.get(rexConditionAsString);
+      StatisticsPayload payload = statsCache.get(rexConditionAsString);
+      if (payload != null) {
+        return costFactor * payload.getRowCount();
       }
     } else if (condition == null
         // We have full table rows mapping i.e. <NULL> QueryCondition, <NULL> RexNode pair
         && conditionRexNodeMap.get(condition) == null) {
-      if (statsCache.get(null) != null) {
-        return costFactor * statsCache.get(null);
+      StatisticsPayload ftsPayload = statsCache.get(null);
+      if (ftsPayload != null) {
+        return costFactor * ftsPayload.getRowCount();
       }
     }
     return ROWCOUNT_UNKNOWN;
   }
 
+  public double getAvgRowSize(QueryCondition condition, boolean isTableScan) {
+    if (condition == null) {
+      if (isTableScan) {
+        if (// We have full table rows mapping i.e. <NULL> QueryCondition, <NULL> RexNode pair
+            conditionRexNodeMap.get(condition) == null) {
+          StatisticsPayload ftsPayload = statsCache.get(null);
+          if (ftsPayload != null) {
+            return ftsPayload.getAvgRowSize();
+          }
+        }
+      } else {
+        return computeIdxRowSizeForNullCondition();
+      }
+    } else {
+      if (condition != null
+          && conditionRexNodeMap.get(condition.toString()) != null) {
+        String rexConditionAsString = conditionRexNodeMap.get(condition.toString());
+        StatisticsPayload payload = statsCache.get(rexConditionAsString);
+        if (payload != null) {
+          return payload.getAvgRowSize();
+        }
+      }
+    }
+    return AVG_ROWSIZE_UNKNOWN;
+  }
+
+  private double computeIdxRowSizeForNullCondition() {
+    // NULL condition on index - Estimate rowsize as the max row size among
+    // all indexes in the cache. Cap at table row size
+    double maxIndexRowSize = AVG_ROWSIZE_UNKNOWN;
+    if (statsCache != null) {
+      for (String queryCondition : statsCache.keySet()) {
+        //Skip NULL query condition which corresponds to FTS. Only consider IDXs here!
+        if (queryCondition != null) {
+          StatisticsPayload payload = statsCache.get(queryCondition);
+          if (payload != null && payload.getAvgRowSize() > maxIndexRowSize) {
+            maxIndexRowSize = payload.getAvgRowSize();
+          }
+        }
+      }
+      if (// We have full table rows mapping i.e. <NULL> QueryCondition, <NULL> RexNode pair
+          conditionRexNodeMap.get(null) == null) {
+        StatisticsPayload ftsPayload = statsCache.get(null);
+        if (maxIndexRowSize != AVG_ROWSIZE_UNKNOWN && ftsPayload != null) {
+          return Math.min(maxIndexRowSize, ftsPayload.getAvgRowSize());
+        }
+      }
+    }
+    return AVG_ROWSIZE_UNKNOWN;
+  }
   public boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context) {
     GroupScan scan;
     PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
     tableCostPrefFactor = settings.getTableCostPrefFactor();
+    rowKeyJoinBackIOFactor = settings.getRowKeyJoinBackIOCostFactor();
     if (!settings.isDisableScanStatistics()
       && scanRel.getGroupScan() instanceof DbGroupScan) {
       String conditionAsStr = convertRexToString(condition, scanRel);
       scan = scanRel.getGroupScan();
       if (statsCache.get(conditionAsStr) == null) {
         IndexCollection indexes = ((DbGroupScan)scan).getSecondaryIndexCollection(scanRel);
-        populateRowCount(condition, indexes, scanRel, context);
+        populateStats(condition, indexes, scanRel, context);
         return true;
       }
     }
     return false;
   }
 
-  private double populateRowCount(RexNode condition, IndexCollection indexes, DrillScanRel scanRel,
-                                  IndexPlanCallContext context) {
+  private void populateStats(RexNode condition, IndexCollection indexes, DrillScanRel scanRel,
+                               IndexPlanCallContext context) {
     JsonTableGroupScan jTabGrpScan;
-    double totalRows;
     Map<IndexDescriptor, IndexConditionInfo> leadingKeyIdxConditionMap;
     Map<IndexDescriptor, IndexConditionInfo> idxConditionMap;
-    String conditionAsStr = convertRexToString(condition, scanRel);
-
-    if (statsCache.get(conditionAsStr) != null) {
-      return statsCache.get(conditionAsStr);
-    }
 
     IndexCollection keyRepIndexes = rowKeyRepIndexes(indexes);
     if (scanRel.getGroupScan() instanceof JsonTableGroupScan) {
       jTabGrpScan = (JsonTableGroupScan) scanRel.getGroupScan();
     } else {
-      return ROWCOUNT_UNKNOWN;
+      logger.debug("populateStats exit early - not an instance of JsonTableGroupScan!");
+      return;
     }
 
     RexBuilder builder = scanRel.getCluster().getRexBuilder();
@@ -173,8 +246,8 @@ public class MapRDBStatistics implements Statistics {
         keyRepIndexes, builder, scanRel);
     idxConditionMap = infoBuilder.getIndexConditionMap();
     leadingKeyIdxConditionMap = infoBuilder.getLeadingKeyIndexConditionMap();
-    // Get total rows in the table
-    totalRows = jTabGrpScan.getEstimatedRowCount(null, null, scanRel);
+    // Get the stats payload for full table (has total rows in the table)
+    StatisticsPayload ftsPayload = jTabGrpScan.getEstimatedStats(null, null, scanRel);
 
     for (IndexDescriptor idx : leadingKeyIdxConditionMap.keySet()) {
       RexNode idxCondition = leadingKeyIdxConditionMap.get(idx).indexCondition;
@@ -195,10 +268,12 @@ public class MapRDBStatistics implements Statistics {
 
       QueryCondition queryCondition = jTabGrpScan.convertToQueryCondition(
           convertToLogicalExpression(preProcIdxCondition, newRowType, settings, builder));
-      // Cap rows at total rows in case of issues with DB APIs
-      double rowCount = Math.min(jTabGrpScan.getEstimatedRowCount(queryCondition, idx, scanRel),
-          totalRows);
-      addToCache(idxCondition, idx, context, rowCount, jTabGrpScan, scanRel, newRowType);
+      // Cap rows/size at total rows in case of issues with DB APIs
+      StatisticsPayload idxPayload = jTabGrpScan.getEstimatedStats(queryCondition, idx, scanRel);
+      double rowCount = Math.min(idxPayload.getRowCount(), ftsPayload.getRowCount());
+      double avgRowSize = Math.min(idxPayload.getAvgRowSize(), ftsPayload.getAvgRowSize());
+      addToCache(idxCondition, idx, context, new MapRDBStatisticsPayload(rowCount, avgRowSize),
+          jTabGrpScan, scanRel, newRowType);
     }
     /* Add the row count for index conditions on all indexes. Stats are only computed for leading
      * keys but index conditions can be pushed and would be required for access path costing
@@ -220,37 +295,43 @@ public class MapRDBStatistics implements Statistics {
       } else {
         newRowType = scanRel.getRowType();
       }
-      double rowCount = totalRows * computeSelectivity(idxCondition, totalRows, scanRel);
-      addToCache(idxCondition, idx, context, rowCount, jTabGrpScan, scanRel, newRowType);
+      double rowCount = ftsPayload.getRowCount() * computeSelectivity(idxCondition,
+          ftsPayload.getRowCount(), scanRel);
+      double avgRowSize = computeRowSize(idxCondition, ftsPayload.getAvgRowSize(), scanRel);
+      addToCache(idxCondition, idx, context, new MapRDBStatisticsPayload(rowCount, avgRowSize),
+          jTabGrpScan, scanRel, newRowType);
     }
     // Add the rowCount for non-pushable predicates
     if (idxRemCondition != null) {
-      double rowCount = totalRows * computeSelectivity(idxRemCondition, totalRows, scanRel);
-      addToCache(idxRemCondition, candIdx, context, rowCount, jTabGrpScan, scanRel, newRowType);
+      double rowCount = ftsPayload.getRowCount() * computeSelectivity(idxRemCondition,
+          ftsPayload.getRowCount(), scanRel);
+      addToCache(idxRemCondition, candIdx, context, new MapRDBStatisticsPayload(rowCount, ftsPayload.getAvgRowSize()),
+          jTabGrpScan, scanRel, newRowType);
     }
     // Add the rowCount for the complete condition - based on table
-    double rowCount = totalRows * computeSelectivity(condition, totalRows, scanRel);
-    addToCache(condition, null, null, rowCount, jTabGrpScan, scanRel, scanRel.getRowType());
+    double rowCount = ftsPayload.getRowCount() * computeSelectivity(condition, ftsPayload.getRowCount(), scanRel);
+    addToCache(condition, null, null, new MapRDBStatisticsPayload(rowCount, ftsPayload.getAvgRowSize()),
+        jTabGrpScan, scanRel, scanRel.getRowType());
     // Add the full table rows while we are at it - represented by <NULL> RexNode, <NULL> QueryCondition
-    addToCache(null, null, null, totalRows, jTabGrpScan, scanRel, scanRel.getRowType());
-    return statsCache.get(conditionAsStr);
+    addToCache(null, null, null, new MapRDBStatisticsPayload(ftsPayload.getRowCount(), ftsPayload.getAvgRowSize()),
+        jTabGrpScan, scanRel, scanRel.getRowType());
   }
 
   /*
    * Adds the statistic(row count) to the cache. Also adds the corresponding QueryCondition->RexNode
    * condition mapping.
    */
-  private void addToCache(RexNode condition, IndexDescriptor idx, IndexPlanCallContext context, double rowcount,
-      JsonTableGroupScan jTabGrpScan, DrillScanRel scanRel, RelDataType rowType) {
+  private void addToCache(RexNode condition, IndexDescriptor idx, IndexPlanCallContext context,
+      StatisticsPayload payload, JsonTableGroupScan jTabGrpScan, DrillScanRel scanRel, RelDataType rowType) {
     if (condition != null
         && !condition.isAlwaysTrue()) {
       RexBuilder builder = scanRel.getCluster().getRexBuilder();
       PlannerSettings settings = PrelUtil.getSettings(scanRel.getCluster());
       String conditionAsStr = convertRexToString(condition, scanRel);
       if (statsCache.get(conditionAsStr) == null
-              && rowcount != Statistics.ROWCOUNT_UNKNOWN) {
-        statsCache.put(conditionAsStr, rowcount);
-        logger.debug("StatsCache:<{}, {}>",conditionAsStr, rowcount);
+              && payload.getRowCount() != Statistics.ROWCOUNT_UNKNOWN) {
+        statsCache.put(conditionAsStr, payload);
+        logger.debug("StatsCache:<{}, {}>",conditionAsStr, payload);
         // Always pre-process CAST conditions - Otherwise queryCondition will not be generated correctly
         RexNode preProcIdxCondition = convertToStatsCondition(condition, idx, context, scanRel,
             Arrays.asList(SqlKind.CAST));
@@ -270,8 +351,8 @@ public class MapRDBStatistics implements Statistics {
         logger.debug("QCRNCache: Unable to generate QueryCondition for {}", conditionAsStr);
       }
     } else if (condition == null) {
-      statsCache.put(null, rowcount);
-      logger.debug("StatsCache:<{}, {}>","NULL", rowcount);
+      statsCache.put(null, payload);
+      logger.debug("StatsCache:<{}, {}>","NULL", payload);
       conditionRexNodeMap.put(null, null);
       logger.debug("QCRNCache:<{}, {}>","NULL", "NULL");
     }
@@ -548,7 +629,7 @@ public class MapRDBStatistics implements Statistics {
     double selectivity;
     String conditionAsStr = convertRexToString(condition, scanRel);
     if (statsCache.get(conditionAsStr) != null) {
-      selectivity = statsCache.get(conditionAsStr)/totalRows;
+      selectivity = statsCache.get(conditionAsStr).getRowCount()/totalRows;
       logger.debug("computeSelectivity: Cache HIT: Found {} -> {}", conditionAsStr, selectivity);
       return selectivity;
     } else if (condition.getKind() == SqlKind.AND) {
@@ -569,6 +650,30 @@ public class MapRDBStatistics implements Statistics {
     selectivity = Math.max(0.0, selectivity);
     logger.debug("computeSelectivity: Cache MISS: Computed {} -> {}", conditionAsStr, selectivity);
     return selectivity;
+  }
+
+ /*
+  * Compute the row size of the given rowCondition. Retrieve the row-size for index conditions
+  * from the cache. The row-size is computed as the max of all row-sizes for different conditions.
+  * It is also capped at the table row size.
+  */
+  private double computeRowSize(RexNode condition, double tableRowSize, DrillScanRel scanRel) {
+    double rowSize = 0.0;
+    String conditionAsStr = convertRexToString(condition, scanRel);
+    if (statsCache.get(conditionAsStr) != null) {
+      rowSize = statsCache.get(conditionAsStr).getAvgRowSize();
+      logger.debug("computeRowSize: Cache HIT: Found {} -> {}", conditionAsStr, rowSize);
+      return rowSize;
+    } else if (condition.getKind() == SqlKind.AND || condition.getKind() == SqlKind.OR) {
+      for(RexNode pred : RelOptUtil.conjunctions(condition)) {
+        rowSize = Math.max(rowSize, computeRowSize(pred, tableRowSize, scanRel));
+      }
+    }
+    // Cap avg row size to be between 0.0 and table row size
+    rowSize = Math.min(tableRowSize, rowSize);
+    rowSize = Math.max(0.0, rowSize);
+    logger.debug("computeRowSize: Cache MISS: Computed {} -> {}", conditionAsStr, rowSize);
+    return rowSize;
   }
 
   /*

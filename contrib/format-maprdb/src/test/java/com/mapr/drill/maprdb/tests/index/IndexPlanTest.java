@@ -46,8 +46,10 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String sliceTargetDefault = "alter session reset `planner.slice_target`";
   private static final String noIndexPlan = "alter session set `planner.enable_index_planning` = false";
   private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
-  private static final String highFTSFactor = "alter session set `planner.fts_cost_factor` = 5000.0";
+  private static final String highFTSFactor = "alter session set `planner.fts_cost_factor` = 1500.0";
   private static final String defaultFTSFactor = "alter session reset `planner.fts_cost_factor`";
+  private static final String lowRowKeyJoinBackIOFactor = "alter session set `planner.rowkey_joinback_io_cost_factor` = 0.1";
+  private static final String defaultRowKeyJoinBackIOFactor = "alter session reset `planner.rowkey_joinback_io_cost_factor`";
 
   /**
    *  A sample row of this 10K table:

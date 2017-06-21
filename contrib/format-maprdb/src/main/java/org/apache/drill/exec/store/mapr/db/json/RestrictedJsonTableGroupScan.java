@@ -32,6 +32,7 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.planner.index.MapRDBStatistics;
+import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
@@ -115,15 +116,29 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
   @Override
   public ScanStats getScanStats() {
     //TODO: ideally here we should use the rowcount from index scan, and multiply a factor of restricted scan
-    int totalColNum = 10;
-    int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
-    long rowCount = (long)(0.001f * tableStats.getNumRows());
     final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
+    double rowCount = Statistics.ROWCOUNT_UNKNOWN;
+    int numColumns = (columns == null || columns.isEmpty()) ?  STAR_COLS: columns.size();
+    // The rowcount should be the same as the build side which was FORCED by putting it in forcedRowCountMap
+    if (forcedRowCountMap.get(scanSpec.getCondition()) != null) {
+      rowCount = forcedRowCountMap.get(scanSpec.getCondition());
+    }
+    // Get the average row size of the primary table
+    double avgRowSize = stats.getAvgRowSize(null, true);
+    if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
+      rowCount = (0.001f * tableStats.getNumRows());
+    }
+    if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
+      avgRowSize = avgColumnSize * numColumns;
+    }
     // restricted scan does random lookups and each row may belong to a different block, with the number
     // of blocks upper bounded by the total num blocks in the primary table
-    double totalBlocksPrimary = Math.ceil((avgColumnSize * numColumns * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
+    double totalBlocksPrimary = Math.ceil((avgRowSize * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
     double numBlocks = Math.min(totalBlocksPrimary, rowCount);
-    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
+    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_RANDOM_READ_COST;
+    // For non-covering plans, the dominating cost would be of the join back. Reduce it using the factor
+    // for biasing towards non-covering plans.
+    diskCost *= stats.getRowKeyJoinBackIOFactor();
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
