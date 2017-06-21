@@ -293,16 +293,9 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
   private CollationContext buildCollationContext(List<LogicalExpression> indexFields,
       List<RelFieldCollation> indexFieldCollations) {
     assert indexFieldCollations.size() <= indexFields.size();
-    Map<SchemaPath, RelFieldCollation> collationMap = Maps.newHashMap();
+    Map<LogicalExpression, RelFieldCollation> collationMap = Maps.newHashMap();
     for (int i = 0; i < indexFieldCollations.size(); i++) {
-      if (indexFields.get(i) instanceof SchemaPath) {
-        SchemaPath p = (SchemaPath)indexFields.get(i);
-        collationMap.put(p, indexFieldCollations.get(i));
-      } else {
-        // currently, only collation maps with SchemaPath as the key is supported
-        collationMap.clear();
-        break;
-      }
+      collationMap.put(indexFields.get(i), indexFieldCollations.get(i));
     }
     CollationContext collationContext = new CollationContext(collationMap, indexFieldCollations);
     return collationContext;

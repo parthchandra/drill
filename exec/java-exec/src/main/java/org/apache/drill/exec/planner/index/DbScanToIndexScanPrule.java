@@ -27,7 +27,9 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.volcano.RelSubset;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -306,21 +308,19 @@ public class DbScanToIndexScanPrule extends Prule {
     DbGroupScan groupScan = (DbGroupScan)scan.getGroupScan();
     return groupScan.getSecondaryIndexCollection(scan);
   }
+
   /**
    *
-   * @param inputRel  the rel node provide input for filter to operate upon
-   * @param indexCondition
+   * @param marker, the marker that has analyzed original index condition on top of original scan
    * @param indexDesc
    * @return If all indexable expressions involved in this condition are in the indexed fields of
    * the single IndexDescriptor, return true
    */
-  static private ConditionIndexed conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
-    return conditionIndexedHelper(inputRel, indexCondition, indexDesc);
+  static private ConditionIndexed conditionIndexed(IndexableExprMarker marker, IndexDescriptor indexDesc) {
+    return conditionIndexedHelper(marker, indexDesc);
   }
 
-  static private ConditionIndexed conditionIndexedHelper(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
-    IndexableExprMarker exprMarker = new IndexableExprMarker(inputRel);
-    indexCondition.accept(exprMarker);
+  static private ConditionIndexed conditionIndexedHelper(IndexableExprMarker exprMarker, IndexDescriptor indexDesc) {
     Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
     List<LogicalExpression> infoCols = Lists.newArrayList();
     infoCols.addAll(mapRexExpr.values());
@@ -358,6 +358,45 @@ public class DbScanToIndexScanPrule extends Prule {
     return prefix;
   }
 
+  /**
+   * generate logical expressions for sort rexNodes in SortRel
+   * @param indexContext
+   */
+  private void updateSortExpression(IndexPlanCallContext indexContext) {
+    if(indexContext.sort == null) {
+      return;
+    }
+
+    DrillParseContext parserContext =
+        new DrillParseContext(PrelUtil.getPlannerSettings(indexContext.call.rel(0).getCluster()));
+
+    indexContext.sortExprs = Lists.newArrayList();
+    for (RelFieldCollation collation : indexContext.sort.getCollation().getFieldCollations()) {
+      int idx = collation.getFieldIndex();
+      DrillProjectRel oneProject;
+      if (indexContext.upperProject != null && indexContext.lowerProject != null) {
+        LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.lowerProject, indexContext.scan,
+            indexContext.upperProject.getProjects().get(idx));
+        indexContext.sortExprs.add(expr);
+      }
+      else {//one project is null now
+        oneProject = (indexContext.upperProject != null)? indexContext.upperProject : indexContext.lowerProject;
+        if(oneProject != null) {
+          LogicalExpression expr = RexToExpression.toDrill(parserContext, null, indexContext.scan,
+              oneProject.getProjects().get(idx));
+          indexContext.sortExprs.add(expr);
+        }
+        else {//two projects are null
+          SchemaPath path;
+          RelDataTypeField f = indexContext.scan.getRowType().getFieldList().get(idx);
+          String pathSeg = f.getName().replaceAll("`", "");
+          final String[] segs = pathSeg.split("\\.");
+          path = SchemaPath.getCompoundPath(segs);
+          indexContext.sortExprs.add(path);
+        }
+      }
+    }
+  }
   /**
    *
    */
@@ -404,6 +443,12 @@ public class DbScanToIndexScanPrule extends Prule {
     List<IndexDescriptor> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
 
+    IndexableExprMarker indexableExprMarker = new IndexableExprMarker(indexContext.scan);
+    indexCondition.accept(indexableExprMarker);
+    indexContext.origMarker = indexableExprMarker;
+
+    updateSortExpression(indexContext);
+
     if (settings.isCostBasedIndexSelectionEnabled()) {
       IndexSelector selector = new IndexSelector(indexCondition,
           indexContext,
@@ -412,7 +457,7 @@ public class DbScanToIndexScanPrule extends Prule {
           totalRows);
 
       for (IndexDescriptor indexDesc : collection) {
-        if (conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE) {
+        if (conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
               indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
@@ -424,7 +469,7 @@ public class DbScanToIndexScanPrule extends Prule {
     } else {
       // get the list of covering and non-covering indexes for this collection
       for (IndexDescriptor indexDesc : collection) {
-        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE &&
+        if(conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE &&
             isConditionPrefix(indexDesc, indexCondition, infoBuilder)) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           if (isCoveringIndex(indexContext, functionInfo)) {

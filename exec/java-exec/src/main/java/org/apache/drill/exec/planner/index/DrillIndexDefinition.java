@@ -249,7 +249,7 @@ public class DrillIndexDefinition implements IndexDefinition {
 
   @Override
   @JsonIgnore
-  public Map<SchemaPath, RelFieldCollation> getCollationMap() {
+  public Map<LogicalExpression, RelFieldCollation> getCollationMap() {
     return indexCollationContext.collationMap;
   }
 

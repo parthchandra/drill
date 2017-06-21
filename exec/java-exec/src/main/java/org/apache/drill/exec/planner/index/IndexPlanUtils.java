@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -40,6 +41,7 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
+import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.Prel;
@@ -52,6 +54,7 @@ import org.apache.calcite.rex.RexNode;
 
 public class IndexPlanUtils {
 
+
   /**
    * Build collation property for the 'lower' project, the one closer to the Scan
    * @param projectRexs
@@ -59,108 +62,74 @@ public class IndexPlanUtils {
    * @param indexInfo
    * @return the output RelCollation
    */
-  public static RelCollation buildCollationLowerProject(List<RexNode> projectRexs, RelNode input, FunctionalIndexInfo indexInfo) {
-    //if leading fields of index are here, add them to RelCollation
-    List<RelFieldCollation> newFields = Lists.newArrayList();
-    if (!indexInfo.hasFunctional()) {
-      Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
-      DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
-      int idx=0;
-      for(RexNode rex : projectRexs) {
-        projectExprs.put(DrillOptiq.toDrill(parserContext, input, rex), idx);
-        idx++;
-      }
-      int idxFieldCount = 0;
-      for (LogicalExpression expr : indexInfo.getIndexDesc().getIndexColumns()) {
-        if (!projectExprs.containsKey(expr)) {
-          break;
-        }
-        RelFieldCollation.Direction dir = indexInfo.getIndexDesc().getCollation().getFieldCollations().get(idxFieldCount).direction;
-        if ( dir == null) {
-          break;
-        }
-        newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
-            RelFieldCollation.NullDirection.UNSPECIFIED));
-      }
-      idxFieldCount++;
-    } else {
-      // TODO: handle functional index
-    }
-
-    return RelCollations.of(newFields);
-  }
 
   /**
-   * Build collation property for the 'upper' project, the one above the filter
+   * Build collation property for project, the one closer to the Scan
    * @param projectRexs
+   * @param project, the project between projectRexs and input, it could be null if no such intermediate project(lower project)
    * @param input
    * @param indexInfo
-   * @param collationFilterMap
+   * @param context
    * @return the output RelCollation
    */
-  public static RelCollation buildCollationUpperProject(List<RexNode> projectRexs,
-      RelCollation inputCollation, FunctionalIndexInfo indexInfo,
-      Map<Integer, List<RexNode>> collationFilterMap) {
-    List<RelFieldCollation> outputFieldCollations = Lists.newArrayList();
+  public static RelCollation buildCollationProject(List<RexNode> projectRexs,
+                                                   DrillProjectRel project,
+                                                   RelNode input,
+                                                   FunctionalIndexInfo indexInfo,
+                                                   IndexPlanCallContext context) {
+    final Set<LogicalExpression> onlyInEquality = context.origMarker.getExpressionsOnlyInEquality();
+    final List<LogicalExpression> sortExpressions = context.sortExprs;
+    //if leading fields of index are here, add them to RelCollation
+    List<RelFieldCollation> newFields = Lists.newArrayList();
 
-    if (inputCollation != null) {
-      List<RelFieldCollation> inputFieldCollations = inputCollation.getFieldCollations();
-      if (!indexInfo.hasFunctional()) {
-        for (int projectExprIdx = 0; projectExprIdx < projectRexs.size(); projectExprIdx++) {
-          RexNode n = projectRexs.get(projectExprIdx);
-          if (n instanceof RexInputRef) {
-            RexInputRef ref = (RexInputRef)n;
-            boolean eligibleForCollation = true;
-            int maxIndex = getIndexFromCollation(ref.getIndex(), inputFieldCollations);
-            if (maxIndex < 0) {
-              eligibleForCollation = false;
-              continue;
-            }
-            // check if the prefix has equality conditions
-            for (int i = 0; i < maxIndex; i++) {
-              int fieldIdx = inputFieldCollations.get(i).getFieldIndex();
-              List<RexNode> conditions = collationFilterMap != null ? collationFilterMap.get(fieldIdx) : null;
-              if ((conditions == null || conditions.size() == 0) &&
-                  i < maxIndex-1) {
-                // if an intermediate column has no filter condition, it would select all values
-                // of that column, so a subsequent column cannot be eligible for collation
-                eligibleForCollation = false;
-                break;
-              } else {
-                for (RexNode r : conditions) {
-                  if (!(r.getKind() == SqlKind.EQUALS)) {
-                    eligibleForCollation = false;
-                    break;
-                  }
-                }
-              }
-            }
-            // for every projected expr, if it is eligible for collation, get the
-            // corresponding field collation from the input
-            if (eligibleForCollation) {
-              for (RelFieldCollation c : inputFieldCollations) {
-                if (ref.getIndex() == c.getFieldIndex()) {
-                  RelFieldCollation outFieldCollation = new RelFieldCollation(projectExprIdx, c.getDirection(), c.nullDirection);
-                  outputFieldCollations.add(outFieldCollation);
-                }
-              }
-            }
-          }
+    if (sortExpressions == null) {
+      return RelCollations.of(newFields);
+    }
+
+    Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
+    DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
+    int idx=0;
+    for(RexNode rex : projectRexs) {
+      LogicalExpression expr;
+      expr = RexToExpression.toDrill(parserContext, project, input, rex);
+      projectExprs.put(expr, idx);
+      idx++;
+    }
+
+    int idxFieldCount = 0;
+    //go through indexed fields to build collation
+    // break out of the loop when found first indexed field [not projected && not _only_ in equality condition of filter]
+    // or the leading field is not projected
+    for (LogicalExpression expr : indexInfo.getIndexDesc().getIndexColumns()) {
+
+      if (!projectExprs.containsKey(expr)) {
+        //leading indexed field is not projected
+        //but it is only-in-equality field, -- we continue to next indexed field, but we don't generate collation for this field
+        if(onlyInEquality.contains(expr)) {
+          continue;
         }
-      } else {
-        // TODO: handle functional index
+        //else no more collation is needed to be generated, since we now have one leading field which is not in equality condition
+        break;
       }
-    }
-    return RelCollations.of(outputFieldCollations);
-  }
 
-  public static int getIndexFromCollation(int refIndex, List<RelFieldCollation> inputFieldCollations) {
-    for (int i=0; i < inputFieldCollations.size(); i++) {
-      if (refIndex == inputFieldCollations.get(i).getFieldIndex()) {
-        return i;
+      // leading indexed field is projected,
+
+      // if this field is not in sort expression && only-in-equality, we don't need to generate collation for this field
+      // and we are okay to continue: generate collation for next indexed field.
+      if (!sortExpressions.contains(expr) && onlyInEquality.contains(expr) ) {
+        continue;
       }
+
+      RelFieldCollation.Direction dir = indexInfo.getIndexDesc().getCollation().getFieldCollations().get(idxFieldCount).direction;
+      if ( dir == null) {
+        break;
+      }
+      newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
+          RelFieldCollation.NullDirection.UNSPECIFIED));
     }
-    return -1;
+    idxFieldCount++;
+
+    return RelCollations.of(newFields);
   }
 
   // TODO: proper implementation
@@ -182,7 +151,7 @@ public class IndexPlanUtils {
     // The collationMap has SchemaPath as key.  This works fine for top level JSON fields.  For
     // nested JSON fields e.g a.b.c, the Project above the Scan will create an ITEM expr to produce
     // the field, so the RelCollation property has to be build separately for that Project.
-    final Map<SchemaPath, RelFieldCollation> collationMap = indexDesc.getCollationMap();
+    final Map<LogicalExpression, RelFieldCollation> collationMap = indexDesc.getCollationMap();
 
     assert collationMap != null : "Invalid collation map for index";
 
@@ -208,7 +177,7 @@ public class IndexPlanUtils {
 
     final List<RelDataTypeField> indexFields = indexScanRowType.getFieldList();
     final List<RelDataTypeField> rsFields = restrictedScanRowType.getFieldList();
-    final Map<SchemaPath, RelFieldCollation> collationMap = indexDesc.getCollationMap();
+    final Map<LogicalExpression, RelFieldCollation> collationMap = indexDesc.getCollationMap();
 
     assert collationMap != null : "Invalid collation map for index";
 

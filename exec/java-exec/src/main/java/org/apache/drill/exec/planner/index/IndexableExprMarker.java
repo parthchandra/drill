@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexCorrelVariable;
@@ -40,6 +41,7 @@ import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The filter expressions that could be helped by index, and thus could be indexed
@@ -59,6 +61,12 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
 
   //map of rexNode->converted LogicalExpression
   final Map<RexNode, LogicalExpression> desiredExpressions = Maps.newHashMap();
+
+  //the expressions in equality comparison
+  final Map<RexNode, LogicalExpression> equalityExpressions = Maps.newHashMap();
+
+  //the expression found in non-equality comparison
+  final Map<RexNode, LogicalExpression> notInEquality = Maps.newHashMap();
 
   //for =(cast(a.b as VARCHAR(len)), 'abcd'), if the 'len' is less than the max length of casted field on index table,
   // we want to rewrite it to LIKE(cast(a.b as VARCHAR(len)), 'abcd%')
@@ -88,15 +96,32 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
     return ImmutableMap.copyOf(equalOnCastChar);
   }
 
+  public Set<LogicalExpression> getExpressionsOnlyInEquality() {
+    Set<LogicalExpression> onlyInEquality = Sets.newHashSet();
+    Set<LogicalExpression> notInEqSet = Sets.newHashSet();
+    notInEqSet.addAll(notInEquality.values());
+    for (LogicalExpression expr : equalityExpressions.values()) {
+      if (!notInEqSet.contains(expr)) {
+        onlyInEquality.add(expr);
+      }
+    }
+    return onlyInEquality;
+  }
+
   @Override
   public Boolean visitInputRef(RexInputRef rexInputRef) {
     return directCompareOp;
   }
 
   public boolean containInputRef(RexNode rex) {
+    if (rex instanceof RexInputRef) {
+      return true;
+    }
+    if ((rex instanceof RexCall) && "ITEM".equals(((RexCall)rex).getOperator().getName())) {
+      return true;
+    }
     //TODO: use a visitor search recursively for inputRef, if found one return true
     return false;
-
   }
 
   public boolean operandsAreIndexable(RexCall call) {
@@ -109,6 +134,8 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
 
     int inputReference = 0;
     for (RexNode operand : call.operands) {
+      //if for this operator, there are two operands and more have inputRef, which means it is something like:
+      // a.b = a.c, instead of a.b ='hello', so this cannot apply index
       if (containInputRef(operand)) {
         inputReference++;
         if(inputReference>=2) {
@@ -129,13 +156,20 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
         directCompareOp = false;
         contextCall = null;
         if (markIt) {
-          desiredExpressions.put(operand, DrillOptiq.toDrill(parserContext, inputRel, operand));
+          LogicalExpression expr = DrillOptiq.toDrill(parserContext, inputRel, operand);
+          desiredExpressions.put(operand, expr);
+          if (call.getKind() == SqlKind.EQUALS) {
+            equalityExpressions.put(operand, expr);
+          }
+          else {
+            notInEquality.put(operand, expr);
+          }
         }
       }
       return false;
     }
 
-    //now we are handling call directly under comparison
+    //now we are handling a call directly under comparison e.g. <([call], literal)
     if (directCompareOp) {
       // if it is an item, or CAST function
       if ("ITEM".equals(call.getOperator().getName())) {
@@ -165,9 +199,9 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
     for (RexNode operand : call.operands) {
       boolean bret = operand.accept(this);
     }
-
     return false;
   }
+
   public Boolean visitLocalRef(RexLocalRef localRef) {
     return false;
   }

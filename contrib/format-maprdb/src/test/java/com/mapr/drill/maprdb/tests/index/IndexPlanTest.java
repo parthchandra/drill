@@ -85,7 +85,7 @@ public class IndexPlanTest extends BaseJsonTest {
             "personal.income", "",
             "driverlicense", "",
             "$CAST(id.ssn@INT)", "contact.phone",
-            "$CAST(driverlicense@STRING)","",
+            "$CAST(driverlicense@STRING)","contact.email",
             "address.state,personal.age,driverlicense", "name.fname"
         };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
@@ -493,13 +493,13 @@ public class IndexPlanTest extends BaseJsonTest {
     );
 
     System.out.println("TestCastVarchar_ConvertToRangePlan Verified!");
-/*//uncomment this when DB team fix the crash issue
+
     testBuilder()
         .sqlQuery(query)
         .ordered()
         .baselineColumns("ssn").baselineValues("100007423")
         .go();
-*/
+
     test(defaultFTSFactor);
     return;
   }
@@ -687,6 +687,67 @@ public class IndexPlanTest extends BaseJsonTest {
       .sqlBaselineQuery(query)
       .build()
       .run();
+  }
+
+  @Test  //ORDER BY last two columns not in the indexed order; Sort SHOULD NOT be dropped
+  public void TestCoveringPlanSortPrefix_3() throws Exception {
+    String query = "SELECT CAST(t.personal.age as VARCHAR) as age, t.driverlicense FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.driverlicense < 100008000 order by t.driverlicense, t.personal.age";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .optionSettingQueriesForBaseline(noIndexPlan)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+  }
+
+  @Test  // last two index fields in non-Equality conditions, ORDER BY last two fields; Sort SHOULD be dropped
+  public void TestCoveringPlanSortPrefix_4() throws Exception {
+    String query = "SELECT t._id as tid, t.driverlicense, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.driverlicense < 100008000 order by t.personal.age, t.driverlicense";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .optionSettingQueriesForBaseline(noIndexPlan)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+  }
+
+  @Test
+  public void orderByCastCoveringPlan() throws Exception {
+    String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        " where CAST(t.id.ssn as INT) < 100000003 order by CAST(t.id.ssn as INT)";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("phone").baselineValues("6500008069")
+        .baselineColumns("phone").baselineValues("6500001411")
+        .baselineColumns("phone").baselineValues("6500001595")
+        .go();
   }
 
 }

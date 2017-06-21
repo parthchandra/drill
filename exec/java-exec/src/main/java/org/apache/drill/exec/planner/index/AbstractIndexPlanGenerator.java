@@ -20,48 +20,34 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 
 import org.apache.calcite.plan.RelTrait;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
-import org.apache.calcite.rel.RelCollations;
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.FieldReference;
-import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
-import org.apache.drill.exec.physical.base.GroupScan;
-import org.apache.drill.exec.physical.base.IndexGroupScan;
-import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
-import org.apache.drill.exec.planner.logical.DrillOptiq;
-import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.DrillSortRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
-import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.Prule;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.exec.planner.physical.SingleMergeExchangePrel;
 import org.apache.drill.exec.planner.physical.SortPrel;
@@ -166,31 +152,6 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     return convertedRight;
   }
 
-  /**
-   * For IndexScan in non-covering case, rowType to return contains only row_key('_id') of primary table.
-   * so the rowType for IndexScan should be converted from [Primary_table.row_key, primary_table.indexed_col]
-   * to [indexTable.row_key(primary_table.indexed_col), indexTable.<primary_key.row_key> (Primary_table.row_key)]
-   * This will impact the columns of scan, the rowType of ScanRel
-   *
-   * @param origScan
-   * @param indexCondition
-   * @param idxScan
-   * @return
-   */
-  public static RelDataType convertRowTypeForIndexScan(DrillScanRel origScan,
-                                                       RexNode indexCondition,
-                                                       IndexGroupScan idxScan,
-                                                       FunctionalIndexInfo functionInfo) {
-    return FunctionalIndexHelper.convertRowTypeForIndexScan(origScan, indexCondition, idxScan, functionInfo);
-  }
-
-  protected RexNode convertConditionForIndexScan(RexNode idxCondition,
-                                                 RelDataType idxRowType,
-                                                 FunctionalIndexInfo functionInfo) {
-    return FunctionalIndexHelper.convertConditionForIndexScan(idxCondition, origScan, idxRowType,
-        builder, functionInfo);
-  }
-
   public RelTraitSet newTraitSet(RelTrait... traits) {
     RelTraitSet set = indexContext.call.getPlanner().emptyTraitSet();
     for (RelTrait t : traits) {
@@ -198,7 +159,6 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
     }
     return set;
   }
-
 
   protected boolean toRemoveSort(DrillSortRel sort, RelCollation inputCollation) {
     if ( (inputCollation != null) && inputCollation.satisfies(sort.getCollation())) {

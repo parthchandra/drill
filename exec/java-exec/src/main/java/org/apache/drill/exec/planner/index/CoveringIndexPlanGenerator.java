@@ -92,7 +92,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
   /**
-   *A RexNode forest with two RexNode for expressions "cast(a.q as int) * 2, b+c, concat(a.q, " world")"
+   *A RexNode forest with three RexNodes for expressions "cast(a.q as int) * 2, b+c, concat(a.q, " world")"
    * on Scan RowType('a', 'b', 'c') will be like this:
    *
    *          (0)Call:"*"                                       Call:"concat"
@@ -178,16 +178,14 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     // build collation for filter
     RelTraitSet indexFilterTraitSet = indexScanPrel.getTraitSet();
-    Map<Integer, List<RexNode>> collationFilterMap = null;
-    FindFiltersForCollation finder = new FindFiltersForCollation(indexScanPrel);
-    collationFilterMap = finder.analyze(indexCondition);
 
     FilterPrel indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexFilterTraitSet,
         indexScanPrel, newIndexCondition);
 
     ProjectPrel indexProjectPrel = null;
     if (origProject != null) {
-      RelCollation collation = IndexPlanUtils.buildCollationLowerProject(origProject.getProjects(), indexScanPrel, functionInfo);
+      RelCollation collation = IndexPlanUtils.buildCollationProject(origProject.getProjects(), null, origScan, functionInfo,
+          indexContext);
       indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexFilterTraitSet.plus(collation),
           indexFilterPrel, origProject.getProjects(), origProject.getRowType());
     }
@@ -206,9 +204,9 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     if ( upperProject != null) {
-      RelCollation inputCollation = finalRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
       RelCollation newCollation =
-          IndexPlanUtils.buildCollationUpperProject(upperProject.getProjects(), inputCollation, functionInfo, collationFilterMap);
+          IndexPlanUtils.buildCollationProject(upperProject.getProjects(), origProject,
+              origScan, functionInfo, indexContext);
 
       ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
           newCollation==null?finalRel.getTraitSet() : finalRel.getTraitSet().plus(newCollation),
@@ -229,7 +227,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
           newProjects.add(newRex);
         }
 
-        ProjectPrel rewrittenProject = new ProjectPrel(newProject.getCluster(), newProject.getTraitSet(),
+        ProjectPrel rewrittenProject = new ProjectPrel(newProject.getCluster(),
+            newCollation==null? newProject.getTraitSet() : newProject.getTraitSet().plus(newCollation),
             indexFilterPrel, newProjects, newProject.getRowType());
 
         cap = rewrittenProject;

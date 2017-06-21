@@ -18,6 +18,7 @@
 package org.apache.drill.exec.planner.index;
 
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.List;
@@ -25,10 +26,10 @@ import java.util.Map;
 
 public class CollationContext {
 
-  public final Map<SchemaPath, RelFieldCollation> collationMap ;
+  public final Map<LogicalExpression, RelFieldCollation> collationMap ;
   public final List<RelFieldCollation> relFieldCollations;
 
-  public CollationContext(Map<SchemaPath, RelFieldCollation> collationMap,
+  public CollationContext(Map<LogicalExpression, RelFieldCollation> collationMap,
       List<RelFieldCollation> relFieldCollations) {
     this.collationMap = collationMap;
     this.relFieldCollations = relFieldCollations;
