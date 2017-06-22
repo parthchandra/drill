@@ -111,7 +111,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
    */
   private class DecodePathinExpr extends CloneVisitor {
     Set<SchemaPath> schemaPathSet = Sets.newHashSet();
-    
+
     public List<LogicalExpression> parseExpressions(Collection<LogicalExpression> expressions) {
       for(LogicalExpression expr : expressions) {
         expr.accept(this, null);
@@ -135,12 +135,13 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
     DrillCostFactory costFactory = (DrillCostFactory)planner.getCostFactory();
     double totalRows = indexProps.getTotalRows();
     double leadRowCount = indexProps.getLeadingSelectivity() * totalRows;
+    double avgRowSize = indexProps.getAvgRowSize();
     Preconditions.checkArgument(primaryTableGroupScan instanceof DbGroupScan);
     DbGroupScan dbGroupScan = (DbGroupScan)primaryTableGroupScan;
     if (indexProps.isCovering()) { // covering index
-      int numIndexCols = allFields.size();
+      // int numIndexCols = allFields.size();
       // for disk i/o, all index columns are going to be read into memory
-      double numBlocks = Math.ceil((leadRowCount * numIndexCols * MapRDBCost.AVG_COLUMN_SIZE)/MapRDBCost.DB_BLOCK_SIZE);
+      double numBlocks = Math.ceil((leadRowCount * avgRowSize)/MapRDBCost.DB_BLOCK_SIZE);
       double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
       // cpu cost is cost of filter evaluation for the remainder condition
       double cpuCost = 0.0;
@@ -148,12 +149,11 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
         cpuCost = leadRowCount * DrillCostBase.COMPARE_CPU_COST;
       }
       double networkCost = 0.0; // TODO: add network cost once full table scan also considers network cost
-      diskCost *= PrelUtil.getPlannerSettings(planner).getIndexIOCostFactor();
       return costFactory.makeCost(leadRowCount, cpuCost, diskCost, networkCost);
 
     } else { // non-covering index
-      int numIndexCols = allFields.size();
-      double numBlocksIndex = Math.ceil((leadRowCount * numIndexCols * MapRDBCost.AVG_COLUMN_SIZE)/MapRDBCost.DB_BLOCK_SIZE);
+      // int numIndexCols = allFields.size();
+      double numBlocksIndex = Math.ceil((leadRowCount * avgRowSize)/MapRDBCost.DB_BLOCK_SIZE);
       double diskCostIndex = numBlocksIndex * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
       // for the primary table join-back each row may belong to a different block, so in general num_blocks = num_rows;
       // however, num_blocks cannot exceed the total number of blocks of the table
@@ -168,7 +168,6 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
         cpuCost = leadRowCount * DrillCostBase.COMPARE_CPU_COST;
       }
       double networkCost = 0.0; // TODO: add network cost once full table scan also considers network cost
-      diskCostTotal *= PrelUtil.getPlannerSettings(planner).getIndexIOCostFactor();
       return costFactory.makeCost(leadRowCount, cpuCost, diskCostTotal, networkCost);
     }
 

@@ -310,17 +310,15 @@ public class DbScanToIndexScanPrule extends Prule {
   }
 
   /**
-   *
+   * Check if any of the fields of the index are present in a list of LogicalExpressions supplied
+   * as part of IndexableExprMarker
    * @param marker, the marker that has analyzed original index condition on top of original scan
    * @param indexDesc
-   * @return If all indexable expressions involved in this condition are in the indexed fields of
-   * the single IndexDescriptor, return true
+   * @return ConditionIndexed.FULL, PARTIAL or NONE depending on whether all, some or no columns
+   * of the indexDesc are present in the list of LogicalExpressions supplied as part of exprMarker
+   *
    */
-  static private ConditionIndexed conditionIndexed(IndexableExprMarker marker, IndexDescriptor indexDesc) {
-    return conditionIndexedHelper(marker, indexDesc);
-  }
-
-  static private ConditionIndexed conditionIndexedHelper(IndexableExprMarker exprMarker, IndexDescriptor indexDesc) {
+  static private ConditionIndexed conditionIndexed(IndexableExprMarker exprMarker, IndexDescriptor indexDesc) {
     Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
     List<LogicalExpression> infoCols = Lists.newArrayList();
     infoCols.addAll(mapRexExpr.values());
@@ -407,10 +405,23 @@ public class DbScanToIndexScanPrule extends Prule {
       dbScan.getStatistics().initialize(condition, scan, indexContext);
       totalRows = dbScan.getRowCount(null, scan);
       filterRows = dbScan.getRowCount(condition, scan);
-      if (filterRows/totalRows > Math.min(1.0, 2.0 * settings.getIndexSelectivityFactor())) {
-        // Generate full table scan only plans for selectivity > 2*index_selectivity_factor
+      double sel = filterRows/totalRows;
+      if (totalRows != Statistics.ROWCOUNT_UNKNOWN &&
+          filterRows != Statistics.ROWCOUNT_UNKNOWN &&
+          !settings.isDisableFullTableScan() &&
+          sel > Math.max(settings.getCoveringIndexSelectivityFactor(),
+              settings.getNonCoveringIndexSelectivityFactor() )) {
+        // If full table scan is not disabled, generate full table scan only plans if selectivity
+        // is greater than covering and non-covering selectivity thresholds
+        logger.info("Skip index planning because filter selectivity: {} is greater than index thresholds", sel);
         return;
       }
+    }
+
+    if (totalRows == Statistics.ROWCOUNT_UNKNOWN ||
+        totalRows == 0) {
+      logger.warn("Total row count is UNKNOWN or 0; skip index planning");
+      return;
     }
 
     RexNode indexCondition = cInfo.indexCondition;
@@ -426,50 +437,36 @@ public class DbScanToIndexScanPrule extends Prule {
     //update sort expressions in context
     updateSortExpression(indexContext);
 
-    if (settings.isCostBasedIndexSelectionEnabled()) {
-      IndexSelector selector = new IndexSelector(indexCondition,
-          indexContext,
-          collection,
-          builder,
-          totalRows);
+    IndexSelector selector = new IndexSelector(indexCondition,
+        indexContext,
+        collection,
+        builder,
+        totalRows);
 
-      for (IndexDescriptor indexDesc : collection) {
-        if (conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE) {
-          FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-          selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
-              indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
-                scan.getRowType().getFieldCount());
-        }
-      }
-      // get the candidate indexes based on selection
-      selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
-    } else {
-      // get the list of covering and non-covering indexes for this collection
-      for (IndexDescriptor indexDesc : collection) {
-        if(conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE &&
-            infoBuilder.isConditionPrefix(indexDesc, indexCondition)) {
-          FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-          if (isCoveringIndex(indexContext, functionInfo)) {
-            coveringIndexes.add(indexDesc);
-          } else {
-            nonCoveringIndexes.add(indexDesc);
-          }
-        }
+    for (IndexDescriptor indexDesc : collection) {
+      // check if any of the indexed fields of the index are present in the filter condition
+      if (conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE) {
+        FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+        selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
+            indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
+              scan.getRowType().getFieldCount());
       }
     }
+    // get the candidate indexes based on selection
+    selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
 
     if (logger.isDebugEnabled()) {
       StringBuffer strBuf = new StringBuffer();
       if (coveringIndexes.size() > 0) {
         strBuf.append("Covering indexes:");
         for (IndexDescriptor indexDesc : coveringIndexes) {
-          strBuf.append(indexDesc.getIndexName()).append(",");
+          strBuf.append(indexDesc.getIndexName()).append(", ");
         }
       }
       if(nonCoveringIndexes.size() > 0) {
         strBuf.append("Non-covering indexes:");
         for (IndexDescriptor indexDesc : nonCoveringIndexes) {
-          strBuf.append(indexDesc.getIndexName()).append(",");
+          strBuf.append(indexDesc.getIndexName()).append(", ");
         }
       }
       logger.debug(strBuf.toString());
@@ -519,7 +516,7 @@ public class DbScanToIndexScanPrule extends Prule {
         FunctionalIndexInfo indexInfo = indexDesc.getFunctionalInfo();
         //Copy primary table statistics to index table
         idxScan.setStatistics(((DbGroupScan) scan.getGroupScan()).getStatistics());
-        logger.info("Generating covering index plan for query condition {}", indexCondition.toString());
+        logger.info("Generating covering index plan for index: {}, query condition {}", indexDesc.getIndexName(), indexCondition.toString());
 
         CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan,
             indexCondition, remainderCondition, builder, settings);
@@ -546,7 +543,7 @@ public class DbScanToIndexScanPrule extends Prule {
           remainderCondition = idxInfo.remainderCondition;
           //Copy primary table statistics to index table
           idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
-          logger.info("Generating non-covering index plan for query condition {}", indexCondition.toString());
+          logger.info("Generating non-covering index plan for index: {}, query condition {}", index.getIndexName(), indexCondition.toString());
           NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index,
             idxScan, indexCondition, remainderCondition, builder, settings);
           planGen.go();

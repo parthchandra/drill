@@ -65,7 +65,7 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
     double ROWCOUNT_UNKNOWN = -1.0;
     PlannerSettings settings = PrelUtil.getPlannerSettings(rel.getCluster().getPlanner());
     GroupScan scan = rel.getGroupScan();
-    if (!settings.isDisableScanStatistics()
+    if (settings.isScanStatisticsEnabled()
       && scan instanceof DbGroupScan) {
       double filterRows = ((DbGroupScan) scan).getRowCount(predicate, rel);
       double totalRows = ((DbGroupScan) scan).getRowCount(null, rel);

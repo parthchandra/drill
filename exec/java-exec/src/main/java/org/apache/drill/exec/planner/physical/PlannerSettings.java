@@ -87,13 +87,15 @@ public class PlannerSettings implements Context{
   public static final BooleanValidator INDEX_FORCE_SORT_NONCOVERING = new BooleanValidator("planner.index_force_sort_noncovering");
   public static final BooleanValidator INDEX_USE_HASHJOIN_NONCOVERING = new BooleanValidator("planner.index_use_hashjoin_noncovering");
   public static final RangeDoubleValidator INDEX_SELECTIVITY_FACTOR = new RangeDoubleValidator("planner.index_selectivity_factor", 0.0, 1.0, 0.8);
+  public static final RangeDoubleValidator COVERING_INDEX_SELECTIVITY_FACTOR =
+      new RangeDoubleValidator("planner.covering_index_selectivity_factor", 0.0, 1.0, 0.75);
+  public static final RangeDoubleValidator NON_COVERING_INDEX_SELECTIVITY_FACTOR =
+      new RangeDoubleValidator("planner.non_covering_index_selectivity_factor", 0.0, 1.0, 0.25);
   public static final RangeDoubleValidator TABLE_COST_PREF_FACTOR = new RangeDoubleValidator("planner.fts_cost_factor", 0.0, Double.MAX_VALUE, 1.0);
   public static final RangeDoubleValidator INDEX_COVERING_NONCOVERING_FACTOR = new RangeDoubleValidator("planner.index_covering_to_noncovering_factor", 0.0, Double.MAX_VALUE, 100.0);
   public static final RangeLongValidator MAX_CANDIDATE_INDEXES_PER_TABLE = new RangeLongValidator("planner.max_candidate_indexes_per_table", 0, 100, 5);
   public static final RangeDoubleValidator ROWKEY_JOINBACK_IO_COST_FACTOR = new RangeDoubleValidator("planner.rowkey_joinback_io_cost_factor", 0, Double.MAX_VALUE, 1.0d);
-  public static final RangeDoubleValidator INDEX_IO_COST_FACTOR = new RangeDoubleValidator("planner.index_io_cost_factor", 0, Double.MAX_VALUE, 1.0d);
   public static final BooleanValidator DISABLE_FULL_TABLE_SCAN = new BooleanValidator("planner.disable_full_table_scan", false);
-  public static final BooleanValidator COST_BASED_INDEX_SEL = new BooleanValidator("planner.enable_cost_based_index_selection", false);
   public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
   public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY);
 
@@ -150,6 +152,7 @@ public class PlannerSettings implements Context{
   public static final String FORCE_2PHASE_AGGR_KEY = "planner.force_2phase_aggr";
   public static final BooleanValidator FORCE_2PHASE_AGGR = new BooleanValidator(FORCE_2PHASE_AGGR_KEY);
   public static final BooleanValidator DISABLE_SCAN_STATS = new BooleanValidator("planner.disable_scan_statistics", true);
+  public static final BooleanValidator ENABLE_SCAN_STATS = new BooleanValidator("planner.enable_scan_statistics", true);
 
   public OptionManager options = null;
   public FunctionImplementationRegistry functionImplementationRegistry = null;
@@ -341,8 +344,12 @@ public class PlannerSettings implements Context{
     return options.getOption(INDEX_USE_HASHJOIN_NONCOVERING);
   }
 
-  public double getIndexSelectivityFactor() {
-    return options.getOption(INDEX_SELECTIVITY_FACTOR);
+  public double getCoveringIndexSelectivityFactor() {
+    return options.getOption(COVERING_INDEX_SELECTIVITY_FACTOR);
+  }
+
+  public double getNonCoveringIndexSelectivityFactor() {
+    return options.getOption(NON_COVERING_INDEX_SELECTIVITY_FACTOR);
   }
 
   public double getIndexCoveringToNonCoveringFactor() {
@@ -351,10 +358,6 @@ public class PlannerSettings implements Context{
 
   public long getMaxCandidateIndexesPerTable() {
     return options.getOption(MAX_CANDIDATE_INDEXES_PER_TABLE);
-  }
-
-  public double getIndexIOCostFactor() {
-    return options.getOption(INDEX_IO_COST_FACTOR);
   }
 
   public double getRowKeyJoinBackIOCostFactor() {
@@ -369,12 +372,8 @@ public class PlannerSettings implements Context{
     return options.getOption(DISABLE_FULL_TABLE_SCAN);
   }
 
-  public boolean isCostBasedIndexSelectionEnabled() {
-    return options.getOption(COST_BASED_INDEX_SEL);
-  }
-
-  public boolean isDisableScanStatistics() {
-    return options.getOption(DISABLE_SCAN_STATS);
+  public boolean isScanStatisticsEnabled() {
+    return options.getOption(ENABLE_SCAN_STATS);
   }
 
   public double getTableCostPrefFactor() {

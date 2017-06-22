@@ -28,7 +28,6 @@ import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runners.MethodSorters;
@@ -48,8 +47,6 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
   private static final String highFTSFactor = "alter session set `planner.fts_cost_factor` = 1500.0";
   private static final String defaultFTSFactor = "alter session reset `planner.fts_cost_factor`";
-  private static final String lowRowKeyJoinBackIOFactor = "alter session set `planner.rowkey_joinback_io_cost_factor` = 0.1";
-  private static final String defaultRowKeyJoinBackIOFactor = "alter session reset `planner.rowkey_joinback_io_cost_factor`";
 
   /**
    *  A sample row of this 10K table:
@@ -202,14 +199,13 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
-  @Ignore("Currently picks full table scan; re-enable after stats and costing are done")
   public void RangeConditionIndexPlan() throws Exception {
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
         " where t.personal.age > 52 AND t.name.fname='KfFzK'";
     test(defaultHavingIndexPlan+";"+ highFTSFactor +";");
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin", ".*RestrictedJsonTableGroupScan.*tableName=.*index_test_primary,",
-           ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_2"},
+           ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_[28]"},
         new String[]{}
     );
     testBuilder()
@@ -525,7 +521,6 @@ public class IndexPlanTest extends BaseJsonTest {
   }
 
   @Test
-  @Ignore("Using stats causes HashToRandomExchange to not be introduced for parallel plan")
   public void TestCoveringPlanSortNotRemoved() throws Exception {
     String query = "SELECT t.`contact`.`phone` as phone FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn <'100000003' order by t.contact.phone";
@@ -542,6 +537,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("phone").baselineValues("6500001595")
         .baselineColumns("phone").baselineValues("6500008069")
         .go();
+    test(defaultFTSFactor);
   }
 
   @Test
@@ -824,7 +820,7 @@ public class IndexPlanTest extends BaseJsonTest {
   public void nonIndexedColumnFilterCoveringPlan() throws Exception {
     String query = "SELECT t.name.fname as fname FROM hbase.`index_test_primary` as t " +
         " where t.personal.age > 68 and t.name.fname IN ('CnGobfR', 'THOHP')";
-    test(defaultHavingIndexPlan);
+    test(defaultHavingIndexPlan+";"+ highFTSFactor +";");
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*Filter.*CnGobfR.*THOHP.*",
             ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
@@ -837,5 +833,6 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("fname").baselineValues("THOHP")
         .baselineColumns("fname").baselineValues("CnGobfR")
         .go();
+    test(defaultFTSFactor);
   }
 }
