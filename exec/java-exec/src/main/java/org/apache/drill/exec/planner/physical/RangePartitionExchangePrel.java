@@ -67,13 +67,22 @@ public class RangePartitionExchangePrel extends ExchangePrel {
     RelNode child = this.getInput();
     double inputRows = RelMetadataQuery.getRowCount(child);
 
-    int  rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
+    // int  rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
 
-    double rangePartitionCpuCost = DrillCostBase.RANGE_PARTITION_CPU_COST * inputRows;
-    double svrCpuCost = DrillCostBase.SVR_CPU_COST * inputRows;
-    double networkCost = DrillCostBase.BYTE_NETWORK_COST * inputRows * rowWidth;
+    /* NOTE: the Exchange costing in general has to be examined in a broader context. A RangePartitionExchange
+     * may be added for index plans with RowJeyJoin and Calcite compares the cost of this sub-plan with a
+     * full table scan (FTS) sub-plan without an exchange.  The RelSubSet would have Filter-Project-TableScan for
+     * the FTS and a RowKeyJoin whose right input is a RangePartitionExchange-IndexScan. Although a final UnionExchange
+     * is done for both plans, the intermediate costing of index plan with exchange makes it more expensive than the FTS
+     * sub-plan, even though the final cost of the overall FTS would have been more expensive.
+     */
+
+    // commenting out following based on comments above
+    // double rangePartitionCpuCost = DrillCostBase.RANGE_PARTITION_CPU_COST * inputRows;
+    // double svrCpuCost = DrillCostBase.SVR_CPU_COST * inputRows;
+    // double networkCost = DrillCostBase.BYTE_NETWORK_COST * inputRows * rowWidth;
     DrillCostFactory costFactory = (DrillCostFactory)planner.getCostFactory();
-    return costFactory.makeCost(inputRows, rangePartitionCpuCost + svrCpuCost, 0, networkCost);
+    return costFactory.makeCost(inputRows, 0, 0, 0 /* see comments above */);
   }
 
   @Override

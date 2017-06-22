@@ -213,7 +213,7 @@ public class MapRDBStatistics implements Statistics {
     PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
     tableCostPrefFactor = settings.getTableCostPrefFactor();
     rowKeyJoinBackIOFactor = settings.getRowKeyJoinBackIOCostFactor();
-    if (!settings.isDisableScanStatistics()
+    if (settings.isScanStatisticsEnabled()
       && scanRel.getGroupScan() instanceof DbGroupScan) {
       String conditionAsStr = convertRexToString(condition, scanRel);
       scan = scanRel.getGroupScan();

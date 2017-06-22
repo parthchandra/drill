@@ -56,12 +56,7 @@ public class RowKeyJoinPrel extends JoinPrel implements Prel {
 
   @Override
   public double getRows() {
-    // Total number of rows returned would be at most the number of row keys
-    // coming from right input. Return that for now but a more accurate row count
-    // would include the estimate from left input which may have remainder filter
-    // applied after restricted scan.
-    // TODO: do a more accurate estimate for this
-    return this.getRight().getRows();
+    return this.getLeft().getRows();
   }
 
   @Override

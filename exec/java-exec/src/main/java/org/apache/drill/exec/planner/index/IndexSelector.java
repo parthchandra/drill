@@ -115,8 +115,6 @@ public class IndexSelector  {
       }
     }
 
-    logger.debug("Index {}: leading prefix map: {}, remainder condition: {}", indexProps.getIndexDesc().getIndexName(),
-        leadingPrefixMap, initCondition);
     indexProps.setProperties(leadingPrefixMap, satisfiesCollation, initCondition /* the remainder condition */, stats);
   }
 
@@ -130,7 +128,6 @@ public class IndexSelector  {
   private boolean buildAndCheckCollation(IndexProperties indexProps) {
     IndexDescriptor indexDesc = indexProps.getIndexDesc();
     FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-    Map<Integer, List<RexNode>> collationFilterMap = null;
 
     RelCollation inputCollation;
     // for the purpose of collation we can assume that a covering index scan would provide
@@ -169,36 +166,80 @@ public class IndexSelector  {
       List<IndexDescriptor> nonCoveringIndexes) {
 
     RelOptPlanner planner = indexContext.call.getPlanner();
+    PlannerSettings settings = PrelUtil.getPlannerSettings(planner);
+    List<IndexProperties> candidateIndexes = Lists.newArrayList();
 
     logger.info("Analyzing indexes for prefix matches");
     // analysis phase
     for (IndexProperties p : indexPropList) {
       analyzePrefixMatches(p);
+
+      // only consider indexes that either have some leading prefix of the filter condition or
+      // can satisfy required collation
+      if (p.numLeadingFilters() > 0 || p.satisfiesCollation()) {
+        double selThreshold = p.isCovering() ? settings.getCoveringIndexSelectivityFactor() :
+          settings.getNonCoveringIndexSelectivityFactor();
+        // only consider indexes whose selectivity is <= the configured threshold
+        if (p.getLeadingSelectivity() <= selThreshold) {
+          candidateIndexes.add(p);
+        }
+      }
     }
 
     int max_candidate_indexes = (int)PrelUtil.getPlannerSettings(planner).getMaxCandidateIndexesPerTable();
-    // ranking phase; only needed if num indexes is greater than MAX_CANDIDATE_INDEXES
-    if (indexPropList.size() > max_candidate_indexes) {
-      Collections.sort(indexPropList, new IndexComparator(planner));
+    // Ranking phase. Technically, we don't need to rank if there are fewer than max_candidate_indexes
+    // but we do it anyways for couple of reasons: the log output will show the indexes in a properly ranked
+    // order which helps diagnosing problems and secondly for internal unit/functional testing we want this code
+    // to be exercised even for few indexes
+    if (candidateIndexes.size() > 1) {
+      Collections.sort(candidateIndexes, new IndexComparator(planner));
     }
 
     logger.info("The top ranked indexes are: ");
 
     int count = 0;
+    boolean foundCovering = false;
+    boolean foundCoveringCollation = false;
 
     // pick the best N indexes
-    for (int i=0; i < indexPropList.size(); i++) {
-      IndexProperties index = indexPropList.get(i);
+    for (int i=0; i < candidateIndexes.size(); i++) {
+      IndexProperties index = candidateIndexes.get(i);
       if (index.isCovering()) {
+        if (foundCoveringCollation) {
+          // if previously we already found a higher ranked covering index that satisfies collation,
+          // then skip this one (note that selectivity and cost considerations were already handled
+          // by the ranking phase)
+          continue;
+        }
         coveringIndexes.add(index.getIndexDesc());
-        logger.info("name: {}, covering: true, leadingSelectivity: {}, cost: {}",
-            index.getIndexDesc().getIndexName(), index.getLeadingSelectivity(),
+        logger.info("name: {}, covering, collation: {}, leadingSelectivity: {}, cost: {}",
+            index.getIndexDesc().getIndexName(),
+            index.satisfiesCollation(),
+            index.getLeadingSelectivity(),
             index.getSelfCost(planner));
         count++;
-      } else {
-        nonCoveringIndexes.add(indexPropList.get(i).getIndexDesc());
-        logger.info("name: {}, covering: false, leadingSelectivity: {}, cost: {}",
-            index.getIndexDesc().getIndexName(), index.getLeadingSelectivity(),
+        foundCovering = true;
+        if (index.satisfiesCollation()) {
+          foundCoveringCollation = true;
+        }
+      } else {  // non-covering
+
+        // skip this non-covering index if (a) there was a higher ranked covering index
+        // with collation or (b) there was a higher ranked ranked covering index and this
+        // non-covering index does not have collation
+        if (foundCoveringCollation ||
+            (foundCovering && !index.satisfiesCollation())) {
+          continue;
+        }
+
+        // all other non-covering indexes can be added to the list because 2 or more non-covering index could
+        // be considered for intersection later; currently the index selector is not costing the index intersection
+        // TODO: enhance index selector for doing cost-based analysis of index intersection
+        nonCoveringIndexes.add(index.getIndexDesc());
+        logger.info("name: {}, non-covering, collation: {}, leadingSelectivity: {}, cost: {}",
+            index.getIndexDesc().getIndexName(),
+            index.satisfiesCollation(),
+            index.getLeadingSelectivity(),
             index.getSelfCost(planner));
         count++;
       }
@@ -248,7 +289,7 @@ public class IndexSelector  {
       } else if (cost1.isEqWithEpsilon(cost2)) {
         if (o1.numLeadingFilters() > o2.numLeadingFilters()) {
           return -1;
-        } else if (o2.numLeadingFilters() < o2.numLeadingFilters()) {
+        } else if (o1.numLeadingFilters() < o2.numLeadingFilters()) {
           return 1;
         }
         return 0;
@@ -270,7 +311,7 @@ public class IndexSelector  {
     private double remainderSel = 1.0;  // selectivity of all remainder satisfiable conjuncts
     private boolean satisfiesCollation = false; // whether index satisfies collation
     private boolean isCovering = false;         // whether index is covering
-    private double  indexSize;                  // size in bytes of the selected part of index
+    private double avgRowSize;          // avg row size in bytes of the selected part of index
 
     private int numProjectedFields;
     private double totalRows;
@@ -301,25 +342,50 @@ public class IndexSelector  {
       this.satisfiesCollation = satisfiesCollation;
       leadingPrefixMap = prefixMap;
 
+      logger.debug("Index {}: leading prefix map: {}, whether satisfies collation: {}, remainder condition: {}",
+          indexDescriptor.getIndexName(), leadingPrefixMap, satisfiesCollation, remainderFilter);
+
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
       // the corresponding conditions
-      for (LogicalExpression p : indexDescriptor.getIndexColumns()) {
-        RexNode n;
-        if ((n = leadingPrefixMap.get(p)) != null) {
-          leadingFilters.add(n);
-        } else {
-          break; // break since the prefix property will not be preserved
+      if (leadingPrefixMap.size() > 0) {
+        for (LogicalExpression p : indexDescriptor.getIndexColumns()) {
+          RexNode n;
+          if ((n = leadingPrefixMap.get(p)) != null) {
+            leadingFilters.add(n);
+          } else {
+            break; // break since the prefix property will not be preserved
+          }
         }
       }
 
       // compute the estimated row count by calling the statistics APIs
+      // NOTE: the calls to stats.getRowCount() below supply the primary table scan
+      // which is ok because its main use is to convert the ordinal-based filter
+      // to a string representation for stats lookup.
       for (RexNode filter : leadingFilters) {
-        leadingSel *= (stats.getRowCount(filter, primaryTableScan, false))/totalRows;
-      }
-      if (remainderFilter != null) {
-        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan, false);
+        double filterRows = stats.getRowCount(filter, primaryTableScan /* see comment above */, false);
+        double sel = 1.0;
+        if (filterRows != Statistics.ROWCOUNT_UNKNOWN) {
+          sel = filterRows/totalRows;
+          logger.debug("Filter: {}, filterRows = {}, totalRows = {}, selectivity = {}",
+              filter, filterRows, totalRows, sel);
+        } else {
+          logger.warn("Filter row count is UNKNOWN for filter: {}", filter);
+        }
+        leadingSel *= sel;
       }
 
+      logger.debug("Combined selectivity of all leading filters: {}", leadingSel);
+
+      if (remainderFilter != null) {
+        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan, false);
+        logger.debug("Selectivity of remainder filters: {}", remainderSel);
+      }
+
+      // get the average row size based on the leading column filter
+      avgRowSize = stats.getAvgRowSize(leadingFilters.size() > 0 ? leadingFilters.get(0) : null,
+          primaryTableScan, false);
+      logger.debug("Average row size based on leading filter: {}", avgRowSize);
     }
 
     public double getLeadingSelectivity() {
@@ -360,6 +426,10 @@ public class IndexSelector  {
 
     public int numLeadingFilters() {
       return leadingFilters.size();
+    }
+
+    public double getAvgRowSize() {
+      return avgRowSize;
     }
 
   }
