@@ -18,10 +18,11 @@
 package org.apache.drill.exec.physical.base;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.apache.calcite.rel.RelNode;
+
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.planner.physical.ScanPrel;
+import org.apache.drill.exec.planner.index.Statistics;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 
 import java.util.List;
 
@@ -38,22 +39,35 @@ public interface IndexGroupScan extends GroupScan {
   public int getRowKeyOrdinal();
 
   /**
-   *
+   * Set the artificial row count after applying the {@link RexNode} condition
+   * Mainly used for debugging
    * @param condition
    * @param count
+   * @param capRowCount
    */
   @JsonIgnore
-  public void setRowCount(RexNode condition, long count, long capRowCount);
+  public void setRowCount(RexNode condition, double count, double capRowCount);
 
   /**
-   *
-   * @param condition, with this condition to search the possible rowCount
-   * @return rowCount of records of certain condition
+   * Get the row count after applying the {@link RexNode} condition
+   * @param condition, filter to apply
+   * @param scanPrel, the current scan physical rel
+   * @return row count post filtering
    */
   @JsonIgnore
-  public long getRowCount(RexNode condition);
+  public double getRowCount(RexNode condition, DrillScanRel scanRel);
 
+  /**
+   * Set the statistics for {@link IndexGroupScan}
+   * @param statistics
+   */
+  @JsonIgnore
+  public void setStatistics(Statistics statistics);
 
   @JsonIgnore
-  void setColumns(List<SchemaPath> columns);
+  public void setColumns(List<SchemaPath> columns);
+
+  @JsonIgnore
+  public List<SchemaPath> getColumns();
+
 }

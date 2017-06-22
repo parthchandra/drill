@@ -20,30 +20,27 @@ package org.apache.drill.exec.planner.index;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
+
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.type.RelDataType;
-import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.rel.type.RelDataTypeField;
-import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
-import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.physical.FilterPrel;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
+
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 
@@ -71,100 +68,12 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
                                     IndexGroupScan indexGroupScan,
                                     RexNode indexCondition,
                                     RexNode remainderCondition,
-                                    RexBuilder builder) {
-    super(indexContext, indexCondition, remainderCondition, builder);
+                                    RexBuilder builder,
+                                    PlannerSettings settings) {
+    super(indexContext, indexCondition, remainderCondition, builder, settings);
     this.indexGroupScan = indexGroupScan;
     this.functionInfo = functionInfo;
-    this.indexDesc = this.functionInfo.getIndexDesc();
-  }
-
-  boolean pathOnlyInIndexedFunction(SchemaPath path) {
-    return true;
-  }
-  /**
-   * For IndexGroupScan, if a column is only appeared in the should-be-renamed function,
-   * this column is to-be-replaced column, we replace that column(schemaPath) from 'a.b'
-   * to '$1' in the list of SchemaPath.
-   * @param paths
-   * @param functionInfo functional index information that may impact rewrite
-   * @return
-   */
-  private List<SchemaPath> rewriteFunctionColumn(List<SchemaPath> paths, FunctionalIndexInfo functionInfo) {
-    if (!functionInfo.hasFunctional()) {
-      return paths;
-    }
-
-    List<SchemaPath> newPaths = Lists.newArrayList(paths);
-    for (int i=0; i<paths.size(); ++i) {
-      SchemaPath newPath = functionInfo.getNewPath(paths.get(i));
-      if(newPath == null) {
-        continue;
-      }
-
-      //if this path only in indexed function, we are safe to replace it
-      if(pathOnlyInIndexedFunction(paths.get(i))) {
-        newPaths.set(i, newPath);
-      }
-      else {//we should not replace this column, instead we add a new "$N" field.
-        newPaths.add(newPath);
-      }
-    }
-    return newPaths;
-  }
-
-  private String getRootSeg(String fullPathString) {
-    String pathSeg = fullPathString.replaceAll("`", "");
-    final String[] segs = pathSeg.split("\\.");
-    return segs[0];
-  }
-  /**
-   * if a field in rowType serves only the to-be-replaced column(s), we should replace it with new name "$1", otherwise
-   * we should keep this dataTypeField and add a new one for "$1"
-   * @param origRowType  original rowtype to rewrite
-   * @param functionInfo functional index information that may impact rewrite
-   * @return
-   */
-  private RelDataType rewriteFunctionalRowType(RelDataType origRowType, FunctionalIndexInfo functionInfo) {
-    if (!functionInfo.hasFunctional()) {
-      return origRowType;
-    }
-    List<RelDataTypeField> fields = Lists.newArrayList();
-
-    Set<String> leftOutFieldNames  = Sets.newHashSet();
-    for (LogicalExpression expr : indexContext.leftOutPathsInFunctions) {
-      leftOutFieldNames.add(getRootSeg(((SchemaPath)expr).getAsUnescapedPath()));
-    }
-
-    Set<String> fieldInFunctions  = Sets.newHashSet();
-    for (SchemaPath path: functionInfo.allPathsInFunction()) {
-      fieldInFunctions.add(getRootSeg(path.getAsUnescapedPath()));
-    }
-
-    RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
-
-    for ( RelDataTypeField field: origRowType.getFieldList()) {
-      final String fieldName = field.getName();
-      if (fieldInFunctions.contains(fieldName)) {
-        if (!leftOutFieldNames.contains(fieldName)) {
-          continue;
-        }
-      }
-      //this should be preserved
-      String pathSeg = fieldName.replaceAll("`", "");
-      final String[] segs = pathSeg.split("\\.");
-
-      fields.add(new RelDataTypeFieldImpl(
-          segs[0], fields.size(),
-          typeFactory.createSqlType(SqlTypeName.ANY)));
-    }
-
-    //TODO: we should have the information about which $N was needed
-    for(SchemaPath dollarPath: functionInfo.allNewSchemaPaths()) {
-      fields.add(
-          new RelDataTypeFieldImpl(dollarPath.getAsUnescapedPath(), fields.size(),
-          origScan.getCluster().getTypeFactory().createSqlType(SqlTypeName.ANY)));
-    }
-    return new RelRecordType(fields);
+    this.indexDesc = functionInfo.getIndexDesc();
   }
 
   /**
@@ -173,18 +82,19 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
    * @param functionInfo functional index information that may impact rewrite
    * @return
    */
-  private RexNode rewriteFunctionalCondition(RexNode inputIndex, RelDataType origRowType, RelDataType newRowType,
+  private RexNode rewriteFunctionalCondition(RexNode inputIndex, RelDataType newRowType,
                                              FunctionalIndexInfo functionInfo) {
     if (!functionInfo.hasFunctional()) {
       return inputIndex;
     }
-    return convertConditionForIndexScan(inputIndex, newRowType, functionInfo);
+    return FunctionalIndexHelper.convertConditionForIndexScan(indexCondition,
+        origScan, newRowType, builder, functionInfo);
   }
 
   /**
-   *
    *A RexNode forest with two RexNode for expressions "cast(a.q as int) * 2, b+c, concat(a.q, " world")"
    * on Scan RowType('a', 'b', 'c') will be like this:
+   *
    *          (0)Call:"*"                                       Call:"concat"
    *           /         \                                    /           \
    *    (1)Call:CAST     2            Call:"+"        (5)Call:ITEM     ' world'
@@ -192,9 +102,6 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
    * (2)Call:ITEM  TYPE:INT       (3)$1    (4)$2       $0    'q'
    *   /      \
    *  $0     'q'
-   *
-   * Class PathInExpr is to recursively analyze a RexNode trees with a map of indexed expression collected from indexDescriptor,
-   * e.g. Map 'cast(a.q as int)' -> '$0' means the expression 'cast(a.q as int)' is named as '$0' in index table
    *
    * So for above expressions, when visiting the RexNode trees using PathInExpr, we could mark indexed expressions in the trees,
    * as shown in the diagram above are the node (1),
@@ -218,9 +125,41 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     if (!functionInfo.hasFunctional()) {
       return toRewriteRex;
     }
+    RexToExpression.RexToDrillExt rexToDrill = new RexToExpression.RexToDrillExt(parseContext, project, scan);
+    LogicalExpression expr = toRewriteRex.accept(rexToDrill);
 
-    //TODO: functional index case
-    return toRewriteRex;
+    final Map<LogicalExpression, Set<SchemaPath>> exprPathMap = functionInfo.getPathsInFunctionExpr();
+    PathInExpr exprSearch = new PathInExpr(exprPathMap);
+    expr.accept(exprSearch, null);
+    Set<LogicalExpression> remainderPaths = exprSearch.getRemainderPaths();
+
+    //now build the rex->logical expression map for SimpleRexRemap
+    //left out schema paths
+    Map<LogicalExpression, Set<RexNode>> exprToRex = rexToDrill.getMapExprToRex();
+    final Map<RexNode, LogicalExpression> mapRexExpr = Maps.newHashMap();
+    for (LogicalExpression leftExpr: remainderPaths) {
+      if (exprToRex.containsKey(leftExpr)) {
+        Set<RexNode> rexs = exprToRex.get(leftExpr);
+        for (RexNode rex: rexs) {
+          mapRexExpr.put(rex, leftExpr);
+        }
+      }
+    }
+
+    //functional expressions e.g. cast(a.b as int)
+    for (LogicalExpression functionExpr: functionInfo.getExprMap().keySet()) {
+      if (exprToRex.containsKey(functionExpr)) {
+        Set<RexNode> rexs = exprToRex.get(functionExpr);
+        for (RexNode rex: rexs) {
+          mapRexExpr.put(rex, functionExpr);
+        }
+      }
+
+    }
+
+    SimpleRexRemap remap = new SimpleRexRemap(origScan, newRowType, builder);
+    remap.setExpressionMap(functionInfo.getExprMap());
+    return remap.rewriteWithMap(toRewriteRex, mapRexExpr);
   }
 
   @Override
@@ -231,23 +170,25 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       return null;
     }
 
-    indexGroupScan.setColumns(
-        rewriteFunctionColumn(((DbGroupScan)origScan.getGroupScan()).getColumns(),
-        this.functionInfo));
-
-    RelDataType newRowType = rewriteFunctionalRowType(origScan.getRowType(), functionInfo);
-    ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexGroupScan,
-        newRowType);
+    ScanPrel indexScanPrel =
+        IndexPlanUtils.buildCoveringIndexScan(origScan, indexGroupScan, indexContext, indexDesc);
 
     RexNode newIndexCondition =
-        rewriteFunctionalCondition(indexCondition, origScan.getRowType(), newRowType, functionInfo);
-    FilterPrel indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
+        rewriteFunctionalCondition(indexCondition, indexScanPrel.getRowType(), functionInfo);
+
+    // build collation for filter
+    RelTraitSet indexFilterTraitSet = indexScanPrel.getTraitSet();
+    Map<Integer, List<RexNode>> collationFilterMap = null;
+    FindFiltersForCollation finder = new FindFiltersForCollation(indexScanPrel);
+    collationFilterMap = finder.analyze(indexCondition);
+
+    FilterPrel indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexFilterTraitSet,
         indexScanPrel, newIndexCondition);
 
     ProjectPrel indexProjectPrel = null;
     if (origProject != null) {
-      indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexScanPrel.getTraitSet(),
+      RelCollation collation = IndexPlanUtils.buildCollationLowerProject(origProject.getProjects(), indexScanPrel, functionInfo);
+      indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexFilterTraitSet.plus(collation),
           indexFilterPrel, origProject.getProjects(), origProject.getRowType());
     }
     RelNode finalRel;
@@ -264,13 +205,18 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       finalRel = indexFilterPrel;
     }
 
-    if ( capProject != null) {
-      ProjectPrel cap = new ProjectPrel(capProject.getCluster(), finalRel.getTraitSet(),
-          finalRel, capProject.getProjects(), capProject.getRowType());
+    if ( upperProject != null) {
+      RelCollation inputCollation = finalRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+      RelCollation newCollation =
+          IndexPlanUtils.buildCollationUpperProject(upperProject.getProjects(), inputCollation, functionInfo, collationFilterMap);
+
+      ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
+          newCollation==null?finalRel.getTraitSet() : finalRel.getTraitSet().plus(newCollation),
+          finalRel, upperProject.getProjects(), upperProject.getRowType());
 
       if (functionInfo.hasFunctional()) {
-        //if there is functional index field, then a rewrite may be needed in capProject/indexProject
-        //merge capProject with indexProjectPrel(from origProject) if both exist,
+        //if there is functional index field, then a rewrite may be needed in upperProject/indexProject
+        //merge upperProject with indexProjectPrel(from origProject) if both exist,
         ProjectPrel newProject = cap;
         if (indexProjectPrel != null) {
           newProject = (ProjectPrel) DrillMergeProjectRule.replace(newProject, indexProjectPrel);
@@ -279,9 +225,10 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         List<RexNode> newProjects = Lists.newArrayList();
         DrillParseContext parseContxt = new DrillParseContext(PrelUtil.getPlannerSettings(newProject.getCluster()));
         for(RexNode projectRex: newProject.getProjects()) {
-          RexNode newRex = rewriteFunctionalRex(parseContxt, null, origScan, projectRex, newRowType, functionInfo);
+          RexNode newRex = rewriteFunctionalRex(parseContxt, null, origScan, projectRex, indexScanPrel.getRowType(), functionInfo);
           newProjects.add(newRex);
         }
+
         ProjectPrel rewrittenProject = new ProjectPrel(newProject.getCluster(), newProject.getTraitSet(),
             indexFilterPrel, newProjects, newProject.getRowType());
 
@@ -291,10 +238,15 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       finalRel = cap;
     }
 
+    if (indexContext.sort != null) {
+      finalRel = getSortNode(indexContext, finalRel);
+    }
+
     finalRel = Prule.convert(finalRel, finalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
 
-    logger.trace("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original disgest {}, new digest {}.",
-        finalRel.toString(), origScan.toString(), capProject==null?indexContext.filter.getDigest(): capProject.getDigest(), finalRel.getDigest());
+    logger.debug("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original digest {}, new digest {}.",
+        finalRel.toString(), origScan.toString(), upperProject==null?indexContext.filter.getDigest(): upperProject.getDigest(), finalRel.getDigest());
     return finalRel;
   }
+
 }

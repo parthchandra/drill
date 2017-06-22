@@ -18,9 +18,11 @@
 package org.apache.drill.exec.planner.index;
 
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -32,9 +34,9 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
 import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
-import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
@@ -102,8 +104,36 @@ public class IndexConditionInfo {
     /**
      * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
      * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
-     * that are relevant to this.indexes
-     * @return
+     * that are relevant to this.indexes. The conditions are separated on LEADING index columns.
+     * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
+     */
+    public Map<IndexDescriptor, IndexConditionInfo> getLeadingKeyIndexConditionMap() {
+
+      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = Maps.newLinkedHashMap();
+
+      RexNode initCondition = condition;
+      for(IndexDescriptor index : indexes) {
+        List<LogicalExpression> leadingColumns = new ArrayList<>();
+        if(initCondition.isAlwaysTrue()) {
+          break;
+        }
+        //TODO: Ensure we dont get NULL pointer exceptions
+        leadingColumns.add(index.getIndexColumns().get(0));
+        IndexConditionInfo info = indexConditionRelatedToFields(leadingColumns, initCondition);
+        if(info == null || info.hasIndexCol == false) {
+          continue;
+        }
+        indexInfoMap.put(index, info);
+        initCondition = info.remainderCondition;
+      }
+      return indexInfoMap;
+    }
+
+    /**
+     * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
+     * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
+     * that are relevant to this.indexes. The conditions are separated based on index columns.
+     * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
      */
     public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap() {
 
@@ -133,7 +163,7 @@ public class IndexConditionInfo {
      * @param condition
      * @return
      */
-    private IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
+    public IndexConditionInfo indexConditionRelatedToFields(List<LogicalExpression> relevantPaths, RexNode condition) {
       // Use the same filter analyzer that is used for partitioning columns
       RewriteCombineBinaryOperators reverseVisitor =
           new RewriteCombineBinaryOperators(true, builder);
@@ -158,22 +188,6 @@ public class IndexConditionInfo {
       indexCondition = indexCondition.accept(reverseVisitor);
 
       return new IndexConditionInfo(indexCondition, remainderCondition, true);
-    }
-
-    private boolean isColumnIndexed(SchemaPath path, IndexDescriptor index) {
-      if (index.getIndexColumnOrdinal(path) >= 0) {
-        return true;
-      }
-      return false;
-    }
-
-    private boolean isColumnIndexed(SchemaPath path, Iterable<IndexDescriptor> indexes) {
-      for (IndexDescriptor index : indexes) {
-        if (index.getIndexColumnOrdinal(path) >= 0) {
-          return true;
-        }
-      }
-      return false;
     }
 
   }

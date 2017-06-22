@@ -30,10 +30,15 @@ public class ScanPrule extends Prule{
 
   public ScanPrule() {
     super(RelOptHelper.any(DrillScanRel.class), "Prel.ScanPrule");
-
   }
+
   @Override
   public void onMatch(RelOptRuleCall call) {
+    // if full table scan is disabled, don't generate the physical scan
+    if (PrelUtil.getPlannerSettings(call.getPlanner()).isDisableFullTableScan()) {
+      return;
+    }
+
     final DrillScanRel scan = (DrillScanRel) call.rel(0);
 
     GroupScan groupScan = scan.getGroupScan();
@@ -44,7 +49,7 @@ public class ScanPrule extends Prule{
 
     final RelTraitSet traits = scan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition);
 
-    final DrillScanPrel newScan = ScanPrel.create(scan, traits, groupScan, scan.getRowType());
+    final ScanPrel newScan = ScanPrel.create(scan, traits, groupScan, scan.getRowType());
 
     call.transformTo(newScan);
   }

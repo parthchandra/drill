@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.InvalidRelException;
@@ -39,9 +40,11 @@ import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
 import org.apache.drill.exec.planner.physical.Prule;
+import org.apache.drill.exec.planner.physical.RowKeyJoinPrel;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.ArrayList;
@@ -60,8 +63,9 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
 
   public IndexIntersectPlanGenerator(IndexPlanCallContext indexContext,
                                      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap,
-                                     RexBuilder builder) {
-    super(indexContext, null, null, builder);
+                                     RexBuilder builder,
+                                     PlannerSettings settings) {
+    super(indexContext, null, null, builder, settings);
     this.indexInfoMap = indexInfoMap;
   }
 
@@ -82,15 +86,23 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
         RelOptUtil.createEquiJoinCondition(left, leftJoinKeys,
             right, rightJoinKeys, builder);
 
-    HashJoinPrel hjPrel;
-    hjPrel = new HashJoinPrel(left.getCluster(), left.getTraitSet(), left,
-        right, joinCondition, JoinRelType.INNER, false, isRowKeyJoin, htControl);
-
     if (isRowKeyJoin == true) {
-      // sine there is a restricted Scan on left side, assume original project
-      return buildOriginalProject(hjPrel);
+      RelNode newRel;
+      if (settings.isIndexUseHashJoinNonCovering()) {
+        HashJoinPrel hjPrel = new HashJoinPrel(left.getCluster(), left.getTraitSet(), left,
+            right, joinCondition, JoinRelType.INNER, false, isRowKeyJoin, htControl);
+        newRel = hjPrel;
+      } else {
+        RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(left.getCluster(), left.getTraitSet(),
+            left, right, joinCondition, JoinRelType.INNER);
+        newRel = rjPrel;
+      }
+      // since there is a restricted Scan on left side, assume original project
+      return buildOriginalProject(newRel);
     } else {
       //there is no restricted scan on left, do a regular rowkey join
+      HashJoinPrel hjPrel = new HashJoinPrel(left.getCluster(), left.getTraitSet(), left,
+          right, joinCondition, JoinRelType.INNER, false, isRowKeyJoin, htControl);
       return buildRowKeyProject(hjPrel, leftRowKeyIdx);
     }
   }
@@ -151,11 +163,16 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
 
     FunctionalIndexInfo functionInfo = getFunctionalIndexInfo(index);
     IndexGroupScan indexScan = index.getIndexGroupScan();
-    RelDataType indexScanRowType = convertRowTypeForIndexScan(origScan, condition, indexScan, functionInfo);
+    RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(origScan, condition,
+        indexScan, functionInfo);
+    DrillDistributionTrait partition = IndexPlanUtils.scanIsPartition(origScan.getGroupScan())?
+        DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
+
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexScan, indexScanRowType);
+        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition), indexScan, indexScanRowType);
     FilterPrel  indexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
-        indexScanPrel, convertConditionForIndexScan(condition, indexScanRowType, functionInfo));
+        indexScanPrel, FunctionalIndexHelper.convertConditionForIndexScan(condition, origScan,
+        indexScanRowType, builder, functionInfo));
     // project the rowkey column from the index scan
     List<RexNode> indexProjectExprs = Lists.newArrayList();
     int rowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType(), origScan);//indexGroupScan.getRowKeyOrdinal();
@@ -283,9 +300,9 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
     Pair<RelNode, DbGroupScan> leftRelAndScan = buildRestrictedDBScan(remnant);
 
     RelNode finalRel = buildRowKeyJoin(leftRelAndScan.left, rangeDistRight, true, JoinControl.DEFAULT);
-    if ( capProject != null) {
+    if ( upperProject != null) {
       ProjectPrel cap = new ProjectPrel(finalRel.getCluster(), finalRel.getTraitSet(),
-          finalRel, capProject.getProjects(), capProject.getRowType());
+          finalRel, upperProject.getProjects(), upperProject.getRowType());
       finalRel = cap;
     }
 

@@ -37,6 +37,7 @@ import com.mapr.db.Table;
 import com.mapr.db.impl.IdCodec;
 import com.mapr.db.impl.TabletInfoImpl;
 
+@SuppressWarnings("deprecation")
 @JsonTypeName("jsontable-range-partition-function")
 public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunction {
 
@@ -86,7 +87,6 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   }
 
 
-  @SuppressWarnings("deprecation")
   @Override
   public int eval(int index, int numPartitions) {
 	  assert partitionKeyVector != null;

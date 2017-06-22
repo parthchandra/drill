@@ -121,6 +121,7 @@ public class LargeTableGen extends LargeTableGenBase {
 
     initRandVector(recordNumber);
     initDictionary();
+    DBTests.setTableStatsSendInterval(1);
 
     if (admin.tableExists(tablePath)) {
       //admin.deleteTable(tablePath);
@@ -155,7 +156,7 @@ public class LargeTableGen extends LargeTableGenBase {
       }
       table.flush();
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
-      //Thread.sleep(5000);
+      Thread.sleep(200000);
     }
   }
 }

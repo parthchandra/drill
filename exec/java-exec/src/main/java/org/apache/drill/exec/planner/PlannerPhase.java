@@ -374,12 +374,20 @@ public enum PlannerPhase {
    *
    */
   static RuleSet getIndexRules(OptimizerRulesContext optimizerRulesContext) {
+    final PlannerSettings ps = optimizerRulesContext.getPlannerSettings();
+    if (!ps.isIndexPlanningEnabled()) {
+      return RuleSets.ofList(ImmutableSet.<RelOptRule>builder().build());
+    }
+
     final ImmutableSet<RelOptRule> indexRules = ImmutableSet.<RelOptRule>builder()
         .add(
             DbScanToIndexScanPrule.REL_FILTER_SCAN,
-            DbScanToIndexScanPrule.REL_FILTER_PROJECT_SCAN
-            //DbScanToIndexScanRule.FILTER_PROJECT_SCAN,
-            //DbScanToIndexScanRule.FILTER_SCAN
+            DbScanToIndexScanPrule.SORT_FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.SORT_PROJECT_FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.PROJECT_FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.SORT_PROJECT_FILTER_SCAN,
+            DbScanToIndexScanPrule.FILTER_PROJECT_SCAN,
+            DbScanToIndexScanPrule.FILTER_SCAN
         )
         .build();
     return RuleSets.ofList(indexRules);

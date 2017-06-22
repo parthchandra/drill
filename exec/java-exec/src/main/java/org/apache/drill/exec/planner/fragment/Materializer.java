@@ -30,6 +30,7 @@ import org.apache.drill.exec.physical.base.Store;
 import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.physical.config.RangePartitionSender;
+import org.apache.drill.exec.physical.config.RowKeyJoinPOP;
 import org.apache.drill.exec.work.foreman.ForemanException;
 
 import com.google.common.collect.Lists;
@@ -142,6 +143,30 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
 
     return newOp;
   }
+
+  @Override
+  public PhysicalOperator visitRowKeyJoin(RowKeyJoinPOP op, IndexedFragmentNode iNode) throws ExecutionSetupException {
+    iNode.addAllocation(op);
+    List<PhysicalOperator> children = Lists.newArrayList();
+
+    children.add(op.getLeft().accept(this, iNode));
+
+    // keep track of the subscan in left input before visiting the right input such that subsequently we can
+    // use it for the rowkey join
+    SubScan subScanInLeftInput = iNode.getSubScan();
+
+    children.add(op.getRight().accept(this, iNode));
+
+    PhysicalOperator newOp = op.getNewWithChildren(children);
+    newOp.setCost(op.getCost());
+    newOp.setOperatorId(Short.MAX_VALUE & op.getOperatorId());
+
+    ((RowKeyJoinPOP)newOp).setSubScanForRowKeyJoin(subScanInLeftInput);
+
+    return newOp;
+  }
+
+
 
   public static class IndexedFragmentNode{
     final Wrapper info;

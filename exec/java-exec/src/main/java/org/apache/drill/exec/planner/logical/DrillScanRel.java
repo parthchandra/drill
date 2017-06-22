@@ -180,12 +180,7 @@ public class DrillScanRel extends DrillScanRelBase implements DrillRel {
       return planner.getCostFactory().makeCost(rowCount * columnCount, stats.getCpuCost(), stats.getDiskCost());
     }
 
-    double cpuCost = rowCount * columnCount; // for now, assume cpu cost is proportional to row count.
-    // Even though scan is reading from disk, in the currently generated plans all plans will
-    // need to read the same amount of data, so keeping the disk io cost 0 is ok for now.
-    // In the future we might consider alternative scans that go against projections or
-    // different compression schemes etc that affect the amount of data read. Such alternatives
-    // would affect both cpu and io cost.
+    double cpuCost = rowCount * columnCount; // for now, assume cpu cost is proportional to row count and number of columns
 
     DrillCostFactory costFactory = (DrillCostFactory)planner.getCostFactory();
     return costFactory.makeCost(rowCount, cpuCost, ioCost, 0);

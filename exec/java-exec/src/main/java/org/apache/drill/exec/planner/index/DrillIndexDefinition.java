@@ -19,14 +19,14 @@ package org.apache.drill.exec.planner.index;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.types.TypeProtos;
 
 import java.util.Collection;
 import java.util.List;
@@ -57,7 +57,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final List<LogicalExpression> rowKeyColumns;
 
   @JsonProperty
-  protected final List<FieldDirection> indexColDirections;
+  protected final CollationContext indexCollationContext;
 
   /**
    * indexName: name of the index that should be unique within the scope of a table
@@ -71,7 +71,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   protected final IndexDescriptor.IndexType indexType;
 
   public DrillIndexDefinition(List<LogicalExpression> indexCols,
-                              List<FieldDirection> indexColDirections,
+                                 CollationContext indexCollationContext,
                                  List<LogicalExpression> nonIndexCols,
                                  List<LogicalExpression> rowKeyColumns,
                                  String indexName,
@@ -85,7 +85,7 @@ public class DrillIndexDefinition implements IndexDefinition {
     this.indexType = type;
     this.allIndexColumns = Sets.newHashSet(indexColumns);
     this.allIndexColumns.addAll(nonIndexColumns);
-    this.indexColDirections = indexColDirections;
+    this.indexCollationContext = indexCollationContext;
 
   }
 
@@ -103,6 +103,11 @@ public class DrillIndexDefinition implements IndexDefinition {
   @Override
   public boolean allColumnsIndexed(Collection<LogicalExpression> columns) {
     return columnsInIndexFields(columns, indexColumns);
+  }
+
+  @Override
+  public boolean someColumnsIndexed(Collection<LogicalExpression> columns) {
+    return someColumnsInIndexFields(columns, indexColumns);
   }
 
   boolean castIsCompatible(CastExpression castExpr, Collection<LogicalExpression> indexFields) {
@@ -142,6 +147,27 @@ public class DrillIndexDefinition implements IndexDefinition {
       }
     }
     return true;//indexFields.containsAll(columns);
+  }
+
+  protected boolean someColumnsInIndexFields(Collection<LogicalExpression> columns,
+      Collection<LogicalExpression> indexFields) {
+    boolean some = false;
+    //we need to do extra check, so we could allow the case when query condition expression is not identical with indexed fields
+    //and they still could use the index either by implicit cast or the difference is allowed, e.g. width of varchar
+    for (LogicalExpression col : columns) {
+      if (col instanceof CastExpression) {
+        if (!castIsCompatible((CastExpression) col, indexFields)) {
+          return false;
+        }
+      }
+      else {
+        if (indexFields.contains(col)) {
+          some = true;
+          break;
+        }
+      }
+    }
+    return some;
   }
 
   @Override
@@ -213,9 +239,18 @@ public class DrillIndexDefinition implements IndexDefinition {
   }
 
   @Override
-  @JsonProperty
-  public List<FieldDirection> getIndexColDirections() {
-    return this.indexColDirections;
+  @JsonIgnore
+  public RelCollation getCollation() {
+    if (indexCollationContext != null) {
+      return RelCollations.of(indexCollationContext.relFieldCollations);
+    }
+    return null;
+  }
+
+  @Override
+  @JsonIgnore
+  public Map<SchemaPath, RelFieldCollation> getCollationMap() {
+    return indexCollationContext.collationMap;
   }
 
 }

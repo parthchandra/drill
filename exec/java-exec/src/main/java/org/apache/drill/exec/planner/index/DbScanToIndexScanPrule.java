@@ -18,8 +18,10 @@
 package org.apache.drill.exec.planner.index;
 
 import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
@@ -33,17 +35,18 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.common.DrillRelNode;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
 import org.apache.drill.exec.planner.logical.RelOptHelper;
 import org.apache.drill.exec.planner.logical.partition.RewriteAsBinaryOperators;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.planner.physical.Prule;
-
 
 import java.util.List;
 import java.util.Map;
@@ -55,22 +58,42 @@ public class DbScanToIndexScanPrule extends Prule {
   final public MatchFunction match;
 
   public static final RelOptRule REL_FILTER_SCAN = new DbScanToIndexScanPrule(
-      RelOptHelper.some(RelNode.class, RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class))),
-      "DbScanToIndexScanRule:Rel_Filter_Scan", new MatchPFS());
+      RelOptHelper.some(DrillRelNode.class, RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class))),
+      "DbScanToIndexScanPrule:Rel_Filter_Scan", new MatchRelFS());
 
-  public static final RelOptRule REL_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
-      RelOptHelper.some(RelNode.class, RelOptHelper.some(DrillFilterRel.class,
-          RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
-      "DbScanToIndexScanRule:Rel_Filter_Project_Scan", new MatchPFPS());
+  public static final RelOptRule PROJECT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
+         RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
+     "DbScanToIndexScanPrule:Project_Filter_Project_Scan", new MatchPFPS());
+
+  public static final RelOptRule SORT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+     RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillFilterRel.class,
+        RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class)))),
+    "DbScanToIndexScanPrule:Sort_Filter_Project_Scan", new MatchSFPS());
+
+  public static final RelOptRule SORT_PROJECT_FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
+          RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))))),
+      "DbScanToIndexScanPrule:Sort_Project_Filter_Project_Scan", new MatchSPFPS());
+
+  public static final RelOptRule SORT_PROJECT_FILTER_SCAN = new DbScanToIndexScanPrule(
+      RelOptHelper.some(DrillSortRel.class, RelOptHelper.some(DrillProjectRel.class, RelOptHelper.some(DrillFilterRel.class,
+          RelOptHelper.any(DrillScanRel.class)))),
+      "DbScanToIndexScanPrule:Sort_Project_Filter_Scan", new MatchSPFS());
 
   public static final RelOptRule FILTER_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillFilterRel.class, RelOptHelper.any(DrillScanRel.class)),
-      "DbScanToIndexScanRule:Filter_On_Scan", new MatchFS());
+      "DbScanToIndexScanPrule:Filter_On_Scan", new MatchFS());
 
   public static final RelOptRule FILTER_PROJECT_SCAN = new DbScanToIndexScanPrule(
       RelOptHelper.some(DrillFilterRel.class,
           RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))),
-      "DbScanToIndexScanRule:Filter_Project_Scan", new MatchFPS());
+      "DbScanToIndexScanPrule:Filter_Project_Scan", new MatchFPS());
+
+  public enum ConditionIndexed {
+    NONE,
+    PARTIAL,
+    FULL}
 
   private DbScanToIndexScanPrule(RelOptRuleOperand operand, String description, MatchFunction match) {
     super(operand, description);
@@ -158,20 +181,27 @@ public class DbScanToIndexScanPrule extends Prule {
     }
   }
 
-  private static class MatchPFS extends AbstractMatchFunction {
+  private static class MatchRelFS extends AbstractMatchFunction {
     public boolean match(RelOptRuleCall call) {
-      final DrillScanRel scan = call.rel(2);
-      return checkScan(scan);
+      if (call.rel(0) instanceof DrillProjectRel ||
+          call.rel(0) instanceof DrillSortRel) {
+        final DrillScanRel scan = call.rel(2);
+        return checkScan(scan);
+      }
+      return false;
     }
 
     public IndexPlanCallContext onMatch(RelOptRuleCall call) {
       DrillProjectRel capProject = null;
+      DrillSortRel sort = null;
       if (call.rel(0) instanceof DrillProjectRel) {
         capProject = call.rel(0);
+      } else if (call.rel(0) instanceof DrillSortRel) {
+        sort = call.rel(0);
       }
       final DrillFilterRel filter = call.rel(1);
       final DrillScanRel scan = call.rel(2);
-      return new IndexPlanCallContext(call, capProject, filter, null, scan);
+      return new IndexPlanCallContext(call, sort, capProject, filter, null, scan);
     }
   }
 
@@ -182,15 +212,57 @@ public class DbScanToIndexScanPrule extends Prule {
     }
 
     public IndexPlanCallContext onMatch(RelOptRuleCall call) {
-      DrillProjectRel capProject = null;
-      if (call.rel(0) instanceof DrillProjectRel) {
-        capProject = call.rel(0);
-      }
-
+      final DrillProjectRel capProject = call.rel(0);
       final DrillFilterRel filter = call.rel(1);
       final DrillProjectRel project = call.rel(2);
       final DrillScanRel scan = call.rel(3);
-      return new IndexPlanCallContext(call, capProject, filter, project, scan);
+      return new IndexPlanCallContext(call, null, capProject, filter, project, scan);
+    }
+  }
+
+  private static class MatchSFPS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(3);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillSortRel sort = call.rel(0);
+      final DrillFilterRel filter = call.rel(1);
+      final DrillProjectRel project = call.rel(2);
+      final DrillScanRel scan = call.rel(3);
+      return new IndexPlanCallContext(call, sort, null, filter, project, scan);
+    }
+  }
+
+  private static class MatchSPFPS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(4);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillSortRel sort = call.rel(0);
+      final DrillProjectRel capProject = call.rel(1);
+      final DrillFilterRel filter = call.rel(2);
+      final DrillProjectRel project = call.rel(3);
+      final DrillScanRel scan = call.rel(4);
+      return new IndexPlanCallContext(call, sort, capProject, filter, project, scan);
+    }
+  }
+
+  private static class MatchSPFS extends AbstractMatchFunction {
+    public boolean match(RelOptRuleCall call) {
+      final DrillScanRel scan = call.rel(3);
+      return checkScan(scan);
+    }
+
+    public IndexPlanCallContext onMatch(RelOptRuleCall call) {
+      final DrillSortRel sort = call.rel(0);
+      final DrillProjectRel capProject = call.rel(1);
+      final DrillFilterRel filter = call.rel(2);
+      final DrillScanRel scan = call.rel(3);
+      return new IndexPlanCallContext(call, sort, capProject, filter, null, scan);
     }
   }
 
@@ -206,25 +278,24 @@ public class DbScanToIndexScanPrule extends Prule {
     RexBuilder builder = indexContext.filter.getCluster().getRexBuilder();
 
     RexNode condition = null;
-    if (indexContext.project == null) {
+    if (indexContext.lowerProject == null) {
       condition = indexContext.filter.getCondition();
     } else {
       // get the filter as if it were below the projection.
-      condition = RelOptUtil.pushFilterPastProject(indexContext.filter.getCondition(), indexContext.project);
+      condition = RelOptUtil.pushFilterPastProject(indexContext.filter.getCondition(), indexContext.lowerProject);
     }
 
     RewriteAsBinaryOperators visitor = new RewriteAsBinaryOperators(true, builder);
     condition = condition.accept(visitor);
 
     if (indexCollection.supportsIndexSelection()) {
-      processWithoutIndexSelection(indexContext, settings, condition,
-          indexCollection, builder);
-    } else {
       processWithIndexSelection(indexContext, settings, condition,
           indexCollection, builder);
+    } else {
+      throw new UnsupportedOperationException("Index collection must support index selection");
     }
     indexPlanTimer.stop();
-    logger.debug("Index Plan took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
+    logger.info("Index Planning took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
   }
   /**
    * Return the index collection relevant for the underlying data source
@@ -243,38 +314,62 @@ public class DbScanToIndexScanPrule extends Prule {
    * @return If all indexable expressions involved in this condition are in the indexed fields of
    * the single IndexDescriptor, return true
    */
-  static private boolean conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
+  static private ConditionIndexed conditionIndexed(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
+    return conditionIndexedHelper(inputRel, indexCondition, indexDesc);
+  }
+
+  static private ConditionIndexed conditionIndexedHelper(RelNode inputRel, RexNode indexCondition, IndexDescriptor indexDesc) {
     IndexableExprMarker exprMarker = new IndexableExprMarker(inputRel);
     indexCondition.accept(exprMarker);
     Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
     List<LogicalExpression> infoCols = Lists.newArrayList();
     infoCols.addAll(mapRexExpr.values());
-    return indexDesc.allColumnsIndexed(infoCols);
+    if (indexDesc.allColumnsIndexed(infoCols)) {
+      return ConditionIndexed.FULL;
+    } else if (indexDesc.someColumnsIndexed(infoCols)) {
+      return ConditionIndexed.PARTIAL;
+    } else {
+      return ConditionIndexed.NONE;
+    }
   }
 
-  private IndexDescriptor selectIndexForNonCoveringPlan(DrillScanRel scan, Iterable<IndexDescriptor> indexes) {
-    IndexDescriptor ret = null;
-    int maxIndexedNum = 0;
-    //XXX the implement here should make decision based on selectivity, for now, we pick the index cover
-    //the most index fields.
-    for(IndexDescriptor index: indexes) {
-      if(index.getIndexColumns().size() > maxIndexedNum) {
-        maxIndexedNum = index.getIndexColumns().size();
-        ret = index;
+  private boolean isConditionPrefix(IndexDescriptor indexDesc, RexNode initCondition, IndexConditionInfo.Builder infoBuilder) {
+    List<LogicalExpression> indexCols = indexDesc.getIndexColumns();
+    boolean prefix = true;
+    if (indexCols.size() > 0 && initCondition != null) {
+      int i=0;
+      while (prefix && i < indexCols.size()) {
+        LogicalExpression p = indexCols.get(i++);
+        List<LogicalExpression> prefixCol = ImmutableList.of(p);
+        IndexConditionInfo info = infoBuilder.indexConditionRelatedToFields(prefixCol, initCondition);
+        if(info != null && info.hasIndexCol) {
+          initCondition = info.remainderCondition;
+          if (initCondition.isAlwaysTrue()) {
+            // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+            // we don't need to keep track of it for rest of the index selection
+            initCondition = null;
+            break;
+          }
+        } else {
+          prefix = false;
+        }
       }
     }
-    return ret;
+    return prefix;
   }
 
   /**
    *
    */
-  private void processWithoutIndexSelection(
+  private void processWithIndexSelection(
       IndexPlanCallContext indexContext,
       PlannerSettings settings,
       RexNode condition,
       IndexCollection collection,
       RexBuilder builder) {
+    double totalRows = 0;
+    double filterRows = totalRows;
+    DrillScanRel scan = indexContext.scan;
     if (! (indexContext.scan.getGroupScan() instanceof DbGroupScan) ) {
       return;
     }
@@ -282,29 +377,61 @@ public class DbScanToIndexScanPrule extends Prule {
     IndexConditionInfo cInfo = infoBuilder.getCollectiveInfo();
 
     if (!cInfo.hasIndexCol) {
-      logger.debug("No index columns are projected from the scan..continue.");
+      logger.info("No index columns are projected from the scan..continue.");
       return;
     }
 
     if (cInfo.indexCondition == null) {
-      logger.debug("No conditions were found eligible for applying index lookup.");
+      logger.info("No conditions were found eligible for applying index lookup.");
       return;
+    }
+
+    if (scan.getGroupScan() instanceof DbGroupScan) {
+      // Initialize statistics
+      DbGroupScan dbScan = ((DbGroupScan) scan.getGroupScan());
+      dbScan.getStatistics().initialize(condition, scan, indexContext);
+      totalRows = dbScan.getRowCount(null, scan);
+      filterRows = dbScan.getRowCount(condition, scan);
+      if (filterRows/totalRows > Math.min(1.0, 2.0 * settings.getIndexSelectivityFactor())) {
+        // Generate full table scan only plans for selectivity > 2*index_selectivity_factor
+        return;
+      }
     }
 
     RexNode indexCondition = cInfo.indexCondition;
     RexNode remainderCondition = cInfo.remainderCondition;
 
-    List<FunctionalIndexInfo> coveringIndexes = Lists.newArrayList();
+    List<IndexDescriptor> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
 
-    // get the list of covering and non-covering indexes for this collection
-    for (IndexDescriptor indexDesc : collection) {
-      if(conditionIndexed(indexContext.scan, indexCondition, indexDesc)) {
-        FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-        if (isCoveringIndex(indexContext, functionInfo)) {
-          coveringIndexes.add(functionInfo);
-        } else {
-          nonCoveringIndexes.add(indexDesc);
+    if (settings.isCostBasedIndexSelectionEnabled()) {
+      IndexSelector selector = new IndexSelector(indexCondition,
+          indexContext,
+          collection,
+          builder,
+          totalRows);
+
+      for (IndexDescriptor indexDesc : collection) {
+        if (conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE) {
+          FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+          selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
+              indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
+                scan.getRowType().getFieldCount());
+        }
+      }
+      // get the candidate indexes based on selection
+      selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
+    } else {
+      // get the list of covering and non-covering indexes for this collection
+      for (IndexDescriptor indexDesc : collection) {
+        if(conditionIndexed(indexContext.scan, indexCondition, indexDesc) != ConditionIndexed.NONE &&
+            isConditionPrefix(indexDesc, indexCondition, infoBuilder)) {
+          FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
+          if (isCoveringIndex(indexContext, functionInfo)) {
+            coveringIndexes.add(indexDesc);
+          } else {
+            nonCoveringIndexes.add(indexDesc);
+          }
         }
       }
     }
@@ -313,14 +440,14 @@ public class DbScanToIndexScanPrule extends Prule {
       StringBuffer strBuf = new StringBuffer();
       strBuf.append("Split  indexes:");
       if (coveringIndexes.size() > 0) {
-        for (FunctionalIndexInfo coveringIdxInfo : coveringIndexes) {
-          strBuf.append(coveringIdxInfo.getIndexDesc().getIndexName()).append(",");
+        for (IndexDescriptor indexDesc : coveringIndexes) {
+          strBuf.append(indexDesc.getIndexName()).append(",");
         }
       }
       if(nonCoveringIndexes.size() > 0) {
         strBuf.append("non-covering indexes:");
-        for (IndexDescriptor coveringIdx : nonCoveringIndexes) {
-          strBuf.append(coveringIdx.getIndexName()).append(",");
+        for (IndexDescriptor indexDesc : nonCoveringIndexes) {
+          strBuf.append(indexDesc.getIndexName()).append(",");
         }
       }
       logger.debug(strBuf.toString());
@@ -328,7 +455,7 @@ public class DbScanToIndexScanPrule extends Prule {
     //Not a single covering index plan or non-covering index plan is sufficient.
     // either 1) there is no usable index at all, 2) or the chop of original condition to
     // indexCondition + remainderCondition is not working for any single index.
-    if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() == 0) {
+    if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() > 1) {
       Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = infoBuilder.getIndexConditionMap();
 
       //no usable index
@@ -349,7 +476,7 @@ public class DbScanToIndexScanPrule extends Prule {
         //TODO: make sure the smallest selectivity of these indexes times rowcount smaller than broadcast threshold
 
         IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
-            indexContext, indexInfoMap, builder);
+            indexContext, indexInfoMap, builder, settings);
         try {
           planGen.go();
         } catch (Exception e) {
@@ -363,11 +490,15 @@ public class DbScanToIndexScanPrule extends Prule {
 
     boolean createdCovering = false;
     try {
-      for (FunctionalIndexInfo indexInfo : coveringIndexes) {
-        IndexGroupScan idxScan = indexInfo.getIndexDesc().getIndexGroupScan();
-        logger.debug("Generating covering index plan for query condition {}", indexCondition.toString());
+      for (IndexDescriptor indexDesc : coveringIndexes) {
+        IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
+        FunctionalIndexInfo indexInfo = indexDesc.getFunctionalInfo();
+        //Copy primary table statistics to index table
+        idxScan.setStatistics(((DbGroupScan) scan.getGroupScan()).getStatistics());
+        logger.info("Generating covering index plan for query condition {}", indexCondition.toString());
 
-        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan, indexCondition, remainderCondition, builder);
+        CoveringIndexPlanGenerator planGen = new CoveringIndexPlanGenerator(indexContext, indexInfo, idxScan,
+            indexCondition, remainderCondition, builder, settings);
 
         planGen.go();
         createdCovering = true;
@@ -387,12 +518,13 @@ public class DbScanToIndexScanPrule extends Prule {
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
       try {
-        if (nonCoveringIndexes.size() > 0) {
-          IndexDescriptor index = selectIndexForNonCoveringPlan(indexContext.scan, nonCoveringIndexes);
-          IndexGroupScan idxScan = nonCoveringIndexes.get(0).getIndexGroupScan();
-          logger.debug("Generating non-covering index plan for query condition {}", indexCondition.toString());
-          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index, idxScan, indexCondition,
-              remainderCondition, builder);
+        for (IndexDescriptor index : nonCoveringIndexes) {
+          IndexGroupScan idxScan = index.getIndexGroupScan();
+          //Copy primary table statistics to index table
+          idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
+          logger.info("Generating non-covering index plan for query condition {}", indexCondition.toString());
+          NonCoveringIndexPlanGenerator planGen = new NonCoveringIndexPlanGenerator(indexContext, index,
+            idxScan, indexCondition, remainderCondition, builder, settings);
           planGen.go();
         }
       } catch (Exception e) {
@@ -400,19 +532,6 @@ public class DbScanToIndexScanPrule extends Prule {
         return;
       }
     }
-
-  }
-
-  private void processWithIndexSelection(
-      IndexPlanCallContext indexContext,
-      PlannerSettings settings,
-      RexNode condition,
-      IndexCollection collection,
-      RexBuilder builder)
-  {
-
-    IndexConditionInfo cInfo = IndexConditionInfo.newBuilder(condition, collection, builder, indexContext.scan).getCollectiveInfo();
-
   }
 
   /**
@@ -446,13 +565,55 @@ public class DbScanToIndexScanPrule extends Prule {
     // check covering based on the local information we have:
     //   if references to schema paths in functional indexes disappear beyond capProject
 
-    if (indexContext.capProject == null) {
+    if (indexContext.upperProject == null) {
       if( !isFullQuery(indexContext)) {
         return false;
       }
     }
-    //TODO: check capProject and other places to decide if this query is covered by functionInfo
-    return false;
+
+    DrillParseContext parserContext =
+        new DrillParseContext(PrelUtil.getPlannerSettings(indexContext.call.rel(0).getCluster()));
+
+    Set<LogicalExpression> exprs = Sets.newHashSet();
+    if (indexContext.upperProject != null) {
+      if (indexContext.lowerProject == null) {
+        for (RexNode rex : indexContext.upperProject.getProjects()) {
+          LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
+          exprs.add(expr);
+        }
+      } else {
+        //we have underneath project, so we have to do more to convert expressions
+        for (RexNode rex : indexContext.upperProject.getProjects()) {
+          LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.lowerProject, indexContext.scan, rex);
+          exprs.add(expr);
+        }
+      }
+    }
+    else {//capProject == null
+      if (indexContext.lowerProject != null) {
+        for (RexNode rex : indexContext.lowerProject.getProjects()) {
+          LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
+          exprs.add(expr);
+        }
+      }
+    }
+
+    Map<LogicalExpression, Set<SchemaPath>> exprPathMap = functionInfo.getPathsInFunctionExpr();
+    PathInExpr exprSearch = new PathInExpr(exprPathMap);
+
+    for(LogicalExpression expr: exprs) {
+      if(expr.accept(exprSearch, null) == false) {
+        return false;
+      }
+    }
+    //if we come to here, paths in indexed function expressions are covered in capProject.
+    //now we check other paths.
+
+    //check the leftout paths (appear in capProject other than functional index expression) are covered by other index fields or not
+    List<LogicalExpression> leftPaths = Lists.newArrayList(exprSearch.getRemainderPaths());
+
+    indexContext.leftOutPathsInFunctions = exprSearch.getRemainderPathsInFunctions();
+    return functionInfo.getIndexDesc().isCoveringIndex(leftPaths);
   }
 
   private boolean isFullQuery(IndexPlanCallContext indexContext) {

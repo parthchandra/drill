@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
@@ -27,13 +28,19 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.JoinControl;
+import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
+import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.drill.exec.planner.physical.ProjectPrel;
+import org.apache.drill.exec.planner.physical.ProjectPrule;
 import org.apache.drill.exec.planner.physical.Prule;
+import org.apache.drill.exec.planner.physical.RowKeyJoinPrel;
 import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
+import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.type.RelDataType;
@@ -46,10 +53,9 @@ import org.apache.calcite.rex.RexNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
-
 /**
  * Generate a non-covering index plan that is equivalent to the original plan. The non-covering plan consists
- * of a join-back between an index lookup and the primary table. This join-back is performed using a hash join.
+ * of a join-back between an index lookup and the primary table. This join-back is performed using a rowkey join.
  * For the primary table, we use a restricted scan that allows doing skip-scan instead of sequential scan.
  *
  * Original Plan:
@@ -59,7 +65,7 @@ import com.google.common.collect.Lists;
  *
  * New Plan:
  *
- *            HashJoin (on rowkey)
+ *            RowKeyJoin
  *          /         \
  * Remainder Filter  Exchange
  *         |            |
@@ -83,15 +89,16 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
                                        IndexGroupScan indexGroupScan,
                                        RexNode indexCondition,
                                        RexNode remainderCondition,
-                                       RexBuilder builder) {
-    super(indexContext, indexCondition, remainderCondition, builder);
+                                       RexBuilder builder,
+                                       PlannerSettings settings) {
+    super(indexContext, indexCondition, remainderCondition, builder, settings);
     this.indexGroupScan = indexGroupScan;
     this.indexDesc = indexDesc;
     this.functionInfo = indexDesc.getFunctionalInfo();
   }
 
   @Override
-  public RelNode convertChild(final RelNode filter, final RelNode input) throws InvalidRelException {
+  public RelNode convertChild(final RelNode topRel, final RelNode input) throws InvalidRelException {
 
     if (indexGroupScan == null) {
       logger.error("Null indexgroupScan in NonCoveringIndexPlanGenerator.convertChild");
@@ -99,14 +106,19 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     }
 
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
-    RelDataType indexScanRowType = convertRowTypeForIndexScan(
+    RelDataType indexScanRowType = FunctionalIndexHelper.convertRowTypeForIndexScan(
         origScan, indexCondition, indexGroupScan, functionInfo);
+
+    DrillDistributionTrait partition = IndexPlanUtils.scanIsPartition(origScan.getGroupScan())?
+        DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
+
     ScanPrel indexScanPrel = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), indexGroupScan, indexScanRowType);
+        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition), indexGroupScan, indexScanRowType);
     DbGroupScan origDbGroupScan = (DbGroupScan)origScan.getGroupScan();
 
-    // right (build) side of the hash join: broadcast the project-filter-indexscan subplan
-    RexNode convertedIndexCondition = convertConditionForIndexScan(indexCondition, indexScanRowType, functionInfo);
+    // right (build) side of the rowkey join: do a distribution of project-filter-indexscan subplan
+    RexNode convertedIndexCondition = FunctionalIndexHelper.convertConditionForIndexScan(indexCondition,
+        origScan, indexScanRowType, builder, functionInfo);
     FilterPrel  rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
           indexScanPrel, convertedIndexCondition);
     // project the rowkey column from the index scan
@@ -138,7 +150,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     // a separate Project here.
     final RelNode convertedRight = rangeDistRight;
 
-    // left (probe) side of the hash join
+    // left (probe) side of the rowkey join
 
     List<SchemaPath> cols = new ArrayList<SchemaPath>(origDbGroupScan.getColumns());
     if (!checkRowKey(cols)) {
@@ -152,8 +164,25 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       return null;
     }
 
+    RelTraitSet origScanTraitSet = origScan.getTraitSet();
+    RelTraitSet restrictedScanTraitSet = origScanTraitSet.plus(Prel.DRILL_PHYSICAL);
+
+    // Create the collation traits for restricted scan based on the index columns under the
+    // conditions that (a) the index actually has collation property (e.g hash indexes don't)
+    // and (b) if an explicit sort operation is not enforced
+    RelCollation collation = null;
+    if (indexDesc.getCollation() != null &&
+         !settings.isIndexForceSortNonCovering()) {
+      collation = IndexPlanUtils.buildCollationNonCoveringIndexScan(indexDesc, indexScanRowType, dbscanRowType);
+      if (restrictedScanTraitSet.contains(RelCollationTraitDef.INSTANCE)) { // replace existing trait
+        restrictedScanTraitSet = restrictedScanTraitSet.replace(collation);
+      } else {  // add new one
+        restrictedScanTraitSet = restrictedScanTraitSet.plus(collation);
+      }
+    }
+
     ScanPrel dbScan = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), restrictedGroupScan, dbscanRowType);
+        restrictedScanTraitSet, restrictedGroupScan, dbscanRowType);
     RelNode lastLeft = dbScan;
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();
@@ -169,6 +198,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       lastLeft = leftIndexFilterPrel;
     }
     RelDataType origRowType = origProject == null ? origScan.getRowType() : origProject.getRowType();
+
     if (origProject != null) {// then we also  don't need a project
       // new Project's rowtype is original Project's rowtype [plus rowkey if rowkey is not in original rowtype]
       List<RelDataTypeField> origProjFields = origRowType.getFieldList();
@@ -183,7 +213,11 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       }
 
       final RelDataType leftProjectRowType = leftFieldTypeBuilder.build();
-      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+
+      //build collation in project
+      collation = IndexPlanUtils.buildCollationLowerProject(leftProjectExprs, dbScan, functionInfo);
+
+      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet().plus(collation),
           leftIndexFilterPrel == null ? dbScan : leftIndexFilterPrel, leftProjectExprs, leftProjectRowType);
       lastLeft = leftIndexProjectPrel;
     }
@@ -192,7 +226,6 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final RelNode convertedLeft = Prule.convert(lastLeft, leftTraits);
 
     // find the rowkey column on the left side of join
-    // TODO: is there a shortcut way to do this ?
     final int leftRowKeyIdx = getRowKeyIndex(convertedLeft.getRowType(), origScan);
     final int rightRowKeyIdx = 0; // only rowkey field is being projected from right side
 
@@ -205,36 +238,62 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         RelOptUtil.createEquiJoinCondition(convertedLeft, leftJoinKeys,
             convertedRight, rightJoinKeys, builder);
 
-    HashJoinPrel hjPrel = new HashJoinPrel(indexContext.filter.getCluster(), leftTraits, convertedLeft,
-        convertedRight, joinCondition, JoinRelType.INNER, false,
-        true /* useful for join-restricted scans */, JoinControl.DEFAULT);
-
-    RelNode newRel = hjPrel;
+    RelNode newRel;
+    if (settings.isIndexUseHashJoinNonCovering()) {
+      //for hash join, collation will be cleared
+      HashJoinPrel hjPrel = new HashJoinPrel(topRel.getCluster(), leftTraits, convertedLeft,
+          convertedRight, joinCondition, JoinRelType.INNER, false,
+          true /* useful for join-restricted scans */, JoinControl.DEFAULT);
+      newRel = hjPrel;
+    } else {
+      //if there is collation, add to rowkey join
+      RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(topRel.getCluster(), leftTraits.plus(collation),
+          convertedLeft, convertedRight, joinCondition, JoinRelType.INNER);
+      newRel = rjPrel;
+    }
 
     final RelDataTypeFactory.FieldInfoBuilder finalFieldTypeBuilder =
         origScan.getCluster().getTypeFactory().builder();
 
-    List<RelDataTypeField> hjRowFields = newRel.getRowType().getFieldList();
+    List<RelDataTypeField> rjRowFields = newRel.getRowType().getFieldList();
     int toRemoveRowKeyCount = 1;
     if (getRowKeyIndex(origRowType, origScan)  < 0 ) {
       toRemoveRowKeyCount = 2;
     }
-    finalFieldTypeBuilder.addAll(hjRowFields.subList(0, hjRowFields.size()-toRemoveRowKeyCount));
+    finalFieldTypeBuilder.addAll(rjRowFields.subList(0, rjRowFields.size()-toRemoveRowKeyCount));
     final RelDataType finalProjectRowType = finalFieldTypeBuilder.build();
 
     List<RexNode> resetExprs = Lists.newArrayList();
-    for (int idx=0; idx<hjRowFields.size()-toRemoveRowKeyCount; ++idx) {
+    for (int idx=0; idx<rjRowFields.size()-toRemoveRowKeyCount; ++idx) {
       resetExprs.add(RexInputRef.of(idx, newRel.getRowType()));
     }
 
+    //rewrite the collation for this projectPrel
     final ProjectPrel resetProjectPrel = new ProjectPrel(newRel.getCluster(), newRel.getTraitSet(),
         newRel, resetExprs, finalProjectRowType);
     newRel = resetProjectPrel;
 
-    if ( capProject != null) {
-      ProjectPrel cap = new ProjectPrel(capProject.getCluster(), newRel.getTraitSet(),
-          newRel, capProject.getProjects(), capProject.getRowType());
+    if ( upperProject != null) {
+      final Map<Integer, Integer> collationMap = ProjectPrule.getCollationMap(upperProject);
+      RelCollation newCollation = null;
+
+      if ( origProject != null) {//so we already built collation there
+        RelCollation collationAdded = newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        newCollation = ProjectPrule.convertRelCollation(collationAdded, collationMap);
+      }
+      else {
+        RelCollation inputCollation = newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
+        newCollation = IndexPlanUtils.buildCollationUpperProject(upperProject.getProjects(), inputCollation, functionInfo, null);
+      }
+      ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
+          (newCollation==null?upperProject.getTraitSet() : upperProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
+          newRel, upperProject.getProjects(), upperProject.getRowType());
       newRel = cap;
+    }
+
+    //whether to remove sort
+    if (indexContext.sort != null) {
+      newRel = getSortNode(indexContext, newRel);
     }
 
     RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
@@ -245,3 +304,4 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
   }
 
 }
+

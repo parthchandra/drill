@@ -70,7 +70,7 @@ public class ProjectPrule extends Prule {
     }
   }
 
-  private class ProjectTraitPull extends SubsetTransformer<DrillProjectRel, RuntimeException> {
+  public static class ProjectTraitPull extends SubsetTransformer<DrillProjectRel, RuntimeException> {
     final Map<Integer, Integer> distributionMap;
     final Map<Integer, Integer> collationMap;
 
@@ -94,7 +94,7 @@ public class ProjectPrule extends Prule {
 
   }
 
-  private DrillDistributionTrait convertDist(DrillDistributionTrait srcDist, Map<Integer, Integer> inToOut) {
+  public static DrillDistributionTrait convertDist(DrillDistributionTrait srcDist, Map<Integer, Integer> inToOut) {
     List<DistributionField> newFields = Lists.newArrayList();
 
     for (DistributionField field : srcDist.getFields()) {
@@ -116,7 +116,7 @@ public class ProjectPrule extends Prule {
     }
   }
 
-  private RelCollation convertRelCollation(RelCollation src, Map<Integer, Integer> inToOut) {
+  public static RelCollation convertRelCollation(RelCollation src, Map<Integer, Integer> inToOut) {
     List<RelFieldCollation> newFields = Lists.newArrayList();
 
     for ( RelFieldCollation field : src.getFieldCollations()) {
@@ -132,7 +132,7 @@ public class ProjectPrule extends Prule {
     }
   }
 
-  private Map<Integer, Integer> getDistributionMap(DrillProjectRel project) {
+  public static Map<Integer, Integer> getDistributionMap(DrillProjectRel project) {
     Map<Integer, Integer> m = new HashMap<Integer, Integer>();
 
     for (Ord<RexNode> node : Ord.zip(project.getProjects())) {
@@ -150,7 +150,7 @@ public class ProjectPrule extends Prule {
 
   }
 
-  private Map<Integer, Integer> getCollationMap(DrillProjectRel project) {
+  public static Map<Integer, Integer> getCollationMap(DrillProjectRel project) {
     Map<Integer, Integer> m = new HashMap<Integer, Integer>();
 
     for (Ord<RexNode> node : Ord.zip(project.getProjects())) {

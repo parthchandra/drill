@@ -20,13 +20,10 @@ package org.apache.drill.exec.store.mapr.db;
 import com.mapr.db.impl.IdCodec;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
-import org.apache.drill.exec.record.VectorContainer;
-import org.apache.drill.exec.record.VectorWrapper;
+import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
 import org.apache.drill.exec.vector.ValueVector;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.collect.Iterables;
 import java.nio.ByteBuffer;
 
 /**
@@ -36,11 +33,11 @@ import java.nio.ByteBuffer;
 public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
 
   /**
-   * The HashJoin instance (specific to one minor fragment) which will supply this
+   * The RowKeyJoin instance (specific to one minor fragment) which will supply this
    * subscan with the set of rowkeys. For efficiency, we keep a reference to this
    * join rather than making another copy of the rowkeys.
    */
-  private HashJoinBatch hjbatch = null;
+  private RowKeyJoin rjbatch = null;
 
   /**
    * The following are needed to maintain internal state of iteration over the set
@@ -57,24 +54,19 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
     // empty constructor, to be used with builder pattern;
   }
 
-  public void setJoinForSubScan(HashJoinBatch hjbatch) {
-    this.hjbatch = hjbatch;
+  public void setJoinForSubScan(RowKeyJoin rjbatch) {
+    this.rjbatch = rjbatch;
   }
 
   @JsonIgnore
-  public HashJoinBatch getJoinForSubScan() {
-    return hjbatch;
+  public RowKeyJoin getJoinForSubScan() {
+    return rjbatch;
   }
 
   @JsonIgnore
-  private void init(Pair<VectorContainer, Integer> b) {
-    VectorContainer vc = b.getLeft();
+  private void init(Pair<ValueVector, Integer> b) {
     this.maxOccupiedIndex = b.getRight();
-
-    // get the value vector corresponding to the given column index (0 in this case since there
-    // should only be 1 column)
-    VectorWrapper<?> vw = Iterables.get(vc, 0);
-    this.rowKeyVector = vw.getValueVector();
+    this.rowKeyVector = b.getLeft();
     this.currentIndex = 0;
   }
 
@@ -83,7 +75,7 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
    */
   @JsonIgnore
   public boolean readyToGetRowKey() {
-    return hjbatch != null && hjbatch.hashTableBuilt();
+    return rjbatch != null && rjbatch.hasRowKeyBatch();
   }
 
   /**
@@ -98,8 +90,8 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
       return true;
     }
 
-    if (hjbatch != null) {
-      Pair<VectorContainer, Integer> currentBatch = hjbatch.nextBuildBatch();
+    if (rjbatch != null) {
+      Pair<ValueVector, Integer> currentBatch = rjbatch.nextRowKeyBatch();
 
       // note that the hash table could be null initially during the BUILD_SCHEMA phase
       if (currentBatch != null) {
@@ -125,8 +117,8 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
         numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
       }
     } else {
-      if (hjbatch != null) {
-        Pair<VectorContainer, Integer> currentBatch = hjbatch.nextBuildBatch();
+      if (rjbatch != null) {
+        Pair<ValueVector, Integer> currentBatch = rjbatch.nextRowKeyBatch();
 
         // note that the hash table could be null initially during the BUILD_SCHEMA phase
         if (currentBatch != null) {
@@ -187,7 +179,7 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
       // occupied index within a batch, move to the next one and reset the current index to 0
       // TODO: we should try to abstract this out
       if (currentIndex > maxOccupiedIndex) {
-        Pair<VectorContainer, Integer> currentBatch = hjbatch.nextBuildBatch();
+        Pair<ValueVector, Integer> currentBatch = rjbatch.nextRowKeyBatch();
         if (currentBatch != null) {
           init(currentBatch);
         }

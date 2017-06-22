@@ -31,7 +31,9 @@ import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
+import org.apache.drill.exec.planner.index.MapRDBStatistics;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
+import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
@@ -52,8 +54,9 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
                             @JsonProperty("storage") FileSystemPlugin storagePlugin,
                             @JsonProperty("format") MapRDBFormatPlugin formatPlugin,
                             @JsonProperty("scanSpec") JsonScanSpec scanSpec, /* scan spec of the original table */
-                            @JsonProperty("columns") List<SchemaPath> columns) {
-    super(userName, storagePlugin, formatPlugin, scanSpec, columns);
+                            @JsonProperty("columns") List<SchemaPath> columns,
+                            @JsonProperty("")MapRDBStatistics statistics) {
+    super(userName, storagePlugin, formatPlugin, scanSpec, columns, statistics);
   }
 
   // TODO:  this method needs to be fully implemented
@@ -115,10 +118,13 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     int totalColNum = 10;
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
     long rowCount = (long)(0.001f * tableStats.getNumRows());
-    final int avgColumnSize = 10;
-    float diskCost = avgColumnSize * numColumns * rowCount;
+    final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
+    // restricted scan does random lookups and each row may belong to a different block, with the number
+    // of blocks upper bounded by the total num blocks in the primary table
+    double totalBlocksPrimary = Math.ceil((avgColumnSize * numColumns * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
+    double numBlocks = Math.min(totalBlocksPrimary, rowCount);
+    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
-    //return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1, 1, 1);
   }
 
   @Override

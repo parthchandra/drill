@@ -19,11 +19,16 @@ package org.apache.drill.exec.planner.index;
 
 import java.util.List;
 
+import org.apache.calcite.plan.RelOptCost;
+import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
 
 /**
  * Abstract base class for an Index descriptor
@@ -33,13 +38,13 @@ public abstract class AbstractIndexDescriptor extends DrillIndexDefinition imple
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexDescriptor .class);
 
   public AbstractIndexDescriptor(List<LogicalExpression> indexCols,
-                                 List<FieldDirection> indexColDirections,
+                               CollationContext indexCollationContext,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
-    super(indexCols, indexColDirections, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
   }
 
   @Override
@@ -62,5 +67,10 @@ public abstract class AbstractIndexDescriptor extends DrillIndexDefinition imple
     return false;
   }
 
+  @Override
+  public RelOptCost getCost(IndexProperties indexProps, RelOptPlanner planner,
+      int numProjectedFields, GroupScan primaryGroupScan) {
+    throw new UnsupportedOperationException("getCost() not supported for this index.");
+  }
 
 }

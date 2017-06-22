@@ -93,6 +93,7 @@ public class DrillSortRel extends Sort implements DrillRel {
       String fieldName = ExprHelper.getFieldName(o.getExpr());
       int fieldId = fieldMap.get(fieldName);
       RelFieldCollation c = new RelFieldCollation(fieldId, o.getDirection(), o.getNullDirection());
+      collations.add(c);
     }
     return new DrillSortRel(context.getCluster(), context.getLogicalTraits(), input, RelCollationImpl.of(collations));
   }

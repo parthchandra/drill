@@ -17,21 +17,16 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import com.google.common.collect.Maps;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
-
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.AbstractIndexGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillTable;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-
 
 public class DrillIndexDescriptor extends AbstractIndexDescriptor {
 
@@ -43,17 +38,17 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   private DrillTable table;
 
   public DrillIndexDescriptor(List<LogicalExpression> indexCols,
-                              List<FieldDirection> indexColDirections,
+                               CollationContext indexCollationContext,
                                List<LogicalExpression> nonIndexCols,
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type) {
-    super(indexCols, indexColDirections, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
   }
 
   public DrillIndexDescriptor(DrillIndexDefinition def) {
-    this(def.indexColumns, def.indexColDirections, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
+    this(def.indexColumns, def.indexCollationContext, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
         def.getTableName(), def.getIndexType());
   }
 
@@ -73,13 +68,10 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
         logger.error("The Groupscan from table {} is not an IndexGroupScan", idxTable.toString());
         return null;
       }
-      if (scan instanceof AbstractIndexGroupScan) {
-        ((AbstractIndexGroupScan)scan).convertColumns(idxTable);
-      }
       return (IndexGroupScan)scan;
     }
     catch(IOException e) {
-      logger.error("Error in getIndexGroupScan: [{}]", e.getStackTrace());
+      logger.error("Error in getIndexGroupScan ", e);
     }
     return null;
   }

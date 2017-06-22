@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 import org.apache.drill.common.expression.FieldReference;
@@ -67,7 +68,7 @@ import com.sun.codemodel.JExpr;
 import com.sun.codemodel.JExpression;
 import com.sun.codemodel.JVar;
 
-public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
+public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements RowKeyJoin {
   public static final long ALLOCATOR_INITIAL_RESERVATION = 1 * 1024 * 1024;
   public static final long ALLOCATOR_MAX_RESERVATION = 20L * 1000 * 1000 * 1000;
 
@@ -561,21 +562,38 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> {
    * @return hash table iterator or null if this hash join was not a row-key join or if it
    * was a row-key join but the build has not yet completed.
    */
-  public Pair<VectorContainer, Integer> nextBuildBatch() {
+  @Override   // implement RowKeyJoin interface
+  public Pair<ValueVector, Integer> nextRowKeyBatch() {
     if (buildComplete) {
-      return hashTable.nextBatch();
+      Pair<VectorContainer, Integer> pp = hashTable.nextBatch();
+      VectorWrapper<?> vw = Iterables.get(pp.getLeft(), 0);
+      ValueVector vv = vw.getValueVector();
+      return Pair.of(vv, pp.getRight());
     }
     else if(hashTable == null && firstOutputBatch == true) { //if there is data coming to right(build) side in build Schema stage, use it.
       firstOutputBatch = false;
       if ( right.getRecordCount() > 0 ) {
-        return Pair.of(right.getOutgoingContainer(), right.getRecordCount()-1);
+        VectorWrapper<?> vw = Iterables.get(right, 0);
+        ValueVector vv = vw.getValueVector();
+        return Pair.of(vv, right.getRecordCount()-1);
       }
     }
     return null;
   }
 
-  public boolean hashTableBuilt() {
+  @Override    // implement RowKeyJoin interface
+  public boolean hasRowKeyBatch() {
     return buildComplete;
+  }
+
+  @Override   // implement RowKeyJoin interface
+  public BatchState getBatchState() {
+    return state;
+  }
+
+  @Override  // implement RowKeyJoin interface
+  public void setBatchState(BatchState newState) {
+    state = newState;
   }
 
   @Override

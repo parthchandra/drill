@@ -22,14 +22,16 @@ import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.logical.DrillSortRel;
 
 import java.util.Set;
 
 public class IndexPlanCallContext {
   final public RelOptRuleCall call;
-  final public DrillProjectRel capProject;
+  final public DrillSortRel sort;
+  final public DrillProjectRel upperProject;
   final public DrillFilterRel filter;
-  final public DrillProjectRel project;
+  final public DrillProjectRel lowerProject;
   final public DrillScanRel scan;
 
   public Set<LogicalExpression> leftOutPathsInFunctions;
@@ -39,10 +41,20 @@ public class IndexPlanCallContext {
                        DrillFilterRel filter,
                        DrillProjectRel project,
                        DrillScanRel scan) {
+    this(call, null, capProject, filter, project, scan);
+  }
+
+  IndexPlanCallContext(RelOptRuleCall call,
+      DrillSortRel sort,
+      DrillProjectRel capProject,
+      DrillFilterRel filter,
+      DrillProjectRel project,
+      DrillScanRel scan) {
     this.call = call;
-    this.capProject = capProject;
+    this.sort = sort;
+    this.upperProject = capProject;
     this.filter = filter;
-    this.project = project;
+    this.lowerProject = project;
     this.scan = scan;
   }
 

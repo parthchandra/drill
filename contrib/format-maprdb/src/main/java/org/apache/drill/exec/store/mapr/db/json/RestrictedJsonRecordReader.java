@@ -30,7 +30,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
-import org.apache.drill.exec.physical.impl.join.HashJoinBatch;
+import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
 import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
@@ -145,18 +145,22 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     //TODO: need to consider and test the case when there are multiple batches of rowkeys
     RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec) this.subScanSpec);
 
-    HashJoinBatch hjBatch = rss.getJoinForSubScan();
-    if (hjBatch == null) {
+    RowKeyJoin rjBatch = rss.getJoinForSubScan();
+    if (rjBatch == null) {
       return false;
     }
-    AbstractRecordBatch.BatchState state = rss.getJoinForSubScan().getState();
+
+    boolean hasMore = false;
+    AbstractRecordBatch.BatchState state = rss.getJoinForSubScan().getBatchState();
     if ( state == AbstractRecordBatch.BatchState.BUILD_SCHEMA ) {
-      return true;
+      hasMore = true;
+    } else if ( state == AbstractRecordBatch.BatchState.FIRST) {
+       rss.getJoinForSubScan().setBatchState(AbstractRecordBatch.BatchState.NOT_FIRST);
+       hasMore = true;
     }
-    if( state == AbstractRecordBatch.BatchState.FIRST) {
-       rss.getJoinForSubScan().setState(AbstractRecordBatch.BatchState.NOT_FIRST);
-      return true;
-    }
-    return false;
+
+    logger.debug("restricted reader hasMore = {}", hasMore);
+
+    return hasMore;
   }
 }
