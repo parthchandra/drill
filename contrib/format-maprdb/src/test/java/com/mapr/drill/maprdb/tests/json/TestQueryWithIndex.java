@@ -57,6 +57,8 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
       DBTests.waitForRowCount(table.getPath(), 5, INDEX_FLUSH_TIMEOUT);
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
+    } finally {
+      test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
     }
   }
 
@@ -69,21 +71,12 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
   @Test
   public void testSelectWithIndex() throws Exception {
-    test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
-
     final String sql = String.format(
           "SELECT\n"
         + "  _id, t.name.last\n"
         + "FROM\n"
-<<<<<<< HEAD
         + "  hbase.`drill_test_table_with_index` t\n"
         + "WHERE t.name.last = 'Harris2345'";
-=======
-        + "  hbase.root.`%s` t\n"
-        + "WHERE t.name.last = 'Russel'",
-        tablePath);
-
->>>>>>> d5dbcf1... Fixed MapRDBIndexDescriptor to extract all field-paths from the encoded FieldPath.
     runSQLAndVerifyCount(sql, 1);
 
     // plan test
