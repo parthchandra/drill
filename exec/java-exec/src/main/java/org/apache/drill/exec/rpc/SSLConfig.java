@@ -39,6 +39,7 @@ public class SSLConfig {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfig.class);
 
   private static final String DEFAULT_SSL_PROTOCOL = new String("TLSv1.2");
+  private static final int DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS = 10*1000; // 10 seconds
 
   private final boolean sslEnabled;
 
@@ -50,11 +51,8 @@ public class SSLConfig {
   private final String truststorePath;
   private final String truststorePassword;
   private final String protocol;
+  private final int handshakeTimeout;
   private final SSLContext sslContext;
-
-  //public SSLConfig(BootStrapContext context) throws DrillException {
-  //  this(context.getConfig());
-  //}
 
   public SSLConfig(DrillConfig config, boolean validateKeyStore) throws DrillException {
     if (sslEnabled = config.hasPath(ExecConstants.USER_SSL_ENABLED) && config
@@ -68,6 +66,13 @@ public class SSLConfig {
       truststorePath = getSystemConfigParam(config, ExecConstants.USER_SSL_TRUSTSTORE_PATH);
       truststorePassword = getSystemConfigParam(config, ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD);
       protocol = getConfigParam(config, ExecConstants.USER_SSL_PROTOCOL, DEFAULT_SSL_PROTOCOL);
+      int hsTimeout = config.hasPath(ExecConstants.USER_SSL_HANDSHAKE_TIMEOUT) ?
+          config.getInt(ExecConstants.USER_SSL_HANDSHAKE_TIMEOUT) :
+          DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
+      if (hsTimeout <= 0) {
+        hsTimeout = DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
+      }
+      handshakeTimeout = hsTimeout;
       sslContext = init(validateKeyStore);
     } else {
       keystoreType = null;
@@ -78,6 +83,7 @@ public class SSLConfig {
       truststorePath = null;
       truststorePassword = null;
       protocol = null;
+      handshakeTimeout = 0;
       sslContext = null;
     }
   }
@@ -94,6 +100,13 @@ public class SSLConfig {
       truststorePath = getSystemProp(properties, ExecConstants.USER_SSL_TRUSTSTORE_PATH);
       truststorePassword = getSystemProp(properties, ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD);
       protocol = getProp(properties, ExecConstants.USER_SSL_PROTOCOL, DEFAULT_SSL_PROTOCOL);
+      int hsTimeout = properties.containsKey(ExecConstants.USER_SSL_HANDSHAKE_TIMEOUT) ?
+          Integer.parseInt(properties.getProperty(ExecConstants.USER_SSL_HANDSHAKE_TIMEOUT)) :
+          DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
+      if (hsTimeout <= 0) {
+        hsTimeout = DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
+      }
+      handshakeTimeout = hsTimeout;
       sslContext = init(validateKeyStore);
     } else {
       keystoreType = null;
@@ -104,6 +117,7 @@ public class SSLConfig {
       truststorePath = null;
       truststorePassword = null;
       protocol = null;
+      handshakeTimeout = 0;
       sslContext = null;
     }
   }
@@ -284,6 +298,10 @@ public class SSLConfig {
 
   public String getProtocol() {
     return protocol;
+  }
+
+  public int getHandshakeTimeout() {
+    return handshakeTimeout;
   }
 
   public SSLContext getSslContext() {

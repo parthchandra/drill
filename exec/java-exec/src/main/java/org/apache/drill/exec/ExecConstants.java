@@ -151,6 +151,7 @@ public interface ExecConstants {
   String USER_SSL_TRUSTSTORE_PATH = HTTP_TRUSTSTORE_PATH; // path to keystore. default : $JRE_HOME/lib/security/cacerts.jks
   String USER_SSL_TRUSTSTORE_PASSWORD = HTTP_TRUSTSTORE_PASSWORD; // default: changeit
   String USER_SSL_PROTOCOL = "drill.exec.security.user.encryption.ssl.protocol"; // valid values are SSL, SSLV2, SSLV3, TLS, TLSV1, TLSv1.1, TLSv1.2(default)
+  String USER_SSL_HANDSHAKE_TIMEOUT = "drill.exec.security.user.encryption.ssl.handshakeTimeout"; // Default 10 seconds
   String USER_SSL_KEY_PASSWORD = "drill.exec.security.user.encryption.ssl.keyPassword"; //
   String BIT_ENCRYPTION_SASL_ENABLED = "drill.exec.security.bit.encryption.sasl.enabled";
   String BIT_ENCRYPTION_SASL_MAX_WRAPPED_SIZE = "drill.exec.security.bit.encryption.sasl.max_wrapped_size";
