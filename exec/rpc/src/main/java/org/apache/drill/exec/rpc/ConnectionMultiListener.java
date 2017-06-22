@@ -179,8 +179,8 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
 
     @Override public void operationComplete(Future<Channel> future) throws Exception {
       if(parent != null){
-        Channel c = future.get(); // Ensure any exceptions are thrown.
         if(future.isSuccess()) {
+          Channel c = future.get();
           parent.sslConnectionHandler.operationComplete(future);
           parent.parent.setSslChannel(c);
         } else {

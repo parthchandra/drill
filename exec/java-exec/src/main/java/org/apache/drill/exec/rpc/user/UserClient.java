@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.net.ssl.SSLEngine;
 import javax.security.sasl.SaslClient;
@@ -153,6 +155,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
 
       // Add SSL handler into pipeline
       SslHandler sslHandler = new SslHandler(sslEngine);
+      sslHandler.setHandshakeTimeoutMillis(sslConfig.getHandshakeTimeout());
 
       // Add a listener for SSL Handshake complete. The Drill client handshake will be enabled only
       // after this is done.
@@ -217,7 +220,17 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
           Integer.parseInt(properties.getProperty(DrillProperties.TEST_SASL_LEVEL))));
     }
 
-    connect(hsBuilder.build(), endpoint).checkedGet();
+    if(sslConfig.isSslEnabled()) {
+      try {
+        connect(hsBuilder.build(), endpoint).checkedGet(sslConfig.getHandshakeTimeout(), TimeUnit.MILLISECONDS);
+      } catch (TimeoutException e) {
+        throw new NonTransientRpcException(
+            "Connecting to the server timed out. This is sometimes due to a mismatch in the SSL configuration between client and server.",
+            e);
+      }
+    } else{
+      connect(hsBuilder.build(), endpoint).checkedGet();
+    }
 
     // Check if client needs encryption and server is not configured for encryption.
     final boolean clientNeedsEncryption = properties.containsKey(DrillProperties.SASL_ENCRYPT)
