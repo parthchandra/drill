@@ -57,18 +57,21 @@ import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.codehaus.jackson.annotate.JsonCreator;
+import org.ojai.store.QueryCondition;
 
 import com.fasterxml.jackson.annotation.JacksonInject;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
+import com.mapr.db.MetaTable;
 import com.mapr.db.MapRDB;
 import com.mapr.db.Table;
 import com.mapr.db.TabletInfo;
 import com.mapr.db.impl.TabletInfoImpl;
 import com.mapr.db.index.IndexDesc;
 import com.mapr.db.index.IndexFieldDesc;
+import com.mapr.db.scan.ScanRange;
 
 import org.ojai.store.QueryCondition;
 
@@ -161,13 +164,16 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       Configuration conf = new Configuration();
       Table t;
       t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexFid());
-      TabletInfo[] tabletInfos = t.getTabletInfos(scanSpec.getCondition());
+      MetaTable metaTable = t.getMetaTable();
+      QueryCondition scanSpecCondition = scanSpec.getCondition();
+      List<? extends ScanRange> scanRanges = metaTable.getScanRanges(scanSpecCondition);
+      
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
       regionsToScan = new TreeMap<TabletFragmentInfo, String>();
-      for (TabletInfo tabletInfo : tabletInfos) {
-        TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) tabletInfo;
-        regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), tabletInfo.getLocations()[0]);
+      for (ScanRange range : scanRanges) {
+        TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) range;
+        regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), range.getLocations()[0]);
       }
     } catch (Exception e) {
       throw new DrillRuntimeException("Error getting region info for table: " +

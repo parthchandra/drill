@@ -35,8 +35,12 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
   private static final String TMP_TABLE_WITH_INDEX = "drill_test_table_with_index";
 
+  private static final String TMP_TABLE_WITH_HASHED_INDEX = "drill_test_table_with_hashed_index";
+
   private static boolean tableCreated = false;
+  private static boolean hashedIndexTableCreated = false;
   private static String tablePath;
+  private static String hashedIndexTablePath;
 
   @BeforeClass
   public static void setup_TestQueryWithIndex() throws Exception {
@@ -57,20 +61,45 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
       DBTests.waitForRowCount(table.getPath(), 5, INDEX_FLUSH_TIMEOUT);
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
+    } finally {
+      test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
+    }
+
+    try (Table table = DBTests.createOrReplaceTable(TMP_TABLE_WITH_HASHED_INDEX)) {
+      hashedIndexTableCreated = true;
+      hashedIndexTablePath = table.getPath().toUri().getPath();
+      DBTests.createIndex(TMP_TABLE_WITH_HASHED_INDEX, "testhashedindex", new String[] {"name.last"}, new String[] {"age"}, true, 5);
+      DBTests.admin().getTableIndexes(table.getPath(), true);
+
+      // insert data
+      table.insertOrReplace(MapRDBImpl.newDocument("{\"_id\":\"user001\", \"age\":43, \"name\": {\"first\":\"Sam\", \"last\":\"Harris\"}}"));
+      table.insertOrReplace(MapRDBImpl.newDocument("{\"_id\":\"user002\", \"age\":12, \"name\": {\"first\":\"Leon\", \"last\":\"Russel\"}}"));
+      table.insertOrReplace(MapRDBImpl.newDocument("{\"_id\":\"user003\", \"age\":87, \"name\": {\"first\":\"David\", \"last\":\"Bowie\"}}"));
+      table.insertOrReplace(MapRDBImpl.newDocument("{\"_id\":\"user004\", \"age\":56, \"name\": {\"first\":\"Bob\", \"last\":\"Dylan\"}}"));
+      table.insertOrReplace(MapRDBImpl.newDocument("{\"_id\":\"user005\", \"age\":54, \"name\": {\"first\":\"David\", \"last\":\"Ackert\"}}"));
+      table.flush();
+
+      DBTests.waitForRowCount(table.getPath(), 5, INDEX_FLUSH_TIMEOUT);
+      DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
+    } finally {
+      test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
     }
   }
 
   @AfterClass
-  public static void cleanup_TestEncodedFieldPaths() throws Exception {
+  public static void cleanup_TestQueryWithIndex() throws Exception {
+    test("ALTER SESSION SET `planner.disable_full_table_scan` = false");
     if (tableCreated) {
       DBTests.deleteTables(TMP_TABLE_WITH_INDEX);
+    }
+
+    if (hashedIndexTableCreated) {
+      DBTests.deleteTables(TMP_TABLE_WITH_HASHED_INDEX);
     }
   }
 
   @Test
   public void testSelectWithIndex() throws Exception {
-    test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
-
     final String sql = String.format(
           "SELECT\n"
         + "  _id, t.name.last\n"
@@ -88,4 +117,22 @@ public class TestQueryWithIndex extends BaseJsonTest {
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
   }
 
+  @Test
+  public void testSelectWithHashedIndex() throws Exception {
+    final String sql = String.format(
+          "SELECT\n"
+        + "  _id, t.name.last\n"
+        + "FROM\n"
+        + "  hbase.root.`%s` t\n"
+        + "WHERE t.name.last = 'Russel'",
+        hashedIndexTablePath);
+
+    runSQLAndVerifyCount(sql, 1);
+
+    // plan test
+    final String[] expectedPlan = {"indexName=testhashedindex"};
+    final String[] excludedPlan = {};
+
+    PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
+  }
 }
