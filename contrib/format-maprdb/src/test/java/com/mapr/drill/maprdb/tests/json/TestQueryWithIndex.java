@@ -61,6 +61,8 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
       DBTests.waitForRowCount(table.getPath(), 5, INDEX_FLUSH_TIMEOUT);
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
+    } finally {
+      test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
     }
 
     try (Table table = DBTests.createOrReplaceTable(TMP_TABLE_WITH_HASHED_INDEX)) {
@@ -79,11 +81,14 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
       DBTests.waitForRowCount(table.getPath(), 5, INDEX_FLUSH_TIMEOUT);
       DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
+    } finally {
+      test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
     }
   }
 
   @AfterClass
   public static void cleanup_TestQueryWithIndex() throws Exception {
+    test("ALTER SESSION SET `planner.disable_full_table_scan` = false");
     if (tableCreated) {
       DBTests.deleteTables(TMP_TABLE_WITH_INDEX);
     }
@@ -95,8 +100,6 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
   @Test
   public void testSelectWithIndex() throws Exception {
-    test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
-
     final String sql = String.format(
           "SELECT\n"
         + "  _id, t.name.last\n"
@@ -116,8 +119,6 @@ public class TestQueryWithIndex extends BaseJsonTest {
 
   @Test
   public void testSelectWithHashedIndex() throws Exception {
-    test("ALTER SESSION SET `planner.disable_full_table_scan` = true");
-
     final String sql = String.format(
           "SELECT\n"
         + "  _id, t.name.last\n"
