@@ -223,7 +223,6 @@ public class SSLConfig {
         value = null;
       }
     }
-    logger.info("SSL: {}: {}", name, value);
     return value;
   }
 
@@ -234,7 +233,6 @@ public class SSLConfig {
     } else {
       value = defaultValue;
     }
-    logger.info("SSL: {}: {}", name, value);
     return value;
   }
 
@@ -249,7 +247,6 @@ public class SSLConfig {
         value = null;
       }
     }
-    logger.info("SSL: {}: {}", name, value);
     return value;
   }
 
@@ -260,7 +257,6 @@ public class SSLConfig {
     } else {
       value = defaultValue;
     }
-    logger.info("SSL: {}: {}", name, value);
     return value;
   }
 
@@ -306,6 +302,28 @@ public class SSLConfig {
 
   public SSLContext getSslContext() {
     return sslContext;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    if(sslEnabled) {
+      sb.append("SSL Configuration :")
+          .append( "keystoreType: ").append( keystoreType)
+          .append( "keystorePath: ").append( keystorePath)
+          .append( "keystorePassword: ").append( keystorePassword)
+          .append( "keyPassword: ").append( keyPassword)
+          .append( "truststoreType: ").append( truststoreType)
+          .append( "truststorePath: ").append( truststorePath)
+          .append( "truststorePassword: ").append( truststorePassword)
+          .append( "protocol: ").append( protocol)
+          .append( "handshakeTimeout: ").append( handshakeTimeout)
+          ;
+
+    } else {
+      sb.append("SSL is not enabled.");
+    }
+    return sb.toString();
   }
 }
 

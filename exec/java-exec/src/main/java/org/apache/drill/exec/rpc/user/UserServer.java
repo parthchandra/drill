@@ -120,7 +120,9 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
 
       // Add SSL handler into pipeline
       pipe.addFirst("SSL", new SslHandler(sslEngine));
+      logger.info("SSL communication between client and server is enabled.");
     }
+    logger.info(sslConfig.toString());
   }
   @Override
   protected boolean isSslEnabled() {
