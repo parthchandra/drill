@@ -750,4 +750,72 @@ public class IndexPlanTest extends BaseJsonTest {
         .go();
   }
 
+  @Test // non-covering plan. sort by the only indexed field, sort SHOULD be removed
+  public void orderByNonCoveringPlan() throws Exception {
+    String query = "SELECT t.name.lname as lname FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn < '100000003' order by t.id.ssn";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("lname").baselineValues("iuMG")
+        .baselineColumns("lname").baselineValues("KpFq")
+        .baselineColumns("lname").baselineValues("bkkAvz")
+        .go();
+  }
+
+  @Test //non-covering plan. order by cast indexed field, sort SHOULD be removed
+  public void orderByCastNonCoveringPlan() throws Exception {
+    String query = "SELECT t.name.lname as lname FROM hbase.`index_test_primary` as t " +
+        " where CAST(t.id.ssn as INT) < 100000003 order by CAST(t.id.ssn as INT)";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("lname").baselineValues("iuMG")
+        .baselineColumns("lname").baselineValues("KpFq")
+        .baselineColumns("lname").baselineValues("bkkAvz")
+        .go();
+  }
+
+
+  @Test //non-covering, order by non leading field, and leading fields are not in equality condition, Sort SHOULD NOT be removed
+  public void NonCoveringPlan_SortPrefix_1() throws Exception {
+
+    String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where t.address.state > 'pc' AND t.address.city>'pfrrr' AND t.address.city<'pfrrt' order by t.adddress.city";
+    test(defaultHavingIndexPlan+";"+ highFTSFactor +";");
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort",
+            "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{}
+    );
+    test(defaultFTSFactor);
+    return;
+  }
+
+  @Test //non-covering, order by non leading field, and leading fields are in equality condition, Sort SHOULD be removed
+  public void NonCoveringPlan_SortPrefix_2() throws Exception {
+
+    String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'pc' AND t.address.city>'pfrrr' AND t.address.city<'pfrrt' order by t.address.city";
+    test(defaultHavingIndexPlan+";"+ highFTSFactor +";");
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {
+            "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{"Sort"}
+    );
+    test(defaultFTSFactor);
+    return;
+  }
 }

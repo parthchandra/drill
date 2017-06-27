@@ -155,7 +155,9 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
   public RelTraitSet newTraitSet(RelTrait... traits) {
     RelTraitSet set = indexContext.call.getPlanner().emptyTraitSet();
     for (RelTrait t : traits) {
-      set = set.plus(t);
+      if(t != null) {
+        set = set.plus(t);
+      }
     }
     return set;
   }

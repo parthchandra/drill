@@ -30,6 +30,7 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.DrillDistributionTrait;
+import org.apache.drill.exec.planner.physical.DrillDistributionTraitDef;
 import org.apache.drill.exec.planner.physical.FilterPrel;
 import org.apache.drill.exec.planner.physical.HashJoinPrel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
@@ -181,9 +182,9 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
          !settings.isIndexForceSortNonCovering()) {
       collation = IndexPlanUtils.buildCollationNonCoveringIndexScan(indexDesc, indexScanRowType, dbscanRowType);
       if (restrictedScanTraitSet.contains(RelCollationTraitDef.INSTANCE)) { // replace existing trait
-        restrictedScanTraitSet = restrictedScanTraitSet.replace(collation);
+        restrictedScanTraitSet = restrictedScanTraitSet.plus(partition).replace(collation);
       } else {  // add new one
-        restrictedScanTraitSet = restrictedScanTraitSet.plus(collation);
+        restrictedScanTraitSet = restrictedScanTraitSet.plus(partition).plus(collation);
       }
     }
 
@@ -284,17 +285,15 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     if ( upperProject != null) {
       final Map<Integer, Integer> collationMap = ProjectPrule.getCollationMap(upperProject);
       RelCollation newCollation = null;
+      DrillDistributionTrait newDist = null;
 
-      if ( origProject != null) {//so we already built collation there
-        RelCollation collationAdded = newRel.getTraitSet().getTrait(RelCollationTraitDef.INSTANCE);
-        newCollation = ProjectPrule.convertRelCollation(collationAdded, collationMap);
-      }
-      else {
-        newCollation = IndexPlanUtils.buildCollationProject(upperProject.getProjects(), origProject, origScan,
-            functionInfo, indexContext);
-      }
+      newDist = upperProject.getInput().getTraitSet().getTrait(DrillDistributionTraitDef.INSTANCE);
+      newCollation = IndexPlanUtils.buildCollationProject(upperProject.getProjects(), origProject, origScan,
+          functionInfo, indexContext);
+
+      RelTraitSet newProjectTraits = newTraitSet(Prel.DRILL_PHYSICAL, newDist, newCollation);
       ProjectPrel cap = new ProjectPrel(upperProject.getCluster(),
-          (newCollation==null?upperProject.getTraitSet().plus(Prel.DRILL_PHYSICAL) : upperProject.getTraitSet().plus(newCollation)).plus(Prel.DRILL_PHYSICAL),
+          newProjectTraits,
           newRel, upperProject.getProjects(), upperProject.getRowType());
       newRel = cap;
     }
@@ -304,8 +303,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       newRel = getSortNode(indexContext, newRel);
     }
 
-    RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
-
+    //RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
+    RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet().replace(DrillDistributionTrait.ANY));
     logger.trace("NonCoveringIndexPlanGenerator got finalRel {} from origScan {}",
         finalRel.toString(), origScan.toString());
     return finalRel;
