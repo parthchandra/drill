@@ -54,7 +54,6 @@ import org.apache.calcite.rex.RexNode;
 
 public class IndexPlanUtils {
 
-
   /**
    * Build collation property for the 'lower' project, the one closer to the Scan
    * @param projectRexs
@@ -62,6 +61,109 @@ public class IndexPlanUtils {
    * @param indexInfo
    * @return the output RelCollation
    */
+  public static RelCollation buildCollationLowerProject(List<RexNode> projectRexs, RelNode input, FunctionalIndexInfo indexInfo) {
+    //if leading fields of index are here, add them to RelCollation
+    List<RelFieldCollation> newFields = Lists.newArrayList();
+    if (!indexInfo.hasFunctional()) {
+      Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
+      DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
+      int idx=0;
+      for(RexNode rex : projectRexs) {
+        projectExprs.put(DrillOptiq.toDrill(parserContext, input, rex), idx);
+        idx++;
+      }
+      int idxFieldCount = 0;
+      for (LogicalExpression expr : indexInfo.getIndexDesc().getIndexColumns()) {
+        if (!projectExprs.containsKey(expr)) {
+          break;
+        }
+        RelFieldCollation.Direction dir = indexInfo.getIndexDesc().getCollation().getFieldCollations().get(idxFieldCount).direction;
+        if ( dir == null) {
+          break;
+        }
+        newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
+            RelFieldCollation.NullDirection.UNSPECIFIED));
+      }
+      idxFieldCount++;
+    } else {
+      // TODO: handle functional index
+    }
+
+    return RelCollations.of(newFields);
+  }
+
+  /**
+   * Build collation property for the 'upper' project, the one above the filter
+   * @param projectRexs
+   * @param inputCollation
+   * @param indexInfo
+   * @param collationFilterMap
+   * @return the output RelCollation
+   */
+  public static RelCollation buildCollationUpperProject(List<RexNode> projectRexs,
+                                                        RelCollation inputCollation, FunctionalIndexInfo indexInfo,
+                                                        Map<Integer, List<RexNode>> collationFilterMap) {
+    List<RelFieldCollation> outputFieldCollations = Lists.newArrayList();
+
+    if (inputCollation != null) {
+      List<RelFieldCollation> inputFieldCollations = inputCollation.getFieldCollations();
+      if (!indexInfo.hasFunctional()) {
+        for (int projectExprIdx = 0; projectExprIdx < projectRexs.size(); projectExprIdx++) {
+          RexNode n = projectRexs.get(projectExprIdx);
+          if (n instanceof RexInputRef) {
+            RexInputRef ref = (RexInputRef)n;
+            boolean eligibleForCollation = true;
+            int maxIndex = getIndexFromCollation(ref.getIndex(), inputFieldCollations);
+            if (maxIndex < 0) {
+              eligibleForCollation = false;
+              continue;
+            }
+            // check if the prefix has equality conditions
+            for (int i = 0; i < maxIndex; i++) {
+              int fieldIdx = inputFieldCollations.get(i).getFieldIndex();
+              List<RexNode> conditions = collationFilterMap != null ? collationFilterMap.get(fieldIdx) : null;
+              if ((conditions == null || conditions.size() == 0) &&
+                  i < maxIndex-1) {
+                // if an intermediate column has no filter condition, it would select all values
+                // of that column, so a subsequent column cannot be eligible for collation
+                eligibleForCollation = false;
+                break;
+              } else {
+                for (RexNode r : conditions) {
+                  if (!(r.getKind() == SqlKind.EQUALS)) {
+                    eligibleForCollation = false;
+                    break;
+                  }
+                }
+              }
+            }
+            // for every projected expr, if it is eligible for collation, get the
+            // corresponding field collation from the input
+            if (eligibleForCollation) {
+              for (RelFieldCollation c : inputFieldCollations) {
+                if (ref.getIndex() == c.getFieldIndex()) {
+                  RelFieldCollation outFieldCollation = new RelFieldCollation(projectExprIdx, c.getDirection(), c.nullDirection);
+                  outputFieldCollations.add(outFieldCollation);
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // TODO: handle functional index
+      }
+    }
+    return RelCollations.of(outputFieldCollations);
+  }
+
+  public static int getIndexFromCollation(int refIndex, List<RelFieldCollation> inputFieldCollations) {
+    for (int i=0; i < inputFieldCollations.size(); i++) {
+      if (refIndex == inputFieldCollations.get(i).getFieldIndex()) {
+        return i;
+      }
+    }
+    return -1;
+  }
 
   /**
    * Build collation property for project, the one closer to the Scan
@@ -156,17 +258,27 @@ public class IndexPlanUtils {
     assert collationMap != null : "Invalid collation map for index";
 
     List<RelFieldCollation> fieldCollations = Lists.newArrayList();
+    Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newTreeMap();
 
     for (int i = 0; i < indexScanRowType.getFieldCount(); i++) {
       RelDataTypeField f1 = indexFields.get(i);
       FieldReference ref = FieldReference.getWithQuotedRef(f1.getName());
       RelFieldCollation origCollation = collationMap.get(ref);
       if (origCollation != null) {
-        RelFieldCollation fc = new RelFieldCollation(origCollation.getFieldIndex(),
+        RelFieldCollation fc = new RelFieldCollation(i, //origCollation.getFieldIndex(),
             origCollation.direction, origCollation.nullDirection);
+        rsScanCollationMap.put(origCollation.getFieldIndex(), fc);
+        //fieldCollations.add(fc);
+      }
+    }
+    //should sort by the order of these fields in indexDesc
+    for (Map.Entry<Integer, RelFieldCollation> entry : rsScanCollationMap.entrySet()) {
+      RelFieldCollation fc = entry.getValue();
+      if (fc != null) {
         fieldCollations.add(fc);
       }
     }
+
     final RelCollation collation = RelCollations.of(fieldCollations);
     return collation;
   }
@@ -182,7 +294,7 @@ public class IndexPlanUtils {
     assert collationMap != null : "Invalid collation map for index";
 
     List<RelFieldCollation> fieldCollations = Lists.newArrayList();
-    Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newHashMap();
+    Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newTreeMap();
 
     // for each index field that is projected from the indexScan, find the corresponding
     // field in the restricted scan's row type and keep track of the ordinal # in the
@@ -195,20 +307,19 @@ public class IndexPlanUtils {
           FieldReference ref = FieldReference.getWithQuotedRef(f1.getName());
           RelFieldCollation origCollation = collationMap.get(ref);
           if (origCollation != null) {
-            RelFieldCollation fc = new RelFieldCollation(origCollation.getFieldIndex(),
+            RelFieldCollation fc = new RelFieldCollation(j,//origCollation.getFieldIndex(),
                 origCollation.direction, origCollation.nullDirection);
-            rsScanCollationMap.put(j, fc);
+            rsScanCollationMap.put(origCollation.getFieldIndex(), fc);
           }
         }
       }
     }
 
-    if (rsScanCollationMap.size() > 0) {
-      for (int j = 0; j < rsFields.size(); j++) {
-        RelFieldCollation fc = rsScanCollationMap.get(j);
-        if (fc != null) {
-          fieldCollations.add(fc);
-        }
+    //should sort by the order of these fields in indexDesc
+    for (Map.Entry<Integer, RelFieldCollation> entry : rsScanCollationMap.entrySet()) {
+      RelFieldCollation fc = entry.getValue();
+      if (fc != null) {
+        fieldCollations.add(fc);
       }
     }
 

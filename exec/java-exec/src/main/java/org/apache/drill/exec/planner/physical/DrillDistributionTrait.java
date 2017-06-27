@@ -86,6 +86,12 @@ public class DrillDistributionTrait implements RelTrait {
           return true; // hash distribution subsumes random distribution and ANY distribution
         }
       }
+
+      if(this.type == DistributionType.RANGE_DISTRIBUTED) {
+        if (requiredDist == DistributionType.RANDOM_DISTRIBUTED) {
+          return true; // RANGE_DISTRIBUTED distribution subsumes random distribution and ANY distribution
+        }
+      }
     }
 
     return this.equals(trait);

@@ -230,11 +230,13 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
       logger.error("Null restricted groupscan in IndexIntersectPlanGenerator.convertChild");
       return null;
     }
+    DrillDistributionTrait partition = IndexPlanUtils.scanIsPartition(origScan.getGroupScan())?
+        DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
 
     RelNode lastRelNode;
     RelDataType dbscanRowType = convertRowType(origScan.getRowType(), origScan.getCluster().getTypeFactory());
     ScanPrel dbScan = new ScanPrel(origScan.getCluster(),
-        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL), restrictedGroupScan, dbscanRowType);
+        origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition), restrictedGroupScan, dbscanRowType);
     lastRelNode = dbScan;
     // build the row type for the left Project
     List<RexNode> leftProjectExprs = Lists.newArrayList();

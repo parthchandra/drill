@@ -38,6 +38,8 @@ import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +54,13 @@ public class IndexConditionInfo {
     this.remainderCondition = remainderCondition;
     this.hasIndexCol = hasIndexCol;
   }
+
+  public static Comparator<IndexDescriptor> indexFieldsDescComparator = new Comparator<IndexDescriptor>() {
+    @Override
+    public int compare(IndexDescriptor o1, IndexDescriptor o2) {
+      return - (o1.getIndexColumns().size() - o2.getIndexColumns().size());
+    }
+  };
 
   public static Builder newBuilder(RexNode condition,
                                    Iterable<IndexDescriptor> indexes,
@@ -129,6 +138,31 @@ public class IndexConditionInfo {
       return indexInfoMap;
     }
 
+    public boolean isConditionPrefix(IndexDescriptor indexDesc, RexNode initCondition) {
+      List<LogicalExpression> indexCols = indexDesc.getIndexColumns();
+      boolean prefix = true;
+      if (indexCols.size() > 0 && initCondition != null) {
+        int i=0;
+        while (prefix && i < indexCols.size()) {
+          LogicalExpression p = indexCols.get(i++);
+          List<LogicalExpression> prefixCol = ImmutableList.of(p);
+          IndexConditionInfo info = indexConditionRelatedToFields(prefixCol, initCondition);
+          if(info != null && info.hasIndexCol) {
+            initCondition = info.remainderCondition;
+            if (initCondition.isAlwaysTrue()) {
+              // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+              // we don't need to keep track of it for rest of the index selection
+              initCondition = null;
+              break;
+            }
+          } else {
+            prefix = false;
+          }
+        }
+      }
+      return prefix;
+    }
+
     /**
      * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
      * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
@@ -137,13 +171,40 @@ public class IndexConditionInfo {
      */
     public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap() {
 
-      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = Maps.newLinkedHashMap();
+      //sort indexes by indexed fields number in desc order
+      List<IndexDescriptor> sortedIndex = Lists.newArrayList(indexes);
+      Collections.sort(sortedIndex, indexFieldsDescComparator);
 
+      return indexConditionMapFromSortedIndexes(sortedIndex);
+    }
+
+    public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap(List<IndexDescriptor> indexList) {
+
+      //sort indexes by indexed fields number in desc order
+      List<IndexDescriptor> sortedIndex = Lists.newArrayList(indexList);
+      Collections.sort(sortedIndex, indexFieldsDescComparator);
+
+      return indexConditionMapFromSortedIndexes(sortedIndex);
+    }
+
+    public IndexConditionInfo getIndexConditionInfo(IndexDescriptor index) {
+      if(!isConditionPrefix(index, condition)) {
+        return null;
+      }
+      return indexConditionRelatedToFields(index.getIndexColumns(), condition);
+    }
+
+    private Map<IndexDescriptor, IndexConditionInfo> indexConditionMapFromSortedIndexes(List<IndexDescriptor> sortedIndex) {
+      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = Maps.newLinkedHashMap();
       RexNode initCondition = condition;
-      for(IndexDescriptor index : indexes) {
+      for(IndexDescriptor index : sortedIndex) {
         if(initCondition.isAlwaysTrue()) {
           break;
         }
+        if(!isConditionPrefix(index, initCondition)) {
+          continue;
+        }
+
         IndexConditionInfo info = indexConditionRelatedToFields(index.getIndexColumns(), initCondition);
         if(info == null || info.hasIndexCol == false) {
           continue;
@@ -153,11 +214,10 @@ public class IndexConditionInfo {
       }
       return indexInfoMap;
     }
-
     /**
      * Given a list of Index Expressions(usually indexed fields/functions from one or a set of indexes),
      * separate a filter condition into
-     *     1), relevant subset of conditions (by relevant, it means at least one given index Expression was found and,
+     *     1), relevant subset of conditions (by relevant, it means at least one given index Expression was found) and,
      *     2), the rest in remainderCondition
      * @param relevantPaths
      * @param condition

@@ -333,30 +333,6 @@ public class DbScanToIndexScanPrule extends Prule {
     }
   }
 
-  private boolean isConditionPrefix(IndexDescriptor indexDesc, RexNode initCondition, IndexConditionInfo.Builder infoBuilder) {
-    List<LogicalExpression> indexCols = indexDesc.getIndexColumns();
-    boolean prefix = true;
-    if (indexCols.size() > 0 && initCondition != null) {
-      int i=0;
-      while (prefix && i < indexCols.size()) {
-        LogicalExpression p = indexCols.get(i++);
-        List<LogicalExpression> prefixCol = ImmutableList.of(p);
-        IndexConditionInfo info = infoBuilder.indexConditionRelatedToFields(prefixCol, initCondition);
-        if(info != null && info.hasIndexCol) {
-          initCondition = info.remainderCondition;
-          if (initCondition.isAlwaysTrue()) {
-            // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
-            // we don't need to keep track of it for rest of the index selection
-            initCondition = null;
-            break;
-          }
-        } else {
-          prefix = false;
-        }
-      }
-    }
-    return prefix;
-  }
 
   /**
    * generate logical expressions for sort rexNodes in SortRel
@@ -447,6 +423,7 @@ public class DbScanToIndexScanPrule extends Prule {
     indexCondition.accept(indexableExprMarker);
     indexContext.origMarker = indexableExprMarker;
 
+    //update sort expressions in context
     updateSortExpression(indexContext);
 
     if (settings.isCostBasedIndexSelectionEnabled()) {
@@ -470,7 +447,7 @@ public class DbScanToIndexScanPrule extends Prule {
       // get the list of covering and non-covering indexes for this collection
       for (IndexDescriptor indexDesc : collection) {
         if(conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE &&
-            isConditionPrefix(indexDesc, indexCondition, infoBuilder)) {
+            infoBuilder.isConditionPrefix(indexDesc, indexCondition)) {
           FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
           if (isCoveringIndex(indexContext, functionInfo)) {
             coveringIndexes.add(indexDesc);
@@ -497,11 +474,13 @@ public class DbScanToIndexScanPrule extends Prule {
       }
       logger.debug(strBuf.toString());
     }
+
     //Not a single covering index plan or non-covering index plan is sufficient.
     // either 1) there is no usable index at all, 2) or the chop of original condition to
     // indexCondition + remainderCondition is not working for any single index.
     if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() > 1) {
-      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = infoBuilder.getIndexConditionMap();
+
+      Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = infoBuilder.getIndexConditionMap(nonCoveringIndexes);
 
       //no usable index
       if (indexInfoMap == null || indexInfoMap.size() == 0) {
@@ -512,9 +491,11 @@ public class DbScanToIndexScanPrule extends Prule {
       //some part of filter condition needs to apply on primary table.
       if(indexInfoMap.size() == 1) {
         IndexDescriptor idx = indexInfoMap.keySet().iterator().next();
-        nonCoveringIndexes.add(idx);
-        indexCondition = indexInfoMap.get(idx).indexCondition;
-        remainderCondition = indexInfoMap.get(idx).remainderCondition;
+        if (infoBuilder.isConditionPrefix(idx, indexCondition) && !nonCoveringIndexes.contains(idx)) {
+          nonCoveringIndexes.add(idx);
+          //indexCondition = indexInfoMap.get(idx).indexCondition;
+          //remainderCondition = indexInfoMap.get(idx).remainderCondition;
+        }
       }
       else {
         //multiple indexes, let us try to intersect results from multiple index tables
@@ -549,14 +530,20 @@ public class DbScanToIndexScanPrule extends Prule {
       logger.warn("Exception while trying to generate covering index plan", e);
     }
 
-    // Create non-covering index plans. First, check if the primary table scan supports creating a
-    // restricted scan
+    // Create non-covering index plans.
     GroupScan primaryTableScan = indexContext.scan.getGroupScan();
+
+    //First, check if the primary table scan supports creating a restricted scan
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
       try {
         for (IndexDescriptor index : nonCoveringIndexes) {
           IndexGroupScan idxScan = index.getIndexGroupScan();
+
+          //get indexCondition, remainderCondition for this index, ideally we should share the conditions with IndexSelector
+          IndexConditionInfo idxInfo = infoBuilder.getIndexConditionInfo(index);
+          indexCondition = idxInfo.indexCondition;
+          remainderCondition = idxInfo.remainderCondition;
           //Copy primary table statistics to index table
           idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
           logger.info("Generating non-covering index plan for query condition {}", indexCondition.toString());

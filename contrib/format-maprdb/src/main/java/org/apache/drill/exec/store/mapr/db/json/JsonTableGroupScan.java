@@ -291,7 +291,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     double avgRowSize = stats.getAvgRowSize(scanSpec.getCondition(), false);
     // If UNKNOWN, use defaults
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
-      rowCount = (filterPushed ? 0.0001f : 0.001f) * tableStats.getNumRows();
+      rowCount = (filterPushed ? 0.0005f : 0.001f) * tableStats.getNumRows() / scanSpec.getIndexDesc().getIndexedFields().size() ;
     }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
