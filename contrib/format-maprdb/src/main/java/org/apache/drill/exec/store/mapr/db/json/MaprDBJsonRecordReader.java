@@ -293,7 +293,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
           logger.warn("{}. Dropping row '{}' from result.", e.getMessage(), err_row);
           logger.debug("Stack trace:", e);
         } else {
-          throw dataReadError(logger, e, "SchemaChangeException for row '{}'.", err_row);
+          throw dataReadError(logger, e, "SchemaChangeException for row '%s'.", err_row);
         }
       }
     }
