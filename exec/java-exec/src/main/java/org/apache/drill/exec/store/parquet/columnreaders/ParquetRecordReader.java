@@ -517,7 +517,9 @@ public class ParquetRecordReader extends AbstractRecordReader {
     ArrayList<Future<Long>> futures = Lists.newArrayList();
     for (ColumnReader<?> crs : columnStatuses) {
       Future<Long> f = crs.processPagesAsync(recordsToRead);
-      futures.add(f);
+      if (f != null) {
+        futures.add(f);
+      }
     }
     Exception exception = null;
     for(Future<Long> f: futures){
