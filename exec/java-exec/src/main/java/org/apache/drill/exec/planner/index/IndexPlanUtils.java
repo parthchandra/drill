@@ -26,6 +26,7 @@ import com.google.common.collect.Maps;
 
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
+import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
@@ -265,7 +266,10 @@ public class IndexPlanUtils {
         DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
     RelDataType newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(origScan, indexContext, functionInfo);
 
-    RelTraitSet indexScanTraitSet = origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition);
+    // add a default collation trait otherwise Calcite runs into a ClassCastException, which at first glance
+    // seems like a Calcite bug
+    RelTraitSet indexScanTraitSet = origScan.getTraitSet().plus(Prel.DRILL_PHYSICAL).
+        plus(RelCollationTraitDef.INSTANCE.getDefault()).plus(partition);
 
     // Create the collation traits for index scan based on the index columns under the
     // condition that the index actually has collation property (e.g hash indexes don't)

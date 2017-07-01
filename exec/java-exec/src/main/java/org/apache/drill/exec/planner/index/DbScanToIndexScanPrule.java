@@ -438,14 +438,14 @@ public class DbScanToIndexScanPrule extends Prule {
 
     if (logger.isDebugEnabled()) {
       StringBuffer strBuf = new StringBuffer();
-      strBuf.append("Split  indexes:");
       if (coveringIndexes.size() > 0) {
+        strBuf.append("Covering indexes:");
         for (IndexDescriptor indexDesc : coveringIndexes) {
           strBuf.append(indexDesc.getIndexName()).append(",");
         }
       }
       if(nonCoveringIndexes.size() > 0) {
-        strBuf.append("non-covering indexes:");
+        strBuf.append("Non-covering indexes:");
         for (IndexDescriptor indexDesc : nonCoveringIndexes) {
           strBuf.append(indexDesc.getIndexName()).append(",");
         }
@@ -481,14 +481,12 @@ public class DbScanToIndexScanPrule extends Prule {
           planGen.go();
         } catch (Exception e) {
           logger.warn("Exception while trying to generate intersect index plan", e);
-          return;
         }
         //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
         return;
       }
     }
 
-    boolean createdCovering = false;
     try {
       for (IndexDescriptor indexDesc : coveringIndexes) {
         IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
@@ -501,15 +499,9 @@ public class DbScanToIndexScanPrule extends Prule {
             indexCondition, remainderCondition, builder, settings);
 
         planGen.go();
-        createdCovering = true;
       }
     } catch (Exception e) {
       logger.warn("Exception while trying to generate covering index plan", e);
-      return;
-    }
-
-    if (createdCovering) {
-      return;
     }
 
     // Create non-covering index plans. First, check if the primary table scan supports creating a
@@ -529,7 +521,6 @@ public class DbScanToIndexScanPrule extends Prule {
         }
       } catch (Exception e) {
         logger.warn("Exception while trying to generate non-covering index access plan", e);
-        return;
       }
     }
   }
