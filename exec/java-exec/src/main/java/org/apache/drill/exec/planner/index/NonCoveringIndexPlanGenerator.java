@@ -223,7 +223,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       //build collation in project
       collation = IndexPlanUtils.buildCollationLowerProject(leftProjectExprs, dbScan, functionInfo);
 
-      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(), dbScan.getTraitSet().plus(collation),
+      final ProjectPrel leftIndexProjectPrel = new ProjectPrel(dbScan.getCluster(),
+          collation != null ? dbScan.getTraitSet().plus(collation) : dbScan.getTraitSet(),
           leftIndexFilterPrel == null ? dbScan : leftIndexFilterPrel, leftProjectExprs, leftProjectRowType);
       lastLeft = leftIndexProjectPrel;
     }
@@ -253,7 +254,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       newRel = hjPrel;
     } else {
       //if there is collation, add to rowkey join
-      RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(topRel.getCluster(), leftTraits.plus(collation),
+      RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(topRel.getCluster(),
+          collation != null ? leftTraits.plus(collation) : leftTraits,
           convertedLeft, convertedRight, joinCondition, JoinRelType.INNER);
       newRel = rjPrel;
     }
