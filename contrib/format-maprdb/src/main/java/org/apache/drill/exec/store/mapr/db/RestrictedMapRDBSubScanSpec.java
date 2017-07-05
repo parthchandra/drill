@@ -112,19 +112,21 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
   public int hasRowKeys(int numRowKeysToRead) {
     int numKeys = 0;
 
-    if (rowKeyVector != null) {
-      if (currentIndex < maxOccupiedIndex) {
+    // if there is pending rows from the current batch, read them first
+    // in chunks of numRowsToRead rows
+    if (rowKeyVector != null && currentIndex < maxOccupiedIndex) {
         numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
-      }
-    } else {
-      if (rjbatch != null) {
-        Pair<ValueVector, Integer> currentBatch = rjbatch.nextRowKeyBatch();
+        return numKeys;
+    }
 
-        // note that the hash table could be null initially during the BUILD_SCHEMA phase
-        if (currentBatch != null) {
-          init(currentBatch);
-          numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
-        }
+    // otherwise, get the next batch of rowkeys
+    if (rjbatch != null) {
+      Pair<ValueVector, Integer> currentBatch = rjbatch.nextRowKeyBatch();
+
+      // note that the currentBatch could be null initially during the BUILD_SCHEMA phase
+      if (currentBatch != null) {
+        init(currentBatch);
+        numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
       }
     }
 

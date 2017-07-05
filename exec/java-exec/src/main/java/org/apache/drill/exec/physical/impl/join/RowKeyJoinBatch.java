@@ -29,10 +29,9 @@ import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.record.VectorWrapper;
-import org.apache.drill.exec.record.AbstractRecordBatch.BatchState;
-import org.apache.drill.exec.record.RecordBatch.IterOutcome;
 import org.apache.drill.exec.record.selection.SelectionVector2;
 import org.apache.drill.exec.record.selection.SelectionVector4;
+import org.apache.drill.exec.vector.SchemaChangeCallBack;
 import org.apache.drill.exec.vector.ValueVector;
 
 import com.google.common.collect.Iterables;
@@ -52,6 +51,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
   private IterOutcome rightUpstream = IterOutcome.NONE;
   private final List<TransferPair> transfers = Lists.newArrayList();
   private int recordCount = 0;
+  private SchemaChangeCallBack callBack = new SchemaChangeCallBack();
 
   public RowKeyJoinBatch(RowKeyJoinPOP config, FragmentContext context, RecordBatch left, RecordBatch right)
       throws OutOfMemoryException {
@@ -63,6 +63,9 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
 
   @Override
   public int getRecordCount() {
+    if (state == BatchState.DONE) {
+      return 0;
+    }
     return recordCount;
   }
 
@@ -100,10 +103,10 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
       return;
     }
 
-    for (VectorWrapper<?> vw : left) {
-      TransferPair tp = vw.getValueVector().getTransferPair(oContext.getAllocator());
-      transfers.add(tp);
-      container.add(tp.getTo());
+    for(final VectorWrapper<?> v : left) {
+      final TransferPair pair = v.getValueVector().makeTransferPair(
+          container.addOrGet(v.getField(), callBack));
+      transfers.add(pair);
     }
 
     container.buildSchema(left.getSchema().getSelectionVectorMode());
@@ -116,6 +119,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
     }
     try {
       if (state == BatchState.FIRST && left.getRecordCount() > 0) {
+        logger.debug("First batch, outputting the batch with {} records.", left.getRecordCount());
         // there is already a pending batch from left, output it
         outputCurrentLeftBatch();
         return IterOutcome.OK;
@@ -129,6 +133,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
       case NONE:
       case OUT_OF_MEMORY:
       case STOP:
+        state = BatchState.DONE;
         return rightUpstream;
       case OK_NEW_SCHEMA:
       case OK:
@@ -155,9 +160,15 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
           if ((leftUpstream == IterOutcome.OK || leftUpstream == IterOutcome.OK_NEW_SCHEMA)) {
             logger.debug("left input num records = {}", left.getRecordCount());
             if (left.getRecordCount() > 0) {
+              logger.debug("Outputting the left batch with {} records.", left.getRecordCount());
               outputCurrentLeftBatch();
+              // Check if schema has changed (this is just to guard against potential changes to the
+              // output schema by outputCurrentLeftBatch, but in general the leftUpstream status should
+              // be sufficient)
+              if (callBack.getSchemaChangedAndReset()) {
+                return IterOutcome.OK_NEW_SCHEMA;
+              }
             }
-//            return IterOutcome.OK;
           }
         }
 
@@ -175,19 +186,21 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
 
   private void outputCurrentLeftBatch() {
     if (state == BatchState.NOT_FIRST) {
+      container.zeroVectors();
       transfers.clear();
-      for (VectorWrapper<?> vw : left) {
-        TransferPair tp = vw.getValueVector().getTransferPair(oContext.getAllocator());
-        transfers.add(tp);
-        container.add(tp.getTo());
+
+      for(final VectorWrapper<?> v : left) {
+        final TransferPair pair = v.getValueVector().makeTransferPair(
+            container.addOrGet(v.getField(), callBack));
+        transfers.add(pair);
       }
-      container.buildSchema(left.getSchema().getSelectionVectorMode());
     }
 
     for(TransferPair t : transfers) {
       t.transfer();
     }
 
+    container.setRecordCount(left.getRecordCount());
     this.recordCount = left.getRecordCount();
   }
 
