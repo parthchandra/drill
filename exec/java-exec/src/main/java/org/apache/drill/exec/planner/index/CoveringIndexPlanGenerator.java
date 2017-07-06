@@ -25,6 +25,11 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlKind;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
@@ -41,9 +46,8 @@ import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.calcite.rel.InvalidRelException;
 
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rex.RexBuilder;
-import org.apache.calcite.rex.RexNode;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -193,8 +197,13 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     if (remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
       // create a Filter corresponding to the remainder condition
+      RexNode newRemainderCondition = remainderCondition;
+      // If project is present rewrite the remainder condition based on the project
+      if (indexProjectPrel != null) {
+        newRemainderCondition = rewriteConditionForProject(remainderCondition, indexProjectPrel.getProjects());
+      }
       FilterPrel remainderFilterPrel = new FilterPrel(origScan.getCluster(), indexProjectPrel.getTraitSet(),
-          indexProjectPrel, remainderCondition);
+          indexProjectPrel, newRemainderCondition);
       finalRel = remainderFilterPrel;
     } else if (indexProjectPrel != null) {
       finalRel = indexProjectPrel;
@@ -248,4 +257,29 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     return finalRel;
   }
 
+  private RexNode rewriteConditionForProject(RexNode condition, List<RexNode> projects) {
+    Map<RexNode, RexNode> mapping = new HashMap<>();
+    rewriteConditionForProjectInternal(condition, projects, mapping);
+    SimpleRexRemap.RexReplace replacer = new SimpleRexRemap.RexReplace(mapping);
+    return condition.accept(replacer);
+  }
+
+  private void rewriteConditionForProjectInternal(RexNode condition, List<RexNode> projects, Map<RexNode, RexNode> mapping) {
+    if (condition instanceof RexCall) {
+      if ("ITEM".equals(((RexCall) condition).getOperator().getName().toUpperCase())) {
+        int index = 0;
+        for (RexNode project : projects) {
+          if (project.toString().equals(condition.toString())) {
+            // Map it to the corresponding RexInputRef for the project
+            mapping.put(condition, new RexInputRef(index, project.getType()));
+          }
+          ++index;
+        }
+      } else {
+        for (RexNode child : ((RexCall) condition).getOperands()) {
+          rewriteConditionForProjectInternal(child, projects, mapping);
+        }
+      }
+    }
+  }
 }
