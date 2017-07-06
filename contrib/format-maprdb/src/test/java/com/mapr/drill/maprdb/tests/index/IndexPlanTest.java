@@ -86,7 +86,8 @@ public class IndexPlanTest extends BaseJsonTest {
             "driverlicense", "",
             "$CAST(id.ssn@INT)", "contact.phone",
             "$CAST(driverlicense@STRING)","contact.email",
-            "address.state,personal.age,driverlicense", "name.fname"
+            "address.state,personal.age,driverlicense", "name.fname",
+            "personal.age", "name.fname"
         };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
   }
@@ -283,7 +284,7 @@ public class IndexPlanTest extends BaseJsonTest {
     test(defaultHavingIndexPlan+";"+ highFTSFactor +";");
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin", ".*RestrictedJsonTableGroupScan",
-            ".*JsonTableGroupScan.*indexName=testindex_2",},
+            ".*JsonTableGroupScan.*indexName=testindex_[28]",},
         new String[]{}
     );
 
@@ -395,7 +396,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String[] expectedPlan = new String[] {"RowKeyJoin(.*[\n\r])+.*" +
         "RestrictedJsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
         "RangePartitionExchange(.*[\n\r])+.*" +
-    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_2"};
+    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_[28]"};
     test(defaultHavingIndexPlan+";"+ highFTSFactor +";"+sliceTargetSmall+";");
     PlanTestBase.testPlanMatchingPatterns(query,
         expectedPlan, new String[]{});
@@ -817,5 +818,24 @@ public class IndexPlanTest extends BaseJsonTest {
     );
     test(defaultFTSFactor);
     return;
+  }
+
+  @Test //Correct projection and results when filter on non-indexed column in covering plan.
+  public void nonIndexedColumnFilterCoveringPlan() throws Exception {
+    String query = "SELECT t.name.fname as fname FROM hbase.`index_test_primary` as t " +
+        " where t.personal.age > 68 and t.name.fname IN ('CnGobfR', 'THOHP')";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*Filter.*CnGobfR.*THOHP.*",
+            ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*Filter.*ITEM*CnGobfR.*THOHP.*"});
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("fname").baselineValues("CnGobfR")
+        .baselineColumns("fname").baselineValues("THOHP")
+        .baselineColumns("fname").baselineValues("CnGobfR")
+        .go();
   }
 }
