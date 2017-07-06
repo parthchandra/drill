@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.expr.CloneVisitor;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -107,28 +108,49 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   }
 
   /**
-   * Search through a LogicalExpression, finding all internal schema path references and returning a decoded path.
+   * Search through a LogicalExpression, finding all referenced schema paths
+   * and replace them with decoded paths.
+   * If one encoded path could be decoded to multiple paths, add these decoded paths to
+   * the end of returned list of expressions from parseExpressions.
    */
   private class DecodePathinExpr extends CloneVisitor {
     Set<SchemaPath> schemaPathSet = Sets.newHashSet();
 
     public List<LogicalExpression> parseExpressions(Collection<LogicalExpression> expressions) {
+      List<LogicalExpression> decodedCols = Lists.newArrayList();
       for(LogicalExpression expr : expressions) {
-        expr.accept(this, null);
+        LogicalExpression decoded = expr.accept(this, null);
+
+        //encoded multiple path will return null
+        if(decoded != null) {
+          decodedCols.add(decoded);
+        }
       }
-      return new ImmutableList.Builder<LogicalExpression>()
-          .addAll(schemaPathSet)
-          .build();
+
+      decodedCols.addAll(schemaPathSet);
+      return decodedCols;
     }
 
     @Override
     public LogicalExpression visitSchemaPath(SchemaPath path, Void value) {
       List<SchemaPath> paths = Lists.newArrayList();
       paths.add(path);
-      schemaPathSet.addAll(EncodedSchemaPathSet.decode(paths));
+      Collection<SchemaPath> decoded = EncodedSchemaPathSet.decode(paths);
+
+      if ( decoded.size() == 1) {
+        return decoded.iterator().next();
+      }
+      else {
+        schemaPathSet.addAll(decoded);
+      }
+
+      // if decoded size is not one, incoming path is encoded path thus there is no cast or other function applied on it,
+      // since users won't pass in encoded fields, so it is safe to return null,
       return null;
     }
+
   }
+
   @Override
   public RelOptCost getCost(IndexProperties indexProps, RelOptPlanner planner,
       int numProjectedFields, GroupScan primaryTableGroupScan) {

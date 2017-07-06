@@ -54,6 +54,33 @@ import org.apache.calcite.rex.RexNode;
 
 public class IndexPlanUtils {
 
+  public enum ConditionIndexed {
+    NONE,
+    PARTIAL,
+    FULL}
+
+  /**
+   * Check if any of the fields of the index are present in a list of LogicalExpressions supplied
+   * as part of IndexableExprMarker
+   * @param exprMarker, the marker that has analyzed original index condition on top of original scan
+   * @param indexDesc
+   * @return ConditionIndexed.FULL, PARTIAL or NONE depending on whether all, some or no columns
+   * of the indexDesc are present in the list of LogicalExpressions supplied as part of exprMarker
+   *
+   */
+  static public ConditionIndexed conditionIndexed(IndexableExprMarker exprMarker, IndexDescriptor indexDesc) {
+    Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
+    List<LogicalExpression> infoCols = Lists.newArrayList();
+    infoCols.addAll(mapRexExpr.values());
+    if (indexDesc.allColumnsIndexed(infoCols)) {
+      return ConditionIndexed.FULL;
+    } else if (indexDesc.someColumnsIndexed(infoCols)) {
+      return ConditionIndexed.PARTIAL;
+    } else {
+      return ConditionIndexed.NONE;
+    }
+  }
+
   /**
    * Build collation property for the 'lower' project, the one closer to the Scan
    * @param projectRexs
