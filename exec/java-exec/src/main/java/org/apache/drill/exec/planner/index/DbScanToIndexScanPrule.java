@@ -18,7 +18,6 @@
 package org.apache.drill.exec.planner.index;
 
 import com.google.common.base.Stopwatch;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -92,10 +91,6 @@ public class DbScanToIndexScanPrule extends Prule {
           RelOptHelper.some(DrillProjectRel.class, RelOptHelper.any(DrillScanRel.class))),
       "DbScanToIndexScanPrule:Filter_Project_Scan", new MatchFPS());
 
-  public enum ConditionIndexed {
-    NONE,
-    PARTIAL,
-    FULL}
 
   private DbScanToIndexScanPrule(RelOptRuleOperand operand, String description, MatchFunction match) {
     super(operand, description);
@@ -310,29 +305,6 @@ public class DbScanToIndexScanPrule extends Prule {
   }
 
   /**
-   * Check if any of the fields of the index are present in a list of LogicalExpressions supplied
-   * as part of IndexableExprMarker
-   * @param marker, the marker that has analyzed original index condition on top of original scan
-   * @param indexDesc
-   * @return ConditionIndexed.FULL, PARTIAL or NONE depending on whether all, some or no columns
-   * of the indexDesc are present in the list of LogicalExpressions supplied as part of exprMarker
-   *
-   */
-  static private ConditionIndexed conditionIndexed(IndexableExprMarker exprMarker, IndexDescriptor indexDesc) {
-    Map<RexNode, LogicalExpression> mapRexExpr = exprMarker.getIndexableExpression();
-    List<LogicalExpression> infoCols = Lists.newArrayList();
-    infoCols.addAll(mapRexExpr.values());
-    if (indexDesc.allColumnsIndexed(infoCols)) {
-      return ConditionIndexed.FULL;
-    } else if (indexDesc.someColumnsIndexed(infoCols)) {
-      return ConditionIndexed.PARTIAL;
-    } else {
-      return ConditionIndexed.NONE;
-    }
-  }
-
-
-  /**
    * generate logical expressions for sort rexNodes in SortRel
    * @param indexContext
    */
@@ -398,6 +370,12 @@ public class DbScanToIndexScanPrule extends Prule {
       logger.info("No conditions were found eligible for applying index lookup.");
       return;
     }
+    RexNode indexCondition = cInfo.indexCondition;
+    RexNode remainderCondition = cInfo.remainderCondition;
+
+    IndexableExprMarker indexableExprMarker = new IndexableExprMarker(indexContext.scan);
+    indexCondition.accept(indexableExprMarker);
+    indexContext.origMarker = indexableExprMarker;
 
     if (scan.getGroupScan() instanceof DbGroupScan) {
       // Initialize statistics
@@ -424,15 +402,8 @@ public class DbScanToIndexScanPrule extends Prule {
       return;
     }
 
-    RexNode indexCondition = cInfo.indexCondition;
-    RexNode remainderCondition = cInfo.remainderCondition;
-
     List<IndexDescriptor> coveringIndexes = Lists.newArrayList();
     List<IndexDescriptor> nonCoveringIndexes = Lists.newArrayList();
-
-    IndexableExprMarker indexableExprMarker = new IndexableExprMarker(indexContext.scan);
-    indexCondition.accept(indexableExprMarker);
-    indexContext.origMarker = indexableExprMarker;
 
     //update sort expressions in context
     updateSortExpression(indexContext);
@@ -445,11 +416,11 @@ public class DbScanToIndexScanPrule extends Prule {
 
     for (IndexDescriptor indexDesc : collection) {
       // check if any of the indexed fields of the index are present in the filter condition
-      if (conditionIndexed(indexableExprMarker, indexDesc) != ConditionIndexed.NONE) {
+      if (IndexPlanUtils.conditionIndexed(indexableExprMarker, indexDesc) != IndexPlanUtils.ConditionIndexed.NONE) {
         FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
         selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
             indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
-              scan.getRowType().getFieldCount());
+                scan.getRowType().getFieldCount());
       }
     }
     // get the candidate indexes based on selection

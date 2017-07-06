@@ -39,7 +39,7 @@ import java.util.List;
 public class IndexPlanTest extends BaseJsonTest {
 
   final static String PRIMARY_TABLE_NAME = "/tmp/index_test_primary";
-  final static List<TableName> indexes = Lists.newArrayList();
+
   final static int PRIMARY_TABLE_SIZE = 10000;
   private static final String sliceTargetSmall = "alter session set `planner.slice_target` = 1";
   private static final String sliceTargetDefault = "alter session reset `planner.slice_target`";
@@ -47,6 +47,7 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
   private static final String highFTSFactor = "alter session set `planner.fts_cost_factor` = 1500.0";
   private static final String defaultFTSFactor = "alter session reset `planner.fts_cost_factor`";
+
 
   /**
    *  A sample row of this 10K table:
@@ -499,6 +500,17 @@ public class IndexPlanTest extends BaseJsonTest {
 
     test(defaultFTSFactor);
     return;
+  }
+
+  @Test // cast expression in filter is not indexed, but the same field casted to different type was indexed (CAST id.ssn as INT)
+  public void TestCastNoIndexPlan() throws Exception {
+    String query = "select t.id.ssn from hbase.`index_test_primary` t where cast(t.id.ssn as varchar(10)) = '100007423'";
+
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[]{},
+        new String[]{"indexName"}
+    );
+
   }
 
   @Test

@@ -250,6 +250,9 @@ public class MapRDBStatistics implements Statistics {
     StatisticsPayload ftsPayload = jTabGrpScan.getEstimatedStats(null, null, scanRel);
 
     for (IndexDescriptor idx : leadingKeyIdxConditionMap.keySet()) {
+      if(IndexPlanUtils.conditionIndexed(context.origMarker, idx) == IndexPlanUtils.ConditionIndexed.NONE) {
+        continue;
+      }
       RexNode idxCondition = leadingKeyIdxConditionMap.get(idx).indexCondition;
       /* Use the pre-processed condition only for getting actual statistic from MapR-DB APIs. Use the
        * original condition everywhere else (cache store/lookups) since the RexNode condition and its
@@ -282,6 +285,9 @@ public class MapRDBStatistics implements Statistics {
     RelDataType newRowType = null;
     IndexDescriptor candIdx = null;
     for (IndexDescriptor idx : idxConditionMap.keySet()) {
+      if(IndexPlanUtils.conditionIndexed(context.origMarker, idx) == IndexPlanUtils.ConditionIndexed.NONE) {
+        continue;
+      }
       candIdx = idx;
       RexNode idxCondition = idxConditionMap.get(idx).indexCondition;
       idxRemCondition = idxConditionMap.get(idx).remainderCondition;
