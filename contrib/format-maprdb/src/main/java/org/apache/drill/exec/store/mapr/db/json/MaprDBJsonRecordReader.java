@@ -91,81 +91,31 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private final IndexDesc indexDesc;
   private OperatorContext operatorContext;
   protected VectorContainerWriter vectorWriter;
+
   private DrillBuf buffer;
-  private Iterator<DocumentReader> documentStreamReaderIterator;
+
+  private DocumentStream documentStream;
+
+  private Iterator<DocumentReader> documentReaderIterators;
+
   private boolean includeId;
   private boolean idOnly;
+
   private boolean projectWholeDocument;
   private FieldProjector projector;
+
   private final boolean unionEnabled;
   private final boolean readNumbersAsDouble;
   private boolean disablePushdown;
   private final boolean allTextMode;
   private final boolean ignoreSchemaChange;
   private final boolean disableCountOptimization;
+
   protected final MapRDBSubScanSpec subScanSpec;
   protected final MapRDBFormatPlugin formatPlugin;
+
   protected OjaiValueWriter valueWriter;
   protected DocumentReaderVectorWriter documentWriter;
-
-  /**
-   * UnionDocumentStreamReader implements an DocumentReader iterable for list of DocumentStreams
-   */
-  private class UnionDocumentStreamReader implements Iterable<DocumentReader> {
-    private List<DocumentStream> documentStreams;
-    private Iterator<DocumentReader> documentReaderIterators;
-    private Iterator<DocumentStream> documentStreamIterator;
-
-    public UnionDocumentStreamReader() {
-      documentStreams = Lists.newArrayList();
-    }
-
-    public void add(DocumentStream documentStream) {
-      documentStreams.add(documentStream);
-    }
-
-    public void close() {
-      for (DocumentStream documentStream : documentStreams) {
-        documentStream.close();
-      }
-    }
-
-    public Iterator<DocumentReader> iterator() {
-      documentStreamIterator = documentStreams.iterator();
-      if (documentStreamIterator.hasNext()) {
-        documentReaderIterators = documentStreamIterator.next().documentReaders().iterator();
-      }
-      return (Iterator<DocumentReader>) new DocumentReaderIterator();
-    }
-
-    class DocumentReaderIterator implements Iterator<DocumentReader> {
-
-      @Override
-      public boolean hasNext() {
-        if (documentReaderIterators == null) return false;
-
-        if (!documentReaderIterators.hasNext()) {
-          if (documentStreamIterator.hasNext()) {
-            documentReaderIterators = documentStreamIterator.next().documentReaders().iterator();
-          }
-        }
-
-        return documentReaderIterators.hasNext();
-      }
-
-      @Override
-      public DocumentReader next() {
-        return documentReaderIterators.next();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("Remove not supported for UnionDocumentStreamReader");
-      }
-    }
-  }
-
-  private UnionDocumentStreamReader documentStreamReader;
 
   public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec, MapRDBFormatPlugin formatPlugin,
                                 List<SchemaPath> projectedColumns, FragmentContext context) {
@@ -184,6 +134,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     if (serializedFilter != null) {
       condition = com.mapr.db.impl.ConditionImpl.parseFrom(ByteBufs.wrap(serializedFilter));
     }
+
     disableCountOptimization = formatPlugin.getConfig().shouldDisableCountOptimization();
     setColumns(projectedColumns);
     unionEnabled = context.getOptions().getOption(ExecConstants.ENABLE_UNION_TYPE);
@@ -191,7 +142,6 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     allTextMode = formatPlugin.getConfig().isAllTextMode();
     ignoreSchemaChange = formatPlugin.getConfig().isIgnoreSchemaChange();
     disablePushdown = !formatPlugin.getConfig().isEnablePushdown();
-    documentStreamReader = new UnionDocumentStreamReader();
   }
 
   @Override
@@ -237,7 +187,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
 
         if (encodedSchemaPathSet.size() > 0) {
           Collection<SchemaPath> decodedSchemaPaths = EncodedSchemaPathSet.decode(encodedSchemaPathSet);
-          // now we look at the fields which are part of encoded field set and either 
+          // now we look at the fields which are part of encoded field set and either
           // add them to scanned set or clear the scanned set if all fields were requested.
           for (SchemaPath column : decodedSchemaPaths) {
             if (column.equals(AbstractRecordReader.STAR_COLUMN)) {
@@ -281,31 +231,6 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     return ignoreSchemaChange;
   }
 
-  /**
-   * This function combines the scan range query condition with user query condition.
-   * We cannot use scan range query condition itself for table.find i.e. filter because there might
-   * be some covering indexes in the original user query condition.
-   */
-  private static QueryCondition getCompleteScanCondition(final QueryCondition userCond, final ScanRange scanRange) {
-    final QueryCondition rangeCondition = scanRange.getCondition();
-    if (userCond == null || userCond.isEmpty()) {
-      return rangeCondition;
-    }
-
-    if (rangeCondition == null || rangeCondition.isEmpty()) {
-      return userCond;
-    }
-
-    // Combine the two.
-    final QueryCondition scanCondition = MapRDBImpl.newCondition()
-      .and()
-      .condition(scanRange.getCondition())
-      .condition(userCond)
-      .close()
-      .build();
-    return scanCondition;
-  }
-
   @Override
   public void setup(OperatorContext context, OutputMutator output) throws ExecutionSetupException {
     this.vectorWriter = new VectorContainerWriter(output, unionEnabled);
@@ -314,21 +239,8 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     try {
       table = formatPlugin.getJsonTableCache().getTable(tablePath, indexDesc);
       table.setOption(TableOption.EXCLUDEID, !includeId);
-
-      final MetaTable metaTable = table.getMetaTable();
-      final List<? extends ScanRange> scanRanges = metaTable.getScanRanges(condition);
-      final Iterator<? extends ScanRange> rangeIterator = scanRanges.iterator();
-
-      while (rangeIterator.hasNext()) {
-        final QueryCondition scanCondition = getCompleteScanCondition(condition, rangeIterator.next());
-        if (scannedFields == null) {
-          documentStreamReader.add(table.find(scanCondition));
-        } else {
-          documentStreamReader.add(table.find(scanCondition, scannedFields));
-        }
-      }
-
-      documentStreamReaderIterator = documentStreamReader.iterator();
+      documentStream = table.find(condition, scannedFields);
+      documentReaderIterators = documentStream.documentReaders().iterator();
 
       if (allTextMode) {
         valueWriter = new AllTextValueWriter(buffer);
@@ -402,10 +314,10 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
         operatorStats.startWait();
       }
       try {
-        if (!documentStreamReaderIterator.hasNext()) {
+        if (!documentReaderIterators.hasNext()) {
           return null;
         } else {
-          return (DBDocumentReaderBase) documentStreamReaderIterator.next();
+          return (DBDocumentReaderBase) documentReaderIterators.next();
         }
       } finally {
         if (operatorStats != null) {
@@ -450,7 +362,9 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
 
   @Override
   public void close() {
-    documentStreamReader.close();
+    if (documentStream != null) {
+      documentStream.close();
+    }
     formatPlugin.getJsonTableCache().closeTable(table);
   }
 
