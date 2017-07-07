@@ -96,7 +96,7 @@ public class LargeTableGen extends LargeTableGenBase {
           + " -path " + table.getPath()
           + " -index testindex_%d"
           + " -indexedfields '%s'"
-          + ((indexDef[2 * i + 1].length()==0)?"":" -nonindexedfields '%s'"),
+          + ((indexDef[2 * i + 1].length()==0)?"":" -includedfields '%s'"),
           i, indexDefInCommand(indexDef[2 * i]), indexDefInCommand(indexDef[2 * i + 1]));
       TestCluster.runCommand(indexCmd);
       DBTests.admin().getTableIndexes(table.getPath(), true);
