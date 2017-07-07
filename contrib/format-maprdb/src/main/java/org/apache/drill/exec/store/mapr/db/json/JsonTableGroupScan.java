@@ -144,6 +144,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     this.stats = that.stats;
     this.tableStats = that.tableStats;
     this.forcedRowCountMap = that.forcedRowCountMap;
+    init();
   }
 
   @Override
