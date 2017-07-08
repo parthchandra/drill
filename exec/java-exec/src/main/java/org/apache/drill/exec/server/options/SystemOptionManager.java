@@ -130,7 +130,6 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       PlannerSettings.PREFER_INTERSECT_PLANS,
       PlannerSettings.DISABLE_FULL_TABLE_SCAN,
       PlannerSettings.ENABLE_SCAN_STATS,
-      PlannerSettings.TABLE_COST_PREF_FACTOR,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,

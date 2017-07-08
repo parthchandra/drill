@@ -29,6 +29,7 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
@@ -47,6 +48,7 @@ import org.apache.calcite.rel.InvalidRelException;
 
 import org.apache.calcite.rel.RelNode;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -174,11 +176,20 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       return null;
     }
 
+    RexNode coveringCondition = indexCondition;
     ScanPrel indexScanPrel =
         IndexPlanUtils.buildCoveringIndexScan(origScan, indexGroupScan, indexContext, indexDesc);
 
+    // If remainder condition, then combine the index and remainder conditions. This is a covering plan so we can
+    // pushed the entire condition into the index.
+    if (remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
+      List<RexNode> conditions = new ArrayList<RexNode>();
+      conditions.add(indexCondition);
+      conditions.add(remainderCondition);
+      coveringCondition = RexUtil.composeConjunction(indexScanPrel.getCluster().getRexBuilder(), conditions, true);
+    }
     RexNode newIndexCondition =
-        rewriteFunctionalCondition(indexCondition, indexScanPrel.getRowType(), functionInfo);
+        rewriteFunctionalCondition(coveringCondition, indexScanPrel.getRowType(), functionInfo);
 
     // build collation for filter
     RelTraitSet indexFilterTraitSet = indexScanPrel.getTraitSet();
@@ -188,31 +199,20 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
 
     ProjectPrel indexProjectPrel = null;
     if (origProject != null) {
-      RelCollation collation = IndexPlanUtils.buildCollationProject(origProject.getProjects(), null, origScan, functionInfo,
-          indexContext);
+      RelCollation collation = IndexPlanUtils.buildCollationProject(origProject.getProjects(), null,
+          origScan, functionInfo, indexContext);
       indexProjectPrel = new ProjectPrel(origScan.getCluster(), indexFilterTraitSet.plus(collation),
           indexFilterPrel, origProject.getProjects(), origProject.getRowType());
     }
-    RelNode finalRel;
 
-    if (remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
-      // create a Filter corresponding to the remainder condition
-      RexNode newRemainderCondition = remainderCondition;
-      // If project is present rewrite the remainder condition based on the project
-      if (indexProjectPrel != null) {
-        newRemainderCondition = rewriteConditionForProject(remainderCondition, indexProjectPrel.getProjects());
-      }
-      FilterPrel remainderFilterPrel = new FilterPrel(origScan.getCluster(), indexProjectPrel.getTraitSet(),
-          indexProjectPrel, newRemainderCondition);
-      finalRel = remainderFilterPrel;
-    } else if (indexProjectPrel != null) {
+    RelNode finalRel;
+    if (indexProjectPrel != null) {
       finalRel = indexProjectPrel;
-    }
-    else {
+    } else {
       finalRel = indexFilterPrel;
     }
 
-    if ( upperProject != null) {
+    if (upperProject != null) {
       RelCollation newCollation =
           IndexPlanUtils.buildCollationProject(upperProject.getProjects(), origProject,
               origScan, functionInfo, indexContext);
@@ -253,7 +253,8 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     finalRel = Prule.convert(finalRel, finalRel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
 
     logger.debug("CoveringIndexPlanGenerator got finalRel {} from origScan {}, original digest {}, new digest {}.",
-        finalRel.toString(), origScan.toString(), upperProject==null?indexContext.filter.getDigest(): upperProject.getDigest(), finalRel.getDigest());
+        finalRel.toString(), origScan.toString(),
+        upperProject==null?indexContext.filter.getDigest(): upperProject.getDigest(), finalRel.getDigest());
     return finalRel;
   }
 

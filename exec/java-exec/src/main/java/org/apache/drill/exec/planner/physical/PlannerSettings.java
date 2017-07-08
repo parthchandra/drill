@@ -91,11 +91,10 @@ public class PlannerSettings implements Context{
       new RangeDoubleValidator("planner.covering_index_selectivity_factor", 0.0, 1.0, 0.75);
   public static final RangeDoubleValidator NON_COVERING_INDEX_SELECTIVITY_FACTOR =
       new RangeDoubleValidator("planner.non_covering_index_selectivity_factor", 0.0, 1.0, 0.25);
-  public static final RangeDoubleValidator TABLE_COST_PREF_FACTOR = new RangeDoubleValidator("planner.fts_cost_factor", 0.0, Double.MAX_VALUE, 1.0);
   public static final RangeDoubleValidator INDEX_COVERING_NONCOVERING_FACTOR = new RangeDoubleValidator("planner.index_covering_to_noncovering_factor", 0.0, Double.MAX_VALUE, 100.0);
   public static final RangeLongValidator MAX_CANDIDATE_INDEXES_PER_TABLE = new RangeLongValidator("planner.max_candidate_indexes_per_table", 0, 100, 5);
-  public static final RangeDoubleValidator ROWKEY_JOINBACK_IO_COST_FACTOR = new RangeDoubleValidator("planner.rowkey_joinback_io_cost_factor", 0, Double.MAX_VALUE, 1.0d);
-  public static final BooleanValidator PREFER_INTERSECT_PLANS = new BooleanValidator("planner.index.prefer_intersect_plans", false);
+  public static final RangeDoubleValidator ROWKEY_JOINBACK_IO_COST_FACTOR = new RangeDoubleValidator("planner.rowkey_joinback_io_cost_factor", 0, Double.MAX_VALUE, 0.1d);
+  public static final BooleanValidator PREFER_INTERSECT_PLANS = new BooleanValidator("planner.index_prefer_intersect_plans", false);
   public static final BooleanValidator DISABLE_FULL_TABLE_SCAN = new BooleanValidator("planner.disable_full_table_scan", false);
   public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
   public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY);
@@ -379,10 +378,6 @@ public class PlannerSettings implements Context{
 
   public boolean isScanStatisticsEnabled() {
     return options.getOption(ENABLE_SCAN_STATS);
-  }
-
-  public double getTableCostPrefFactor() {
-    return options.getOption(TABLE_COST_PREF_FACTOR);
   }
 
   @Override

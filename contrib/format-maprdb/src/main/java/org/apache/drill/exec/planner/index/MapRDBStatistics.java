@@ -56,7 +56,6 @@ import java.util.Map;
 
 public class MapRDBStatistics implements Statistics {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBStatistics.class);
-  double tableCostPrefFactor = 1.0;
   double rowKeyJoinBackIOFactor = 1.0;
   /*
    * The computed statistics are cached in <statsCache> so that any subsequent calls are returned
@@ -78,20 +77,13 @@ public class MapRDBStatistics implements Statistics {
     conditionRexNodeMap = new HashMap<>();
   }
 
-  public double getTableCostPrefFactor() {
-    return tableCostPrefFactor;
-  }
-
   public double getRowKeyJoinBackIOFactor() {
     return rowKeyJoinBackIOFactor;
   }
 
   @Override
-  public double getRowCount(RexNode condition, DrillScanRel scanRel, boolean isTableScan) {
+  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
     double costFactor = 1.0;
-    if (isTableScan) {
-      costFactor = tableCostPrefFactor;
-    }
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
       if (condition == null) {
         if (statsCache.get(null)!= null) {
@@ -130,16 +122,10 @@ public class MapRDBStatistics implements Statistics {
 
   /** Returns the number of rows satisfying the given FILTER condition
    *  @param condition - FILTER specified as a {@link QueryCondition}
-   *  @param isTableScan - Whether the rowcounts are requested by an TableScan
-   * @return approximate rows satisfying the filter
+   *  @return approximate rows satisfying the filter
    */
-  public double getRowCount(QueryCondition condition, boolean isTableScan) {
+  public double getRowCount(QueryCondition condition) {
     double costFactor = 1.0;
-    // For table scan multiply the rowcounts with the planner.fts_cost_factor to make
-    // index scans less costly and bias towards index plans.
-    if (isTableScan) {
-      costFactor = tableCostPrefFactor;
-    }
     if (condition != null
         && conditionRexNodeMap.get(condition.toString()) != null) {
       String rexConditionAsString = conditionRexNodeMap.get(condition.toString());
@@ -211,7 +197,6 @@ public class MapRDBStatistics implements Statistics {
   public boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context) {
     GroupScan scan;
     PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
-    tableCostPrefFactor = settings.getTableCostPrefFactor();
     rowKeyJoinBackIOFactor = settings.getRowKeyJoinBackIOCostFactor();
     if (settings.isScanStatisticsEnabled()
       && scanRel.getGroupScan() instanceof DbGroupScan) {

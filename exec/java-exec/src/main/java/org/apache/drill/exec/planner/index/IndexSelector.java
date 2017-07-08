@@ -26,6 +26,7 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollationTraitDef;
+import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -364,14 +365,15 @@ public class IndexSelector  {
       // which is ok because its main use is to convert the ordinal-based filter
       // to a string representation for stats lookup.
       for (RexNode filter : leadingFilters) {
-        double filterRows = stats.getRowCount(filter, primaryTableScan /* see comment above */, false);
+        double filterRows = stats.getRowCount(filter, primaryTableScan /* see comment above */);
         double sel = 1.0;
         if (filterRows != Statistics.ROWCOUNT_UNKNOWN) {
           sel = filterRows/totalRows;
           logger.debug("Filter: {}, filterRows = {}, totalRows = {}, selectivity = {}",
               filter, filterRows, totalRows, sel);
         } else {
-          logger.warn("Filter row count is UNKNOWN for filter: {}", filter);
+          sel = RelMdUtil.guessSelectivity(filter);
+          logger.warn("Filter row count is UNKNOWN for filter: {} using guess {}", filter, sel);
         }
         leadingSel *= sel;
       }
@@ -379,7 +381,7 @@ public class IndexSelector  {
       logger.debug("Combined selectivity of all leading filters: {}", leadingSel);
 
       if (remainderFilter != null) {
-        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan, false);
+        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan);
         logger.debug("Selectivity of remainder filters: {}", remainderSel);
       }
 

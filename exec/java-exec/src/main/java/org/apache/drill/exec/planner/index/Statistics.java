@@ -28,10 +28,10 @@ public interface Statistics {
   double AVG_ROWSIZE_UNKNOWN = -1;
 
   /** Returns the statistics given the specified filter condition
-   *  @param condition - Filter specified as a {@link RexNode}
+   * @param condition - Filter specified as a {@link RexNode}
    *  @param scanRel - The current scan rel
    */
-  double getRowCount(RexNode condition, DrillScanRel scanRel, boolean isIndexScan);
+  double getRowCount(RexNode condition, DrillScanRel scanRel);
 
   double getAvgRowSize(RexNode condition, DrillScanRel scanRel, boolean isIndexScan);
 
