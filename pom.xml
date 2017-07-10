@@ -38,9 +38,9 @@
     <calcite.version>1.4.0-drill-r21</calcite.version>
     <janino.version>2.7.6</janino.version>
     <sqlline.version>1.1.9-drill-r7</sqlline.version>
-    <jackson.version>2.7.8</jackson.version>
-    <mapr.release.version>6.0.0-mapr-SNAPSHOT</mapr.release.version>
-    <ojai.version>2.0-SNAPSHOT</ojai.version>
+    <jackson.version>2.7.1</jackson.version>
+    <mapr.release.version>6.0.0-mapr-beta</mapr.release.version>
+    <ojai.version>2.0-mapr-1707-beta</ojai.version>
     <kerby.version>1.0.0-RC2</kerby.version>
     <findbugs.version>3.0.0</findbugs.version>
 
@@ -1688,8 +1688,8 @@
         <alt-hadoop>mapr</alt-hadoop>
         <rat.excludeSubprojects>true</rat.excludeSubprojects>
         <hive.version>1.2.0-mapr-1608</hive.version>
-        <hbase.version>1.1.1-mapr-1602-m7-5.2.0</hbase.version>
-        <hadoop.version>2.7.0-mapr-1607</hadoop.version>
+        <hbase.version>1.1.1-mapr-1602</hbase.version>
+        <hadoop.version>2.7.0-mapr-1707-beta</hadoop.version>
       </properties>
       <dependencyManagement>
         <dependencies>
