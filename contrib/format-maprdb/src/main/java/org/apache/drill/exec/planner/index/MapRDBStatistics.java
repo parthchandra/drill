@@ -664,8 +664,12 @@ public class MapRDBStatistics implements Statistics {
       rowSize = statsCache.get(conditionAsStr).getAvgRowSize();
       logger.debug("computeRowSize: Cache HIT: Found {} -> {}", conditionAsStr, rowSize);
       return rowSize;
-    } else if (condition.getKind() == SqlKind.AND || condition.getKind() == SqlKind.OR) {
-      for(RexNode pred : RelOptUtil.conjunctions(condition)) {
+    } else if (condition.getKind() == SqlKind.AND) {
+      for (RexNode pred : RelOptUtil.conjunctions(condition)) {
+        rowSize = Math.max(rowSize, computeRowSize(pred, tableRowSize, scanRel));
+      }
+    } else if (condition.getKind() == SqlKind.OR) {
+      for (RexNode pred : RelOptUtil.disjunctions(condition)) {
         rowSize = Math.max(rowSize, computeRowSize(pred, tableRowSize, scanRel));
       }
     }
