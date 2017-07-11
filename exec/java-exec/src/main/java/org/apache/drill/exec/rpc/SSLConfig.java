@@ -38,7 +38,7 @@ public class SSLConfig {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfig.class);
 
-  private static final String DEFAULT_SSL_PROTOCOL = new String("TLSv1.2");
+  private static final String DEFAULT_SSL_PROTOCOL = "TLSv1.2";
   private static final int DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS = 10*1000; // 10 seconds
 
   private final boolean sslEnabled;
