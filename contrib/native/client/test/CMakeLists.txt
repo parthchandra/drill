@@ -21,4 +21,8 @@ include_directories("${OPENSSL_INCLUDE_DIR}")
 include_directories(${CMAKE_SOURCE_DIR}/src)
 add_executable(testSSL ssl/testSSL.cpp )
 target_link_libraries(testSSL ${Boost_LIBRARIES} ${PROTOBUF_LIBRARY} drillClient protomsgs y2038 ${OPENSSL_LIBRARIES} )
+add_executable(testServer ssl/testServer.cpp )
+target_link_libraries(testServer ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} )
+add_executable(testClient ssl/testClient.cpp )
+target_link_libraries(testClient ${Boost_LIBRARIES} ${OPENSSL_LIBRARIES} )
 
