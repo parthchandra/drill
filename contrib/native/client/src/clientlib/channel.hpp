@@ -59,8 +59,8 @@ namespace Drill {
 
     class ChannelContext{
         public:
-            ChannelContext();
-            ~ChannelContext();
+            ChannelContext(){ m_pSslContext=NULL;};
+            ~ChannelContext(){};
             void setSslContext(boost::asio::ssl::context* c){
                 this->m_pSslContext=c;
             }
@@ -76,7 +76,6 @@ namespace Drill {
      * the connection string and the options, the connection will be either 
      * a simple socket or a socket using an ssl stream. The class also encapsulates
      * connecting to a drillbit directly or thru zookeeper.
-     * The class also provides interfaces to handle async send and receive methods (with timeout)
      * The channel class owns the socket and the io_service that the applications
      * will use to communicate with the server.
      ***/
@@ -86,7 +85,25 @@ namespace Drill {
             virtual ~Channel();
             virtual connectionStatus_t init(ChannelContext_t* context)=0;
             connectionStatus_t connect();
+            connectionStatus_t protocolClose();
             template <typename SettableSocketOption> void setOption(SettableSocketOption& option);
+            DrillClientError* getError(){ return m_pError;}
+
+            boost::asio::io_service& getIOService(){
+                return m_ioService;
+            }
+
+            // returns a reference to the underlying socket 
+            // This access should really be removed and encapsulated in calls that 
+            // manage async_send and async_recv 
+            // Until then we will let DrillClientImpl have direct access
+            streamSocket_t& getInnerSocket(){
+                return m_pSocket->getInnerSocket();
+            }
+            
+            AsioStreamSocket& getSocketStream(){
+                return *m_pSocket;
+            }
 
         protected:
             connectionStatus_t handleError(connectionStatus_t status, std::string msg);
@@ -97,6 +114,15 @@ namespace Drill {
         private:
             
             connectionStatus_t connectInternal();
+            connectionStatus_t protocolHandshake(){
+                connectionStatus_t status = CONN_SUCCESS;
+                try{
+                    m_pSocket->protocolHandshake();
+                } catch (boost::system::system_error e) {
+                    status = handleError(CONN_HANDSHAKE_FAILED, e.what());
+                }
+                return status;
+            }
 
             ConnectionEndpoint* m_pEndpoint;
 
@@ -120,7 +146,8 @@ namespace Drill {
     };
 
     class ChannelFactory{
-        static Channel* getChannel(channelType_t t, const char* connStr);
+        public:
+            static Channel* getChannel(channelType_t t, const char* connStr);
     };
 
 

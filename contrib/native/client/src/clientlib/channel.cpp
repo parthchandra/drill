@@ -208,7 +208,7 @@ connectionStatus_t Channel::connectInternal(){
             DRILL_LOG(LOG_TRACE) << endpoint << std::endl;
         }
         boost::system::error_code ec;
-        m_pSocket->getSocket().connect(endpoint, ec);
+        m_pSocket->getInnerSocket().connect(endpoint, ec);
         if(ec){
             return handleError(CONN_FAILURE, getMessage(ERR_CONN_FAILURE, host, port, ec.message().c_str()));
         }
@@ -222,15 +222,15 @@ connectionStatus_t Channel::connectInternal(){
 
     // set socket keep alive
     boost::asio::socket_base::keep_alive keepAlive(true);
-    m_pSocket->getSocket().set_option(keepAlive);
+    m_pSocket->getInnerSocket().set_option(keepAlive);
 	// set no_delay
     boost::asio::ip::tcp::no_delay noDelay(true);
-    m_pSocket->getSocket().set_option(noDelay);
+    m_pSocket->getInnerSocket().set_option(noDelay);
     // set reuse addr
     boost::asio::socket_base::reuse_address reuseAddr(true);
-    m_pSocket->getSocket().set_option(reuseAddr);
+    m_pSocket->getInnerSocket().set_option(reuseAddr);
+    return this->protocolHandshake();
 
-    return CONN_SUCCESS;
 }
 
 connectionStatus_t SocketChannel::init(ChannelContext_t* pContext){
