@@ -1669,7 +1669,7 @@
         <alt-hadoop>mapr</alt-hadoop>
         <rat.excludeSubprojects>true</rat.excludeSubprojects>
         <hive.version>1.2.0-mapr-1608</hive.version>
-        <hbase.version>1.1.1-mapr-1602</hbase.version>
+        <hbase.version>1.1.1-mapr-1602-m7-6.0.0-mapr-beta</hbase.version>
         <hadoop.version>2.7.0-mapr-1707-beta</hadoop.version>
       </properties>
       <dependencyManagement>
