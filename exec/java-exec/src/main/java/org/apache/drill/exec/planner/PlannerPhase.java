@@ -71,7 +71,7 @@ import org.apache.drill.exec.planner.physical.FilterPrule;
 import org.apache.drill.exec.planner.physical.HashAggPrule;
 import org.apache.drill.exec.planner.physical.HashJoinPrule;
 import org.apache.drill.exec.planner.physical.LimitPrule;
-import org.apache.drill.exec.planner.physical.LimitUnionExchangeTransposeRule;
+import org.apache.drill.exec.planner.physical.LimitExchangeTransposeRule;
 import org.apache.drill.exec.planner.physical.MergeJoinPrule;
 import org.apache.drill.exec.planner.physical.NestedLoopJoinPrule;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
@@ -526,7 +526,7 @@ public enum PlannerPhase {
     ruleList.add(WriterPrule.INSTANCE);
     ruleList.add(WindowPrule.INSTANCE);
     ruleList.add(PushLimitToTopN.INSTANCE);
-    ruleList.add(LimitUnionExchangeTransposeRule.INSTANCE);
+    ruleList.add(LimitExchangeTransposeRule.INSTANCE);
     ruleList.add(UnionAllPrule.INSTANCE);
     ruleList.add(ValuesPrule.INSTANCE);
     ruleList.add(DirectScanPrule.INSTANCE);
