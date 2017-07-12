@@ -18,18 +18,17 @@
 
 package org.apache.drill.exec.planner.index;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.collect.Maps;
+import com.mapr.db.Admin;
+import com.mapr.db.MapRDB;
+import com.mapr.db.exceptions.DBException;
+import com.mapr.db.index.IndexDesc;
+import com.mapr.db.index.IndexFieldDesc;
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.CommonTokenStream;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.expression.ExpressionPosition;
 import org.apache.drill.common.expression.FunctionCallFactory;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -48,16 +47,19 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatMatcher;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
+import org.apache.drill.exec.util.ImpersonationUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.common.collect.Maps;
-import com.mapr.db.Admin;
-import com.mapr.db.MapRDB;
-import com.mapr.db.exceptions.DBException;
-import com.mapr.db.index.IndexDesc;
-import com.mapr.db.index.IndexFieldDesc;
+import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDiscover {
 
@@ -122,11 +124,11 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       MapRDBFormatPlugin maprFormatPlugin = ((MapRDBGroupScan) origScan).getFormatPlugin();
       FileSystemPlugin fsPlugin = ((MapRDBGroupScan) origScan).getStoragePlugin();
 
-      DrillFileSystem fs = new DrillFileSystem(fsPlugin.getFsConf());
+      DrillFileSystem fs = ImpersonationUtil.createFileSystem(origScan.getUserName(), fsPlugin.getFsConf());
       MapRDBFormatMatcher matcher = (MapRDBFormatMatcher) (maprFormatPlugin.getMatcher());
       FileSelection fsSelection = deriveFSSelection(fs, idxDescriptor);
       return matcher.isReadableIndex(fs, fsSelection, fsPlugin, fsPlugin.getName(),
-          UserGroupInformation.getCurrentUser().getUserName(), idxDescriptor);
+          origScan.getUserName(), idxDescriptor);
 
     } catch (Exception e) {
       logger.error("Failed to get native DrillTable.", e);
@@ -336,8 +338,21 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
   @SuppressWarnings("deprecation")
   private Admin admin() {
     assert getOriginalScan() instanceof MapRDBGroupScan;
-    Configuration conf = ((MapRDBGroupScan) getOriginalScan()).getFormatPlugin().getFsConf();
-    return MapRDB.getAdmin(conf);
-  }
 
+    final MapRDBGroupScan dbGroupScan = (MapRDBGroupScan) getOriginalScan();
+    final UserGroupInformation currentUser = ImpersonationUtil.createProxyUgi(dbGroupScan.getUserName());
+    final Configuration conf = dbGroupScan.getFormatPlugin().getFsConf();
+
+    final Admin admin;
+    try {
+      admin = currentUser.doAs(new PrivilegedExceptionAction<Admin>() {
+        public Admin run() throws Exception {
+          return MapRDB.getAdmin(conf);
+        }
+      });
+    } catch (Exception e) {
+      throw new DrillRuntimeException("Failed to get Admin instance for user: " + currentUser.getUserName(), e);
+    }
+    return admin;
+  }
 }

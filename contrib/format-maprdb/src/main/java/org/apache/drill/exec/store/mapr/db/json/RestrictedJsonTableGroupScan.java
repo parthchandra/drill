@@ -66,7 +66,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     RestrictedMapRDBSubScanSpec subScanSpec =
         new RestrictedMapRDBSubScanSpec(
         spec.getTableName(),
-        regionsToScan.get(tfi));
+        regionsToScan.get(tfi), getUserName());
     return subScanSpec;
   }
 

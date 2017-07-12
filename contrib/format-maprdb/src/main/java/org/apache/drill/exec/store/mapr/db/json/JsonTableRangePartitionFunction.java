@@ -84,7 +84,7 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
     partitionKeyVector = v.getValueVector();
 
     // initialize the table handle from the table cache
-    table = subScan.getFormatPlugin().getJsonTableCache().getTable(tableName);
+    table = subScan.getFormatPlugin().getJsonTableCache().getTable(tableName, subScan.getUserName());
 
     // Set the condition to null such that all scan ranges are retrieved for the primary table.
     // The reason is the row keys could typically belong to any one of the tablets of the table, so

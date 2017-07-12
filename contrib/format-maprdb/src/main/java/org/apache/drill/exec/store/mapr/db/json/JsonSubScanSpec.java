@@ -42,8 +42,8 @@ public class JsonSubScanSpec extends MapRDBSubScanSpec {
   protected QueryCondition condition;
 
   public JsonSubScanSpec(String tableName, IndexDesc indexDesc, String regionServer,
-                         byte[] startRow, byte[] stopRow, QueryCondition cond) {
-    super(tableName, indexDesc, regionServer, null, null, null, null);
+                         byte[] startRow, byte[] stopRow, QueryCondition cond, String userName) {
+    super(tableName, indexDesc, regionServer, null, null, null, null, userName);
 
     this.condition = MapRDBImpl.newCondition().and();
 

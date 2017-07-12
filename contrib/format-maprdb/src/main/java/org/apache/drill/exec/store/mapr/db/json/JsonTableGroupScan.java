@@ -188,7 +188,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       Configuration conf = new Configuration();
 
       Table t;
-      t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexDesc());
+      t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexDesc(), getUserName());
       MetaTable metaTable = t.getMetaTable();
       QueryCondition scanSpecCondition = scanSpec.getCondition();
       List<? extends ScanRange> scanRanges = metaTable.getScanRanges(scanSpecCondition);
@@ -231,7 +231,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         regionsToScan.get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
-        spec.getCondition());
+        spec.getCondition(),
+        getUserName());
     return subScanSpec;
   }
 
@@ -416,21 +417,17 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    */
   private MapRDBStatisticsPayload getEstimatedRowCountInternal(QueryCondition condition, IndexDesc index, DrillScanRel scanRel) {
     // double totalRows = getRowCount(null, scanPrel);
-    // Get the index table and use the DB API to get the estimated number of rows. For size estimates, we assume that
-    // all the columns would be read from the disk.
-    Table table;
-    if (index != null) {
-      table = MapRDBImpl.getIndexTable(index);
-    } else {
-      // If no index is specified, get it from the primary table
-      if (scanSpec.isSecondaryIndex()) {
-        // If stats not cached get it from the table.
-        //table = MapRDB.getTable(scanSpec.getPrimaryTablePath());
-        throw new UnsupportedOperationException("getEstimatedRowCount should be invoked on primary table");
-      } else {
-        table = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName());
-      }
+
+    // If no index is specified, get it from the primary table
+    if(index == null && scanSpec.isSecondaryIndex()) {
+      // If stats not cached get it from the table.
+      //table = MapRDB.getTable(scanSpec.getPrimaryTablePath());
+      throw new UnsupportedOperationException("getEstimatedRowCount should be invoked on primary table");
     }
+
+    // Get the index table or primary table and use the DB API to get the estimated number of rows. For size estimates,
+    // we assume that all the columns would be read from the disk.
+    final Table table = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), index, getUserName());
 
     if (table != null) {
       com.mapr.db.scan.ScanStats stats = table.getMetaTable().getScanStats(condition);

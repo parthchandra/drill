@@ -31,6 +31,7 @@ public class MapRDBSubScanSpec {
   protected byte[] startRow;
   protected byte[] stopRow;
   protected byte[] serializedFilter;
+  protected String userName;
 
   @JsonCreator
   public MapRDBSubScanSpec(@JsonProperty("tableName") String tableName,
@@ -39,7 +40,8 @@ public class MapRDBSubScanSpec {
                            @JsonProperty("startRow") byte[] startRow,
                            @JsonProperty("stopRow") byte[] stopRow,
                            @JsonProperty("serializedFilter") byte[] serializedFilter,
-                           @JsonProperty("filterString") String filterString) {
+                           @JsonProperty("filterString") String filterString,
+                           @JsonProperty("username") String userName) {
     if (serializedFilter != null && filterString != null) {
       throw new IllegalArgumentException("The parameters 'serializedFilter' or 'filterString' cannot be specified at the same time.");
     }
@@ -49,6 +51,7 @@ public class MapRDBSubScanSpec {
     this.startRow = startRow;
     this.stopRow = stopRow;
     this.serializedFilter = serializedFilter;
+    this.userName = userName;
   }
 
   /* package */ MapRDBSubScanSpec() {
@@ -110,13 +113,22 @@ public class MapRDBSubScanSpec {
     return this;
   }
 
+  public String getUserName() {
+    return userName;
+  }
+
+  public void setUserName(String userName) {
+    this.userName = userName;
+  }
+
   @Override
   public String toString() {
     return "MapRDBSubScanSpec [tableName=" + tableName
         + ", startRow=" + (startRow == null ? null : Bytes.toStringBinary(startRow))
         + ", stopRow=" + (stopRow == null ? null : Bytes.toStringBinary(stopRow))
         + ", filter=" + (getSerializedFilter() == null ? null : Bytes.toBase64(getSerializedFilter()))
-        + ", regionServer=" + regionServer + "]";
+        + ", regionServer=" + regionServer
+        + ", userName=" + userName + "]";
   }
 
 }

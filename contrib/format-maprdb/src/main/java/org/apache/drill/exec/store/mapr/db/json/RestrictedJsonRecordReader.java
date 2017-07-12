@@ -98,7 +98,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
       return 0;
     }
 
-    Table table = super.formatPlugin.getJsonTableCache().getTable(subScanSpec.getTableName());
+    Table table = super.formatPlugin.getJsonTableCache().getTable(subScanSpec.getTableName(), subScanSpec.getUserName());
     final MultiGet multiGet = new MultiGet((BaseJsonTable) table, null, false, (String[]) null);
     int recordCount = 0;
     DBDocumentReaderBase reader = null;

@@ -173,7 +173,8 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
         spec.getSerializedFilter(),
-        null);
+        null,
+        getUserName());
     return subScanSpec;
   }
 
