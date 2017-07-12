@@ -847,4 +847,47 @@ public class IndexPlanTest extends BaseJsonTest {
         .go();
     test(defaultFTSFactor);
   }
+
+  @Test
+  public void orderByLimitNonCoveringPlan() throws Exception {
+    String query = "SELECT t.name.lname as lname FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn < '100000003' order by t.id.ssn limit 2";
+    test(defaultHavingIndexPlan);
+    test(sliceTargetSmall);
+    try {
+      PlanTestBase.testPlanMatchingPatterns(query,
+          new String[]{"Limit(.*[\n\r])+.*SingleMergeExchange(.*[\n\r])+.*Limit(.*[\n\r])+.*indexName="},
+          new String[]{"Sort"}
+      );
+
+      testBuilder()
+          .sqlQuery(query)
+          .ordered()
+          .baselineColumns("lname").baselineValues("iuMG")
+          .baselineColumns("lname").baselineValues("KpFq")
+          .go();
+    } finally {
+      test(sliceTargetDefault);
+    }
+  }
+
+  @Test
+  public void orderByLimitCoveringPlan() throws Exception {
+    String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn < '100000003' order by t.id.ssn limit 2";
+    test(defaultHavingIndexPlan);
+
+    //when index table has only one tablet, the SingleMergeExchange in the middle of two Limits will be removed.
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Limit(.*[\n\r])+.*Limit(.*[\n\r])+.*indexName="},
+        new String[]{"Sort"}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("phone").baselineValues("6500008069")
+        .baselineColumns("phone").baselineValues("6500001411")
+        .go();
+  }
 }
