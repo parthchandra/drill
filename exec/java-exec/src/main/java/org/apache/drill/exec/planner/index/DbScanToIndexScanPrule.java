@@ -473,11 +473,15 @@ public class DbScanToIndexScanPrule extends Prule {
             indexContext, indexInfoMap, builder, settings);
         try {
           planGen.go();
+          // If intersect plans are forced do not generate further non-covering plans
+          if (settings.isIntersectPlanPreferred()) {
+            //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
+            return;
+          }
         } catch (Exception e) {
+          // If error while generating intersect plans, continue onto generating non-covering plans
           logger.warn("Exception while trying to generate intersect index plan", e);
         }
-        //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
-        return;
       }
     }
 
