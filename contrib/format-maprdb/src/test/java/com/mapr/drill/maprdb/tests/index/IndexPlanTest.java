@@ -17,22 +17,18 @@
  */
 package com.mapr.drill.maprdb.tests.index;
 
-import com.google.common.collect.Lists;
 import com.mapr.db.Admin;
 import com.mapr.drill.maprdb.tests.MaprDBTestsSuite;
 import com.mapr.drill.maprdb.tests.json.BaseJsonTest;
 import com.mapr.tests.annotations.ClusterTest;
 
 import org.apache.drill.PlanTestBase;
-import org.apache.hadoop.hbase.TableName;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runners.MethodSorters;
-
-import java.util.List;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @Category(ClusterTest.class)
@@ -49,7 +45,8 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String defaultFTSFactor = "alter session reset `planner.fts_cost_factor`";
   private static final String disableFTS = "alter session set `planner.disable_full_table_scan` = true";
   private static final String enableFTS = "alter session reset `planner.disable_full_table_scan`";
-
+  private static final String preferIntersectPlans = "alter session set `planner.index.prefer_intersect_plans` = true";
+  private static final String defaultIntersectPlans = "alter session reset `planner.index.prefer_intersect_plans`";
 
   /**
    *  A sample row of this 10K table:
@@ -303,6 +300,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
         " where t.personal.age = 53 AND t.personal.income=45";
     test(defaultHavingIndexPlan+";"+ highFTSFactor +";");
+    test(preferIntersectPlans);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=testindex_(.*[\n\r])+.*JsonTableGroupScan.*indexName=testindex_"},
         new String[]{}
@@ -324,6 +322,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .build()
         .run();
     test(defaultFTSFactor);
+    test(defaultIntersectPlans);
     return;
   }
 

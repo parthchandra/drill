@@ -91,6 +91,7 @@ public class PlannerSettings implements Context{
   public static final RangeDoubleValidator INDEX_COVERING_NONCOVERING_FACTOR = new RangeDoubleValidator("planner.index_covering_to_noncovering_factor", 0.0, Double.MAX_VALUE, 100.0);
   public static final RangeLongValidator MAX_CANDIDATE_INDEXES_PER_TABLE = new RangeLongValidator("planner.max_candidate_indexes_per_table", 0, 100, 5);
   public static final RangeDoubleValidator ROWKEY_JOINBACK_IO_COST_FACTOR = new RangeDoubleValidator("planner.rowkey_joinback_io_cost_factor", 0, Double.MAX_VALUE, 1.0d);
+  public static final BooleanValidator PREFER_INTERSECT_PLANS = new BooleanValidator("planner.index.prefer_intersect_plans", false);
   public static final BooleanValidator DISABLE_FULL_TABLE_SCAN = new BooleanValidator("planner.disable_full_table_scan", false);
   public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
   public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY, false);
@@ -312,6 +313,10 @@ public class PlannerSettings implements Context{
 
   public boolean isDisableFullTableScan() {
     return options.getOption(DISABLE_FULL_TABLE_SCAN);
+  }
+
+  public boolean isIntersectPlanPreferred() {
+    return options.getOption(PREFER_INTERSECT_PLANS);
   }
 
   public boolean isScanStatisticsEnabled() {

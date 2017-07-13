@@ -100,6 +100,7 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       PlannerSettings.INDEX_COVERING_NONCOVERING_FACTOR,
       PlannerSettings.MAX_CANDIDATE_INDEXES_PER_TABLE,
       PlannerSettings.ROWKEY_JOINBACK_IO_COST_FACTOR,
+      PlannerSettings.PREFER_INTERSECT_PLANS,
       PlannerSettings.DISABLE_FULL_TABLE_SCAN,
       PlannerSettings.ENABLE_SCAN_STATS,
       PlannerSettings.TABLE_COST_PREF_FACTOR,
