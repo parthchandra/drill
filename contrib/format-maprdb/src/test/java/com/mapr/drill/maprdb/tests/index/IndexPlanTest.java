@@ -47,6 +47,8 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
   private static final String highFTSFactor = "alter session set `planner.fts_cost_factor` = 1500.0";
   private static final String defaultFTSFactor = "alter session reset `planner.fts_cost_factor`";
+  private static final String disableFTS = "alter session set `planner.disable_full_table_scan` = true";
+  private static final String enableFTS = "alter session reset `planner.disable_full_table_scan`";
 
 
   /**
@@ -889,5 +891,28 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("phone").baselineValues("6500008069")
         .baselineColumns("phone").baselineValues("6500001411")
         .go();
+  }
+
+  @Test
+  public void pickAnyIndexWithFTSDisabledPlan() throws Exception {
+    String lowCoveringSel = "alter session set `planner.covering_index_selectivity_factor` = 0.025";
+    String defaultCoveringSel = "alter session reset `planner.covering_index_selectivity_factor`";
+    String query = "SELECT t.`contact`.`phone` AS `phone` FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn = '100007423'";
+    try {
+      test(defaultHavingIndexPlan + ";" + lowCoveringSel + ";");
+      PlanTestBase.testPlanMatchingPatterns(query,
+          new String[]{".*JsonTableGroupScan.*tableName=.*index_test_primary"},
+          new String[]{".*indexName=testindex_0"}
+      );
+      // Must not throw CANNOTPLANEXCEPTION
+      test(defaultHavingIndexPlan + ";" + lowCoveringSel + ";" + disableFTS + ";");
+      PlanTestBase.testPlanMatchingPatterns(query,
+          new String[]{".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=testindex_0"},
+          new String[]{"RowKeyJoin"}
+      );
+    } finally {
+      test(defaultCoveringSel+";"+enableFTS+";");
+    }
   }
 }

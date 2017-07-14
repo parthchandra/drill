@@ -179,8 +179,9 @@ public class IndexSelector  {
       if (p.numLeadingFilters() > 0 || p.satisfiesCollation()) {
         double selThreshold = p.isCovering() ? settings.getCoveringIndexSelectivityFactor() :
           settings.getNonCoveringIndexSelectivityFactor();
-        // only consider indexes whose selectivity is <= the configured threshold
-        if (p.getLeadingSelectivity() <= selThreshold) {
+        // only consider indexes whose selectivity is <= the configured threshold OR consider
+        // all when full table scan is disable to avoid a CannotPlanException
+        if (settings.isDisableFullTableScan() || p.getLeadingSelectivity() <= selThreshold) {
           candidateIndexes.add(p);
         }
       }
