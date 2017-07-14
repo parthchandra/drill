@@ -25,17 +25,15 @@ import org.apache.drill.exec.planner.physical.AbstractRangePartitionFunction;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.vector.ValueVector;
-import org.ojai.store.QueryCondition;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
-
-import com.mapr.db.TabletInfo;
 import com.mapr.db.Table;
 import com.mapr.db.impl.IdCodec;
 import com.mapr.db.impl.TabletInfoImpl;
+import com.mapr.db.scan.ScanRange;
 
 @SuppressWarnings("deprecation")
 @JsonTypeName("jsontable-range-partition-function")
@@ -57,6 +55,9 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 
   @JsonIgnore
   protected Table table = null;
+
+  @JsonIgnore
+  List<? extends ScanRange> scanRanges = null;
 
   @JsonCreator
   public JsonTableRangePartitionFunction(
@@ -84,6 +85,12 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 
     // initialize the table handle from the table cache
     table = subScan.getFormatPlugin().getJsonTableCache().getTable(tableName);
+
+    // Set the condition to null such that all scan ranges are retrieved for the primary table.
+    // The reason is the row keys could typically belong to any one of the tablets of the table, so
+    // there is no use trying to get only limited set of scan ranges (note that applying a non-null
+    // condition to getScanRanges() also has a cost associated with it).
+    scanRanges = table.getMetaTable().getScanRanges(null);
   }
 
 
@@ -99,20 +106,13 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
     // have stale information. Such discrepancy will be handled by the join operator itself but
     // from a range partition function viewpoint, it should just put it in a default bucket.
     int tabletId = 0;
-
-    // Set the condition to null such that all TabletInfos are retrieved for the primary table.
-    // The reason is the row keys could typically belong to any one of the tablets of the table, so
-    // there is no use trying to get only limited set of TabletInfos (note that applying a non-null
-    // condition to getTabletInfo() also has a cost associated with it).
-    QueryCondition condition = null;
     TabletInfoImpl tablet = null;
-    TabletInfo[] tabletInfos = table.getTabletInfos(condition);
 
     // TODO: currently this is doing a linear search through the tablet ranges; For N rows and M tablets,
     // this will be an O(NxM) operation. This search should ideally be delegated to MapR-DB once an
     // appropriate API is available to optimize this
-    for (int i = 0; i < tabletInfos.length; i++) {
-      tablet = (TabletInfoImpl) (tabletInfos[i]);
+    for (int i = 0; i < scanRanges.size(); i++) {
+      tablet = (TabletInfoImpl) (scanRanges.get(i));
       if (tablet.containsRow(encodedKey)) {
          tabletId = i;
          break;
