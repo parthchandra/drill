@@ -35,6 +35,8 @@ public class JsonScanSpec {
   protected String tableName;
   protected IndexDesc indexDesc;
   protected QueryCondition condition;
+  protected byte[] startRow;
+  protected byte[] stopRow;
 
   @JsonCreator
   public JsonScanSpec(@JsonProperty("tableName") String tableName,
@@ -43,6 +45,16 @@ public class JsonScanSpec {
     this.tableName = tableName;
     this.indexDesc = indexDesc;
     this.condition = condition;
+    if (this.condition != null) {
+      List<RowkeyRange> rkRanges = ((ConditionImpl)this.condition).getRowkeyRanges();
+      if (rkRanges.size() > 0) {
+        startRow = rkRanges.get(0).getStartRow();
+        stopRow  = rkRanges.get(rkRanges.size() - 1).getStopRow();
+      } else {
+        startRow = HConstants.EMPTY_START_ROW;
+        stopRow  = HConstants.EMPTY_END_ROW;
+      }
+    }
   }
 
   public String getTableName() {
@@ -53,26 +65,20 @@ public class JsonScanSpec {
     return this.indexDesc;
   }
 
+  public void setStartRow(byte []startRow) {
+    this.startRow = startRow;
+  }
+
+  public void setStopRow(byte []stopRow) {
+    this.stopRow = stopRow;
+  }
+
   public byte[] getStartRow() {
-    if (condition == null) {
-      return HConstants.EMPTY_START_ROW;
-    }
-    List<RowkeyRange> rkRanges = ((ConditionImpl)this.condition).getRowkeyRanges();
-    if (rkRanges.size() > 0) {
-      return rkRanges.get(0).getStartRow();
-    }
-    return HConstants.EMPTY_START_ROW;
+    return this.startRow;
   }
 
   public byte[] getStopRow() {
-    if (condition == null) {
-      return HConstants.EMPTY_END_ROW;
-    }
-    List<RowkeyRange> rkRanges = ((ConditionImpl)this.condition).getRowkeyRanges();
-    if (rkRanges.size() > 0) {
-      return rkRanges.get(0).getStopRow();
-    }
-    return HConstants.EMPTY_END_ROW;
+    return this.stopRow;
   }
 
   public Object getSerializedFilter() {

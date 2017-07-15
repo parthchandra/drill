@@ -27,6 +27,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 import com.mapr.db.impl.MapRDBImpl;
+import com.mapr.db.impl.ConditionImpl;
+import com.mapr.db.impl.ConditionNode.RowkeyRange;
+
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -191,6 +194,19 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       MetaTable metaTable = t.getMetaTable();
       QueryCondition scanSpecCondition = scanSpec.getCondition();
       List<? extends ScanRange> scanRanges = metaTable.getScanRanges(scanSpecCondition);
+
+      // set the start-row of the scanspec as the start-row of the first scan range
+      ScanRange firstRange = scanRanges.get(0);
+      QueryCondition firstCondition = firstRange.getCondition();
+      byte[] firstStartRow = ((ConditionImpl)firstCondition).getRowkeyRanges().get(0).getStartRow();
+      scanSpec.setStartRow(firstStartRow);
+
+      // set the stop-row of ScanSpec as the stop-row of the last scan range
+      ScanRange lastRange = scanRanges.get(scanRanges.size() - 1);
+      QueryCondition lastCondition = lastRange.getCondition();
+      List<RowkeyRange> rowkeyRanges =  ((ConditionImpl)lastCondition).getRowkeyRanges();
+      byte[] lastStopRow = rowkeyRanges.get(rowkeyRanges.size() - 1).getStopRow();
+      scanSpec.setStopRow(lastStopRow);
       
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
