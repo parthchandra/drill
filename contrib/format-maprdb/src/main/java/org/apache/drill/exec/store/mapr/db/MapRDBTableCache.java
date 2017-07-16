@@ -190,22 +190,14 @@ public class MapRDBTableCache {
     static boolean isEqual(Object a, Object b) {
       return a == b || a != null && a.equals(b);
     }
-
-    static boolean isIndexDescEqual(IndexDesc a, IndexDesc b) {
-      return ((a == null && b == null) || (a == b) || (a != null && a.equals(b)));
-    }
-
-    /**
-     * Since IndexDesc is optional for a table if there are 2 Key entries for same table path, ugi and null
-     * IndexDesc, those key's will be treated as equal.
-     */
+    
     public boolean equals(Object obj) {
       if (obj == this) {
         return true;
       } else if (obj != null && obj instanceof MapRDBTableCache.Key) {
         MapRDBTableCache.Key that = (MapRDBTableCache.Key) obj;
         return isEqual(this.path, that.path)
-            && isIndexDescEqual(this.indexDesc, that.indexDesc)
+            && isEqual(this.indexDesc, that.indexDesc)
             && isEqual(this.ugi, that.ugi);
       } else {
         return false;
