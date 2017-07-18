@@ -26,6 +26,7 @@ public interface Statistics {
   //HUGE is same as DrillCostBase.HUGE
   double ROWCOUNT_HUGE = Double.MAX_VALUE;
   double AVG_ROWSIZE_UNKNOWN = -1;
+  long AVG_COLUMN_SIZE = 10;
 
   /** Returns the statistics given the specified filter condition
    * @param condition - Filter specified as a {@link RexNode}

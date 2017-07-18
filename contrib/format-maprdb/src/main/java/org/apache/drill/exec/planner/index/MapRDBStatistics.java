@@ -56,6 +56,7 @@ import java.util.Map;
 
 public class MapRDBStatistics implements Statistics {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBStatistics.class);
+  static final String nullConditionAsString = "<NULL>";
   double rowKeyJoinBackIOFactor = 1.0;
   /*
    * The computed statistics are cached in <statsCache> so that any subsequent calls are returned
@@ -83,24 +84,26 @@ public class MapRDBStatistics implements Statistics {
 
   @Override
   public double getRowCount(RexNode condition, DrillScanRel scanRel) {
-    double costFactor = 1.0;
+    String conditionAsStr = nullConditionAsString;
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
       if (condition == null) {
         if (statsCache.get(null)!= null) {
-          return costFactor * statsCache.get(null).getRowCount();
+          return statsCache.get(null).getRowCount();
         }
       } else {
-        String conditionAsStr = convertRexToString(condition, scanRel);
+        conditionAsStr = convertRexToString(condition, scanRel);
         if (statsCache.get(conditionAsStr) != null) {
-          return costFactor * statsCache.get(conditionAsStr).getRowCount();
+          return statsCache.get(conditionAsStr).getRowCount();
         }
       }
     }
+    logger.warn("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
     return ROWCOUNT_UNKNOWN;
   }
 
   @Override
   public double getAvgRowSize(RexNode condition, DrillScanRel scanRel, boolean isTableScan) {
+    String conditionAsStr = nullConditionAsString;
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
       if (condition == null) {
         if (isTableScan) {
@@ -111,12 +114,13 @@ public class MapRDBStatistics implements Statistics {
           return computeIdxRowSizeForNullCondition();
         }
       } else {
-        String conditionAsStr = convertRexToString(condition, scanRel);
+        conditionAsStr = convertRexToString(condition, scanRel);
         if (statsCache.get(conditionAsStr) != null) {
           return statsCache.get(conditionAsStr).getAvgRowSize();
         }
       }
     }
+    logger.warn("Statistics: Average row size is UNKNOWN for filter: {}", conditionAsStr);
     return AVG_ROWSIZE_UNKNOWN;
   }
 
@@ -125,26 +129,31 @@ public class MapRDBStatistics implements Statistics {
    *  @return approximate rows satisfying the filter
    */
   public double getRowCount(QueryCondition condition) {
-    double costFactor = 1.0;
+    String conditionAsStr = nullConditionAsString;
     if (condition != null
         && conditionRexNodeMap.get(condition.toString()) != null) {
       String rexConditionAsString = conditionRexNodeMap.get(condition.toString());
       StatisticsPayload payload = statsCache.get(rexConditionAsString);
       if (payload != null) {
-        return costFactor * payload.getRowCount();
+        return payload.getRowCount();
       }
     } else if (condition == null
         // We have full table rows mapping i.e. <NULL> QueryCondition, <NULL> RexNode pair
         && conditionRexNodeMap.get(condition) == null) {
       StatisticsPayload ftsPayload = statsCache.get(null);
       if (ftsPayload != null) {
-        return costFactor * ftsPayload.getRowCount();
+        return ftsPayload.getRowCount();
       }
     }
+    if (condition != null) {
+      conditionAsStr = condition.toString();
+    }
+    logger.warn("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
     return ROWCOUNT_UNKNOWN;
   }
 
   public double getAvgRowSize(QueryCondition condition, boolean isTableScan) {
+    String conditionAsStr = nullConditionAsString;
     if (condition == null) {
       if (isTableScan) {
         if (// We have full table rows mapping i.e. <NULL> QueryCondition, <NULL> RexNode pair
@@ -167,6 +176,10 @@ public class MapRDBStatistics implements Statistics {
         }
       }
     }
+    if (condition != null) {
+      conditionAsStr = condition.toString();
+    }
+    logger.warn("Statistics: Average row size is UNKNOWN for filter: {}", conditionAsStr);
     return AVG_ROWSIZE_UNKNOWN;
   }
 
@@ -192,6 +205,7 @@ public class MapRDBStatistics implements Statistics {
         }
       }
     }
+    logger.warn("Statistics: Average row size is UNKNOWN for filter: {}", nullConditionAsString);
     return AVG_ROWSIZE_UNKNOWN;
   }
   public boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context) {
@@ -221,7 +235,7 @@ public class MapRDBStatistics implements Statistics {
     if (scanRel.getGroupScan() instanceof JsonTableGroupScan) {
       jTabGrpScan = (JsonTableGroupScan) scanRel.getGroupScan();
     } else {
-      logger.debug("populateStats exit early - not an instance of JsonTableGroupScan!");
+      logger.debug("Statistics: populateStats exit early - not an instance of JsonTableGroupScan!");
       return;
     }
 
@@ -322,7 +336,7 @@ public class MapRDBStatistics implements Statistics {
       if (statsCache.get(conditionAsStr) == null
               && payload.getRowCount() != Statistics.ROWCOUNT_UNKNOWN) {
         statsCache.put(conditionAsStr, payload);
-        logger.debug("StatsCache:<{}, {}>",conditionAsStr, payload);
+        logger.debug("Statistics: StatsCache:<{}, {}>",conditionAsStr, payload);
         // Always pre-process CAST conditions - Otherwise queryCondition will not be generated correctly
         RexNode preProcIdxCondition = convertToStatsCondition(condition, idx, context, scanRel,
             Arrays.asList(SqlKind.CAST));
@@ -333,19 +347,24 @@ public class MapRDBStatistics implements Statistics {
           String queryConditionAsStr = queryCondition.toString();
           if (conditionRexNodeMap.get(queryConditionAsStr) == null) {
             conditionRexNodeMap.put(queryConditionAsStr, conditionAsStr);
-            logger.debug("QCRNCache:<{}, {}>",queryConditionAsStr, conditionAsStr);
+            logger.debug("Statistics: QCRNCache:<{}, {}>",queryConditionAsStr, conditionAsStr);
           }
         } else {
-          logger.debug("QCRNCache: Unable to generate QueryCondition for {}", conditionAsStr);
+          logger.warn("Statistics: QCRNCache: Unable to generate QueryCondition for {}", conditionAsStr);
         }
       } else {
-        logger.debug("QCRNCache: Unable to generate QueryCondition for {}", conditionAsStr);
+        if (statsCache.get(conditionAsStr) != null) {
+          logger.debug("Statistics: Filter row count already exists for filter: {}. Skip!", conditionAsStr);
+        } else {
+          logger.debug("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
+        }
+
       }
     } else if (condition == null) {
       statsCache.put(null, payload);
-      logger.debug("StatsCache:<{}, {}>","NULL", payload);
+      logger.debug("Statistics: StatsCache:<{}, {}>","NULL", payload);
       conditionRexNodeMap.put(null, null);
-      logger.debug("QCRNCache:<{}, {}>","NULL", "NULL");
+      logger.debug("Statistics: QCRNCache:<{}, {}>","NULL", "NULL");
     }
   }
 
@@ -603,7 +622,7 @@ public class MapRDBStatistics implements Statistics {
             }
           } catch (UnsupportedEncodingException ex) {
             // Encoding not supported - Do nothing!
-            logger.debug("convertLikeToRange: Unsupported Encoding Exception -> {}", ex.getMessage());
+            logger.warn("Statistics: convertLikeToRange: Unsupported Encoding Exception -> {}", ex.getMessage());
           }
         }
       }
@@ -621,7 +640,7 @@ public class MapRDBStatistics implements Statistics {
     String conditionAsStr = convertRexToString(condition, scanRel);
     if (statsCache.get(conditionAsStr) != null) {
       selectivity = statsCache.get(conditionAsStr).getRowCount()/totalRows;
-      logger.debug("computeSelectivity: Cache HIT: Found {} -> {}", conditionAsStr, selectivity);
+      logger.debug("Statistics: computeSelectivity: Cache HIT: Found {} -> {}", conditionAsStr, selectivity);
       return selectivity;
     } else if (condition.getKind() == SqlKind.AND) {
       selectivity = 1.0;
@@ -639,7 +658,7 @@ public class MapRDBStatistics implements Statistics {
     // Cap selectivity to be between 0.0 and 1.0
     selectivity = Math.min(1.0, selectivity);
     selectivity = Math.max(0.0, selectivity);
-    logger.debug("computeSelectivity: Cache MISS: Computed {} -> {}", conditionAsStr, selectivity);
+    logger.debug("Statistics: computeSelectivity: Cache MISS: Computed {} -> {}", conditionAsStr, selectivity);
     return selectivity;
   }
 
@@ -653,7 +672,7 @@ public class MapRDBStatistics implements Statistics {
     String conditionAsStr = convertRexToString(condition, scanRel);
     if (statsCache.get(conditionAsStr) != null) {
       rowSize = statsCache.get(conditionAsStr).getAvgRowSize();
-      logger.debug("computeRowSize: Cache HIT: Found {} -> {}", conditionAsStr, rowSize);
+      logger.debug("Statistics: computeRowSize: Cache HIT: Found {} -> {}", conditionAsStr, rowSize);
       return rowSize;
     } else if (condition.getKind() == SqlKind.AND) {
       for (RexNode pred : RelOptUtil.conjunctions(condition)) {
@@ -667,7 +686,7 @@ public class MapRDBStatistics implements Statistics {
     // Cap avg row size to be between 0.0 and table row size
     rowSize = Math.min(tableRowSize, rowSize);
     rowSize = Math.max(0.0, rowSize);
-    logger.debug("computeRowSize: Cache MISS: Computed {} -> {}", conditionAsStr, rowSize);
+    logger.debug("Statistics: computeRowSize: Cache MISS: Computed {} -> {}", conditionAsStr, rowSize);
     return rowSize;
   }
 

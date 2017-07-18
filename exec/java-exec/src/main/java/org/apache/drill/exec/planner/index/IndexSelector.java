@@ -373,7 +373,7 @@ public class IndexSelector  {
               filter, filterRows, totalRows, sel);
         } else {
           sel = RelMdUtil.guessSelectivity(filter);
-          logger.warn("Filter row count is UNKNOWN for filter: {} using guess {}", filter, sel);
+          logger.warn("Filter row count is UNKNOWN for filter: {}, using guess {}", filter, sel);
         }
         leadingSel *= sel;
       }
@@ -381,14 +381,22 @@ public class IndexSelector  {
       logger.debug("Combined selectivity of all leading filters: {}", leadingSel);
 
       if (remainderFilter != null) {
-        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan);
+        remainderSel = stats.getRowCount(remainderFilter, primaryTableScan)/totalRows;
         logger.debug("Selectivity of remainder filters: {}", remainderSel);
       }
 
       // get the average row size based on the leading column filter
       avgRowSize = stats.getAvgRowSize(leadingFilters.size() > 0 ? leadingFilters.get(0) : null,
           primaryTableScan, false);
-      logger.debug("Average row size based on leading filter: {}", avgRowSize);
+      if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN) {
+        avgRowSize = numProjectedFields * Statistics.AVG_COLUMN_SIZE;
+        logger.debug("Average row size is UNKNOWN based on leading filter: {}, using guess {}, columns {}, columnSize {}",
+            leadingFilters.size() > 0 ? leadingFilters.get(0).toString() : "<NULL>",
+            avgRowSize, numProjectedFields, Statistics.AVG_COLUMN_SIZE);
+      } else {
+        logger.debug("Filter: {}, Average row size: {}",
+            leadingFilters.size() > 0 ? leadingFilters.get(0).toString() : "<NULL>", avgRowSize);
+      }
     }
 
     public double getLeadingSelectivity() {
