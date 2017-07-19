@@ -28,13 +28,16 @@ public interface Statistics {
   double AVG_ROWSIZE_UNKNOWN = -1;
   long AVG_COLUMN_SIZE = 10;
 
+  boolean isStatsAvailable();
+
+  String buildUniqueIndexIdentifier(IndexDescriptor idx);
   /** Returns the statistics given the specified filter condition
    * @param condition - Filter specified as a {@link RexNode}
    *  @param scanRel - The current scan rel
    */
-  double getRowCount(RexNode condition, DrillScanRel scanRel);
+  double getRowCount(RexNode condition, String tabIdxName, DrillScanRel scanRel);
 
-  double getAvgRowSize(RexNode condition, DrillScanRel scanRel, boolean isIndexScan);
+  double getAvgRowSize(RexNode condition, String tabIdxName, DrillScanRel scanRel, boolean isIndexScan);
 
   boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context);
 }

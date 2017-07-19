@@ -130,6 +130,14 @@ public class IndexConditionInfo {
         leadingColumns.add(index.getIndexColumns().get(0));
         IndexConditionInfo info = indexConditionRelatedToFields(leadingColumns, initCondition);
         if(info == null || info.hasIndexCol == false) {
+          // No info found, based on remaining condition. Check if the leading columns are same as another index
+          IndexConditionInfo origInfo = indexConditionRelatedToFields(leadingColumns, condition);
+          if (origInfo == null || origInfo.hasIndexCol == false) {
+            // do nothing
+          } else {
+            indexInfoMap.put(index, origInfo);
+            // Leave the initCondition as-is, since this is a duplicate condition
+          }
           continue;
         }
         indexInfoMap.put(index, info);

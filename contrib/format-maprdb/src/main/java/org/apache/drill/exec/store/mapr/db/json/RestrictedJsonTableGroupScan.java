@@ -124,7 +124,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
       rowCount = forcedRowCountMap.get(scanSpec.getCondition());
     }
     // Get the average row size of the primary table
-    double avgRowSize = stats.getAvgRowSize(null, true);
+    double avgRowSize = stats.getAvgRowSize(null, null, true);
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
       rowCount = (0.001f * tableStats.getNumRows());
     }

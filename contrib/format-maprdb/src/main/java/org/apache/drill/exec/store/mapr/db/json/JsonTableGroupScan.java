@@ -254,9 +254,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
     final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
     final int numColumns = (columns == null || columns.isEmpty()) ? STAR_COLS : columns.size();
-    double rowCount = stats.getRowCount(scanSpec.getCondition());
-    double avgRowSize = stats.getAvgRowSize(null, true);
-    double totalRowCount = stats.getRowCount(null);
+    // index will be NULL for FTS
+    double rowCount = stats.getRowCount(scanSpec.getCondition(), null);
+    double avgRowSize = stats.getAvgRowSize(null, null, true);
+    double totalRowCount = stats.getRowCount(null, null);
     // If UNKNOWN, or DB stats sync issues(manifests as 0 rows) use defaults.
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
       rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows();
@@ -304,8 +305,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
           + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
     }
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
-    double rowCount = stats.getRowCount(scanSpec.getCondition());
-    double avgRowSize = stats.getAvgRowSize(scanSpec.getCondition(), false);
+    String idxIdentifier = stats.buildUniqueIndexIdentifier(scanSpec.getIndexDesc().getPrimaryTablePath(),
+        scanSpec.getIndexDesc().getIndexName());
+    double rowCount = stats.getRowCount(scanSpec.getCondition(), idxIdentifier);
+    double avgRowSize = stats.getAvgRowSize(scanSpec.getCondition(), idxIdentifier, false);
     // If UNKNOWN, use defaults
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
       rowCount = (filterPushed ? 0.0005f : 0.001f) * tableStats.getNumRows() / scanSpec.getIndexDesc().getIndexedFields().size() ;
@@ -479,7 +482,13 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     if (forcedRowCountMap.get(condition) != null) {
       return forcedRowCountMap.get(condition);
     }
-    return stats.getRowCount(condition, scanRel);
+    if (scanSpec.getIndexDesc() != null) {
+      String idxIdentifier = stats.buildUniqueIndexIdentifier(scanSpec.getIndexDesc().getPrimaryTablePath(),
+          scanSpec.getIndexName());
+      return stats.getRowCount(condition, idxIdentifier, scanRel);
+    } else {
+      return stats.getRowCount(condition, null, scanRel);
+    }
   }
 
   @Override
