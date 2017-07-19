@@ -905,4 +905,31 @@ public class IndexPlanTest extends BaseJsonTest {
       test(defaultCoveringSel+";"+enableFTS+";");
     }
   }
+
+  @Test
+  public void testCaseSensitive() throws Exception {
+    String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        " where t.id.SSN = '100000003' ";
+    test(defaultHavingIndexPlan);
+
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {""},
+        new String[]{"indexName"}
+    );
+
+  }
+
+  @Test
+  public void testCaseSensitiveIncludedField() throws Exception {
+
+    String query = "SELECT t.`CONTACT`.`phone` AS `phone` FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn = '100007423'";
+    test(defaultHavingIndexPlan);
+
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[]{"RowKeyJoin",
+            ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=testindex_0"},
+        new String[]{}
+    );
+  }
 }

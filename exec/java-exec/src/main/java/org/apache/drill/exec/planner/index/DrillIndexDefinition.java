@@ -19,6 +19,7 @@ package org.apache.drill.exec.planner.index;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 import org.apache.calcite.rel.RelCollation;
@@ -110,6 +111,18 @@ public class DrillIndexDefinition implements IndexDefinition {
     return someColumnsInIndexFields(columns, indexColumns);
   }
 
+  public boolean pathExactIn(SchemaPath path, Collection<LogicalExpression> exprs) {
+    for (LogicalExpression expr : exprs) {
+      if (expr instanceof SchemaPath) {
+        if (((SchemaPath) expr).getAsUnescapedPath().equals(path.getAsUnescapedPath()) ) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   boolean castIsCompatible(CastExpression castExpr, Collection<LogicalExpression> indexFields) {
     for(LogicalExpression indexExpr : indexFields) {
       if(indexExpr.getClass() != castExpr.getClass()) {
@@ -141,7 +154,7 @@ public class DrillIndexDefinition implements IndexDefinition {
         }
       }
       else {
-        if (!indexFields.contains(col)) {
+        if (!pathExactIn((SchemaPath)col, indexFields)) {
           return false;
         }
       }
@@ -161,7 +174,7 @@ public class DrillIndexDefinition implements IndexDefinition {
         }
       }
       else {
-        if (indexFields.contains(col)) {
+        if (pathExactIn((SchemaPath)col, indexFields)) {
           some = true;
           break;
         }

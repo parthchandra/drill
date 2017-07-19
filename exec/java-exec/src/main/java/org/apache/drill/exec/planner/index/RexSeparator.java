@@ -24,6 +24,7 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
@@ -54,7 +55,15 @@ public class RexSeparator {
     for(Map.Entry<RexNode, LogicalExpression> entry : relevantRexMap.entrySet()) {
       //for the expressions found in expr, only these in relatedPaths is related
       LogicalExpression relevantExpr = entry.getValue();
-      if (relatedPaths.contains(relevantExpr)) {
+      int idxFound = relatedPaths.indexOf(relevantExpr);
+      if ( idxFound >= 0 ) {
+        if (relevantExpr instanceof SchemaPath) {
+          //case sensitive comparison
+          if (! ((SchemaPath)relevantExpr).getAsUnescapedPath().equals(
+              ((SchemaPath)relatedPaths.get(idxFound)).getAsUnescapedPath()) ) {
+            continue;
+          }
+        }
         markMap.put(entry.getKey(), entry.getValue());
       }
     }
