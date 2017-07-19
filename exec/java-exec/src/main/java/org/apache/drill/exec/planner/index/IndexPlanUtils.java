@@ -225,11 +225,12 @@ public class IndexPlanUtils {
       idx++;
     }
 
-    int idxFieldCount = 0;
     //go through indexed fields to build collation
     // break out of the loop when found first indexed field [not projected && not _only_ in equality condition of filter]
     // or the leading field is not projected
-    for (LogicalExpression expr : indexInfo.getIndexDesc().getIndexColumns()) {
+    List<LogicalExpression> indexedCols = indexInfo.getIndexDesc().getIndexColumns();
+    for (int idxFieldCount=0; idxFieldCount<indexedCols.size(); ++idxFieldCount) {
+      LogicalExpression expr = indexedCols.get(idxFieldCount);
 
       if (!projectExprs.containsKey(expr)) {
         //leading indexed field is not projected
@@ -249,14 +250,15 @@ public class IndexPlanUtils {
         continue;
       }
 
-      RelFieldCollation.Direction dir = indexInfo.getIndexDesc().getCollation().getFieldCollations().get(idxFieldCount).direction;
+      RelCollation idxCollation = indexInfo.getIndexDesc().getCollation();
+      RelFieldCollation.Direction dir = (idxCollation == null)?
+          null : idxCollation.getFieldCollations().get(idxFieldCount).direction;
       if ( dir == null) {
         break;
       }
       newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
           RelFieldCollation.NullDirection.UNSPECIFIED));
     }
-    idxFieldCount++;
 
     return RelCollations.of(newFields);
   }
