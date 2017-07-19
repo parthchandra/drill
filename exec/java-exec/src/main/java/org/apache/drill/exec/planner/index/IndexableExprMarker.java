@@ -96,12 +96,37 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
     return ImmutableMap.copyOf(equalOnCastChar);
   }
 
+  /**
+   * return the expressions that were only in equality condition _and_ only once. ( a.b = 'value' )
+   * @return
+   */
   public Set<LogicalExpression> getExpressionsOnlyInEquality() {
+
     Set<LogicalExpression> onlyInEquality = Sets.newHashSet();
+
     Set<LogicalExpression> notInEqSet = Sets.newHashSet();
+
+    Set<LogicalExpression> inEqMoreThanOnce = Sets.newHashSet();
+
     notInEqSet.addAll(notInEquality.values());
+
     for (LogicalExpression expr : equalityExpressions.values()) {
+      //only process expr that is not in any non-equality condition(!notInEqSet.contains)
       if (!notInEqSet.contains(expr)) {
+
+        //expr appear in two and more equality conditions should be ignored too
+        if (inEqMoreThanOnce.contains(expr)) {
+          continue;
+        }
+
+        //we already have recorded this expr in equality condition, move it to inEqMoreThanOnce
+        if (onlyInEquality.contains(expr)) {
+          inEqMoreThanOnce.add(expr);
+          onlyInEquality.remove(expr);
+          continue;
+        }
+
+        //finally we could take this expr
         onlyInEquality.add(expr);
       }
     }

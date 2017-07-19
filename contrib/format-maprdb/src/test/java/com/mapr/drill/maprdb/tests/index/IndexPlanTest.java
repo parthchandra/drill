@@ -734,6 +734,27 @@ public class IndexPlanTest extends BaseJsonTest {
         .run();
   }
 
+  @Test  // index field in two or more equality conditions, it is not leading prefix, Sort SHOULD NOT be dropped
+  public void TestCoveringPlanSortPrefix_5() throws Exception {
+    String query = "SELECT t._id as tid, t.driverlicense, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age IN (31, 32, 33, 34) and t.driverlicense < 100008000 order by t.driverlicense";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[]{}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .optionSettingQueriesForBaseline(noIndexPlan)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+  }
+
   @Test
   public void orderByCastCoveringPlan() throws Exception {
     String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
