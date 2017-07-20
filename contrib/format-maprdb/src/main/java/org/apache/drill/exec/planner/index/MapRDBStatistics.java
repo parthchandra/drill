@@ -239,9 +239,8 @@ public class MapRDBStatistics implements Statistics {
   public boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context) {
     GroupScan scan;
     PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
-    rowKeyJoinBackIOFactor = settings.getRowKeyJoinBackIOCostFactor();
-    if (settings.isScanStatisticsEnabled()
-      && scanRel.getGroupScan() instanceof DbGroupScan) {
+    rowKeyJoinBackIOFactor = settings.getIndexRowKeyJoinCostFactor();
+    if (scanRel.getGroupScan() instanceof DbGroupScan) {
       String conditionAsStr = convertRexToString(condition, scanRel);
       scan = scanRel.getGroupScan();
       if (statsCache.get(conditionAsStr) == null) {

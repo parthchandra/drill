@@ -44,12 +44,12 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
   private static final String disableFTS = "alter session set `planner.disable_full_table_scan` = true";
   private static final String enableFTS = "alter session reset `planner.disable_full_table_scan`";
-  private static final String preferIntersectPlans = "alter session set `planner.index_prefer_intersect_plans` = true";
-  private static final String defaultIntersectPlans = "alter session reset `planner.index_prefer_intersect_plans`";
+  private static final String preferIntersectPlans = "alter session set `planner.index.prefer_intersect_plans` = true";
+  private static final String defaultIntersectPlans = "alter session reset `planner.index.prefer_intersect_plans`";
   private static final String lowRowKeyJoinBackIOFactor
-      = "alter session set `planner.rowkey_joinback_io_cost_factor` = 0.01";
+      = "alter session set `planner.index.rowkeyjoin_cost_factor` = 0.01";
   private static final String defaultRowKeyJoinBackIOFactor
-      = "alter session reset `planner.rowkey_joinback_io_cost_factor`";
+      = "alter session reset `planner.index.rowkeyjoin_cost_factor`";
 
   /**
    *  A sample row of this 10K table:
@@ -910,8 +910,8 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test
   public void pickAnyIndexWithFTSDisabledPlan() throws Exception {
-    String lowCoveringSel = "alter session set `planner.covering_index_selectivity_factor` = 0.025";
-    String defaultCoveringSel = "alter session reset `planner.covering_index_selectivity_factor`";
+    String lowCoveringSel = "alter session set `planner.index.covering_selectivity_threshold` = 0.025";
+    String defaultCoveringSel = "alter session reset `planner.index.covering_selectivity_threshold`";
     String query = "SELECT t.`contact`.`phone` AS `phone` FROM hbase.`index_test_primary` as t " +
         " where t.id.ssn = '100007423'";
     try {

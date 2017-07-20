@@ -43,7 +43,7 @@ import com.google.common.collect.Maps;
 
 public class IndexSelector  {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexSelector.class);
-
+  private static final double COVERING_TO_NONCOVERING_FACTOR = 100.0;
   private RexNode indexCondition;
   private double totalRows;
   private Statistics stats;         // a Statistics instance that will be used to get estimated rowcount for filter conditions
@@ -178,8 +178,8 @@ public class IndexSelector  {
       // only consider indexes that either have some leading prefix of the filter condition or
       // can satisfy required collation
       if (p.numLeadingFilters() > 0 || p.satisfiesCollation()) {
-        double selThreshold = p.isCovering() ? settings.getCoveringIndexSelectivityFactor() :
-          settings.getNonCoveringIndexSelectivityFactor();
+        double selThreshold = p.isCovering() ? settings.getIndexCoveringSelThreshold() :
+          settings.getIndexNonCoveringSelThreshold();
         // only consider indexes whose selectivity is <= the configured threshold OR consider
         // all when full table scan is disable to avoid a CannotPlanException
         if (settings.isDisableFullTableScan() || p.getLeadingSelectivity() <= selThreshold) {
@@ -188,7 +188,7 @@ public class IndexSelector  {
       }
     }
 
-    int max_candidate_indexes = (int)PrelUtil.getPlannerSettings(planner).getMaxCandidateIndexesPerTable();
+    int max_candidate_indexes = (int)PrelUtil.getPlannerSettings(planner).getIndexMaxChosenIndexesPerTable();
     // Ranking phase. Technically, we don't need to rank if there are fewer than max_candidate_indexes
     // but we do it anyways for couple of reasons: the log output will show the indexes in a properly ranked
     // order which helps diagnosing problems and secondly for internal unit/functional testing we want this code
@@ -266,13 +266,13 @@ public class IndexSelector  {
       // given a covering and a non-covering index, prefer covering index unless the
       // difference in their selectivity is bigger than a configurable factor
       if (o1.isCovering() && !o2.isCovering()) {
-        if (o1.getLeadingSelectivity()/o2.getLeadingSelectivity() < settings.getIndexCoveringToNonCoveringFactor()) {
+        if (o1.getLeadingSelectivity()/o2.getLeadingSelectivity() < COVERING_TO_NONCOVERING_FACTOR) {
           return -1;  // covering is ranked higher (better) than non-covering
         }
       }
 
       if (o2.isCovering() && !o1.isCovering()) {
-        if (o2.getLeadingSelectivity()/o1.getLeadingSelectivity() < settings.getIndexCoveringToNonCoveringFactor()) {
+        if (o2.getLeadingSelectivity()/o1.getLeadingSelectivity() < COVERING_TO_NONCOVERING_FACTOR) {
           return 1;  // covering is ranked higher (better) than non-covering
         }
       }

@@ -122,14 +122,13 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       PlannerSettings.INDEX_FORCE_SORT_NONCOVERING,
       PlannerSettings.INDEX_USE_HASHJOIN_NONCOVERING,
       PlannerSettings.USE_SIMPLE_OPTIMIZER,
-      PlannerSettings.COVERING_INDEX_SELECTIVITY_FACTOR,
-      PlannerSettings.NON_COVERING_INDEX_SELECTIVITY_FACTOR,
-      PlannerSettings.INDEX_COVERING_NONCOVERING_FACTOR,
-      PlannerSettings.MAX_CANDIDATE_INDEXES_PER_TABLE,
-      PlannerSettings.ROWKEY_JOINBACK_IO_COST_FACTOR,
-      PlannerSettings.PREFER_INTERSECT_PLANS,
+      PlannerSettings.INDEX_COVERING_SELECTIVITY_THRESHOLD,
+      PlannerSettings.INDEX_NONCOVERING_SELECTIVITY_THRESHOLD,
+      PlannerSettings.INDEX_MAX_CHOSEN_INDEXES_PER_TABLE,
+      PlannerSettings.INDEX_ROWKEYJOIN_COST_FACTOR,
+      PlannerSettings.INDEX_PREFER_INTERSECT_PLANS,
       PlannerSettings.DISABLE_FULL_TABLE_SCAN,
-      PlannerSettings.ENABLE_SCAN_STATS,
+      PlannerSettings.ENABLE_STATS,
       ExecConstants.CAST_TO_NULLABLE_NUMERIC_OPTION,
       ExecConstants.OUTPUT_FORMAT_VALIDATOR,
       ExecConstants.PARQUET_BLOCK_SIZE_VALIDATOR,
@@ -215,6 +214,7 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.ENABLE_VECTOR_VALIDATOR,
       ExecConstants.ENABLE_ITERATOR_VALIDATOR,
       ExecConstants.ROWKEY_JOIN_BATCHSIZE
+      ExecConstants.QUERY_ROWKEYJOIN_BATCHSIZE
     };
     final Map<String, OptionValidator> tmp = new HashMap<>();
     for (final OptionValidator validator : validators) {

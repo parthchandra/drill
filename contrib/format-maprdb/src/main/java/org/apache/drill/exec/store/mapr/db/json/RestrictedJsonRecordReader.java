@@ -54,7 +54,7 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
                                     List<SchemaPath> projectedColumns, FragmentContext context) {
 
     super(subScanSpec, formatPlugin, projectedColumns, context);
-    batchSize = (int)context.getOptions().getOption(ExecConstants.ROWKEY_JOIN_BATCHSIZE);
+    batchSize = (int)context.getOptions().getOption(ExecConstants.QUERY_ROWKEYJOIN_BATCHSIZE);
   }
 
   public void readToInitSchema() {

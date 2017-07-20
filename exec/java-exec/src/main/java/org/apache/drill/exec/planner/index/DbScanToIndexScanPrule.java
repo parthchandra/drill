@@ -380,15 +380,17 @@ public class DbScanToIndexScanPrule extends Prule {
     if (scan.getGroupScan() instanceof DbGroupScan) {
       // Initialize statistics
       DbGroupScan dbScan = ((DbGroupScan) scan.getGroupScan());
-      dbScan.getStatistics().initialize(condition, scan, indexContext);
+      if (settings.isStatisticsEnabled()) {
+        dbScan.getStatistics().initialize(condition, scan, indexContext);
+      }
       totalRows = dbScan.getRowCount(null, scan);
       filterRows = dbScan.getRowCount(condition, scan);
       double sel = filterRows/totalRows;
       if (totalRows != Statistics.ROWCOUNT_UNKNOWN &&
           filterRows != Statistics.ROWCOUNT_UNKNOWN &&
           !settings.isDisableFullTableScan() &&
-          sel > Math.max(settings.getCoveringIndexSelectivityFactor(),
-              settings.getNonCoveringIndexSelectivityFactor() )) {
+          sel > Math.max(settings.getIndexCoveringSelThreshold(),
+              settings.getIndexNonCoveringSelThreshold() )) {
         // If full table scan is not disabled, generate full table scan only plans if selectivity
         // is greater than covering and non-covering selectivity thresholds
         logger.info("Skip index planning because filter selectivity: {} is greater than index thresholds", sel);
@@ -474,7 +476,7 @@ public class DbScanToIndexScanPrule extends Prule {
         try {
           planGen.go();
           // If intersect plans are forced do not generate further non-covering plans
-          if (settings.isIntersectPlanPreferred()) {
+          if (settings.isIndexIntersectPlanPreferred()) {
             //TODO:we may generate some more non-covering plans(each uses a single index) from the indexes of smallest selectivity
             return;
           }
