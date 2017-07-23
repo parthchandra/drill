@@ -27,7 +27,6 @@ import com.google.common.collect.Sets;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.expr.CloneVisitor;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -35,14 +34,12 @@ import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.cost.DrillCostBase.DrillCostFactory;
 import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
-import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.store.mapr.PluginConstants;
 import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.util.EncodedSchemaPathSet;
 import org.apache.drill.common.expression.LogicalExpression;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
@@ -167,7 +164,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
       double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
       // cpu cost is cost of filter evaluation for the remainder condition
       double cpuCost = 0.0;
-      if (indexProps.getRemainderFilter() != null) {
+      if (indexProps.getTotalRemainderFilter() != null) {
         cpuCost = leadRowCount * DrillCostBase.COMPARE_CPU_COST;
       }
       double networkCost = 0.0; // TODO: add network cost once full table scan also considers network cost
@@ -186,7 +183,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
 
       // cpu cost of remainder condition evaluation over the selected rows
       double cpuCost = 0.0;
-      if (indexProps.getRemainderFilter() != null) {
+      if (indexProps.getTotalRemainderFilter() != null) {
         cpuCost = leadRowCount * DrillCostBase.COMPARE_CPU_COST;
       }
       double networkCost = 0.0; // TODO: add network cost once full table scan also considers network cost

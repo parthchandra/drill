@@ -831,6 +831,7 @@ public class IndexPlanTest extends BaseJsonTest {
     return;
   }
 
+  @Ignore ("Needs MD-2340 fix")
   @Test //non-covering, order by non leading field, and leading fields are in equality condition, Sort SHOULD be removed
   public void NonCoveringPlan_SortPrefix_2() throws Exception {
 

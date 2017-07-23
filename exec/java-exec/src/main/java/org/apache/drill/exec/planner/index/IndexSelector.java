@@ -29,6 +29,7 @@ import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
@@ -44,23 +45,28 @@ import com.google.common.collect.Maps;
 public class IndexSelector  {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(IndexSelector.class);
   private static final double COVERING_TO_NONCOVERING_FACTOR = 100.0;
-  private RexNode indexCondition;
+  private RexNode indexCondition;   // filter condition on indexed columns
+  private RexNode otherRemainderCondition;  // remainder condition on all other columns
   private double totalRows;
   private Statistics stats;         // a Statistics instance that will be used to get estimated rowcount for filter conditions
   private IndexConditionInfo.Builder builder;
   private List<IndexProperties> indexPropList;
   private DrillScanRel primaryTableScan;
   private IndexPlanCallContext indexContext;
+  private RexBuilder rexBuilder;
 
   public IndexSelector(RexNode indexCondition,
+      RexNode otherRemainderCondition,
       IndexPlanCallContext indexContext,
       IndexCollection collection,
       RexBuilder rexBuilder,
       double totalRows) {
     this.indexCondition = indexCondition;
+    this.otherRemainderCondition = otherRemainderCondition;
     this.indexContext = indexContext;
     this.totalRows = totalRows;
     this.stats = ((DbGroupScan) (indexContext.scan).getGroupScan()).getStatistics();
+    this.rexBuilder = rexBuilder;
     this.builder =
         IndexConditionInfo.newBuilder(indexCondition, collection, rexBuilder, indexContext.scan);
     this.primaryTableScan = indexContext.scan;
@@ -68,7 +74,7 @@ public class IndexSelector  {
   }
 
   public void addIndex(IndexDescriptor indexDesc, boolean isCovering, int numProjectedFields) {
-    IndexProperties indexProps = new IndexProperties(indexDesc, isCovering,
+    IndexProperties indexProps = new IndexProperties(indexDesc, isCovering, otherRemainderCondition, rexBuilder,
         numProjectedFields, totalRows, primaryTableScan);
     indexPropList.add(indexProps);
   }
@@ -116,7 +122,8 @@ public class IndexSelector  {
       }
     }
 
-    indexProps.setProperties(leadingPrefixMap, satisfiesCollation, initCondition /* the remainder condition */, stats);
+    indexProps.setProperties(leadingPrefixMap, satisfiesCollation,
+        initCondition /* the remainder condition for indexed columns */, stats);
   }
 
   private boolean requiredCollation() {
@@ -163,8 +170,8 @@ public class IndexSelector  {
   /**
    * Run the index selection algorithm and return the top N indexes
    */
-  public void getCandidateIndexes(List<IndexDescriptor> coveringIndexes,
-      List<IndexDescriptor> nonCoveringIndexes) {
+  public void getCandidateIndexes(List<IndexProperties> coveringIndexes,
+      List<IndexProperties> nonCoveringIndexes) {
 
     RelOptPlanner planner = indexContext.call.getPlanner();
     PlannerSettings settings = PrelUtil.getPlannerSettings(planner);
@@ -188,7 +195,13 @@ public class IndexSelector  {
       }
     }
 
+    if (candidateIndexes.size() == 0) {
+      logger.info("No suitable indexes found !");
+      return;
+    }
+
     int max_candidate_indexes = (int)PrelUtil.getPlannerSettings(planner).getIndexMaxChosenIndexesPerTable();
+
     // Ranking phase. Technically, we don't need to rank if there are fewer than max_candidate_indexes
     // but we do it anyways for couple of reasons: the log output will show the indexes in a properly ranked
     // order which helps diagnosing problems and secondly for internal unit/functional testing we want this code
@@ -206,14 +219,16 @@ public class IndexSelector  {
     // pick the best N indexes
     for (int i=0; i < candidateIndexes.size(); i++) {
       IndexProperties index = candidateIndexes.get(i);
+
       if (index.isCovering()) {
         if (foundCoveringCollation) {
           // if previously we already found a higher ranked covering index that satisfies collation,
           // then skip this one (note that selectivity and cost considerations were already handled
           // by the ranking phase)
+          logger.debug("Skipping covering index {} because a higher ranked covering index with collation already exists.", index.getIndexDesc().getIndexName());
           continue;
         }
-        coveringIndexes.add(index.getIndexDesc());
+        coveringIndexes.add(index);
         logger.info("name: {}, covering, collation: {}, leadingSelectivity: {}, cost: {}",
             index.getIndexDesc().getIndexName(),
             index.satisfiesCollation(),
@@ -227,17 +242,19 @@ public class IndexSelector  {
       } else {  // non-covering
 
         // skip this non-covering index if (a) there was a higher ranked covering index
-        // with collation or (b) there was a higher ranked ranked covering index and this
+        // with collation or (b) there was a higher ranked covering index and this
         // non-covering index does not have collation
         if (foundCoveringCollation ||
             (foundCovering && !index.satisfiesCollation())) {
+          logger.debug("Skipping non-covering index {} because it does not have collation and a higher ranked covering index already exists.",
+              index.getIndexDesc().getIndexName());
           continue;
         }
 
         // all other non-covering indexes can be added to the list because 2 or more non-covering index could
         // be considered for intersection later; currently the index selector is not costing the index intersection
         // TODO: enhance index selector for doing cost-based analysis of index intersection
-        nonCoveringIndexes.add(index.getIndexDesc());
+        nonCoveringIndexes.add(index);
         logger.info("name: {}, non-covering, collation: {}, leadingSelectivity: {}, cost: {}",
             index.getIndexDesc().getIndexName(),
             index.satisfiesCollation(),
@@ -320,17 +337,23 @@ public class IndexSelector  {
     private DrillScanRel primaryTableScan = null;
     private RelOptCost selfCost = null;
 
-    public List<RexNode> leadingFilters = Lists.newArrayList();
-    public Map<LogicalExpression, RexNode> leadingPrefixMap;
-    public RexNode remainderFilter = null;
+    private List<RexNode> leadingFilters = Lists.newArrayList();
+    private Map<LogicalExpression, RexNode> leadingPrefixMap;
+    private RexNode indexColumnsRemainderFilter = null;
+    private RexNode otherColumnsRemainderFilter = null;
+    private RexBuilder rexBuilder;
 
     public IndexProperties(IndexDescriptor indexDescriptor,
         boolean isCovering,
+        RexNode otherColumnsRemainderFilter,
+        RexBuilder rexBuilder,
         int numProjectedFields,
         double totalRows,
         DrillScanRel primaryTableScan) {
       this.indexDescriptor = indexDescriptor;
       this.isCovering = isCovering;
+      this.otherColumnsRemainderFilter = otherColumnsRemainderFilter;
+      this.rexBuilder = rexBuilder;
       this.numProjectedFields = numProjectedFields;
       this.totalRows = totalRows;
       this.primaryTableScan = primaryTableScan;
@@ -338,14 +361,14 @@ public class IndexSelector  {
 
     public void setProperties(Map<LogicalExpression, RexNode> prefixMap,
         boolean satisfiesCollation,
-        RexNode remainderFilter,
+        RexNode indexColumnsRemainderFilter,
         Statistics stats) {
-      this.remainderFilter = remainderFilter;
+      this.indexColumnsRemainderFilter = indexColumnsRemainderFilter;
       this.satisfiesCollation = satisfiesCollation;
       leadingPrefixMap = prefixMap;
 
-      logger.debug("Index {}: leading prefix map: {}, whether satisfies collation: {}, remainder condition: {}",
-          indexDescriptor.getIndexName(), leadingPrefixMap, satisfiesCollation, remainderFilter);
+      logger.debug("Index {}: leading prefix map: {}, whether satisfies collation: {}, index columns remainder condition: {}",
+          indexDescriptor.getIndexName(), leadingPrefixMap, satisfiesCollation, indexColumnsRemainderFilter);
 
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
       // the corresponding conditions
@@ -383,10 +406,10 @@ public class IndexSelector  {
 
       logger.debug("Combined selectivity of all leading filters: {}", leadingSel);
 
-      if (remainderFilter != null) {
+      if (indexColumnsRemainderFilter != null) {
         // The remainder filter is evaluated against the primary table i.e. NULL index
-        remainderSel = stats.getRowCount(remainderFilter, null, primaryTableScan)/totalRows;
-        logger.debug("Selectivity of remainder filters: {}", remainderSel);
+        remainderSel = stats.getRowCount(indexColumnsRemainderFilter, null, primaryTableScan)/totalRows;
+        logger.debug("Selectivity of index columns remainder filters: {}", remainderSel);
       }
 
       // get the average row size based on the leading column filter
@@ -425,8 +448,26 @@ public class IndexSelector  {
       return indexDescriptor;
     }
 
-    public RexNode getRemainderFilter() {
-      return remainderFilter;
+    public RexNode getLeadingColumnsFilter() {
+      if (leadingFilters.size() > 0) {
+        RexNode leadingColumnsFilter = RexUtil.composeConjunction(rexBuilder, leadingFilters, false);
+        return leadingColumnsFilter;
+      }
+      return null;
+    }
+
+    public RexNode getTotalRemainderFilter() {
+      if (indexColumnsRemainderFilter != null && otherColumnsRemainderFilter != null) {
+        List<RexNode> operands = Lists.newArrayList();
+        operands.add(indexColumnsRemainderFilter);
+        operands.add(otherColumnsRemainderFilter);
+        RexNode totalRemainder = RexUtil.composeConjunction(rexBuilder, operands, false);
+        return totalRemainder;
+      } else if (indexColumnsRemainderFilter != null) {
+        return indexColumnsRemainderFilter;
+      } else {
+        return otherColumnsRemainderFilter;
+      }
     }
 
     public boolean satisfiesCollation() {

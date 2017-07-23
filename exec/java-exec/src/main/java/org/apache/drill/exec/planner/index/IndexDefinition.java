@@ -21,7 +21,6 @@ package org.apache.drill.exec.planner.index;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
 
 import java.util.Collection;
 import java.util.List;

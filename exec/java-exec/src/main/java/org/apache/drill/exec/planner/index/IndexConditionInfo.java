@@ -27,17 +27,11 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
-import org.apache.calcite.util.BitSets;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
-import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
 import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -149,6 +143,7 @@ public class IndexConditionInfo {
     public boolean isConditionPrefix(IndexDescriptor indexDesc, RexNode initCondition) {
       List<LogicalExpression> indexCols = indexDesc.getIndexColumns();
       boolean prefix = true;
+      int numPrefix = 0;
       if (indexCols.size() > 0 && initCondition != null) {
         int i=0;
         while (prefix && i < indexCols.size()) {
@@ -156,11 +151,10 @@ public class IndexConditionInfo {
           List<LogicalExpression> prefixCol = ImmutableList.of(p);
           IndexConditionInfo info = indexConditionRelatedToFields(prefixCol, initCondition);
           if(info != null && info.hasIndexCol) {
+            numPrefix++;
             initCondition = info.remainderCondition;
             if (initCondition.isAlwaysTrue()) {
-              // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
-              // we don't need to keep track of it for rest of the index selection
-              initCondition = null;
+              // all filter conditions are accounted for
               break;
             }
           } else {
@@ -168,7 +162,7 @@ public class IndexConditionInfo {
           }
         }
       }
-      return prefix;
+      return numPrefix > 0;
     }
 
     /**
@@ -193,13 +187,6 @@ public class IndexConditionInfo {
       Collections.sort(sortedIndex, indexFieldsDescComparator);
 
       return indexConditionMapFromSortedIndexes(sortedIndex);
-    }
-
-    public IndexConditionInfo getIndexConditionInfo(IndexDescriptor index) {
-      if(!isConditionPrefix(index, condition)) {
-        return null;
-      }
-      return indexConditionRelatedToFields(index.getIndexColumns(), condition);
     }
 
     private Map<IndexDescriptor, IndexConditionInfo> indexConditionMapFromSortedIndexes(List<IndexDescriptor> sortedIndex) {
