@@ -20,15 +20,17 @@
 #define CHANNEL_HPP
 
 #include "drill/common.hpp"
+#include "drill/drillClient.hpp"
 #include "streamSocket.hpp"
 
-class DrillClientError;
-
 namespace Drill {
+
+class UserProperties;
 
     class ConnectionEndpoint{
         public:
             ConnectionEndpoint(const char* connStr);
+            ConnectionEndpoint(const char* host, const char* port);
             ~ConnectionEndpoint();
 
             //parse the connection string and set up the host and port to connect to
@@ -37,6 +39,7 @@ namespace Drill {
             std::string& getProtocol(){return m_protocol;}
             std::string& getHost(){return m_host;}
             std::string& getPort(){return m_port;}
+            DrillClientError* getError(){ return m_pError;};
 
         private:
             void parseConnectString();
@@ -59,17 +62,43 @@ namespace Drill {
 
     class ChannelContext{
         public:
-            ChannelContext(){ m_pSslContext=NULL;};
-            ~ChannelContext(){};
-            void setSslContext(boost::asio::ssl::context* c){
-                this->m_pSslContext=c;
-            }
-            boost::asio::ssl::context* getSslContext(){ return m_pSslContext;}
+            ChannelContext():m_properties(NULL){};
+            virtual ~ChannelContext(){};
+            // Base channel context has no user settable properties
+            virtual void setProperties(DrillUserProperties* prop){
+                m_properties=prop;
+            };
+        protected:
+            DrillUserProperties* m_properties;
+    };
+
+    class SSLChannelContext: public ChannelContext{
+        public:
+            SSLChannelContext():
+                m_SSLContext(boost::asio::ssl::context::sslv23) {
+                m_SSLContext.set_default_verify_paths();
+                m_SSLContext.set_options(
+                        boost::asio::ssl::context::default_workarounds
+                        | boost::asio::ssl::context::no_sslv2
+                        | boost::asio::ssl::context::single_dh_use
+                        );
+                m_SSLContext.set_verify_mode(boost::asio::ssl::context::verify_peer);
+
+            };
+            ~SSLChannelContext(){};
+            void setProperties(DrillUserProperties* prop); // override; throws exception
+            boost::asio::ssl::context& getSslContext(){ return m_SSLContext;}
         private:
-            boost::asio::ssl::context* m_pSslContext;
+            boost::asio::ssl::context m_SSLContext;
     };
 
     typedef ChannelContext ChannelContext_t; 
+    typedef SSLChannelContext SSLChannelContext_t; 
+
+    class ChannelContextFactory{
+        public:
+            static ChannelContext_t* getChannelContext(channelType_t t);
+    };
 
     /***
      * The Channel class encapsulates a connection to a drillbit. Based on 
@@ -82,12 +111,15 @@ namespace Drill {
     class Channel{
         public: 
             Channel(const char* connStr);
+            Channel(const char* host, const char* port);
+            Channel(boost::asio::io_service& ioService, const char* connStr);
             virtual ~Channel();
             virtual connectionStatus_t init(ChannelContext_t* context)=0;
             connectionStatus_t connect();
             connectionStatus_t protocolClose();
             template <typename SettableSocketOption> void setOption(SettableSocketOption& option);
             DrillClientError* getError(){ return m_pError;}
+            void close(){ m_pSocket->protocolClose();} // Not OK to use the channel after this call. 
 
             boost::asio::io_service& getIOService(){
                 return m_ioService;
@@ -105,10 +137,13 @@ namespace Drill {
                 return *m_pSocket;
             }
 
+            ConnectionEndpoint* getEndpoint(){return m_pEndpoint;}
+
         protected:
             connectionStatus_t handleError(connectionStatus_t status, std::string msg);
 
-            boost::asio::io_service m_ioService;
+            boost::asio::io_service& m_ioService;
+            boost::asio::io_service m_ioServiceFallback; // used if m_ioService is not provided
             AsioStreamSocket* m_pSocket;
 
         private:
@@ -128,12 +163,15 @@ namespace Drill {
 
             bool m_bIsConnected;
             DrillClientError* m_pError;
+            bool m_ownIoService;
 
     };
 
     class SocketChannel: public Channel{
         public:
             SocketChannel(const char* connStr):Channel(connStr){
+            }
+            SocketChannel(const char* host, const char* port):Channel(host, port){
             }
             connectionStatus_t init(ChannelContext_t* context=NULL);
     };
@@ -142,12 +180,15 @@ namespace Drill {
         public:
             SSLStreamChannel(const char* connStr):Channel(connStr){
             }
+            SSLStreamChannel(const char* host, const char* port):Channel(host, port){
+            }
             connectionStatus_t init(ChannelContext_t* context);
     };
 
     class ChannelFactory{
         public:
             static Channel* getChannel(channelType_t t, const char* connStr);
+            static Channel* getChannel(channelType_t t, const char* host, const char* port);
     };
 
 

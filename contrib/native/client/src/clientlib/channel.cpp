@@ -17,9 +17,11 @@
  */
 
 #include <boost/lexical_cast.hpp>
+#include <boost/regex.hpp>
 
 #include "drill/drillConfig.hpp"
 #include "drill/drillError.hpp"
+#include "drill/userProperties.hpp"
 #include "channel.hpp"
 #include "errmsgs.hpp"
 #include "logger.hpp"
@@ -35,6 +37,13 @@ ConnectionEndpoint::ConnectionEndpoint(const char* connStr){
     m_pError=NULL;
 }
 
+ConnectionEndpoint::ConnectionEndpoint(const char* host, const char* port){
+    m_host=host;
+    m_port=port;
+    m_protocol="drillbit"; // direct connection
+    m_pError=NULL;
+}
+
 ConnectionEndpoint::~ConnectionEndpoint(){
     if(m_pError!=NULL){
         delete m_pError; m_pError=NULL;
@@ -43,34 +52,44 @@ ConnectionEndpoint::~ConnectionEndpoint(){
 
 connectionStatus_t ConnectionEndpoint::getDrillbitEndpoint(){
     connectionStatus_t ret=CONN_SUCCESS;
-    parseConnectString();
-    if(isZookeeperConnection()){
-        if((ret=getDrillbitEndpointFromZk())!=CONN_SUCCESS){
-            return ret;
+    if(!m_connectString.empty()){
+        parseConnectString();
+        if(isZookeeperConnection()){
+            if((ret=getDrillbitEndpointFromZk())!=CONN_SUCCESS){
+                return ret;
+            }
+        }else if(!this->isDirectConnection()){
+            return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, this->getProtocol().c_str()));
         }
-    }else if(!this->isDirectConnection()){
-        return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_UNKPROTO, this->getProtocol().c_str()));
+    }else{
+        if(m_host.empty() || m_port.empty()){
+            return handleError(CONN_INVALID_INPUT, getMessage(ERR_CONN_NOCONNSTR));
+        }
     }
     return ret;
 }
 
 void ConnectionEndpoint::parseConnectString(){
-    char u[MAX_CONNECT_STR+1];
-    assert(!m_connectString.empty());
-    strncpy(u, m_connectString.c_str(), MAX_CONNECT_STR); u[MAX_CONNECT_STR]=0;
-    char* z=strtok(u, "=");
-    char* c=strtok(NULL, "/");
-    char* p=strtok(NULL, "");
+    boost::regex connStrExpr("(.*)=(.*):([0-9]+)/(.*)");
+    boost::cmatch matched;
 
-    if(p!=NULL) m_pathToDrill=std::string("/")+p;
-    m_protocol=z; 
-    m_hostPortStr=c;
-    // if the connection is to a zookeeper , we will get the host and the port only after connecting to the Zookeeper
+    //TODO: add error handling for regex match
+    boost::regex_match(m_connectString.c_str(), matched, connStrExpr);
+    m_protocol.assign(matched[1].first, matched[1].second);
+    std::string host, port;
+    host.assign(matched[2].first, matched[2].second);
+    port.assign(matched[3].first, matched[3].second);
     if(isDirectConnection()){
-        char tempStr[MAX_CONNECT_STR+1];
-        strncpy(tempStr, m_hostPortStr.c_str(), MAX_CONNECT_STR); tempStr[MAX_CONNECT_STR]=0;
-        m_host=strtok(tempStr, ":");
-        m_port=strtok(NULL, "");
+        // if the connection is to a zookeeper, 
+        // we will get the host and the port only after connecting to the Zookeeper
+        m_host=host;
+        m_port=port;
+    }
+    m_hostPortStr=host+std::string(":")+port;
+    std::string pathToDrill;
+    pathToDrill.assign(matched[4].first, matched[4].second);
+    if(!pathToDrill.empty()){
+        m_pathToDrill=std::string("/")+pathToDrill;
     }
     return;
 }
@@ -114,6 +133,38 @@ connectionStatus_t ConnectionEndpoint::handleError(connectionStatus_t status, st
     return status;
 }
 
+/***********************
+ * SSL Channel Context
+ ***********************/
+#if defined(IS_SSL_ENABLED)
+void SSLChannelContext::setProperties(DrillUserProperties* prop){
+    ChannelContext::setProperties(prop);
+    std::string certFile=prop->getProp(USERPROP_CERTFILEPATH, certFile);
+    m_SSLContext.load_verify_file(certFile);
+}
+#endif
+
+/****************************
+ * Channel Context Factory
+ ****************************/
+ChannelContext* ChannelContextFactory::getChannelContext(channelType_t t){
+    ChannelContext* pChannelContext=NULL;
+    switch(t){
+        case CHANNEL_TYPE_SOCKET:
+            pChannelContext=new ChannelContext();
+            break;
+#if defined(IS_SSL_ENABLED)
+        case CHANNEL_TYPE_SSLSTREAM:
+            pChannelContext=new SSLChannelContext();
+            break;
+#endif
+        default:
+            DRILL_LOG(LOG_ERROR) << "Channel type " << t << " is not supported." << std::endl;
+            break;
+    }
+    return pChannelContext;
+} 
+
 /*******************
  *  ChannelFactory
  * *****************/
@@ -135,14 +186,49 @@ Channel* ChannelFactory::getChannel(channelType_t t, const char* connStr){
     return pChannel;
 }
 
+Channel* ChannelFactory::getChannel(channelType_t t, const char* host, const char* port){
+    Channel* pChannel=NULL;
+    switch(t){
+        case CHANNEL_TYPE_SOCKET:
+            pChannel=new SocketChannel(host, port);
+            break;
+#if defined(IS_SSL_ENABLED)
+        case CHANNEL_TYPE_SSLSTREAM:
+            pChannel=new SSLStreamChannel(host, port);
+            break;
+#endif
+        default:
+            DRILL_LOG(LOG_ERROR) << "Channel type " << t << " is not supported." << std::endl;
+            break;
+    }
+    return pChannel;
+}
+
 
 
 /*******************
  *  Channel
  * *****************/
 
-Channel::Channel(const char* connStr){
+Channel::Channel(const char* connStr) : m_ioService(m_ioServiceFallback){
     m_pEndpoint=new ConnectionEndpoint(connStr);
+    m_ownIoService = true;
+    m_pSocket=NULL;
+    m_bIsConnected=false;
+    m_pError=NULL;
+}
+
+Channel::Channel(const char* host, const char* port) : m_ioService(m_ioServiceFallback){
+    m_pEndpoint=new ConnectionEndpoint(host, port);
+    m_ownIoService = true;
+    m_pSocket=NULL;
+    m_bIsConnected=false;
+    m_pError=NULL;
+}
+
+Channel::Channel(boost::asio::io_service& ioService, const char* connStr):m_ioService(ioService){
+    m_pEndpoint=new ConnectionEndpoint(connStr);
+    m_ownIoService = false;
     m_pSocket=NULL;
     m_bIsConnected=false;
     m_pError=NULL;
@@ -161,7 +247,8 @@ Channel::~Channel(){
 }
 
 template <typename SettableSocketOption> void Channel::setOption(SettableSocketOption& option){
-    //TODO: May be useful some day. For the moment, we only need to set some well known options after we connect.
+    //May be useful some day. 
+    //At the moment, we only need to set some well known options after we connect.
     assert(0); 
 }
 
@@ -180,6 +267,8 @@ connectionStatus_t Channel::connect(){
                 << ":" << m_pEndpoint->getPort() 
                 << "." << std::endl;
             ret=this->connectInternal();
+        }else{
+            handleError(ret, m_pEndpoint->getError()->msg);
         }
     }
     m_bIsConnected=(ret==CONN_SUCCESS);
@@ -248,7 +337,7 @@ connectionStatus_t SocketChannel::init(ChannelContext_t* pContext){
 #if defined(IS_SSL_ENABLED)
 connectionStatus_t SSLStreamChannel::init(ChannelContext_t* pContext){
     connectionStatus_t ret=CONN_SUCCESS;
-    m_pSocket=new SslSocket(m_ioService, *pContext->getSslContext());
+    m_pSocket=new SslSocket(m_ioService, ((SSLChannelContext_t*)pContext)->getSslContext() );
     if(m_pSocket!=NULL){
         ret=Channel::init(pContext);
     }else{

@@ -32,9 +32,10 @@ typedef boost::asio::ip::tcp::socket::lowest_layer_type streamSocket_t;
 typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> sslTCPSocket_t;
 typedef boost::asio::ip::tcp::socket basicTCPSocket_t;
 
+
 // Some helper typedefs to define the highly templatized boost::asio methods
 typedef boost::asio::const_buffers_1 ConstBufferSequence; 
-typedef boost::asio::mutable_buffers_1 MutableBufferSequence; 
+typedef boost::asio::mutable_buffers_1 MutableBufferSequence;
 
 // ReadHandlers have different possible signatures.
 //
@@ -97,7 +98,11 @@ class Socket:
         Socket(boost::asio::io_service& ioService) : basicTCPSocket_t(ioService) {
             }
 
-        ~Socket(){};
+        ~Socket(){
+            boost::system::error_code ignorederr;
+            this->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignorederr);
+            this->close();
+        };
 
         basicTCPSocket_t& getSocketStream(){ return *this;}
 
@@ -120,7 +125,10 @@ class Socket:
         }
 
         void protocolHandshake(){}; //nothing to do
-        void protocolClose(){};     //nothing to do
+        void protocolClose(){ 
+            boost::system::error_code ignorederr;
+            ((basicTCPSocket_t*)this)->shutdown(boost::asio::ip::tcp::socket::shutdown_both); // shuts down the socket!
+        } 
 };
 
 
@@ -171,6 +179,11 @@ class SslSocket:
             this->shutdown();
             return;
         };
+
+        void close(){
+            this->protocolClose();
+
+        }
 };
 #endif
 
