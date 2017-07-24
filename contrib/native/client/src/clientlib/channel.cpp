@@ -265,7 +265,7 @@ Channel::Channel(const char* connStr) : m_ioService(m_ioServiceFallback){
     m_pEndpoint=new ConnectionEndpoint(connStr);
     m_ownIoService = true;
     m_pSocket=NULL;
-    m_bIsConnected=false;
+    m_state=CHANNEL_UNINITIALIZED;
     m_pError=NULL;
 }
 
@@ -273,7 +273,7 @@ Channel::Channel(const char* host, const char* port) : m_ioService(m_ioServiceFa
     m_pEndpoint=new ConnectionEndpoint(host, port);
     m_ownIoService = true;
     m_pSocket=NULL;
-    m_bIsConnected=false;
+    m_state=CHANNEL_UNINITIALIZED;
     m_pError=NULL;
 }
 
@@ -281,7 +281,7 @@ Channel::Channel(boost::asio::io_service& ioService, const char* connStr):m_ioSe
     m_pEndpoint=new ConnectionEndpoint(connStr);
     m_ownIoService = false;
     m_pSocket=NULL;
-    m_bIsConnected=false;
+    m_state=CHANNEL_UNINITIALIZED;
     m_pError=NULL;
 }
 
@@ -289,7 +289,7 @@ Channel::Channel(boost::asio::io_service& ioService, const char* host, const cha
     m_pEndpoint=new ConnectionEndpoint(host, port);
     m_ownIoService = true;
     m_pSocket=NULL;
-    m_bIsConnected=false;
+    m_state=CHANNEL_UNINITIALIZED;
     m_pError=NULL;
 }
 
@@ -313,12 +313,13 @@ template <typename SettableSocketOption> void Channel::setOption(SettableSocketO
 
 connectionStatus_t Channel::init(ChannelContext_t* pContext){
     connectionStatus_t ret=CONN_SUCCESS;
+    this->m_state=CHANNEL_INITIALIZED;
     return ret;
 }
 
 connectionStatus_t Channel::connect(){
-    connectionStatus_t ret=CONN_SUCCESS;
-    if(!this->m_bIsConnected){
+    connectionStatus_t ret=CONN_FAILURE;
+    if(this->m_state==CHANNEL_INITIALIZED){
         ret=m_pEndpoint->getDrillbitEndpoint();
         if(ret==CONN_SUCCESS){
             DRILL_LOG(LOG_TRACE) << "Connecting to drillbit: " 
@@ -330,7 +331,7 @@ connectionStatus_t Channel::connect(){
             handleError(ret, m_pEndpoint->getError()->msg);
         }
     }
-    m_bIsConnected=(ret==CONN_SUCCESS);
+    this->m_state=(ret==CONN_SUCCESS)?CHANNEL_CONNECTED:this->m_state;
     return ret;
 }
 
