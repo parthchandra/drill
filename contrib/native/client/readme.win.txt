@@ -151,7 +151,7 @@ Windows platforms should be more or less similar.
     c) InVisual Studio 2010 Express open <CPPUNIT_HOME>/src/CppUnitLibraries2010.sln
        i) Build cppunit project
 
-2.5 Install or  Cyrus SASL 
+2.5 Install or build Cyrus SASL
    To build your own see readme.sasl for instructions
 
 2.6 Install OpenSSL
