@@ -125,9 +125,21 @@ public class LargeTableGenBase {
     return String.format("%d",randomized[i%randomized.length] % 47 + 1);
   }
 
-  protected String getBirthday(int i) {
-    return String.format("%d",randomized[i%randomized.length]);
+  //date yyyy-mm-dd
+  protected String getBirthdate(int i) {
+    int thisseed = randomized[i%randomized.length];
+    return String.format("%d-%02d-%02d",
+        2016 - (thisseed % 60 + 10), thisseed % 12 + 1, (thisseed * 31) % 28 + 1 );
   }
+
+  //timestamp, yyyy-mm-dd HH:mm:ss
+  protected String getFirstLogin(int i) {
+    int thisseed = randomized[i%randomized.length];
+    int nextseed = randomized[(i+1)%randomized.length];
+    return String.format("%d-%02d-%02d %02d:%02d:%02d.0",
+        2016 - (thisseed % 7), (thisseed * 31) % 12 + 1, thisseed % 28 + 1, nextseed % 24, nextseed % 60, (nextseed * 47) % 60 );
+  }
+
 
   protected String getField(String field, int i) {
     if(field.equals("ssn")) {

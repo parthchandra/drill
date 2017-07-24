@@ -91,13 +91,18 @@ public class LargeTableGen extends LargeTableGenBase {
       //don't create index here. indexes may have been created
       return;
     }
-    for(int i=0; i<indexDef.length / 2; ++i) {
+    for(int i=0; i<indexDef.length / 3; ++i) {
       String indexCmd = String.format("maprcli table index add"
           + " -path " + table.getPath()
-          + " -index testindex_%d"
+          + " -index %s"
           + " -indexedfields '%s'"
-          + ((indexDef[2 * i + 1].length()==0)?"":" -includedfields '%s'"),
-          i, indexDefInCommand(indexDef[2 * i]), indexDefInCommand(indexDef[2 * i + 1]));
+          + ((indexDef[3 * i + 2].length()==0)?"":" -includedfields '%s'")
+          + ((indexDef[3 * i].startsWith("hash"))? " -hashed true" : ""),
+          indexDefInCommand(indexDef[3 * i]), //index name
+          indexDefInCommand(indexDef[3 * i + 1]), //indexedfields
+          indexDefInCommand(indexDef[3 * i + 2])); //includedfields
+      System.out.println(indexCmd);
+
       TestCluster.runCommand(indexCmd);
       DBTests.admin().getTableIndexes(table.getPath(), true);
     }
@@ -137,13 +142,17 @@ public class LargeTableGen extends LargeTableGenBase {
         int batchStop = Math.min(recordNumber, batch + BATCH_SIZE);
         StringBuffer strBuf = new StringBuffer();
         for (i = batch; i < batchStop; ++i) {
-          strBuf.append(String.format("{\"rowid\": \"%d\", \"id\": {\"ssn\": \"%s\"}, \"contact\": {\"phone\": \"%s\", \"email\": \"%s\"}," +
+
+          strBuf.append(String.format("{\"rowid\": \"%d\", \"reverseid\": \"%d\", \"id\": {\"ssn\": \"%s\"}, \"contact\": {\"phone\": \"%s\", \"email\": \"%s\"}," +
                   "\"address\": {\"city\": \"%s\", \"state\": \"%s\"}, \"name\": { \"fname\": \"%s\", \"lname\": \"%s\" }," +
-                  "\"personal\": {\"age\" : %s, \"income\": %s}," +
+                  "\"personal\": {\"age\" : %s, \"income\": %s, \"birthdate\": {\"$dateDay\": \"%s\"} }," +
+                  "\"activity\": {\"irs\" : { \"firstlogin\":  \"%s\" } }," +
                   "\"driverlicense\":{\"$numberLong\": %s} } \n",
-              i + 1, getSSN(i), getPhone(i), getEmail(i),
+              i + 1, recordNumber - i , getSSN(i), getPhone(i), getEmail(i),
               getAddress(i)[2], getAddress(i)[1], getFirstName(i), getLastName(i),
-              getAge(i), getIncome(i), getSSN(i)));
+              getAge(i), getIncome(i), getBirthdate(i),
+              getFirstLogin(i),
+              getSSN(i)));
         }
         try (InputStream in = new StringBufferInputStream(strBuf.toString());
              DocumentStream stream = Json.newDocumentStream(in)) {
@@ -151,7 +160,12 @@ public class LargeTableGen extends LargeTableGenBase {
           //for (Document document : stream) {
           //  table.insert(document, "rowid");
           //}
-          table.insert(stream, "rowid"); //insert a batch  of document in stream
+          try {
+            table.insert(stream, "rowid"); //insert a batch  of document in stream
+          }catch(Exception e) {
+            System.out.println(stream.toString());
+            throw e;
+          }
         }
       }
       table.flush();

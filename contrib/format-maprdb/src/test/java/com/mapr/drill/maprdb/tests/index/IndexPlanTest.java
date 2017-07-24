@@ -76,18 +76,22 @@ public class IndexPlanTest extends BaseJsonTest {
     /**
      * indexDef is an array of string, LargeTableGen.generateTableWithIndex will take it as parameter to generate indexes
      * for primary table.
-     * indexDef[2*i] defines i-th index's indexed field, index[2*i+1] defines i-th index's non-indexed fields
+     * indexDef[3*i] defines i-th index's indexName, NOTE: IF the name begins with "hash", it is a hash index
+     * indexDef[3*i+1] indexed field,
+     * and indexDef[3*i+2] defines i-th index's non-indexed fields
      */
     final String[] indexDef = //null;
-        {"id.ssn", "contact.phone",
-            "address.state,address.city", "name.fname,name.lname",//mainly for composite key test
-            "personal.age", "",
-            "personal.income", "",
-            "driverlicense", "",
-            "$CAST(id.ssn@INT)", "contact.phone",
-            "$CAST(driverlicense@STRING)","contact.email",
-            "address.state,personal.age,driverlicense", "name.fname",
-            "personal.age", "name.fname"
+        {"i_ssn", "id.ssn", "contact.phone",
+            "i_state_city", "address.state,address.city", "name.fname,name.lname",//mainly for composite key test
+            "i_age", "personal.age", "",
+            "i_income", "personal.income", "",
+            "i_lic", "driverlicense", "",
+            "i_cast_int_ssn", "$CAST(id.ssn@INT)", "contact.phone",
+            "i_cast_vchar_lic", "$CAST(driverlicense@STRING)","contact.email",
+            "i_state_age_lic", "address.state,personal.age,driverlicense", "name.fname",
+            "i_age_with_fname", "personal.age", "name.fname",
+            "hash_i_reverseid", "reverseid", "",
+            "hash_i_cast_timestamp_firstlogin", "$CAST(activity.irs.firstlogin@TIMESTAMP)", "id.ssn"
         };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
   }
@@ -117,7 +121,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.id.ssn = '100007423'";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=testindex_0"},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_ssn"},
         new String[]{"RowKeyJoin"}
     );
 
@@ -138,7 +142,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.id.ssn = '100007423'";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=testindex_0"},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_ssn"},
         new String[]{"RowKeyJoin"}
     );
 
@@ -185,7 +189,7 @@ public class IndexPlanTest extends BaseJsonTest {
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin", ".*RestrictedJsonTableGroupScan.*tableName=.*index_test_primary,",
-           ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_0"},
+           ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=i_ssn"},
         new String[]{}
     );
 
@@ -207,7 +211,7 @@ public class IndexPlanTest extends BaseJsonTest {
     test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin", ".*RestrictedJsonTableGroupScan.*tableName=.*index_test_primary,",
-           ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_[28]"},
+           ".*JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=(i_age|i_age_with_fname)"},
         new String[]{}
     );
     testBuilder()
@@ -234,18 +238,18 @@ public class IndexPlanTest extends BaseJsonTest {
   @Test
   public void CoveringWithSimpleFieldsOnly() throws Exception {
 
-    String query = "SELECT t._id AS `rowid` FROM hbase.`index_test_primary` as t " +
+    String query = "SELECT t._id AS `tid` FROM hbase.`index_test_primary` as t " +
         " where t.driverlicense = 100007423";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_4"},
+        new String[] {"JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=i_lic"},
         new String[]{"RowKeyJoin"}
     );
 
     testBuilder()
         .sqlQuery(query)
         .ordered()
-        .baselineColumns("rowid").baselineValues("1012")
+        .baselineColumns("tid").baselineValues("1012")
         .go();
 
     return;
@@ -260,7 +264,7 @@ public class IndexPlanTest extends BaseJsonTest {
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin(.*[\n\r])+.*" +
             "RestrictedJsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
-            "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_4"},
+            "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=i_lic"},
         new String[]{}
     );
 
@@ -276,19 +280,19 @@ public class IndexPlanTest extends BaseJsonTest {
   @Test
   public void NonCoveringWithExtraConditonOnPrimary() throws Exception {
 
-    String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
-        " where t.personal.age = 53 AND t.name.fname='KfFzK'";
+    String query = "SELECT t.`name`.`fname` AS `fname` FROM hbase.`index_test_primary` as t " +
+        " where t.personal.age = 53 AND t.name.lname='UZwNk'";
     test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin", ".*RestrictedJsonTableGroupScan",
-            ".*JsonTableGroupScan.*indexName=testindex_[28]",},
+            ".*JsonTableGroupScan.*indexName=i_age",},
         new String[]{}
     );
 
     testBuilder()
         .sqlQuery(query)
         .ordered()
-        .baselineColumns("lname").baselineValues("UZwNk")
+        .baselineColumns("fname").baselineValues("KfFzK")
         .go();
     test(defaultRowKeyJoinBackIOFactor);
     return;
@@ -302,7 +306,7 @@ public class IndexPlanTest extends BaseJsonTest {
     test(defaultHavingIndexPlan);
     test(preferIntersectPlans);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=testindex_(.*[\n\r])+.*JsonTableGroupScan.*indexName=testindex_"},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=(i_age|i_income)(.*[\n\r])+.*JsonTableGroupScan.*indexName=(i_age|i_income)"},
         new String[]{}
     );
 
@@ -332,7 +336,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
     test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=testindex_1"},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_state_city"},
         new String[]{}
     );
 
@@ -362,7 +366,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*indexName=testindex_1"},
+        new String[] {".*JsonTableGroupScan.*indexName=i_state_city"},
         new String[]{"RowKeyJoin", "Filter"}
     );
 
@@ -392,7 +396,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String[] expectedPlan = new String[] {"RowKeyJoin(.*[\n\r])+.*" +
         "RestrictedJsonTableGroupScan.*tableName=.*index_test_primary(.*[\n\r])+.*" +
         "RangePartitionExchange(.*[\n\r])+.*" +
-    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=testindex_[28]"};
+    "JsonTableGroupScan.*tableName=.*index_test_primary,.*indexName=(i_age|i_age_with_fname)"};
     test(defaultHavingIndexPlan+";"+sliceTargetSmall+";");
     PlanTestBase.testPlanMatchingPatterns(query,
         expectedPlan, new String[]{});
@@ -419,7 +423,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where cast(t.driverlicense as varchar(128))='100007423'";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_cast_vchar_lic"},
         new String[]{"RowKeyJoin"}
     );
 
@@ -441,7 +445,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where CAST(t.id.ssn as INT) = 100007423";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_cast_int_ssn"},
         new String[]{"RowKeyJoin"}
     );
 
@@ -463,7 +467,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where CAST(t.id.ssn as INT) = 100007423";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=testindex_5"},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_cast_int_ssn"},
         new String[]{}
     );
 
@@ -483,7 +487,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where CAST(driverlicense as VARCHAR(10)) = '100007423'";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*MATCHES \"\\^.*100007423.*E.*\\$\".*indexName=testindex_6"},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*MATCHES \"\\^.*100007423.*E.*\\$\".*indexName=i_cast_vchar_lic"},
         new String[]{}
     );
 
@@ -515,7 +519,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.id.ssn <'100000003' order by t.id.ssn";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_ssn"},
         new String[]{"Sort"}
     );
 
@@ -534,7 +538,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.id.ssn <'100000003' order by t.contact.phone";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_ssn"},
         new String[]{"RowkeyJoin"}
     );
 
@@ -553,7 +557,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.driverlicense < 100000003 order by t.driverlicense";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_lic"},
         new String[]{"Sort"}
     );
 
@@ -572,7 +576,7 @@ public class IndexPlanTest extends BaseJsonTest {
         " where t.driverlicense < 100000003 order by t.driverlicense";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_lic"},
         new String[]{"Sort"}
     );
     String query2 = "SELECT t.name.fname as fname FROM hbase.`index_test_primary` as t " +
@@ -604,7 +608,7 @@ public class IndexPlanTest extends BaseJsonTest {
     try {
       PlanTestBase.testPlanMatchingPatterns(query2,
           new String[]{"SingleMergeExchange(.*[\n\r])+.*"
-              + "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+              + "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_ssn"},
           new String[]{"Sort"}
       );
     } finally {
@@ -914,12 +918,12 @@ public class IndexPlanTest extends BaseJsonTest {
       test(defaultHavingIndexPlan + ";" + lowCoveringSel + ";");
       PlanTestBase.testPlanMatchingPatterns(query,
           new String[]{".*JsonTableGroupScan.*tableName=.*index_test_primary"},
-          new String[]{".*indexName=testindex_0"}
+          new String[]{".*indexName=i_ssn"}
       );
       // Must not throw CANNOTPLANEXCEPTION
       test(defaultHavingIndexPlan + ";" + lowCoveringSel + ";" + disableFTS + ";");
       PlanTestBase.testPlanMatchingPatterns(query,
-          new String[]{".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=testindex_0"},
+          new String[]{".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_ssn"},
           new String[]{"RowKeyJoin"}
       );
     } finally {
@@ -949,7 +953,19 @@ public class IndexPlanTest extends BaseJsonTest {
 
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[]{"RowKeyJoin",
-            ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=testindex_0"},
+            ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_ssn"},
+        new String[]{}
+    );
+  }
+
+
+  @Test
+  public void testHashIndexNoRemovingSort() throws Exception {
+    String query = "SELECT t.`contact`.`phone` as phone FROM hbase.`index_test_primary` as t " +
+        " where t.reverseid <'10' order by t.reverseid";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort", "indexName=hash_i_reverseid", "RowKeyJoin"},
         new String[]{}
     );
   }
