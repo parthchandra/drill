@@ -73,23 +73,24 @@ void ConnectionEndpoint::parseConnectString(){
     boost::regex connStrExpr("(.*)=(.*):([0-9]+)/(.*)");
     boost::cmatch matched;
 
-    //TODO: add error handling for regex match
-    boost::regex_match(m_connectString.c_str(), matched, connStrExpr);
-    m_protocol.assign(matched[1].first, matched[1].second);
-    std::string host, port;
-    host.assign(matched[2].first, matched[2].second);
-    port.assign(matched[3].first, matched[3].second);
-    if(isDirectConnection()){
-        // if the connection is to a zookeeper, 
-        // we will get the host and the port only after connecting to the Zookeeper
-        m_host=host;
-        m_port=port;
-    }
-    m_hostPortStr=host+std::string(":")+port;
-    std::string pathToDrill;
-    pathToDrill.assign(matched[4].first, matched[4].second);
-    if(!pathToDrill.empty()){
-        m_pathToDrill=std::string("/")+pathToDrill;
+    if(boost::regex_match(m_connectString.c_str(), matched, connStrExpr)){
+        m_protocol.assign(matched[1].first, matched[1].second);
+        std::string host, port;
+        host.assign(matched[2].first, matched[2].second);
+        port.assign(matched[3].first, matched[3].second);
+        if(isDirectConnection()){
+            // if the connection is to a zookeeper, 
+            // we will get the host and the port only after connecting to the Zookeeper
+            m_host=host;
+            m_port=port;
+        }
+        m_hostPortStr=host+std::string(":")+port;
+        std::string pathToDrill;
+        pathToDrill.assign(matched[4].first, matched[4].second);
+        if(!pathToDrill.empty()){
+            m_pathToDrill=std::string("/")+pathToDrill;
+
+        }
     }
     return;
 }
@@ -139,7 +140,8 @@ connectionStatus_t ConnectionEndpoint::handleError(connectionStatus_t status, st
 #if defined(IS_SSL_ENABLED)
 void SSLChannelContext::setProperties(DrillUserProperties* prop){
     ChannelContext::setProperties(prop);
-    std::string certFile=prop->getProp(USERPROP_CERTFILEPATH, certFile);
+    std::string certFile;
+    prop->getProp(USERPROP_CERTFILEPATH, certFile);
     m_SSLContext.load_verify_file(certFile);
 }
 #endif
