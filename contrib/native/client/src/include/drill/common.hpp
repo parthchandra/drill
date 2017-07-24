@@ -168,9 +168,8 @@ typedef enum{
 #define USERPROP_USERNAME "userName"
 #define USERPROP_PASSWORD "password"
 #define USERPROP_SCHEMA   "schema"
-#define USERPROP_USESSL   "useSSL"        // Not implemented yet
-#define USERPROP_FILEPATH "pemLocation"   // Not implemented yet
-#define USERPROP_FILENAME "pemFile"       // Not implemented yet
+#define USERPROP_USESSL   "useSSL"        
+#define USERPROP_CERTFILEPATH "certFilePath" // pem file path and name 
 #define USERPROP_IMPERSONATION_TARGET "impersonation_target"
 #define USERPROP_AUTH_MECHANISM "auth"
 #define USERPROP_SERVICE_NAME "service_name"

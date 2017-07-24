@@ -198,7 +198,7 @@ class DrillTestClient {
 
             DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "validateHandShake\n";)
 
-            exec::user::UserToBitHandshake u2b;
+                exec::user::UserToBitHandshake u2b;
             u2b.set_channel(exec::shared::USER);
             u2b.set_rpc_version(DRILL_RPC_VERSION);
             u2b.set_support_listening(true);
@@ -223,33 +223,33 @@ class DrillTestClient {
                 exec::user::UserProperties* userProperties = u2b.mutable_properties();
 
                 std::map<char,int>::iterator it;
-                for(size_t i=0; i<properties->size(); i++){
-                    std::map<std::string,uint32_t>::const_iterator it=DrillUserProperties::USER_PROPERTIES.find(properties->keyAt(i));
+                for (std::map<std::string,std::string>::const_iterator propIter=properties->begin(); propIter!=properties->end(); ++propIter){
+                    std::string currKey=propIter->first;
+                    std::string currVal=propIter->second;
+                    std::map<std::string,uint32_t>::const_iterator it=DrillUserProperties::USER_PROPERTIES.find(currKey);
                     if(it==DrillUserProperties::USER_PROPERTIES.end()){
-                        DRILL_MT_LOG(DRILL_LOG(LOG_INFO) << "Connection property ("<< properties->keyAt(i)
+                        DRILL_MT_LOG(DRILL_LOG(LOG_INFO) << "Connection property ("<< currKey
                                 << ") is unknown" << std::endl;)
-
-                        exec::user::Property* connProp = userProperties->add_properties();
-                        connProp->set_key(properties->keyAt(i));
-                        connProp->set_value(properties->valueAt(i));
-
+                            exec::user::Property* connProp = userProperties->add_properties();
+                        connProp->set_key(currKey);
+                        connProp->set_value(currVal);
                         continue;
                     }
                     if(IS_BITSET((*it).second,USERPROP_FLAGS_SERVERPROP)){
                         exec::user::Property* connProp = userProperties->add_properties();
-                        connProp->set_key(properties->keyAt(i));
-                        connProp->set_value(properties->valueAt(i));
+                        connProp->set_key(currKey);
+                        connProp->set_value(currVal);
                         //Username(but not the password) also needs to be set in UserCredentials
                         if(IS_BITSET((*it).second,USERPROP_FLAGS_USERNAME)){
                             exec::shared::UserCredentials* creds = u2b.mutable_credentials();
-                            username=properties->valueAt(i);
+                            username=currVal;
                             creds->set_user_name(username);
                             //u2b.set_credentials(&creds);
                         }
                         if(IS_BITSET((*it).second,USERPROP_FLAGS_PASSWORD)){
-                            DRILL_MT_LOG(DRILL_LOG(LOG_INFO) <<  properties->keyAt(i) << ": ********** " << std::endl;)
+                            DRILL_MT_LOG(DRILL_LOG(LOG_INFO) <<  currKey << ": ********** " << std::endl;)
                         }else{
-                            DRILL_MT_LOG(DRILL_LOG(LOG_INFO) << properties->keyAt(i) << ":" << properties->valueAt(i) << std::endl;)
+                            DRILL_MT_LOG(DRILL_LOG(LOG_INFO) << currKey << ":" << currVal << std::endl;)
                         }
                     }// Server properties
                 }
@@ -306,14 +306,14 @@ class DrillTestClient {
 
         DrillClientError* m_pError;
     private:
-        ByteBuf_t m_rbuf; 
         Channel* m_pChannel;
         int32_t m_coordinationId;
         std::string m_handshakeErrorId;
         std::string m_handshakeErrorMsg;
-    exec::user::HandshakeStatus m_handshakeStatus;
-    DataBuf m_wbuf;
-    boost::mutex m_dcMutex;
+        exec::user::HandshakeStatus m_handshakeStatus;
+        DataBuf m_wbuf;
+        ByteBuf_t m_rbuf;
+        boost::mutex m_dcMutex;
     
 
 
@@ -331,27 +331,24 @@ int main(int argc, char* argv[]){
     //std::string connectStr = "drillbit=localhost:31090";
     channelType_t type;
 
-    boost::asio::ssl::context sslContext(boost::asio::ssl::context::sslv23);
-    sslContext.set_default_verify_paths();
     bool isSSL = argc==2 && !(strcmp(argv[1], "ssl"));
     type = CHANNEL_TYPE_SOCKET;
-    pChannelContext = new ChannelContext(); 
     if(isSSL){
-        try{
-        sslContext.set_options(
-                boost::asio::ssl::context::default_workarounds
-                | boost::asio::ssl::context::no_sslv2
-                | boost::asio::ssl::context::single_dh_use
-            );
-            sslContext.set_verify_mode(boost::asio::ssl::context::verify_peer);
-            sslContext.load_verify_file("../../../test/ssl/drillTestCert.pem");
         type = CHANNEL_TYPE_SSLSTREAM;
-        pChannelContext->setSslContext(&sslContext);
-        } catch (boost::system::system_error e) {
-            std::cout << "Something wrong. What? " << e.what() << std::endl;
-            return -1;
-        }
     }
+    Drill::DrillUserProperties props;
+    props.setProperty(USERPROP_USERNAME, "admin");
+    props.setProperty(USERPROP_PASSWORD, "admin");
+    props.setProperty(USERPROP_CERTFILEPATH, "../../../test/ssl/drillTestCert.pem");
+
+    pChannelContext = ChannelContextFactory::getChannelContext(type);
+    try{
+        pChannelContext->setProperties(&props);
+    } catch (boost::system::system_error e) {
+        std::cout << "Something wrong. What? " << e.what() << std::endl;
+        return -1;
+    }
+
     pChannel = ChannelFactory::getChannel(type, connectStr.c_str());
     if(pChannel != NULL){
         connectionStatus_t connStat;
@@ -373,9 +370,6 @@ int main(int argc, char* argv[]){
     std::cout << "Connected." << std::endl;
     std::cout << "Starting Drill handshake" << std::endl;
 
-    DrillUserProperties props;
-    props.setProperty(USERPROP_USERNAME, "admin");
-    props.setProperty(USERPROP_PASSWORD, "admin");
 
     DrillTestClient client(pChannel);
 
