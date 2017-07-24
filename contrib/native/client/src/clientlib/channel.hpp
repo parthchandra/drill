@@ -169,7 +169,6 @@ class UserProperties;
             ChannelContext_t *m_pContext;
 
         private:
-
             typedef enum channelState{ 
                 CHANNEL_UNINITIALIZED=1, 
                 CHANNEL_INITIALIZED, 
