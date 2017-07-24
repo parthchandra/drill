@@ -192,10 +192,6 @@ class SslSocket:
             return;
         };
 
-        void close(){
-            this->protocolClose();
-
-        }
 };
 #endif
 
