@@ -87,7 +87,11 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr, DrillUserProper
     m_pChannel= ChannelFactory::getChannel(type, connStr);
     m_pChannel->init(m_pChannelContext);
     props->setProperty(USERPROP_SERVICE_HOST, m_pChannel->getEndpoint()->getHost());
-    return m_pChannel->connect();
+    connectionStatus_t ret =  m_pChannel->connect();
+    if(ret!=CONN_SUCCESS){
+        handleConnError(m_pChannel->getError());
+    }
+    return ret;
 }
 
 connectionStatus_t DrillClientImpl::connect(const char* host, const char* port, DrillUserProperties* props){
@@ -106,10 +110,15 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port, 
         CHANNEL_TYPE_SOCKET;
 
     m_pChannelContext = ChannelContextFactory::getChannelContext(type);
+    m_pChannelContext->setProperties(props);
     m_pChannel= ChannelFactory::getChannel(type, host, port);
     m_pChannel->init(m_pChannelContext);
     props->setProperty(USERPROP_SERVICE_HOST, m_pChannel->getEndpoint()->getHost());
-    return m_pChannel->connect();
+    connectionStatus_t ret =  m_pChannel->connect();
+    if(ret!=CONN_SUCCESS){
+        handleConnError(m_pChannel->getError());
+    }
+    return ret;
 }
 
 void DrillClientImpl::startHeartbeatTimer(){
@@ -2089,6 +2098,20 @@ connectionStatus_t DrillClientImpl::handleConnError(connectionStatus_t status, c
     return status;
 }
 
+connectionStatus_t DrillClientImpl::handleConnError(DrillClientError* err){
+    DrillClientError* pErr = new DrillClientError(*err);
+    m_pendingRequests=0;
+    if(!m_queryHandles.empty()){
+        // set query error only if queries are running
+        broadcastError(pErr);
+    }else{
+        if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
+        m_pError=pErr;
+        shutdownSocket();
+    }
+    return (connectionStatus_t)pErr->status;
+}
+
 /*
  * Always called with NULL QueryHandle when there is any error while reading data from socket. Once enough data is read
  * and a valid RPC message is formed then it can get called with NULL/valid QueryHandle depending on if QueryHandle is found
@@ -2208,8 +2231,8 @@ void DrillClientImpl::sendCancel(const exec::shared::QueryId* pQueryId){
 }
 
 void DrillClientImpl::shutdownSocket(){
-    m_io_service.stop();
     m_pChannel->close();
+    m_io_service.stop();
     m_bIsConnected=false;
 
     // Delete the saslAuthenticatorImpl instance since connection is broken. It will recreated on next

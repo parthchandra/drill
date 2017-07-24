@@ -532,6 +532,7 @@ class DrillClientImpl : public DrillClientImplBase{
         status_t validateResultMessage(const rpc::InBoundRpcMessage& msg, const exec::shared::QueryResult& qr, std::string& valError);
         bool validateResultRPCType(DrillClientQueryHandle* pQueryHandle, const rpc::InBoundRpcMessage& msg);
         connectionStatus_t handleConnError(connectionStatus_t status, const std::string& msg);
+        connectionStatus_t handleConnError(DrillClientError* err);
         status_t handleQryCancellation(status_t status, DrillClientQueryResult* pQueryResult);
         status_t handleQryError(status_t status, const std::string& msg, DrillClientQueryHandle* pQueryHandle);
         status_t handleQryError(status_t status, const exec::shared::DrillPBError& e, DrillClientQueryHandle* pQueryHandle);
