@@ -126,8 +126,11 @@ class Socket:
 
         void protocolHandshake(){}; //nothing to do
         void protocolClose(){ 
+            // shuts down the socket!
             boost::system::error_code ignorederr;
-            ((basicTCPSocket_t*)this)->shutdown(boost::asio::ip::tcp::socket::shutdown_both); // shuts down the socket!
+            ((basicTCPSocket_t*)this)->shutdown(boost::asio::ip::tcp::socket::shutdown_both,
+                ignorederr
+                );         
         } 
 };
 
@@ -176,7 +179,16 @@ class SslSocket:
         // public method that can be invoked by callers to invoke a clean ssl shutdown
         // throws: boost::system::system_error
         void protocolClose(){
-            this->shutdown();
+            try{
+                this->shutdown();
+            }catch(boost::system::system_error e){
+                //swallow the exception. The channel is unusable anyway
+            }
+            // shuts down the socket!
+            boost::system::error_code ignorederr;
+            this->lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both,
+                ignorederr
+                );         
             return;
         };
 
