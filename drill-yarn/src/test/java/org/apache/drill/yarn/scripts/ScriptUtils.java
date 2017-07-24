@@ -17,11 +17,7 @@
  */
 package org.apache.drill.yarn.scripts;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.apache.commons.io.FileUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -38,11 +34,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-import org.apache.commons.io.FileUtils;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 
 public class ScriptUtils {
 
@@ -286,24 +288,93 @@ public class ScriptUtils {
     }
   }
 
+  public void writeEnvFile(PrintWriter out, String key, String value, boolean overrideValue) {
+    out.print("export ");
+    out.print(key);
+    out.print("=");
+
+    if (!overrideValue) {
+      out.print("${");
+      out.print(key);
+      out.print(":-");
+    }
+
+    out.print("\"");
+    out.print(value);
+    out.print("\"");
+
+    if (!overrideValue) {
+      out.print("}");
+    }
+
+    out.println();
+  }
+
   /**
    * Create a drill-env.sh or distrib-env.sh file with the given environment in
-   * the recommended format.
+   * different formats based on overrideValue flag
+   *
+   * @param file - File instance to set environment variables in
+   * @param env - Environment to be placed inside File
+   * @param overrideValue - true - Set environment value such that it overrides previously set value
+   *                      - false - Set environment value in recommended format.
    */
 
-  public void createEnvFile(File file, Map<String, String> env)
+  public void createEnvFile(File file, Map<String, String> env, boolean overrideValue)
       throws IOException {
     try (PrintWriter out = new PrintWriter(new FileWriter(file))) {
       out.println("#!/usr/bin/env bash");
       for (String key : env.keySet()) {
         String value = env.get(key);
-        out.print("export ");
-        out.print(key);
-        out.print("=${");
-        out.print(key);
-        out.print(":-\"");
-        out.print(value);
-        out.println("\"}");
+        writeEnvFile(out, key, value, overrideValue);
+      }
+    }
+  }
+
+  /**
+   * Creates a drill-env.sh or distrib-env.sh file with the given environment under
+   * a given condition. If size of env map is smaller than condition map then last
+   * env entry is repeated for rest of conditions.
+   *
+   * @param file - File instance to set environment and condition in
+   * @param condition - Conditions to guard environment variable
+   * @param env - Environment to be placed inside File
+   * @param overrideValue - true - Set environment value such that it overrides previously set value
+   *                      - false - Set environment value in recommended format.
+   *
+   */
+
+  public void createEnvFileWithCondition(File file, Map<String, String> condition,
+                                         Map<String, String> env, boolean overrideValue) throws IOException {
+
+    if (env.size() == 0 || condition.size() == 0) {
+      return;
+    }
+
+    Iterator envIterator = env.entrySet().iterator();
+    Map.Entry currentEnv = (Map.Entry) envIterator.next();
+
+    try (PrintWriter out = new PrintWriter(new FileWriter(file))) {
+      out.println("#!/usr/bin/env bash");
+
+      for (String condKey : condition.keySet()) {
+        String condValue = condition.get(condKey);
+        out.print("if [ \"$");
+        out.print(condKey);
+        out.print("\" = \"");
+        out.print(condValue);
+        out.println("\" ]; then");
+
+        final String envKey = currentEnv.getKey().toString();
+        final String envValue = currentEnv.getValue().toString();
+        writeEnvFile(out, envKey, envValue, overrideValue);
+
+        out.println("fi");
+        out.println();
+
+        if (envIterator.hasNext()) {
+          currentEnv = (Map.Entry) envIterator.next();
+        }
       }
     }
   }

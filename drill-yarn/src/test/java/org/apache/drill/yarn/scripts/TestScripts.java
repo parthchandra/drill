@@ -324,6 +324,7 @@ public class TestScripts {
     doEnvFileTest("distrib-env.sh");
   }
 
+
   /**
    * Implementation of the drill-env.sh and distrib-env.sh tests.
    */
@@ -345,7 +346,7 @@ public class TestScripts {
     drillEnv.put("SERVER_LOG_GC", "1");
     drillEnv.put("DRILLBIT_MAX_PERM", "600M");
     drillEnv.put("DRILLBIT_CODE_CACHE_SIZE", "2G");
-    context.createEnvFile(new File(siteDir, fileName), drillEnv);
+    context.createEnvFile(new File(siteDir, fileName), drillEnv, false);
 
     {
       RunResult result = new DrillbitRun(DrillbitRun.DRILLBIT_RUN).run();
@@ -381,6 +382,54 @@ public class TestScripts {
     }
   }
 
+  @Test
+  public void testDistribEnvWithNegativeCond() throws IOException {
+
+    // Construct condition map
+    Map<String, String> conditions = new HashMap<>();
+    conditions.put("DRILLBIT_CONTEXT", "0");
+
+    String expectedArgs[] = {"-XX:ReservedCodeCacheSize=1G"};
+
+    doEnvFileWithConditionTest("distrib-env.sh", conditions, expectedArgs);
+  }
+
+  @Test
+  public void testDistribEnvWithPositiveCond() throws IOException {
+
+    // Construct condition map
+    Map<String, String> conditions = new HashMap<>();
+    conditions.put("DRILLBIT_CONTEXT", "1");
+
+    String expectedArgs[] = {"-XX:ReservedCodeCacheSize=2G"};
+
+    doEnvFileWithConditionTest("distrib-env.sh", conditions, expectedArgs);
+  }
+
+  /**
+   * Implementation of the drill-env.sh or distrib-env.sh tests with conditions
+   * guarding environment variables.
+   */
+
+  private void doEnvFileWithConditionTest(String fileName, Map<String, String> conditions,
+                                          String[] expectedArgs) throws IOException {
+    context.createMockDistrib();
+    File siteDir = new File(context.testDrillHome, "conf");
+    context.createMockConf(siteDir);
+
+    // Set a property in the env file.
+    Map<String, String> drillEnv = new HashMap<>();
+    drillEnv.put("DRILLBIT_CODE_CACHE_SIZE", "2G");
+
+    context.createEnvFileWithCondition(new File(siteDir, fileName), conditions, drillEnv, false);
+
+    {
+      RunResult result = new DrillbitRun(DrillbitRun.DRILLBIT_RUN).run();
+      assertEquals(0, result.returnCode);
+      result.validateArgs(expectedArgs);
+    }
+  }
+
   /**
    * Test that drill-env.sh overrides distrib-env.sh, and that the environment
    * overrides both. Assumes the basics were tested above.
@@ -398,12 +447,12 @@ public class TestScripts {
     distribEnv.put("DRILL_HEAP", "5G");
     distribEnv.put("DRILL_MAX_DIRECT_MEMORY", "7G");
     distribEnv.put("DRILLBIT_MAX_PERM", "600M");
-    context.createEnvFile(new File(siteDir, "distrib-env.sh"), distribEnv);
+    context.createEnvFile(new File(siteDir, "distrib-env.sh"), distribEnv, false);
 
     Map<String, String> drillEnv = new HashMap<>();
     drillEnv.put("DRILL_HEAP", "6G");
     drillEnv.put("DRILL_MAX_DIRECT_MEMORY", "9G");
-    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv);
+    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv, false);
 
     {
       RunResult result = new DrillbitRun(DrillbitRun.DRILLBIT_RUN).run();
@@ -496,12 +545,12 @@ public class TestScripts {
     distribEnv.put("DRILL_HEAP", "5G");
     distribEnv.put("DRILL_MAX_DIRECT_MEMORY", "7G");
     distribEnv.put("DRILLBIT_MAX_PERM", "600M");
-    context.createEnvFile(new File(confDir, "distrib-env.sh"), distribEnv);
+    context.createEnvFile(new File(confDir, "distrib-env.sh"), distribEnv, false);
 
     Map<String, String> drillEnv = new HashMap<>();
     drillEnv.put("DRILL_HEAP", "6G");
     drillEnv.put("DRILL_MAX_DIRECT_MEMORY", "9G");
-    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv);
+    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv, false);
 
     String expectedArgs[] = {
         "-Xms6G", "-Xmx6G",
@@ -871,7 +920,7 @@ public class TestScripts {
     File pidDir = context.createDir(new File(context.testDir, "pid"));
     Map<String, String> drillEnv = new HashMap<>();
     drillEnv.put("DRILL_PID_DIR", pidDir.getAbsolutePath());
-    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv);
+    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv, false);
 
     {
       RunResult result = new DrillbitRun(DrillbitRun.DRILLBIT_START)
@@ -902,7 +951,7 @@ public class TestScripts {
 
     Map<String, String> drillEnv = new HashMap<>();
     drillEnv.put("DRILL_MAX_DIRECT_MEMORY", "9G");
-    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv);
+    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv, false);
 
     // Use the -site (--config) option.
 
@@ -945,7 +994,7 @@ public class TestScripts {
     context.removeDir(new File(context.testDrillHome, "log"));
     Map<String, String> drillEnv = new HashMap<>();
     drillEnv.put("DRILL_LOG_DIR", logsDir.getAbsolutePath());
-    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv);
+    context.createEnvFile(new File(siteDir, "drill-env.sh"), drillEnv, false);
 
     {
       DrillbitRun runner = new DrillbitRun(DrillbitRun.DRILLBIT_START);
@@ -1170,6 +1219,85 @@ public class TestScripts {
 
       result.validateArgs(expectedArgs);
       assertTrue(result.containsArg("sqlline.SqlLine"));
+    }
+  }
+
+
+  /**
+   * Test to verify no effect of DRILLBIT_CONTEXT for Sqlline.
+   * @throws IOException
+   */
+  @Test
+  public void testSqllineWithDrillbitContextEnv() throws IOException {
+    context.createMockDistrib();
+    File siteDir = new File(context.testDrillHome, "conf");
+    context.createMockConf(siteDir);
+
+    // Test when SQLLINE_JAVA_OPTS is overriden inside a condition for
+    // DRILLBIT_CONTEXT = 0, then there is no effect
+    {
+      // Create a condition variable to be placed in distrib-env.sh
+      Map<String, String> conditions = new HashMap<>();
+      conditions.put("DRILLBIT_CONTEXT", "0");
+
+      // Create environment variable to be placed inside a condition in distrib-env.sh
+      Map<String, String> drillEnv = new HashMap<>();
+      drillEnv.put("SQLLINE_JAVA_OPTS", "-XX:MaxPermSize=256M");
+
+      // Create the environment variable file overriding SQLLINE_JAVA_OPTS
+      context.createEnvFileWithCondition(new File(siteDir, "distrib-env.sh"), conditions, drillEnv, true);
+
+      // Expected value of the property
+      String expectedArgs[] = {"-XX:MaxPermSize=512M"};
+
+      // Run the test and match the output with expectedArgs
+      RunResult result = new ScriptRunner("sqlline").run();
+      assertEquals(0, result.returnCode);
+      result.validateJava();
+      result.validateClassPath(ScriptUtils.stdCp);
+      assertTrue(result.containsArgsRegex(expectedArgs));
+    }
+
+    // Test when SQLLINE_JAVA_OPTS is overriden inside a condition for
+    // DRILLBIT_CONTEXT = 1, then there is no effect
+    {
+      Map<String, String> conditions = new HashMap<>();
+      conditions.put("DRILLBIT_CONTEXT", "1");
+
+      Map<String, String> drillEnv = new HashMap<>();
+      drillEnv.put("SQLLINE_JAVA_OPTS", "-XX:MaxPermSize=256M");
+
+      String expectedArgs[] = {"-XX:MaxPermSize=512M"};
+
+      // Create the environment variable file overriding SQLLINE_JAVA_OPTS
+      context.createEnvFileWithCondition(new File(siteDir, "distrib-env.sh"), conditions, drillEnv, true);
+
+
+      RunResult result = new ScriptRunner("sqlline").run();
+      assertEquals(0, result.returnCode);
+      result.validateJava();
+      result.validateClassPath(ScriptUtils.stdCp);
+      assertTrue(result.containsArgsRegex(expectedArgs));
+    }
+
+    // Test when SQLLINE_JAVA_OPTS is overriden without condition for
+    // DRILLBIT_CONTEXT then the environment variable is updated
+    {
+
+      Map<String, String> drillEnv = new HashMap<>();
+      drillEnv.put("SQLLINE_JAVA_OPTS", "-XX:MaxPermSize=256M");
+
+      // Create the environment variable file overriding SQLLINE_JAVA_OPTS without any condition
+      // around it.
+      String expectedArgs[] = {"-XX:MaxPermSize=256M"};
+      context.createEnvFile(new File(siteDir, "distrib-env.sh"), drillEnv, true);
+
+
+      RunResult result = new ScriptRunner("sqlline").run();
+      assertEquals(0, result.returnCode);
+      result.validateJava();
+      result.validateClassPath(ScriptUtils.stdCp);
+      assertTrue(result.containsArgsRegex(expectedArgs));
     }
   }
 
