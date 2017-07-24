@@ -25,7 +25,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include "drill/drillc.hpp"
 
-int nOptions=19;
+int nOptions=21;
 
 struct Option{
     char name[32];
@@ -50,7 +50,9 @@ struct Option{
     {"service_host", "Service host for Kerberos", false},
     {"service_name", "Service name for Kerberos", false},
     {"auth", "Authentication mechanism to use", false},
-    {"sasl_encrypt", "Negotiate for encrypted connection", false}
+    {"sasl_encrypt", "Negotiate for encrypted connection", false},
+    {"enableSSL", "Enable SSL", false},
+    {"certPath", "Path to SSL certificate file", false}
 };
 
 std::map<std::string, std::string> qsOptionValues;
@@ -302,6 +304,8 @@ int main(int argc, char* argv[]) {
         std::string serviceHost=qsOptionValues["service_host"];
         std::string serviceName=qsOptionValues["service_name"];
         std::string auth=qsOptionValues["auth"];
+        std::string enableSSL=qsOptionValues["enableSSL"];
+        std::string certPath=qsOptionValues["certPath"];
 
         Drill::QueryType type;
 
@@ -389,6 +393,14 @@ int main(int argc, char* argv[]) {
         }
         if(auth.length()>0){
             props.setProperty(USERPROP_AUTH_MECHANISM, auth);
+        }
+        if(enableSSL.length()>0){
+            props.setProperty(USERPROP_USESSL, enableSSL);
+            if(enableSSL=="true" && certPath.length()<=0){
+                std::cerr<< "SSL is enabled but no certificate provided. " << std::endl;
+                return -1;
+            }
+            props.setProperty(USERPROP_CERTFILEPATH, certPath);
         }
 
         if(client.connect(connectStr.c_str(), &props)!=Drill::CONN_SUCCESS){
