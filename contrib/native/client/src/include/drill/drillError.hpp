@@ -55,6 +55,8 @@ class DECLSPEC_DRILL_CLIENT DrillClientError{
 
         DrillClientError(uint32_t s, uint32_t e, char* m){status=s; errnum=e; msg=m;};
         DrillClientError(uint32_t s, uint32_t e, std::string m){status=s; errnum=e; msg=m;};
+        //copy ctor
+        DrillClientError(const DrillClientError& err){status=err.status; errnum=err.errnum; msg=err.msg;};
 
         static DrillClientError*  getErrorObject(const exec::shared::DrillPBError& e);
 
