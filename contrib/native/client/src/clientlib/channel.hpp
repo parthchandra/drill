@@ -134,7 +134,12 @@ class UserProperties;
             connectionStatus_t protocolClose();
             template <typename SettableSocketOption> void setOption(SettableSocketOption& option);
             DrillClientError* getError(){ return m_pError;}
-            void close(){ m_pSocket->protocolClose();} // Not OK to use the channel after this call. 
+            void close(){ 
+                if(m_state==CHANNEL_INITIALIZED||m_state==CHANNEL_CONNECTED){
+                    m_pSocket->protocolClose();
+                    m_state=CHANNEL_CLOSED;
+                }
+            } // Not OK to use the channel after this call. 
 
             boost::asio::io_service& getIOService(){
                 return m_ioService;
@@ -163,6 +168,13 @@ class UserProperties;
             ConnectionEndpoint *m_pEndpoint;
 
         private:
+            typedef 
+            enum channelState{ 
+                CHANNEL_UNINITIALIZED=1, 
+                CHANNEL_INITIALIZED, 
+                CHANNEL_CONNECTED, 
+                CHANNEL_CLOSED       
+            } channelState_t;
             
             connectionStatus_t connectInternal();
             connectionStatus_t protocolHandshake(){
@@ -176,7 +188,7 @@ class UserProperties;
             }
 
 
-            bool m_bIsConnected;
+            channelState_t m_state;
             DrillClientError* m_pError;
             bool m_ownIoService;
     };
