@@ -40,6 +40,7 @@ class  DrillClientError;
 class  DrillClientImplBase;
 class  DrillClientImpl;
 class  DrillClientQueryResult;
+class  DrillUserProperties;
 class  FieldMetadata;
 class  PreparedStatement;
 class  RecordBatch;
@@ -56,53 +57,6 @@ class DECLSPEC_DRILL_CLIENT DrillClientInitializer{
     public:
         DrillClientInitializer();
         ~DrillClientInitializer();
-};
-
-class DECLSPEC_DRILL_CLIENT DrillUserProperties{
-    public:
-        static const std::map<std::string, uint32_t> USER_PROPERTIES;
-
-        DrillUserProperties(){};
-
-        void setProperty( const std::string& propName, const std::string& propValue){
-            std::pair< std::string, std::string> in = make_pair(propName, propValue);
-            m_properties.insert(in);
-        }
-
-        size_t size() const { return m_properties.size(); }
-
-        //const std::string& keyAt(size_t i) const { return m_properties.at(i).first; }
-
-        //const std::string& valueAt(size_t i) const { return m_properties.at(i).second; }
-
-        const bool  isPropSet(const std::string& key) const{
-            bool isSet=true;
-            auto f= m_properties.find(key);
-            if(f==m_properties.end()){
-                isSet=false;
-            }
-            return isSet;
-        }
-        const std::string&  getProp(const std::string& key, std::string& value) const{
-            auto f= m_properties.find(key);
-            if(f!=m_properties.end()){
-                value=f->second;
-            }
-            return value;
-        }
-
-        bool validate(std::string& err);
-
-        std::map<std::string,std::string>::const_iterator begin() const{
-            return m_properties.begin();
-        }
-
-        std::map<std::string,std::string>::const_iterator end() const{
-            return m_properties.end();
-        }
-
-    private:
-        std::map< std::string, std::string > m_properties;
 };
 
 /*

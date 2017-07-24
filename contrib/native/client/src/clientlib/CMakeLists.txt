@@ -31,6 +31,7 @@ set (CLIENTLIB_SRC_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/logger.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/recordBatch.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/rpcMessage.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/userProperties.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/saslAuthenticatorImpl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/zookeeperClient.cpp)

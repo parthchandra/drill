@@ -17,11 +17,11 @@
  */
 
 #include <stdlib.h>
-#include <boost/assign.hpp>
 #include "drill/common.hpp"
 #include "drill/drillClient.hpp"
 #include "drill/fieldmeta.hpp"
 #include "drill/recordBatch.hpp"
+#include "drill/userProperties.hpp"
 #include "drillClientImpl.hpp"
 #include "env.h"
 #include "errmsgs.hpp"
@@ -37,27 +37,6 @@ DrillClientInitializer::DrillClientInitializer(){
 
 DrillClientInitializer::~DrillClientInitializer(){
     google::protobuf::ShutdownProtobufLibrary();
-}
-
-//Using boost assign to initialize maps. 
-const std::map<std::string, uint32_t>  DrillUserProperties::USER_PROPERTIES=boost::assign::map_list_of
-    ( USERPROP_USERNAME,    USERPROP_FLAGS_SERVERPROP|USERPROP_FLAGS_USERNAME|USERPROP_FLAGS_STRING )
-    ( USERPROP_PASSWORD,    USERPROP_FLAGS_SERVERPROP|USERPROP_FLAGS_PASSWORD)
-    ( USERPROP_SCHEMA,      USERPROP_FLAGS_SERVERPROP|USERPROP_FLAGS_STRING)
-    ( USERPROP_IMPERSONATION_TARGET,   USERPROP_FLAGS_SERVERPROP|USERPROP_FLAGS_STRING)
-    ( USERPROP_AUTH_MECHANISM,         USERPROP_FLAGS_STRING)
-    ( USERPROP_SERVICE_NAME,           USERPROP_FLAGS_STRING)
-    ( USERPROP_SERVICE_HOST,           USERPROP_FLAGS_STRING)
-    ( USERPROP_USESSL,      USERPROP_FLAGS_BOOLEAN|USERPROP_FLAGS_SSLPROP)
-    ( USERPROP_CERTPATH,    USERPROP_FLAGS_STRING|USERPROP_FLAGS_SSLPROP|USERPROP_FLAGS_FILEPATH)
-    ( USERPROP_CERTFILE,    USERPROP_FLAGS_STRING|USERPROP_FLAGS_SSLPROP|USERPROP_FLAGS_FILENAME)
-    ( USERPROP_SASL_ENCRYPT,  USERPROP_FLAGS_STRING)
-;
-
-bool DrillUserProperties::validate(std::string& err){
-    bool ret=true;
-    //We can add additional validation for any params here
-    return ret;
 }
 
 RecordIterator::~RecordIterator(){

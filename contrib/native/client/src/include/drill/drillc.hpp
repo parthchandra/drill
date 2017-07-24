@@ -26,6 +26,7 @@
 #include "drill/fieldmeta.hpp"
 #include "drill/preparedStatement.hpp"
 #include "drill/recordBatch.hpp"
+#include "drill/userProperties.hpp"
 #include "drill/protobuf/Types.pb.h"
 
 #endif

@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/assign.hpp>
+#include "drill/userProperties.hpp"
 #include "saslAuthenticatorImpl.hpp"
 
 #include "drillClientImpl.hpp"
