@@ -206,7 +206,41 @@ Channel* ChannelFactory::getChannel(channelType_t t, const char* host, const cha
     return pChannel;
 }
 
+Channel* ChannelFactory::getChannel(channelType_t t, boost::asio::io_service& ioService, const char* connStr){
+    Channel* pChannel=NULL;
+    switch(t){
+        case CHANNEL_TYPE_SOCKET:
+            pChannel=new SocketChannel(ioService, connStr);
+            break;
+#if defined(IS_SSL_ENABLED)
+        case CHANNEL_TYPE_SSLSTREAM:
+            pChannel=new SSLStreamChannel(ioService, connStr);
+            break;
+#endif
+        default:
+            DRILL_LOG(LOG_ERROR) << "Channel type " << t << " is not supported." << std::endl;
+            break;
+    }
+    return pChannel;
+}
 
+Channel* ChannelFactory::getChannel(channelType_t t, boost::asio::io_service& ioService, const char* host, const char* port){
+    Channel* pChannel=NULL;
+    switch(t){
+        case CHANNEL_TYPE_SOCKET:
+            pChannel=new SocketChannel(ioService, host, port);
+            break;
+#if defined(IS_SSL_ENABLED)
+        case CHANNEL_TYPE_SSLSTREAM:
+            pChannel=new SSLStreamChannel(ioService, host, port);
+            break;
+#endif
+        default:
+            DRILL_LOG(LOG_ERROR) << "Channel type " << t << " is not supported." << std::endl;
+            break;
+    }
+    return pChannel;
+}
 
 /*******************
  *  Channel
@@ -231,6 +265,14 @@ Channel::Channel(const char* host, const char* port) : m_ioService(m_ioServiceFa
 Channel::Channel(boost::asio::io_service& ioService, const char* connStr):m_ioService(ioService){
     m_pEndpoint=new ConnectionEndpoint(connStr);
     m_ownIoService = false;
+    m_pSocket=NULL;
+    m_bIsConnected=false;
+    m_pError=NULL;
+}
+
+Channel::Channel(boost::asio::io_service& ioService, const char* host, const char* port) : m_ioService(ioService){
+    m_pEndpoint=new ConnectionEndpoint(host, port);
+    m_ownIoService = true;
     m_pSocket=NULL;
     m_bIsConnected=false;
     m_pError=NULL;

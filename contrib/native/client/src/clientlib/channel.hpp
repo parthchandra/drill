@@ -113,6 +113,7 @@ class UserProperties;
             Channel(const char* connStr);
             Channel(const char* host, const char* port);
             Channel(boost::asio::io_service& ioService, const char* connStr);
+            Channel(boost::asio::io_service& ioService, const char* host, const char* port);
             virtual ~Channel();
             virtual connectionStatus_t init(ChannelContext_t* context)=0;
             connectionStatus_t connect();
@@ -173,6 +174,12 @@ class UserProperties;
             }
             SocketChannel(const char* host, const char* port):Channel(host, port){
             }
+            SocketChannel(boost::asio::io_service& ioService, const char* connStr)
+                :Channel(ioService, connStr){
+            }
+            SocketChannel(boost::asio::io_service& ioService, const char* host, const char* port)
+                :Channel(ioService, host, port){
+            }
             connectionStatus_t init(ChannelContext_t* context=NULL);
     };
 
@@ -182,6 +189,12 @@ class UserProperties;
             }
             SSLStreamChannel(const char* host, const char* port):Channel(host, port){
             }
+            SSLStreamChannel(boost::asio::io_service& ioService, const char* connStr)
+                :Channel(ioService, connStr){
+            }
+            SSLStreamChannel(boost::asio::io_service& ioService, const char* host, const char* port)
+                :Channel(ioService, host, port){
+            }
             connectionStatus_t init(ChannelContext_t* context);
     };
 
@@ -189,6 +202,8 @@ class UserProperties;
         public:
             static Channel* getChannel(channelType_t t, const char* connStr);
             static Channel* getChannel(channelType_t t, const char* host, const char* port);
+            static Channel* getChannel(channelType_t t, boost::asio::io_service& ioService, const char* connStr);
+            static Channel* getChannel(channelType_t t, boost::asio::io_service& ioService, const char* host, const char* port);
     };
 
 
