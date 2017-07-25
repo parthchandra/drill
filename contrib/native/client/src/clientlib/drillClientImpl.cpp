@@ -84,7 +84,7 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr, DrillUserProper
 
     m_pChannelContext = ChannelContextFactory::getChannelContext(type);
     m_pChannelContext->setProperties(props);
-    m_pChannel= ChannelFactory::getChannel(type, connStr);
+    m_pChannel= ChannelFactory::getChannel(type, m_io_service, connStr);
     m_pChannel->init(m_pChannelContext);
     props->setProperty(USERPROP_SERVICE_HOST, m_pChannel->getEndpoint()->getHost());
     connectionStatus_t ret =  m_pChannel->connect();
@@ -111,7 +111,7 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port, 
 
     m_pChannelContext = ChannelContextFactory::getChannelContext(type);
     m_pChannelContext->setProperties(props);
-    m_pChannel= ChannelFactory::getChannel(type, host, port);
+    m_pChannel= ChannelFactory::getChannel(type, m_io_service, host, port);
     m_pChannel->init(m_pChannelContext);
     props->setProperty(USERPROP_SERVICE_HOST, m_pChannel->getEndpoint()->getHost());
     connectionStatus_t ret =  m_pChannel->connect();
@@ -311,8 +311,10 @@ connectionStatus_t DrillClientImpl::recvHandshake(){
     }
 
     m_io_service.reset();
-    if (DrillClientConfig::getHandshakeTimeout() > 0){
-        m_deadlineTimer.expires_from_now(boost::posix_time::seconds(DrillClientConfig::getHandshakeTimeout()));
+      
+    int32_t handshakeTimeout=DrillClientConfig::getHandshakeTimeout();
+    if (handshakeTimeout > 0){
+        m_deadlineTimer.expires_from_now(boost::posix_time::seconds(handshakeTimeout));
         m_deadlineTimer.async_wait(boost::bind(
                     &DrillClientImpl::handleHShakeReadTimeout,
                     this,
@@ -321,7 +323,6 @@ connectionStatus_t DrillClientImpl::recvHandshake(){
         DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Started new handshake wait timer with "
                 << DrillClientConfig::getHandshakeTimeout() << " seconds." << std::endl;)
     }
-
     
     m_pChannel->getSocketStream().asyncRead(
             boost::asio::buffer(m_rbuf, LEN_PREFIX_BUFLEN),
