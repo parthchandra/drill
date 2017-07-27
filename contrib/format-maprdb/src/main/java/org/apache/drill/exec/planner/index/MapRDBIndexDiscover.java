@@ -312,7 +312,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
 
     IndexDescriptor.IndexType idxType = IndexDescriptor.IndexType.NATIVE_SECONDARY_INDEX;
     List<LogicalExpression> indexFields = field2SchemaPath(desc.getIndexedFields());
-    List<LogicalExpression> coveringFields = field2SchemaPath(desc.getCoveredFields());
+    List<LogicalExpression> coveringFields = field2SchemaPath(desc.getIncludedFields());
     coveringFields.add(SchemaPath.getSimplePath("_id"));
     CollationContext collationContext = null;
     if (!desc.isHashed()) { // hash index has no collation property

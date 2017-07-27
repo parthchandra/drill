@@ -205,7 +205,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       List<RowkeyRange> rowkeyRanges =  ((ConditionImpl)lastCondition).getRowkeyRanges();
       byte[] lastStopRow = rowkeyRanges.get(rowkeyRanges.size() - 1).getStopRow();
       scanSpec.setStopRow(lastStopRow);
-      
+
       tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
 
       regionsToScan = new TreeMap<TabletFragmentInfo, String>();
@@ -300,7 +300,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
     boolean filterPushed = (scanSpec.getSerializedFilter() != null);
     if(scanSpec != null && scanSpec.getIndexDesc() != null) {
-      totalColNum = scanSpec.getIndexDesc().getCoveredFields().size()
+      totalColNum = scanSpec.getIndexDesc().getIncludedFields().size()
           + scanSpec.getIndexDesc().getIndexedFields().size() + 1;
     }
     int numColumns = (columns == null || columns.isEmpty()) ?  totalColNum: columns.size();
