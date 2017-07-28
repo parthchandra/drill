@@ -17,12 +17,12 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.logical.DrillTable;
 
 import java.io.IOException;
@@ -98,6 +98,11 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   }
 
   public FunctionalIndexInfo getFunctionalInfo() {
+    return null;
+  }
+
+  @Override
+  public PluginCost getPluginCostModel() {
     return null;
   }
 }

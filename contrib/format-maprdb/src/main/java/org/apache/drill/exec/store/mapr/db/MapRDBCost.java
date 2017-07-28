@@ -17,18 +17,74 @@
  */
 package org.apache.drill.exec.store.mapr.db;
 
-import org.apache.drill.exec.planner.cost.DrillCostBase;
+import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.planner.cost.PluginCost;
+import org.apache.drill.exec.store.mapr.PluginConstants;
+import org.apache.drill.exec.store.mapr.db.json.JsonTableGroupScan;
 
-public class MapRDBCost {
-  public static final int AVG_COLUMN_SIZE = 10;
-  public static final int DB_BLOCK_SIZE = 8192;  // bytes per block
+public class MapRDBCost implements PluginCost {
 
-  // TODO: Currently, DrillCostBase has a byte read cost, but not a block read cost. The block
-  // read cost is dependent on block size and the type of the storage, so it makes more sense to
-  // define one here. However, the appropriate factor needs to be decided.
-  public static final int SSD_BLOCK_SEQ_READ_COST = 32 * DrillCostBase.BASE_CPU_COST;
+  private int JSON_AVG_COLUMN_SIZE;
+  private int JSON_TABLE_BLOCK_SIZE;  // bytes per block
+  private int JSON_SSD_BLOCK_SEQ_READ_COST;
+  private int JSON_SSD_BLOCK_RANDOM_READ_COST;
 
-  // for SSD random and sequential costs are the same
-  public static final int SSD_BLOCK_RANDOM_READ_COST = SSD_BLOCK_SEQ_READ_COST;
+  public MapRDBCost(DrillConfig config) {
+    JSON_AVG_COLUMN_SIZE = setConfigValue(config, PluginConstants.JSON_TABLE_AVERGE_COLUMN_SIZE,
+        PluginConstants.JSON_TABLE_AVERGE_COLUMN_SIZE_DEFAULT);
+    JSON_TABLE_BLOCK_SIZE = setConfigValue(config, PluginConstants.JSON_TABLE_BLOCK_SIZE,
+        PluginConstants.JSON_TABLE_BLOCK_SIZE_DEFAULT);
+    JSON_SSD_BLOCK_SEQ_READ_COST = setConfigValue(config, PluginConstants.JSON_TABLE_SSD_BLOCK_SEQ_READ_COST,
+        PluginConstants.JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT);
+    JSON_SSD_BLOCK_RANDOM_READ_COST = setConfigValue(config, PluginConstants.JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST,
+        PluginConstants.JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT);
+  }
 
+  private int setConfigValue(DrillConfig config, String configPath, int defaultValue) {
+    int configValue;
+    try {
+      configValue = config.getInt(configPath);
+    } catch (Exception ex) {
+      // Use defaults, if config values not present or any other issue
+      configValue = defaultValue;
+    }
+    return configValue;
+  }
+
+  @Override
+  public int getAverageColumnSize(GroupScan scan) {
+    if (scan instanceof JsonTableGroupScan) {
+      return JSON_AVG_COLUMN_SIZE;
+    } else {
+      return PluginConstants.TABLE_AVERGE_COLUMN_SIZE_DEFAULT;
+    }
+  }
+
+  @Override
+  public int getBlockSize(GroupScan scan) {
+    if (scan instanceof JsonTableGroupScan) {
+      return JSON_TABLE_BLOCK_SIZE;
+    } else {
+      return PluginConstants.TABLE_BLOCK_SIZE_DEFAULT;
+    }
+  }
+
+  @Override
+  public int getSequentialBlockReadCost(GroupScan scan) {
+    if (scan instanceof JsonTableGroupScan) {
+      return JSON_SSD_BLOCK_SEQ_READ_COST;
+    } else {
+      return PluginConstants.TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT;
+    }
+  }
+
+  @Override
+  public int getRandomBlockReadCost(GroupScan scan) {
+    if (scan instanceof JsonTableGroupScan) {
+      return JSON_SSD_BLOCK_RANDOM_READ_COST;
+    } else {
+      return PluginConstants.TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT;
+    }
+  }
 }

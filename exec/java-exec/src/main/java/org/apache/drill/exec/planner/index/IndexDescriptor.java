@@ -23,6 +23,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
 
 
@@ -62,5 +63,7 @@ public interface IndexDescriptor extends IndexDefinition {
 
   public RelOptCost getCost(IndexProperties indexProps, RelOptPlanner planner,
       int numProjectedFields, GroupScan primaryGroupScan);
+
+  public PluginCost getPluginCostModel();
 
 }

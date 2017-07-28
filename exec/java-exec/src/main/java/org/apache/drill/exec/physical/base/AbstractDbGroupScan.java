@@ -24,8 +24,8 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.index.IndexCollection;
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.physical.PartitionFunction;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.AbstractStoragePlugin;
 
 public abstract class AbstractDbGroupScan extends AbstractGroupScan implements DbGroupScan {
@@ -86,4 +86,8 @@ public abstract class AbstractDbGroupScan extends AbstractGroupScan implements D
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public PluginCost getPluginCostModel() {
+    return null;
+  }
 }

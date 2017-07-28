@@ -17,11 +17,13 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.base.Preconditions;
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.rel.RelCollation;
@@ -32,7 +34,9 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.physical.base.DbGroupScan;
+import org.apache.drill.exec.planner.common.DrillJoinRelBase;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
@@ -166,16 +170,68 @@ public class IndexSelector  {
 
   }
 
+  private void addIndexIntersections(List<IndexGroup> candidateIndexes,
+      IndexConditionInfo.Builder infoBuilder, long maxIndexesToIntersect) {
+    // Sort the non-covering indexes for candidate intersect indexes. Generating all
+    // possible combinations of candidates is not feasible so we guide our decision
+    // based on selectivity/collation considerations
+    IndexGroup indexesInCandidate = new IndexGroup();
+    final double SELECTIVITY_UNKNOWN = -1.0;
+    // We iterate over indexes upto planner.index.max_indexes_to_intersect. An index which allows
+    // filter pushdown is added to the existing list of indexes provided it reduces the selectivity
+    // by COVERING_TO_NONCOVERING_FACTOR
+    double prevSel = SELECTIVITY_UNKNOWN;
+    for (int idx = 0; idx < candidateIndexes.size(); idx++) {
+      // Maximum allowed indexes is intersect plan reached!
+      if (indexesInCandidate.numIndexes() == maxIndexesToIntersect) {
+        break;
+      }
+      // Skip covering indexes
+      if (candidateIndexes.get(idx).getIndexProps().get(0).isCovering()) {
+        continue;
+      }
+      // Check if adding the current index to the already existing intersect indexes is redundant
+      List<IndexDescriptor> candidateDescs = Lists.newArrayList();
+      for (IndexProperties prop : indexesInCandidate.getIndexProps()) {
+        candidateDescs.add(prop.getIndexDesc());
+      }
+      candidateDescs.add(candidateIndexes.get(idx).getIndexProps().get(0).getIndexDesc());
+      Map<IndexDescriptor, IndexConditionInfo> intersectIdxInfoMap
+          = infoBuilder.getIndexConditionMap(candidateDescs);
+      // Current index redundant(no conditions pushed down) - skip!
+      if (intersectIdxInfoMap.keySet().size() < candidateDescs.size()) {
+        continue;
+      }
+      IndexProperties curProp = candidateIndexes.get(idx).getIndexProps().get(0);
+      indexesInCandidate.addIndexProp(curProp);
+      double currSel = 1.0;
+      if (indexesInCandidate.isIntersectIndex()) {
+        for (IndexProperties prop : indexesInCandidate.getIndexProps()) {
+          currSel *= prop.getLeadingSelectivity();
+        }
+        if (prevSel == SELECTIVITY_UNKNOWN ||
+            currSel/prevSel < COVERING_TO_NONCOVERING_FACTOR) {
+          prevSel = currSel;
+        } else {
+          indexesInCandidate.removeIndexProp(curProp);
+        }
+      }
+    }
+    // If intersect plan was generated, add it to the set of candidate indexes.
+    if (indexesInCandidate.isIntersectIndex()) {
+      candidateIndexes.add(indexesInCandidate);
+    }
+  }
 
   /**
    * Run the index selection algorithm and return the top N indexes
    */
-  public void getCandidateIndexes(List<IndexProperties> coveringIndexes,
-      List<IndexProperties> nonCoveringIndexes) {
+  public void getCandidateIndexes(IndexConditionInfo.Builder infoBuilder, List<IndexGroup> coveringIndexes,
+      List<IndexGroup> nonCoveringIndexes, List<IndexGroup> intersectIndexes) {
 
     RelOptPlanner planner = indexContext.call.getPlanner();
     PlannerSettings settings = PrelUtil.getPlannerSettings(planner);
-    List<IndexProperties> candidateIndexes = Lists.newArrayList();
+    List<IndexGroup> candidateIndexes = Lists.newArrayList();
 
     logger.info("index_plan_info: Analyzing indexes for prefix matches");
     // analysis phase
@@ -190,7 +246,9 @@ public class IndexSelector  {
         // only consider indexes whose selectivity is <= the configured threshold OR consider
         // all when full table scan is disable to avoid a CannotPlanException
         if (settings.isDisableFullTableScan() || p.getLeadingSelectivity() <= selThreshold) {
-          candidateIndexes.add(p);
+          IndexGroup index = new IndexGroup();
+          index.addIndexProp(p);
+          candidateIndexes.add(index);
         }
       }
     }
@@ -207,7 +265,15 @@ public class IndexSelector  {
     // order which helps diagnosing problems and secondly for internal unit/functional testing we want this code
     // to be exercised even for few indexes
     if (candidateIndexes.size() > 1) {
-      Collections.sort(candidateIndexes, new IndexComparator(planner));
+      Collections.sort(candidateIndexes, new IndexComparator(planner, builder));
+    }
+
+    // Generate index intersections for ranking
+    addIndexIntersections(candidateIndexes, infoBuilder, settings.getMaxIndexesToIntersect());
+
+    // Sort again after intersect plan is added to the list
+    if (candidateIndexes.size() > 1) {
+      Collections.sort(candidateIndexes, new IndexComparator(planner, builder));
     }
 
     logger.info("index_plan_info: The top ranked indexes are: ");
@@ -215,52 +281,80 @@ public class IndexSelector  {
     int count = 0;
     boolean foundCovering = false;
     boolean foundCoveringCollation = false;
+    boolean foundNonCoveringCollation = false;
 
     // pick the best N indexes
     for (int i=0; i < candidateIndexes.size(); i++) {
-      IndexProperties index = candidateIndexes.get(i);
-
-      if (index.isCovering()) {
+      IndexGroup index = candidateIndexes.get(i);
+      if (index.numIndexes() == 1
+          && index.getIndexProps().get(0).isCovering()) {
+        IndexProperties indexProps = index.getIndexProps().get(0);
         if (foundCoveringCollation) {
           // if previously we already found a higher ranked covering index that satisfies collation,
           // then skip this one (note that selectivity and cost considerations were already handled
           // by the ranking phase)
-          logger.debug("index_plan_info: Skipping covering index {} because a higher ranked covering index with collation already exists.", index.getIndexDesc().getIndexName());
+          logger.debug("index_plan_info: Skipping covering index {} because a higher ranked covering index with collation already exists.", indexProps.getIndexDesc().getIndexName());
           continue;
         }
         coveringIndexes.add(index);
         logger.info("index_plan_info: name: {}, covering, collation: {}, leadingSelectivity: {}, cost: {}",
-            index.getIndexDesc().getIndexName(),
-            index.satisfiesCollation(),
-            index.getLeadingSelectivity(),
-            index.getSelfCost(planner));
+            indexProps.getIndexDesc().getIndexName(),
+            indexProps.satisfiesCollation(),
+            indexProps.getLeadingSelectivity(),
+            indexProps.getSelfCost(planner));
         count++;
         foundCovering = true;
-        if (index.satisfiesCollation()) {
+        if (indexProps.satisfiesCollation()) {
           foundCoveringCollation = true;
         }
-      } else {  // non-covering
-
+      } else if (index.numIndexes() == 1) {  // non-covering
+        IndexProperties indexProps = index.getIndexProps().get(0);
         // skip this non-covering index if (a) there was a higher ranked covering index
         // with collation or (b) there was a higher ranked covering index and this
         // non-covering index does not have collation
         if (foundCoveringCollation ||
-            (foundCovering && !index.satisfiesCollation())) {
+            (foundCovering && !indexProps.satisfiesCollation())) {
           logger.debug("index_plan_info: Skipping non-covering index {} because it does not have collation and a higher ranked covering index already exists.",
-              index.getIndexDesc().getIndexName());
+              indexProps.getIndexDesc().getIndexName());
           continue;
         }
-
+        if (indexProps.satisfiesCollation()) {
+          foundNonCoveringCollation = true;
+        }
         // all other non-covering indexes can be added to the list because 2 or more non-covering index could
         // be considered for intersection later; currently the index selector is not costing the index intersection
-        // TODO: enhance index selector for doing cost-based analysis of index intersection
         nonCoveringIndexes.add(index);
         logger.info("index_plan_info: name: {}, non-covering, collation: {}, leadingSelectivity: {}, cost: {}",
-            index.getIndexDesc().getIndexName(),
-            index.satisfiesCollation(),
-            index.getLeadingSelectivity(),
-            index.getSelfCost(planner));
+            indexProps.getIndexDesc().getIndexName(),
+            indexProps.satisfiesCollation(),
+            indexProps.getLeadingSelectivity(),
+            indexProps.getSelfCost(planner));
         count++;
+      } else {  // intersect indexes
+        if (foundCoveringCollation ||
+            (foundCovering && !index.getIndexProps().get(index.numIndexes()-1).satisfiesCollation()) ||
+            foundNonCoveringCollation) {
+          continue;
+        }
+        IndexGroup intersectIndex = new IndexGroup();
+        double isectLeadingSel = 1.0;
+        String isectName = "Intersect-"+count;
+        for (IndexProperties indexProps : index.getIndexProps()) {
+          intersectIndex.addIndexProp(indexProps);
+          isectLeadingSel *= indexProps.getLeadingSelectivity();
+          logger.info("name: {}, {}, collation: {}, leadingSelectivity: {}, cost: {}",
+              indexProps.getIndexDesc().getIndexName(),
+              isectName,
+              indexProps.satisfiesCollation(),
+              indexProps.getLeadingSelectivity(),
+              indexProps.getSelfCost(planner));
+        }
+        logger.info("name: {}, intersect-idx, collation: {}, leadingSelectivity: {}, cost: {}",
+            isectName,
+            index.getIndexProps().get(index.numIndexes()-1).satisfiesCollation(),
+            isectLeadingSel,
+            index.getIndexProps().get(0).getIntersectCost(index, builder, planner));
+        intersectIndexes.add(intersectIndex);
       }
       if (count == max_candidate_indexes) {
         break;
@@ -268,53 +362,167 @@ public class IndexSelector  {
     }
   }
 
-  public static class IndexComparator implements Comparator<IndexProperties> {
+  public static class IndexComparator implements Comparator<IndexGroup> {
 
     private RelOptPlanner planner;
+    private IndexConditionInfo.Builder builder;
     private PlannerSettings settings;
 
-    public IndexComparator(RelOptPlanner planner) {
+    public IndexComparator(RelOptPlanner planner, IndexConditionInfo.Builder builder) {
       this.planner = planner;
+      this.builder = builder;
       this.settings = PrelUtil.getPlannerSettings(planner);
     }
 
     @Override
-    public int compare(IndexProperties o1, IndexProperties o2) {
+    public int compare(IndexGroup index1, IndexGroup index2) {
       // given a covering and a non-covering index, prefer covering index unless the
       // difference in their selectivity is bigger than a configurable factor
-      if (o1.isCovering() && !o2.isCovering()) {
-        if (o1.getLeadingSelectivity()/o2.getLeadingSelectivity() < COVERING_TO_NONCOVERING_FACTOR) {
+      List<IndexProperties> o1, o2;
+      boolean o1Covering, o2Covering, o1SatisfiesCollation, o2SatisfiesCollation;
+      int o1NumLeadingFilters, o2NumLeadingFilters;
+      double o1LeadingSelectivity, o2LeadingSelectivity;
+      DrillCostBase o1SelfCost, o2SelfCost;
+
+      o1 = index1.getIndexProps();
+      o2 = index2.getIndexProps();
+      Preconditions.checkArgument(o1.size() > 0 && o2.size() > 0);
+
+      if (o1.size() == 1) {
+        o1Covering = o1.get(0).isCovering();
+        o1NumLeadingFilters = o1.get(0).numLeadingFilters();
+        o1SatisfiesCollation = o1.get(0).satisfiesCollation();
+        o1LeadingSelectivity = o1.get(0).getLeadingSelectivity();
+      } else {
+        o1Covering = false;
+        // If the intersect plan is a left-deep join tree, the last index
+        // in the join would satisfy the collation. For now, assume no collation.
+        o1SatisfiesCollation = false;
+        o1NumLeadingFilters = o1.get(0).numLeadingFilters();
+        for (int idx=1; idx<o1.size(); idx++) {
+          o1NumLeadingFilters+=o1.get(idx).numLeadingFilters();
+        }
+        o1LeadingSelectivity = o1.get(0).getLeadingSelectivity();
+        for (int idx=1; idx<o1.size(); idx++) {
+          o1LeadingSelectivity*=o1.get(idx).getLeadingSelectivity();
+        }
+      }
+      if (o2.size() == 1) {
+        o2Covering = o2.get(0).isCovering();
+        o2NumLeadingFilters = o2.get(0).numLeadingFilters();
+        o2SatisfiesCollation = o2.get(0).satisfiesCollation();
+        o2LeadingSelectivity = o2.get(0).getLeadingSelectivity();
+      } else {
+        o2Covering = false;
+        // If the intersect plan is a left-deep join tree, the last index
+        // in the join would satisfy the collation. For now, assume no collation.
+        o2SatisfiesCollation = false;
+        o2NumLeadingFilters = o2.get(0).numLeadingFilters();
+        for (int idx=1; idx<o2.size(); idx++) {
+          o2NumLeadingFilters+=o2.get(idx).numLeadingFilters();
+        }
+        o2LeadingSelectivity = o2.get(0).getLeadingSelectivity();
+        for (int idx=1; idx<o2.size(); idx++) {
+          o2LeadingSelectivity*=o2.get(idx).getLeadingSelectivity();
+        }
+      }
+
+      if (o1Covering && !o2Covering) {
+        if (o1LeadingSelectivity/o2LeadingSelectivity < COVERING_TO_NONCOVERING_FACTOR) {
           return -1;  // covering is ranked higher (better) than non-covering
         }
       }
 
-      if (o2.isCovering() && !o1.isCovering()) {
-        if (o2.getLeadingSelectivity()/o1.getLeadingSelectivity() < COVERING_TO_NONCOVERING_FACTOR) {
+      if (o2Covering && !o1Covering) {
+        if (o2LeadingSelectivity/o1LeadingSelectivity < COVERING_TO_NONCOVERING_FACTOR) {
           return 1;  // covering is ranked higher (better) than non-covering
         }
       }
 
-      if (o1.satisfiesCollation() && !o2.satisfiesCollation()) {
+      if (!o1Covering && !o2Covering) {
+        if (o1.size() > 1) {
+          if (o1LeadingSelectivity/o2LeadingSelectivity < COVERING_TO_NONCOVERING_FACTOR) {
+            return -1; // Intersect is ranked higher than non-covering/intersect
+          }
+        } else if (o2.size() > 1) {
+          if (o2LeadingSelectivity/o1LeadingSelectivity < COVERING_TO_NONCOVERING_FACTOR) {
+            return -1; // Intersect is ranked higher than non-covering/intersect
+          }
+        }
+      }
+
+      if (o1SatisfiesCollation && !o2SatisfiesCollation) {
         return -1;  // index with collation is ranked higher (better) than one without collation
-      } else if (o2.satisfiesCollation() && !o1.satisfiesCollation()) {
+      } else if (o2SatisfiesCollation && !o1SatisfiesCollation) {
         return 1;
       }
 
-      DrillCostBase cost1 = (DrillCostBase)(o1.getSelfCost(planner));
-      DrillCostBase cost2 = (DrillCostBase)(o2.getSelfCost(planner));
+      if (o1.size() == 1) {
+        o1SelfCost = (DrillCostBase) o1.get(0).getSelfCost(planner);
+      } else {
+        o1SelfCost = (DrillCostBase) o1.get(0).getIntersectCost(index1, builder, planner);
+      }
+      if (o2.size() == 1) {
+        o2SelfCost = (DrillCostBase) o2.get(0).getSelfCost(planner);
+      } else {
+        o2SelfCost = (DrillCostBase) o2.get(0).getIntersectCost(index2, builder, planner);
+      }
+
+      DrillCostBase cost1 = o1SelfCost;
+      DrillCostBase cost2 = o2SelfCost;
 
       if (cost1.isLt(cost2)) {
         return -1;
       } else if (cost1.isEqWithEpsilon(cost2)) {
-        if (o1.numLeadingFilters() > o2.numLeadingFilters()) {
+        if (o1NumLeadingFilters > o2NumLeadingFilters) {
           return -1;
-        } else if (o1.numLeadingFilters() < o2.numLeadingFilters()) {
+        } else if (o1NumLeadingFilters < o2NumLeadingFilters) {
           return 1;
         }
         return 0;
       } else {
         return 1;
       }
+    }
+  }
+
+  /**
+   * Encapsulates one or more IndexProperties representing (non)covering or intersecting indexes. The encapsulated
+   * IndexProperties are used to rank the index in comparison with other IndexGroups.
+   */
+  public static class IndexGroup {
+    private List<IndexProperties> indexProps;
+
+    public IndexGroup() {
+      indexProps = Lists.newArrayList();
+    }
+
+    public boolean isIntersectIndex() {
+      if (indexProps.size() > 1) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+
+    public int numIndexes() {
+      return indexProps.size();
+    }
+
+    public void addIndexProp(IndexProperties prop) {
+      indexProps.add(prop);
+    }
+
+    public void addIndexProp(List<IndexProperties> prop) {
+      indexProps.addAll(prop);
+    }
+
+    public boolean removeIndexProp(IndexProperties prop) {
+      return indexProps.remove(prop);
+    }
+
+    public List<IndexProperties> getIndexProps() {
+      return indexProps;
     }
   }
 
@@ -482,6 +690,11 @@ public class IndexSelector  {
       return selfCost;
     }
 
+    public RelOptCost getIntersectCost(IndexGroup index, IndexConditionInfo.Builder builder,
+        RelOptPlanner planner) {
+      return getIntersectCost(index, builder, planner, indexDescriptor.getPluginCostModel(), primaryTableScan);
+    }
+
     public int numLeadingFilters() {
       return leadingFilters.size();
     }
@@ -490,6 +703,88 @@ public class IndexSelector  {
       return avgRowSize;
     }
 
+    public RelOptCost getIntersectCost(IndexGroup index, IndexConditionInfo.Builder builder,
+                                       RelOptPlanner planner, PluginCost costBase, DrillScanRel scanRel) {
+      DrillCostBase.DrillCostFactory costFactory = (DrillCostBase.DrillCostFactory)planner.getCostFactory();
+      double totLeadRowCount = 1.0;
+      double totalRows = 0.0, totCpuCost = 0.0, totDiskCost = 0.0, totNetworkCost = 0.0, totMemoryCost = 0.0;
+      double rightSideRows = Statistics.ROWCOUNT_UNKNOWN;
+      DbGroupScan primaryTableGroupScan = (DbGroupScan) scanRel.getGroupScan();
+      RexNode remFilters;
+      final List<RexNode> remFilterList = Lists.newArrayList();
+      for (IndexProperties indexProps : index.getIndexProps()) {
+        remFilterList.add(indexProps.getTotalRemainderFilter());
+      }
+      remFilters = RexUtil.composeConjunction(scanRel.getCluster().getRexBuilder(), remFilterList, false);
+
+      for (IndexProperties indexProps : index.getIndexProps()) {
+        totalRows = indexProps.getTotalRows();
+        double leadRowCount = indexProps.getLeadingSelectivity() * indexProps.getRemainderSelectivity() * totalRows;
+        totLeadRowCount *= indexProps.getLeadingSelectivity();
+        double avgRowSize = indexProps.getAvgRowSize();
+        Preconditions.checkArgument(primaryTableGroupScan instanceof DbGroupScan);
+        // IO Cost (Filter evaluation CPU cost for pushed down filters)
+        double numBlocksIndex = Math.ceil((leadRowCount * avgRowSize) / costBase.getBlockSize(primaryTableGroupScan));
+        double diskCostIndex = numBlocksIndex * costBase.getSequentialBlockReadCost(primaryTableGroupScan);
+        totDiskCost += diskCostIndex;
+        // Join Cost (include network cost?) borrow from Hash Join
+        if (rightSideRows != Statistics.ROWCOUNT_UNKNOWN) {
+          DrillCostBase joinCost = (DrillCostBase) DrillJoinRelBase.computeHashJoinCostWithRowCntKeySize(planner,
+              rightSideRows, leadRowCount, 1);
+          totDiskCost += joinCost.getIo();
+          totCpuCost += joinCost.getCpu();
+          totMemoryCost += joinCost.getMemory();
+          // No NDV statistics; compute join rowcount as max of build side and probe side rows
+          rightSideRows = PrelUtil.getPlannerSettings(planner).getRowCountEstimateFactor() *
+              Math.max(leadRowCount, rightSideRows);
+        } else {
+          rightSideRows = leadRowCount;
+        }
+        remFilters = remainderCondition(indexProps.getIndexDesc(), builder, remFilters);
+      }
+
+      totLeadRowCount *= totalRows;
+      // for the primary table join-back each row may belong to a different block, so in general num_blocks = num_rows;
+      // however, num_blocks cannot exceed the total number of blocks of the table
+      DbGroupScan dbGroupScan = (DbGroupScan) primaryTableGroupScan;
+      double totalBlocksPrimary = Math.ceil((dbGroupScan.getColumns().size() *
+          costBase.getAverageColumnSize(dbGroupScan) * totalRows) / costBase.getBlockSize(dbGroupScan));
+      double diskBlocksPrimary = Math.min(totalBlocksPrimary, totLeadRowCount);
+      double diskCostPrimary = diskBlocksPrimary * costBase.getRandomBlockReadCost(dbGroupScan);
+      totDiskCost += diskCostPrimary;
+      // CPU cost of remainder condition evaluation over the selected rows
+      if (remFilters != null) {
+        totCpuCost += totLeadRowCount * DrillCostBase.COMPARE_CPU_COST;
+      }
+      double networkCost = 0.0; // TODO: add network cost once full table scan also considers network cost
+      return costFactory.makeCost(totLeadRowCount, totCpuCost, totDiskCost, totNetworkCost, totMemoryCost);
+    }
+
+    public RexNode remainderCondition(IndexDescriptor indexDesc, IndexConditionInfo.Builder builder,
+                                      RexNode initCondition) {
+      List<LogicalExpression> indexCols = indexDesc.getIndexColumns();
+      boolean prefix = true;
+      if (indexCols.size() > 0 && initCondition != null) {
+        int i=0;
+        while (prefix && i < indexCols.size()) {
+          LogicalExpression p = indexCols.get(i++);
+          List<LogicalExpression> prefixCol = ImmutableList.of(p);
+          IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
+          if(info != null && info.hasIndexCol) {
+            initCondition = info.remainderCondition;
+            if (initCondition.isAlwaysTrue()) {
+              // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+              // we don't need to keep track of it for rest of the index selection
+              initCondition = null;
+              break;
+            }
+          } else {
+            prefix = false;
+          }
+        }
+      }
+      return initCondition;
+    }
   }
 
 }

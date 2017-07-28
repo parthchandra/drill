@@ -29,6 +29,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
+import org.apache.drill.exec.planner.logical.DrillScanRel;
 
 /**
  * Abstract base class for an Index descriptor
@@ -72,5 +73,4 @@ public abstract class AbstractIndexDescriptor extends DrillIndexDefinition imple
       int numProjectedFields, GroupScan primaryGroupScan) {
     throw new UnsupportedOperationException("getCost() not supported for this index.");
   }
-
 }

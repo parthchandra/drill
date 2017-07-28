@@ -53,6 +53,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   private final Connection connection;
   private final MapRDBTableCache jsonTableCache;
   private final int scanRangeSizeMB;
+  private final MapRDBCost pluginCostModel;
 
   public MapRDBFormatPlugin(String name, DrillbitContext context, Configuration fsConf,
       StoragePluginConfig storageConfig, MapRDBFormatPluginConfig formatConfig) throws IOException {
@@ -68,6 +69,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
       scanRangeSizeMBConfig = PluginConstants.JSON_TABLE_SCAN_SIZE_MB_DEFAULT;
     }
     scanRangeSizeMB = scanRangeSizeMBConfig;
+    pluginCostModel = new MapRDBCost(context.getConfig());
   }
 
   @Override
@@ -126,4 +128,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
     return scanRangeSizeMB;
   }
 
+  public MapRDBCost getPluginCostModel() {
+    return pluginCostModel;
+  }
 }

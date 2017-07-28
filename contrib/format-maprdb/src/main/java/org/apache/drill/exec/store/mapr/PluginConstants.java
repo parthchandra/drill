@@ -22,6 +22,7 @@ import static org.ojai.DocumentConstants.ID_KEY;
 import org.apache.drill.common.expression.SchemaPath;
 
 import com.mapr.db.DBConstants;
+import org.apache.drill.exec.planner.cost.DrillCostBase;
 
 public class PluginConstants {
 
@@ -31,4 +32,25 @@ public class PluginConstants {
 
   public static final String JSON_TABLE_SCAN_SIZE_MB = "format-maprdb.json.scanSizeMB";
   public static final int JSON_TABLE_SCAN_SIZE_MB_DEFAULT = 128;
+
+  public static final String JSON_TABLE_BLOCK_SIZE = "format-maprdb.json.pluginCost.blockSize";
+  public static final int JSON_TABLE_BLOCK_SIZE_DEFAULT = 8192;
+
+  // TODO: Currently, DrillCostBase has a byte read cost, but not a block read cost. The block
+  // read cost is dependent on block size and the type of the storage, so it makes more sense to
+  // define one here. However, the appropriate factor needs to be decided.
+  public static final String JSON_TABLE_SSD_BLOCK_SEQ_READ_COST = "format-maprdb.json.pluginCost.ssdBlockSequentialReadCost";
+  public static final int JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT = 32 * DrillCostBase.BASE_CPU_COST;
+
+  // for SSD random and sequential costs are the same
+  public static final String JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST = "format-maprdb.json.pluginCost.ssdBlockRandomReadCost";
+  public static final int JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT = JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT;
+
+  public static final String JSON_TABLE_AVERGE_COLUMN_SIZE = "format-maprdb.json.pluginCost.averageColumnSize";
+  public static final int JSON_TABLE_AVERGE_COLUMN_SIZE_DEFAULT = 10;
+
+  public static final int TABLE_BLOCK_SIZE_DEFAULT = 8192;
+  public static final int TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT = 32 * DrillCostBase.BASE_CPU_COST;
+  public static final int TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT = TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT;
+  public static final int TABLE_AVERGE_COLUMN_SIZE_DEFAULT = 10;
 }

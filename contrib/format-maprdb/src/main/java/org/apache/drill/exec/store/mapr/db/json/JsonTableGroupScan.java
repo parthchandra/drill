@@ -46,6 +46,7 @@ import org.apache.drill.exec.planner.index.IndexDescriptor;
 import org.apache.drill.exec.planner.index.MapRDBIndexDescriptor;
 import org.apache.drill.exec.planner.index.MapRDBStatistics;
 import org.apache.drill.exec.planner.index.MapRDBStatisticsPayload;
+import org.apache.drill.exec.planner.cost.PluginCost;
 
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -259,7 +260,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   }
 
   private ScanStats fullTableScanStats() {
-    final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
+    PluginCost pluginCostModel = formatPlugin.getPluginCostModel();
+    final int avgColumnSize = pluginCostModel.getAverageColumnSize(this);
     final int numColumns = (columns == null || columns.isEmpty()) ? STAR_COLS : columns.size();
     // index will be NULL for FTS
     double rowCount = stats.getRowCount(scanSpec.getCondition(), null);
@@ -283,10 +285,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       rowsFromDisk = totalRowCount;
     }
 
-    double totalBlocks = Math.ceil((avgRowSize * totalRowCount)/MapRDBCost.DB_BLOCK_SIZE);
-    double numBlocks = Math.ceil((avgRowSize * rowsFromDisk)/MapRDBCost.DB_BLOCK_SIZE);
+    double totalBlocks = Math.ceil((avgRowSize * totalRowCount)/pluginCostModel.getBlockSize(this));
+    double numBlocks = Math.ceil((avgRowSize * rowsFromDisk)/pluginCostModel.getBlockSize(this));
     numBlocks = Math.min(totalBlocks, numBlocks);
-    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
+    double diskCost = numBlocks * pluginCostModel.getSequentialBlockReadCost(this);
     /*
      * Table scan cost made INFINITE in order to pick index plans. Use the MAX possible rowCount for
      * costing purposes.
@@ -312,7 +314,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     }
 
     int totalColNum = STAR_COLS;
-    final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
+    PluginCost pluginCostModel = formatPlugin.getPluginCostModel();
+    final int avgColumnSize = pluginCostModel.getAverageColumnSize(this);
     boolean filterPushed = (scanSpec.getSerializedFilter() != null);
     if(scanSpec != null && scanSpec.getIndexDesc() != null) {
       totalColNum = scanSpec.getIndexDesc().getIncludedFields().size()
@@ -337,10 +340,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       // use the total rows for calculating disk i/o
       rowsFromDisk = fullTableRowCount;
     }
-    double totalBlocks = Math.ceil((avgRowSize * fullTableRowCount)/MapRDBCost.DB_BLOCK_SIZE);
-    double numBlocks = Math.ceil(((avgRowSize * rowsFromDisk)/MapRDBCost.DB_BLOCK_SIZE));
+    double totalBlocks = Math.ceil((avgRowSize * fullTableRowCount)/pluginCostModel.getBlockSize(this));
+    double numBlocks = Math.ceil(((avgRowSize * rowsFromDisk)/pluginCostModel.getBlockSize(this)));
     numBlocks = Math.min(totalBlocks, numBlocks);
-    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
+    double diskCost = numBlocks * pluginCostModel.getSequentialBlockReadCost(this);
     logger.debug("JsonIndexGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, diskCost:{}",
         this, rowCount, avgRowSize, numBlocks, totalBlocks, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);

@@ -38,6 +38,7 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillRelNode;
+import org.apache.drill.exec.planner.index.IndexSelector.IndexGroup;
 import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
@@ -422,8 +423,9 @@ public class DbScanToIndexScanPrule extends Prule {
       return;
     }
 
-    List<IndexProperties> coveringIndexes = Lists.newArrayList();
-    List<IndexProperties> nonCoveringIndexes = Lists.newArrayList();
+    List<IndexGroup> coveringIndexes = Lists.newArrayList();
+    List<IndexGroup> nonCoveringIndexes = Lists.newArrayList();
+    List<IndexGroup> intersectIndexes = Lists.newArrayList();
 
     //update sort expressions in context
     updateSortExpression(indexContext);
@@ -449,20 +451,20 @@ public class DbScanToIndexScanPrule extends Prule {
       }
     }
     // get the candidate indexes based on selection
-    selector.getCandidateIndexes(coveringIndexes, nonCoveringIndexes);
+    selector.getCandidateIndexes(infoBuilder, coveringIndexes, nonCoveringIndexes, intersectIndexes);
 
     if (logger.isDebugEnabled()) {
       StringBuffer strBuf = new StringBuffer();
       if (coveringIndexes.size() > 0) {
         strBuf.append("Covering indexes:");
-        for (IndexProperties indexProps : coveringIndexes) {
-          strBuf.append(indexProps.getIndexDesc().getIndexName()).append(", ");
+        for (IndexGroup index : coveringIndexes) {
+          strBuf.append(index.getIndexProps().get(0).getIndexDesc().getIndexName()).append(", ");
         }
       }
       if(nonCoveringIndexes.size() > 0) {
         strBuf.append("Non-covering indexes:");
-        for (IndexProperties indexProps : nonCoveringIndexes) {
-          strBuf.append(indexProps.getIndexDesc().getIndexName()).append(", ");
+        for (IndexGroup index : nonCoveringIndexes) {
+          strBuf.append(index.getIndexProps().get(0).getIndexDesc().getIndexName()).append(", ");
         }
       }
       logger.debug("index_plan_info: ",strBuf.toString());
@@ -475,8 +477,8 @@ public class DbScanToIndexScanPrule extends Prule {
     // TODO: this logic for intersect should eventually be migrated to the IndexSelector
     if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() > 1) {
       List<IndexDescriptor> indexList = Lists.newArrayList();
-      for (IndexProperties p : nonCoveringIndexes) {
-        indexList.add(p.getIndexDesc());
+      for (IndexGroup index : nonCoveringIndexes) {
+        indexList.add(index.getIndexProps().get(0).getIndexDesc());
       }
 
       Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = infoBuilder.getIndexConditionMap(indexList);
@@ -487,36 +489,47 @@ public class DbScanToIndexScanPrule extends Prule {
         return;
       }
 
+      //if there is only one index found, no need to do intersect, but just a regular non-covering plan
+      //some part of filter condition needs to apply on primary table.
       if(indexInfoMap.size() > 1) {
         logger.info("index_plan_info: intersect plan is generated");
 
         if (logger.isDebugEnabled()) {
           List<String> indices = new ArrayList<>(nonCoveringIndexes.size());
-          for (IndexProperties p : nonCoveringIndexes) {
-            indices.add(p.getIndexDesc().getIndexName());
+          for (IndexGroup index : nonCoveringIndexes) {
+            indices.add(index.getIndexProps().get(0).getIndexDesc().getIndexName());
           }
           logger.debug("index_plan_info: intersect plan is generated on index list {}", indices);
         }
+        boolean intersectPlanGenerated = false;
         //multiple indexes, let us try to intersect results from multiple index tables
         //TODO: make sure the smallest selectivity of these indexes times rowcount smaller than broadcast threshold
-
-        IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
-            indexContext, indexInfoMap, builder, settings);
-        try {
-          planGen.go();
-          // If intersect plans are forced do not generate further non-covering plans
-          if (settings.isIndexIntersectPlanPreferred()) {
-            return;
+        for (IndexGroup index : intersectIndexes) {
+          List<IndexDescriptor> candidateDesc = Lists.newArrayList();
+          for (IndexProperties candProp : index.getIndexProps()) {
+            candidateDesc.add(candProp.getIndexDesc());
           }
-        } catch (Exception e) {
-          // If error while generating intersect plans, continue onto generating non-covering plans
-          logger.warn("index_plan_info: Exception while trying to generate intersect index plan", e);
+          Map<IndexDescriptor, IndexConditionInfo> intersectIdxInfoMap = infoBuilder.getIndexConditionMap(candidateDesc);
+          IndexIntersectPlanGenerator planGen = new IndexIntersectPlanGenerator(
+              indexContext, intersectIdxInfoMap, builder, settings);
+          try {
+            planGen.go();
+            intersectPlanGenerated = true;
+          } catch (Exception e) {
+            // If error while generating intersect plans, continue onto generating non-covering plans
+            logger.warn("index_plan_info: Exception while trying to generate intersect index plan", e);
+          }
+        }
+        // If intersect plans are forced do not generate further non-covering plans
+        if (intersectPlanGenerated && settings.isIndexIntersectPlanPreferred()) {
+          return;
         }
       }
     }
 
     try {
-      for (IndexProperties indexProps : coveringIndexes) {
+      for (IndexGroup index : coveringIndexes) {
+        IndexProperties indexProps = index.getIndexProps().get(0);
         IndexDescriptor indexDesc = indexProps.getIndexDesc();
         IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
         FunctionalIndexInfo indexInfo = indexDesc.getFunctionalInfo();
@@ -543,7 +556,8 @@ public class DbScanToIndexScanPrule extends Prule {
     if (primaryTableScan instanceof DbGroupScan &&
         (((DbGroupScan) primaryTableScan).supportsRestrictedScan())) {
       try {
-        for (IndexProperties indexProps : nonCoveringIndexes) {
+        for (IndexGroup index : nonCoveringIndexes) {
+          IndexProperties indexProps = index.getIndexProps().get(0);
           IndexDescriptor indexDesc = indexProps.getIndexDesc();
           IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
 

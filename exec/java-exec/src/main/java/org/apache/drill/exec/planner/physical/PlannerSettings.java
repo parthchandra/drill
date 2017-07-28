@@ -101,6 +101,7 @@ public class PlannerSettings implements Context{
       new RangeDoubleValidator("planner.index.rowkeyjoin_cost_factor", 0, Double.MAX_VALUE);
   // TODO: Deprecate
   public static final BooleanValidator INDEX_PREFER_INTERSECT_PLANS = new BooleanValidator("planner.index.prefer_intersect_plans");
+  public static final RangeLongValidator INDEX_MAX_INDEXES_TO_INTERSECT = new RangeLongValidator("planner.index.max_indexes_to_intersect", 2, 100);
   // ------------------------------------------- Index planning related options END ----------------------------------------------------------------
   public static final OptionValidator IDENTIFIER_MAX_LENGTH =
       new RangeLongValidator("planner.identifier_max_length", 128 /* A minimum length is needed because option names are identifiers themselves */,
@@ -378,6 +379,8 @@ public class PlannerSettings implements Context{
   public boolean isIndexIntersectPlanPreferred() {
     return options.getOption(INDEX_PREFER_INTERSECT_PLANS);
   }
+
+  public long getMaxIndexesToIntersect() { return options.getOption(INDEX_MAX_INDEXES_TO_INTERSECT); }
 
   @Override
   public <T> T unwrap(Class<T> clazz) {

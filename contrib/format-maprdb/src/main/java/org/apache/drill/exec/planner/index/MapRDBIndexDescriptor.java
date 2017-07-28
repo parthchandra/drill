@@ -33,9 +33,9 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.cost.DrillCostBase.DrillCostFactory;
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
 import org.apache.drill.exec.store.mapr.PluginConstants;
-import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.util.EncodedSchemaPathSet;
 import org.apache.drill.common.expression.LogicalExpression;
 
@@ -48,6 +48,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   protected final Set<LogicalExpression> allFields;
   protected final Set<LogicalExpression> indexedFields;
   protected MapRDBFunctionalIndexInfo functionalInfo;
+  protected PluginCost pluginCost;
 
   public MapRDBIndexDescriptor(List<LogicalExpression> indexCols,
                                CollationContext indexCollationContext,
@@ -56,7 +57,8 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
                                String indexName,
                                String tableName,
                                IndexDescriptor.IndexType type,
-                               Object desc) {
+                               Object desc,
+                               DbGroupScan scan) {
     super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
     this.desc = desc;
     this.indexedFields = ImmutableSet.copyOf(indexColumns);
@@ -65,6 +67,7 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
         .addAll(indexColumns)
         .addAll(nonIndexColumns)
         .build();
+    this.pluginCost = scan.getPluginCostModel();
   }
 
   public Object getOriginalDesc(){
@@ -151,17 +154,17 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
   @Override
   public RelOptCost getCost(IndexProperties indexProps, RelOptPlanner planner,
       int numProjectedFields, GroupScan primaryTableGroupScan) {
+    Preconditions.checkArgument(primaryTableGroupScan instanceof DbGroupScan);
+    DbGroupScan dbGroupScan = (DbGroupScan) primaryTableGroupScan;
     DrillCostFactory costFactory = (DrillCostFactory)planner.getCostFactory();
     double totalRows = indexProps.getTotalRows();
     double leadRowCount = indexProps.getLeadingSelectivity() * totalRows;
     double avgRowSize = indexProps.getAvgRowSize();
-    Preconditions.checkArgument(primaryTableGroupScan instanceof DbGroupScan);
-    DbGroupScan dbGroupScan = (DbGroupScan)primaryTableGroupScan;
     if (indexProps.isCovering()) { // covering index
       // int numIndexCols = allFields.size();
       // for disk i/o, all index columns are going to be read into memory
-      double numBlocks = Math.ceil((leadRowCount * avgRowSize)/MapRDBCost.DB_BLOCK_SIZE);
-      double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
+      double numBlocks = Math.ceil((leadRowCount * avgRowSize)/pluginCost.getBlockSize(primaryTableGroupScan));
+      double diskCost = numBlocks * pluginCost.getSequentialBlockReadCost(primaryTableGroupScan);
       // cpu cost is cost of filter evaluation for the remainder condition
       double cpuCost = 0.0;
       if (indexProps.getTotalRemainderFilter() != null) {
@@ -172,13 +175,15 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
 
     } else { // non-covering index
       // int numIndexCols = allFields.size();
-      double numBlocksIndex = Math.ceil((leadRowCount * avgRowSize)/MapRDBCost.DB_BLOCK_SIZE);
-      double diskCostIndex = numBlocksIndex * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
+      double numBlocksIndex = Math.ceil((leadRowCount * avgRowSize)/pluginCost.getBlockSize(primaryTableGroupScan));
+      double diskCostIndex = numBlocksIndex * pluginCost.getSequentialBlockReadCost(primaryTableGroupScan);
       // for the primary table join-back each row may belong to a different block, so in general num_blocks = num_rows;
       // however, num_blocks cannot exceed the total number of blocks of the table
-      double totalBlocksPrimary = Math.ceil((dbGroupScan.getColumns().size() * MapRDBCost.AVG_COLUMN_SIZE * totalRows)/MapRDBCost.DB_BLOCK_SIZE);
+      double totalBlocksPrimary = Math.ceil((dbGroupScan.getColumns().size() *
+          pluginCost.getAverageColumnSize(primaryTableGroupScan) * totalRows)/
+          pluginCost.getBlockSize(primaryTableGroupScan));
       double diskBlocksPrimary = Math.min(totalBlocksPrimary, leadRowCount);
-      double diskCostPrimary = diskBlocksPrimary * MapRDBCost.SSD_BLOCK_RANDOM_READ_COST;
+      double diskCostPrimary = diskBlocksPrimary * pluginCost.getRandomBlockReadCost(primaryTableGroupScan);
       double diskCostTotal = diskCostIndex + diskCostPrimary;
 
       // cpu cost of remainder condition evaluation over the selected rows
@@ -189,26 +194,30 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
       double networkCost = 0.0; // TODO: add network cost once full table scan also considers network cost
       return costFactory.makeCost(leadRowCount, cpuCost, diskCostTotal, networkCost);
     }
-
   }
 
   // Future use once full table scan also includes network cost
-  private double getNetworkCost(double leadRowCount, int numProjectedFields, boolean isCovering) {
+  private double getNetworkCost(double leadRowCount, int numProjectedFields, boolean isCovering,
+      GroupScan primaryTableGroupScan) {
     if (isCovering) {
       // db server will send only the projected columns to the db client for the selected
       // number of rows, so network cost is based on the number of actual projected columns
-      double networkCost = leadRowCount * numProjectedFields * MapRDBCost.AVG_COLUMN_SIZE;
+      double networkCost = leadRowCount * numProjectedFields * pluginCost.getAverageColumnSize(primaryTableGroupScan);
       return networkCost;
     } else {
       // only the rowkey column is projected from the index and sent over the network
-      double networkCostIndex = leadRowCount * 1 * MapRDBCost.AVG_COLUMN_SIZE;
+      double networkCostIndex = leadRowCount * 1 * pluginCost.getAverageColumnSize(primaryTableGroupScan);
 
       // after join-back to primary table, all projected columns are sent over the network
-      double networkCostPrimary = leadRowCount * numProjectedFields * MapRDBCost.AVG_COLUMN_SIZE;
+      double networkCostPrimary = leadRowCount * numProjectedFields * pluginCost.getAverageColumnSize(primaryTableGroupScan);
 
       return networkCostIndex + networkCostPrimary;
     }
 
   }
 
+  @Override
+  public PluginCost getPluginCostModel() {
+    return pluginCost;
+  }
 }

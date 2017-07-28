@@ -18,19 +18,17 @@
 package org.apache.drill.exec.physical.base;
 
 import org.apache.drill.common.expression.FieldReference;
-import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.common.DrillScanRelBase;
 import org.apache.drill.exec.planner.index.IndexCollection;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
-import org.apache.drill.exec.planner.physical.PlannerSettings;
 
 import java.util.List;
 
@@ -120,4 +118,12 @@ public interface DbGroupScan extends GroupScan {
    */
   @JsonIgnore
   PartitionFunction getRangePartitionFunction(List<FieldReference> refList);
+
+  /**
+   * Get the format plugin cost model. The cost model will provide cost factors such as seq. scan cost,
+   * random scan cost, block size.
+   * @return a PluginCost cost model
+   */
+  @JsonIgnore
+  PluginCost getPluginCostModel();
 }

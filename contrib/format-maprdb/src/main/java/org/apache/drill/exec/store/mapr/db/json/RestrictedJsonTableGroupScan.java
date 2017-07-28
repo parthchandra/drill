@@ -32,9 +32,9 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.planner.index.MapRDBStatistics;
+import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
-import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
@@ -116,8 +116,9 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
   @Override
   public ScanStats getScanStats() {
     //TODO: ideally here we should use the rowcount from index scan, and multiply a factor of restricted scan
-    final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
     double rowCount;
+    PluginCost pluginCostModel = formatPlugin.getPluginCostModel();
+    final int avgColumnSize = pluginCostModel.getAverageColumnSize(this);
     int numColumns = (columns == null || columns.isEmpty()) ?  STAR_COLS: columns.size();
     // Get the restricted group scan row count - same as the right side index rows
     rowCount = computeRestrictedScanRowcount();
@@ -128,9 +129,9 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     }
     // restricted scan does random lookups and each row may belong to a different block, with the number
     // of blocks upper bounded by the total num blocks in the primary table
-    double totalBlocksPrimary = Math.ceil((avgRowSize * rowCount)/MapRDBCost.DB_BLOCK_SIZE);
+    double totalBlocksPrimary = Math.ceil((avgRowSize * fullTableRowCount)/pluginCostModel.getBlockSize(this));
     double numBlocks = Math.min(totalBlocksPrimary, rowCount);
-    double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_RANDOM_READ_COST;
+    double diskCost = numBlocks * pluginCostModel.getRandomBlockReadCost(this);
     // For non-covering plans, the dominating cost would be of the join back. Reduce it using the factor
     // for biasing towards non-covering plans.
     diskCost *= stats.getRowKeyJoinBackIOFactor();
