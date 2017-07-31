@@ -969,4 +969,21 @@ public class IndexPlanTest extends BaseJsonTest {
         new String[]{}
     );
   }
+
+  @Test
+  public void testCastTimestampPlan() throws Exception {
+    String query = "SELECT  t.id.ssn as ssn FROM hbase.`index_test_primary` as t " +
+        " where cast(t.activity.irs.firstlogin as timestamp)=to_timestamp('2013-02-04 22:34:38.0', 'YYYY-MM-dd HH:mm:ss.S')";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"indexName=hash_i_cast_timestamp_firstlogin"},
+        new String[]{"RowKeyJoin"}
+    );
+    testBuilder()
+        .sqlQuery(query)
+        .ordered()
+        .baselineColumns("ssn").baselineValues("100007423")
+        .go();
+
+  }
 }

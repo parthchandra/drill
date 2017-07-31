@@ -41,6 +41,7 @@ import org.ojai.types.OTime;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import org.ojai.types.OTimestamp;
 
 class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpression, RuntimeException> {
 
@@ -174,11 +175,9 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
     }
 
     if (valueArg instanceof TimeStampExpression) {
-      // disable pushdown of TimeStampExpression type until bug 22824 is fixed.
-      //
-      // this.value = KeyValueBuilder.initFrom(new OTimestamp(((TimeStampExpression)valueArg).getTimeStamp()));
-      // this.path = path;
-      // return true;
+      this.value = KeyValueBuilder.initFrom(new OTimestamp(((TimeStampExpression)valueArg).getTimeStamp()));
+      this.path = path;
+      return true;
     }
 
     return false;
