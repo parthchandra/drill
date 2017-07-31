@@ -85,6 +85,9 @@ public class PlannerSettings implements Context{
 
   public static final BooleanValidator UNIONALL_DISTRIBUTE = new BooleanValidator(UNIONALL_DISTRIBUTE_KEY);
   // ------------------------------------------- Index planning related options BEGIN --------------------------------------------------------------
+  public static final String USE_SIMPLE_OPTIMIZER_KEY = "planner.use_simple_optimizer";
+  public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator(USE_SIMPLE_OPTIMIZER_KEY);
+
   public static final BooleanValidator USE_SIMPLE_OPTIMIZER = new BooleanValidator("planner.use_simple_optimizer");
   public static final BooleanValidator INDEX_PLANNING = new BooleanValidator("planner.enable_index_planning");
   public static final BooleanValidator ENABLE_STATS = new BooleanValidator("planner.enable_statistics");
