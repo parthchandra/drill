@@ -126,14 +126,14 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     // Get the average row size of the primary table
     double avgRowSize = stats.getAvgRowSize(null, null, true);
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
-      rowCount = (0.001f * tableStats.getNumRows());
+      rowCount = (0.001f * fullTableRowCount);
     }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
     }
     // restricted scan does random lookups and each row may belong to a different block, with the number
     // of blocks upper bounded by the total num blocks in the primary table
-    double totalBlocksPrimary = Math.ceil((avgRowSize * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
+    double totalBlocksPrimary = Math.ceil((avgRowSize * fullTableRowCount)/MapRDBCost.DB_BLOCK_SIZE);
     double numBlocks = Math.min(totalBlocksPrimary, rowCount);
     double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_RANDOM_READ_COST;
     // For non-covering plans, the dominating cost would be of the join back. Reduce it using the factor

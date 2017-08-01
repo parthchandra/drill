@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
+import static org.apache.drill.exec.planner.index.Statistics.ROWCOUNT_UNKNOWN;
 import static org.apache.drill.exec.store.mapr.db.util.CommonFns.isNullOrEmpty;
 
 import java.io.IOException;
@@ -98,9 +99,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    * before using it to compute filter row counts based on query conditions.
    */
   protected MapRDBStatistics stats;
-  protected MapRDBTableStats tableStats;
   protected JsonScanSpec scanSpec;
   protected long rowCount;
+  protected double fullTableRowCount;
 
   @JsonCreator
   public JsonTableGroupScan(@JsonProperty("userName") final String userName,
@@ -143,7 +144,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     this.scanSpec = that.scanSpec;
     this.endpointFragmentMapping = that.endpointFragmentMapping;
     this.stats = that.stats;
-    this.tableStats = that.tableStats;
+    this.fullTableRowCount = that.fullTableRowCount;
     this.forcedRowCountMap = that.forcedRowCountMap;
     init();
   }
@@ -206,7 +207,19 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       byte[] lastStopRow = rowkeyRanges.get(rowkeyRanges.size() - 1).getStopRow();
       scanSpec.setStopRow(lastStopRow);
 
-      tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
+      // Get the fullTableRowCount only once i.e. if not already obtained before.
+      if (fullTableRowCount == 0) {
+        // For condition null, we get full table stats.
+        com.mapr.db.scan.ScanStats stats = t.getMetaTable().getScanStats(null);
+        fullTableRowCount = stats.getEstimatedNumRows();
+        // MapRDB client can return invalid rowCount i.e. 0, especially right after table
+        // creation. It takes 15 minutes before table stats are obtained and cached in client.
+        // If we get 0 rowCount, fallback to getting rowCount using old admin API.
+        if (fullTableRowCount == 0) {
+          MapRDBTableStats tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
+          fullTableRowCount = tableStats.getNumRows();
+        }
+      }
 
       regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       for (ScanRange range : scanRanges) {
@@ -259,11 +272,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     double avgRowSize = stats.getAvgRowSize(null, null, true);
     double totalRowCount = stats.getRowCount(null, null);
     // If UNKNOWN, or DB stats sync issues(manifests as 0 rows) use defaults.
-    if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
-      rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * tableStats.getNumRows();
+    if (rowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
+      rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * fullTableRowCount;
     }
-    if (totalRowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
-      totalRowCount = tableStats.getNumRows();
+    if (totalRowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
+      totalRowCount = fullTableRowCount;
     }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
@@ -310,8 +323,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     double rowCount = stats.getRowCount(scanSpec.getCondition(), idxIdentifier);
     double avgRowSize = stats.getAvgRowSize(scanSpec.getCondition(), idxIdentifier, false);
     // If UNKNOWN, use defaults
-    if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
-      rowCount = (filterPushed ? 0.0005f : 0.001f) * tableStats.getNumRows() / scanSpec.getIndexDesc().getIndexedFields().size() ;
+    if (rowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
+      rowCount = (filterPushed ? 0.0005f : 0.001f) * fullTableRowCount / scanSpec.getIndexDesc().getIndexedFields().size() ;
     }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
@@ -321,9 +334,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         Arrays.equals(scanSpec.getStopRow(), HConstants.EMPTY_END_ROW)) {
       // both start and stop rows are empty, indicating this is a full scan so
       // use the total rows for calculating disk i/o
-      rowsFromDisk = tableStats.getNumRows();
+      rowsFromDisk = fullTableRowCount;
     }
-    double totalBlocks = Math.ceil((avgRowSize * tableStats.getNumRows())/MapRDBCost.DB_BLOCK_SIZE);
+    double totalBlocks = Math.ceil((avgRowSize * fullTableRowCount)/MapRDBCost.DB_BLOCK_SIZE);
     double numBlocks = Math.ceil(((avgRowSize * rowsFromDisk)/MapRDBCost.DB_BLOCK_SIZE));
     numBlocks = Math.min(totalBlocks, numBlocks);
     double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_SEQ_READ_COST;
@@ -446,7 +459,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       return new MapRDBStatisticsPayload(factor * stats.getEstimatedNumRows(),
           ((double)stats.getEstimatedSize()/stats.getEstimatedNumRows()));
     } else {
-      return new MapRDBStatisticsPayload(Statistics.ROWCOUNT_UNKNOWN, Statistics.AVG_ROWSIZE_UNKNOWN);
+      return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, Statistics.AVG_ROWSIZE_UNKNOWN);
     }
   }
 
