@@ -118,8 +118,16 @@ public class MapRDBStatistics implements Statistics {
       } else {
         conditionAsStr = convertRexToString(condition, scanRel);
         payloadMap = statsCache.get(conditionAsStr);
-        if (payloadMap != null && payloadMap.get(tabIdxName) != null) {
-          return payloadMap.get(tabIdxName).getRowCount();
+        if (payloadMap != null) {
+          if (payloadMap.get(tabIdxName) != null) {
+            return payloadMap.get(tabIdxName).getRowCount();
+          } else {
+            // We might not have computed rowcount for the given condition from the tab/index in question.
+            // For rowcount it does not matter which index was used to get the rowcount for the given condition.
+            // Hence, just use the first one!
+            StatisticsPayload anyPayload = payloadMap.entrySet().iterator().next().getValue();
+            return anyPayload.getRowCount();
+          }
         }
       }
     }
@@ -165,8 +173,16 @@ public class MapRDBStatistics implements Statistics {
         && conditionRexNodeMap.get(condition.toString()) != null) {
       String rexConditionAsString = conditionRexNodeMap.get(condition.toString());
       payloadMap = statsCache.get(rexConditionAsString);
-      if (payloadMap != null && payloadMap.get(tabIdxName) != null) {
-        return payloadMap.get(tabIdxName).getRowCount();
+      if (payloadMap != null) {
+        if (payloadMap.get(tabIdxName) != null) {
+          return payloadMap.get(tabIdxName).getRowCount();
+        } else {
+          // We might not have computed rowcount for the given condition from the tab/index in question.
+          // For rowcount it does not matter which index was used to get the rowcount for the given condition.
+          // Hence, just use the first one!
+          StatisticsPayload anyPayload = payloadMap.entrySet().iterator().next().getValue();
+          return anyPayload.getRowCount();
+        }
       }
     } else if (condition == null
         && fullTableScanPayload != null) {

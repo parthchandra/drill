@@ -117,23 +117,18 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
   public ScanStats getScanStats() {
     //TODO: ideally here we should use the rowcount from index scan, and multiply a factor of restricted scan
     final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
-    double rowCount = Statistics.ROWCOUNT_UNKNOWN;
+    double rowCount;
     int numColumns = (columns == null || columns.isEmpty()) ?  STAR_COLS: columns.size();
-    // The rowcount should be the same as the build side which was FORCED by putting it in forcedRowCountMap
-    if (forcedRowCountMap.get(scanSpec.getCondition()) != null) {
-      rowCount = forcedRowCountMap.get(scanSpec.getCondition());
-    }
+    // Get the restricted group scan row count - same as the right side index rows
+    rowCount = computeRestrictedScanRowcount();
     // Get the average row size of the primary table
     double avgRowSize = stats.getAvgRowSize(null, null, true);
-    if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
-      rowCount = (0.001f * fullTableRowCount);
-    }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
     }
     // restricted scan does random lookups and each row may belong to a different block, with the number
     // of blocks upper bounded by the total num blocks in the primary table
-    double totalBlocksPrimary = Math.ceil((avgRowSize * fullTableRowCount)/MapRDBCost.DB_BLOCK_SIZE);
+    double totalBlocksPrimary = Math.ceil((avgRowSize * rowCount)/MapRDBCost.DB_BLOCK_SIZE);
     double numBlocks = Math.min(totalBlocksPrimary, rowCount);
     double diskCost = numBlocks * MapRDBCost.SSD_BLOCK_RANDOM_READ_COST;
     // For non-covering plans, the dominating cost would be of the join back. Reduce it using the factor
@@ -144,6 +139,18 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
+  private double computeRestrictedScanRowcount() {
+    double rowCount = Statistics.ROWCOUNT_UNKNOWN;
+    // The rowcount should be the same as the build side which was FORCED by putting it in forcedRowCountMap
+    if (forcedRowCountMap.get(scanSpec.getCondition()) != null) {
+      rowCount = forcedRowCountMap.get(scanSpec.getCondition());
+    }
+    if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
+      rowCount = (0.001f * fullTableRowCount);
+    }
+    return rowCount;
+  }
+
   @Override
   public boolean isRestrictedScan() {
     return true;
@@ -151,7 +158,8 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
 
   @Override
   public String toString() {
-    return "RestrictedJsonTableGroupScan [ScanSpec=" + scanSpec + ", columns=" + columns + "]";
+    return "RestrictedJsonTableGroupScan [ScanSpec=" + scanSpec + ", columns=" + columns
+        + ", rowcount=" + computeRestrictedScanRowcount() + "]";
   }
 
 
