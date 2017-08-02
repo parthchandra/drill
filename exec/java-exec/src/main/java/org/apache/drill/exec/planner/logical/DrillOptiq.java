@@ -202,14 +202,9 @@ public class DrillOptiq {
             return FunctionCallFactory.createExpression(call.getOperator().getName().toLowerCase(),
                 ExpressionPosition.UNKNOWN, arg);
           case MINUS_PREFIX:
-            final RexBuilder builder = getRexBuilder();
-            final List<RexNode> operands = Lists.newArrayList();
-            operands.add(builder.makeExactLiteral(new BigDecimal(-1)));
-            operands.add(call.getOperands().get(0));
-
-            return visitCall((RexCall) builder.makeCall(
-                SqlStdOperatorTable.MULTIPLY,
-                    operands));
+            List<LogicalExpression> operands = Lists.newArrayList();
+            operands.add(call.getOperands().get(0).accept(this));
+            return FunctionCallFactory.createExpression("u-", operands);
         }
         throw new AssertionError("todo: implement syntax " + syntax + "(" + call + ")");
       case SPECIAL:
