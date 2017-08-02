@@ -245,12 +245,9 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
     final RelDataTypeFactory.FieldInfoBuilder leftFieldTypeBuilder =
         dbScan.getCluster().getTypeFactory().builder();
 
-    FilterPrel leftIndexFilterPrel = null;
-    if(remnant != null && !remnant.isAlwaysTrue()) {
-      leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
-          dbScan, remnant);
-      lastRelNode = leftIndexFilterPrel;
-    }
+    FilterPrel leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+          dbScan, indexContext.origPushedCondition);
+    lastRelNode = leftIndexFilterPrel;
 
     // new Project's rowtype is original Project's rowtype [plus rowkey if rowkey is not in original rowtype]
     ProjectPrel leftIndexProjectPrel = null;

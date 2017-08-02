@@ -359,6 +359,34 @@ public class IndexPlanTest extends BaseJsonTest {
     return;
   }
 
+  @Test//filter cover indexed, included and not in index at all filter
+  public void CompositeIndexNonCoveringFilterWithAllFieldsPlan() throws Exception {
+
+    String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'pc' AND t.address.city='pfrrs' AND t.id.ssn IN (100007423, 100007424)";
+    test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"RowKeyJoin(.*[\n\r])+.*Filter.*state.*city.*ssn(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[]{}
+    );
+
+    testBuilder()
+        .sqlQuery(query)
+        .unOrdered()
+        .baselineColumns("ssn").baselineValues("100007423")
+        .go();
+
+    testBuilder()
+        .optionSettingQueriesForTestQuery(sliceTargetSmall)
+        .optionSettingQueriesForBaseline(sliceTargetDefault)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+
+    return;
+  }
   @Test
   public void CompositeIndexCoveringPlan() throws Exception {
 

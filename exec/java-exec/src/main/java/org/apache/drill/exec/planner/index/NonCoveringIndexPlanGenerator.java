@@ -198,12 +198,16 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final RelDataTypeFactory.FieldInfoBuilder leftFieldTypeBuilder =
         dbScan.getCluster().getTypeFactory().builder();
 
-    FilterPrel leftIndexFilterPrel = null;
-    if(remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
-      leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
-          dbScan, remainderCondition);
-      lastLeft = leftIndexFilterPrel;
-    }
+    //we are applying the original condition to primary table, instead of remainder condition, the reason
+    // for this is, the sub-queries on index and primary table are not a transaction, meaning that _after_ index scan,
+    // primary table might already have data updated, thus some rows picked by index were modified and no more satisfy the
+    // index condition part of the original filter condition. By applying original filter again here, we will avoid
+    //not-wanted records get into downstream operators in such scenarios.
+    FilterPrel leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
+          dbScan, indexContext.origPushedCondition);
+
+    lastLeft = leftIndexFilterPrel;
+
     RelDataType origRowType = origProject == null ? origScan.getRowType() : origProject.getRowType();
 
     if (origProject != null) {// then we also  don't need a project

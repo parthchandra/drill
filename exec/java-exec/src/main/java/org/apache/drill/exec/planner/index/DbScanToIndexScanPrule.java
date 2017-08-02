@@ -283,6 +283,9 @@ public class DbScanToIndexScanPrule extends Prule {
       condition = RelOptUtil.pushFilterPastProject(indexContext.filter.getCondition(), indexContext.lowerProject);
     }
 
+    //save this pushed down condition, in case it is needed later to build filter when joining back primary table
+    indexContext.origPushedCondition = condition;
+
     RewriteAsBinaryOperators visitor = new RewriteAsBinaryOperators(true, builder);
     condition = condition.accept(visitor);
 

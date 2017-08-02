@@ -18,6 +18,7 @@
 package org.apache.drill.exec.planner.index;
 
 import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
@@ -39,6 +40,8 @@ public class IndexPlanCallContext {
 
   public IndexableExprMarker origMarker;
   public List<LogicalExpression> sortExprs;
+
+  public RexNode origPushedCondition;
 
   IndexPlanCallContext(RelOptRuleCall call,
                        DrillProjectRel capProject,
