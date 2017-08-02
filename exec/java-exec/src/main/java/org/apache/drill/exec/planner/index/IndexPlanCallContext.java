@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.logical.DrillFilterRel;
 import org.apache.drill.exec.planner.logical.DrillProjectRel;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -35,6 +36,7 @@ public class IndexPlanCallContext {
   final public DrillFilterRel filter;
   final public DrillProjectRel lowerProject;
   final public DrillScanRel scan;
+  final public String indexHint;
 
   public Set<LogicalExpression> leftOutPathsInFunctions;
 
@@ -63,6 +65,7 @@ public class IndexPlanCallContext {
     this.filter = filter;
     this.lowerProject = project;
     this.scan = scan;
+    this.indexHint = ((DbGroupScan)this.scan.getGroupScan()).getIndexHint();
   }
 
 }

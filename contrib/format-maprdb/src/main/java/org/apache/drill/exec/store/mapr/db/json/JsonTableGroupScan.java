@@ -41,6 +41,7 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
+import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.planner.index.IndexDescriptor;
 import org.apache.drill.exec.planner.index.MapRDBIndexDescriptor;
@@ -263,6 +264,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       return indexScanStats();
     }
 
+    return fullTableScanStats();
+  }
+
+  private ScanStats fullTableScanStats() {
     final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
     final int numColumns = (columns == null || columns.isEmpty()) ? STAR_COLS : columns.size();
     // index will be NULL for FTS
@@ -298,16 +303,22 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
      * e.g. forcedRowCountMap<NULL, 1000>
      */
     if (forcedRowCountMap.get(null) != null && //Forced full table rowcount and it is HUGE
-        forcedRowCountMap.get(null) == Statistics.ROWCOUNT_HUGE) {
+        forcedRowCountMap.get(null) == Statistics.ROWCOUNT_HUGE ) {
       rowCount = Statistics.ROWCOUNT_HUGE;
       diskCost = Statistics.ROWCOUNT_HUGE;
     }
+
     logger.debug("JsonGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, diskCost:{}",
         this, rowCount, avgRowSize, numBlocks, totalBlocks, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
   private ScanStats indexScanStats() {
+    if (!this.getIndexHint().equals("")) {
+      logger.debug("JsonIndexGroupScan:{} forcing index {} by making tiny cost", this, this.getIndexHint());
+      return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1,1, 0);
+    }
+
     int totalColNum = STAR_COLS;
     final int avgColumnSize = MapRDBCost.AVG_COLUMN_SIZE;
     boolean filterPushed = (scanSpec.getSerializedFilter() != null);

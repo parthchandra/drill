@@ -323,7 +323,7 @@ public enum PlannerPhase {
       //DrillProjectSetOpTransposeRule.INSTANCE,
       ProjectWindowTransposeRule.INSTANCE,
       DrillPushProjIntoScan.INSTANCE,
-
+      DrillPushProjIntoScan.DRILL_LOGICAL_INSTANCE,
       /*
        Convert from Calcite Logical to Drill Logical Rules.
        */

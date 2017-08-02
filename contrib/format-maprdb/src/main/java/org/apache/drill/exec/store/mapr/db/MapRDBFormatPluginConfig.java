@@ -32,6 +32,7 @@ public class MapRDBFormatPluginConfig extends TableFormatPluginConfig {
   public boolean ignoreSchemaChange = false;
   public boolean readAllNumbersAsDouble = false;
   public boolean disableCountOptimization = false;
+  public String index = "";
 
   @Override
   public int hashCode() {
@@ -55,6 +56,8 @@ public class MapRDBFormatPluginConfig extends TableFormatPluginConfig {
     } else if (enablePushdown != other.enablePushdown) {
       return false;
     } else if (disableCountOptimization != other.disableCountOptimization) {
+      return false;
+    } else if (!index.equals(other.index)) {
       return false;
     }
     return true;
@@ -80,4 +83,12 @@ public class MapRDBFormatPluginConfig extends TableFormatPluginConfig {
     return ignoreSchemaChange;
   }
 
+  public void setIgnoreSchemaChange(boolean ignoreSchemaChange) {
+    this.ignoreSchemaChange = ignoreSchemaChange;
+  }
+
+  @JsonProperty("index")
+  public void setIndex(String index) { this.index = index; }
+
+  public String getIndex() { return this.index; }
 }

@@ -281,6 +281,8 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
     this.filterPushedDown = true;
   }
 
+  public String getIndexHint() { return this.formatPluginConfig.getIndex(); }
+
   @JsonIgnore
   public boolean isFilterPushedDown() {
     return filterPushedDown;

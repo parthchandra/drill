@@ -27,6 +27,7 @@ import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
+import org.apache.calcite.util.Pair;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
@@ -95,13 +96,27 @@ public class IndexConditionInfo {
      * Get a single IndexConditionInfo in which indexCondition has field  on all indexes in this.indexes
      * @return
      */
-    public IndexConditionInfo getCollectiveInfo() {
+    public IndexConditionInfo getCollectiveInfo(IndexPlanCallContext indexContext) {
       Set<LogicalExpression> paths = Sets.newLinkedHashSet();
       for ( IndexDescriptor index : indexes ) {
         paths.addAll(index.getIndexColumns());
         //paths.addAll(index.getNonIndexColumns());
       }
       return indexConditionRelatedToFields(Lists.newArrayList(paths), condition);
+    }
+
+    /*
+     * A utility function to check whether the given index hint is valid.
+     */
+    public boolean isValidIndexHint(IndexPlanCallContext indexContext) {
+      if (indexContext.indexHint.equals("")) { return false; }
+
+      for ( IndexDescriptor index: indexes ) {
+        if ( indexContext.indexHint.equals(index.getIndexName())) {
+          return true;
+        }
+      }
+      return false;
     }
 
     /**

@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.util.Pair;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -363,7 +364,8 @@ public class DbScanToIndexScanPrule extends Prule {
       return;
     }
     IndexConditionInfo.Builder infoBuilder = IndexConditionInfo.newBuilder(condition, collection, builder, indexContext.scan);
-    IndexConditionInfo cInfo = infoBuilder.getCollectiveInfo();
+    IndexConditionInfo cInfo = infoBuilder.getCollectiveInfo(indexContext);
+    boolean isValidIndexHint = infoBuilder.isValidIndexHint(indexContext);
 
     if (!cInfo.hasIndexCol) {
       logger.info("No index columns are projected from the scan..continue.");
@@ -374,6 +376,11 @@ public class DbScanToIndexScanPrule extends Prule {
       logger.info("No conditions were found eligible for applying index lookup.");
       return;
     }
+
+    if (!indexContext.indexHint.equals("") && !isValidIndexHint) {
+      logger.warn("Index Hint {} is not useful as index with that name is not available", indexContext.indexHint);
+    }
+
     RexNode indexCondition = cInfo.indexCondition;
     RexNode remainderCondition = cInfo.remainderCondition;
 
@@ -396,7 +403,7 @@ public class DbScanToIndexScanPrule extends Prule {
       double sel = filterRows/totalRows;
       if (totalRows != Statistics.ROWCOUNT_UNKNOWN &&
           filterRows != Statistics.ROWCOUNT_UNKNOWN &&
-          !settings.isDisableFullTableScan() &&
+          !settings.isDisableFullTableScan() && !isValidIndexHint &&
           sel > Math.max(settings.getIndexCoveringSelThreshold(),
               settings.getIndexNonCoveringSelThreshold() )) {
         // If full table scan is not disabled, generate full table scan only plans if selectivity
@@ -428,6 +435,10 @@ public class DbScanToIndexScanPrule extends Prule {
     for (IndexDescriptor indexDesc : collection) {
       // check if any of the indexed fields of the index are present in the filter condition
       if (IndexPlanUtils.conditionIndexed(indexableExprMarker, indexDesc) != IndexPlanUtils.ConditionIndexed.NONE) {
+        if (isValidIndexHint && !indexContext.indexHint.equals(indexDesc.getIndexName())) {
+          logger.debug("Index {} is being discarded due to index Hint", indexDesc.getIndexName());
+          continue;
+        }
         FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
         selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
             indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :

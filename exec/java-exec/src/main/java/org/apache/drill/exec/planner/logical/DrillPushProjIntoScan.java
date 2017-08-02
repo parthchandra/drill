@@ -37,12 +37,18 @@ import org.apache.calcite.rex.RexNode;
 import com.google.common.collect.Lists;
 
 public class DrillPushProjIntoScan extends RelOptRule {
-  public static final RelOptRule INSTANCE = new DrillPushProjIntoScan(LogicalProject.class, EnumerableTableScan.class);
+  public static final RelOptRule INSTANCE =
+          new DrillPushProjIntoScan(LogicalProject.class,
+                EnumerableTableScan.class,
+          "DrillPushProjIntoEnumerableScan");
 
-  public static final RelOptRule DRILL_LOGICAL_INSTANCE = new DrillPushProjIntoScan(DrillProjectRel.class, DrillScanRel.class);
+  public static final RelOptRule DRILL_LOGICAL_INSTANCE =
+          new DrillPushProjIntoScan(LogicalProject.class,
+                  DrillScanRel.class,
+                    "DrillPushProjIntoDrillRelScan");
 
-  private DrillPushProjIntoScan(Class<? extends Project> projectClass, Class<? extends TableScan> scanClass) {
-    super(RelOptHelper.some(projectClass, RelOptHelper.any(scanClass)), "DrillPushProjIntoScan");
+  private DrillPushProjIntoScan(Class<? extends Project> projectClass, Class<? extends TableScan> scanClass, String description) {
+    super(RelOptHelper.some(projectClass, RelOptHelper.any(scanClass)), description);
   }
 
 

@@ -108,6 +108,9 @@ public interface DbGroupScan extends GroupScan {
   String getRowKeyName();
 
   @JsonIgnore
+  String getIndexHint();
+
+  @JsonIgnore
   SchemaPath getRowKeyPath();
 
   /**
