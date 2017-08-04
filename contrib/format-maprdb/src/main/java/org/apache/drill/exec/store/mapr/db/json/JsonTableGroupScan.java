@@ -505,16 +505,25 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @JsonIgnore
   public double getRowCount(RexNode condition, DrillScanRel scanRel) {
     // Do not use statistics if row count is forced. Forced rowcounts take precedence over stats
+    double rowcount;
     if (forcedRowCountMap.get(condition) != null) {
       return forcedRowCountMap.get(condition);
     }
     if (scanSpec.getIndexDesc() != null) {
       String idxIdentifier = stats.buildUniqueIndexIdentifier(scanSpec.getIndexDesc().getPrimaryTablePath(),
           scanSpec.getIndexName());
-      return stats.getRowCount(condition, idxIdentifier, scanRel);
+      rowcount = stats.getRowCount(condition, idxIdentifier, scanRel);
     } else {
-      return stats.getRowCount(condition, null, scanRel);
+      rowcount = stats.getRowCount(condition, null, scanRel);
     }
+    // Stats might NOT have the full rows (e.g. table is newly populated and DB stats APIs return it after
+    // 15 mins). Use the table rows as populated using the (expensive but accurate) Hbase API if needed.
+    if (condition == null && (rowcount == 0 || rowcount == Statistics.ROWCOUNT_UNKNOWN)) {
+      rowcount = fullTableRowCount;
+      logger.debug("getRowCount: Stats not available yet! Use Admin APIs full table rowcount {}",
+          fullTableRowCount);
+    }
+    return rowcount;
   }
 
   @Override
