@@ -113,10 +113,10 @@ public class LargeTableGen extends LargeTableGenBase {
     StringBuffer ret = new StringBuffer();
     for(String field: splitted) {
       if(ret.length() == 0) {
-        ret.append("\"").append(field).append("\"");
+        ret.append(field);
       }
       else {
-        ret.append(",").append("\"").append(field).append("\"");
+        ret.append(",").append(field);
       }
     }
     return ret.toString();
