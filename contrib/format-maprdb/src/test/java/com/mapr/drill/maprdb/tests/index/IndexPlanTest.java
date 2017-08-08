@@ -335,8 +335,9 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
     test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
+    //either i_state_city or i_state_age_phone will be picked due to cost model, and they re est compositekey noncovering plan
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_state_city"},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_state_"},
         new String[]{}
     );
 
@@ -1013,6 +1014,34 @@ public class IndexPlanTest extends BaseJsonTest {
         .ordered()
         .baselineColumns("ssn").baselineValues("100007423")
         .go();
+
+  }
+
+  @Test
+  public void testNotConditionNoIndexPlan() throws Exception {
+    String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where NOT t.id.ssn = '100007423'";
+
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {},
+        new String[]{"indexName="}
+    );
+
+
+    String notInQuery = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn NOT IN ('100007423', '100007424')";
+    PlanTestBase.testPlanMatchingPatterns(notInQuery,
+        new String[] {},
+        new String[]{"indexName="}
+    );
+
+    String notLikeQuery = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
+        " where t.id.ssn NOT LIKE '100007423'";
+    PlanTestBase.testPlanMatchingPatterns(notLikeQuery,
+        new String[] {},
+        new String[]{"indexName="}
+    );
 
   }
 }
