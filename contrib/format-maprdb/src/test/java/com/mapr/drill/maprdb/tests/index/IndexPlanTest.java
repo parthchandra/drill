@@ -88,7 +88,7 @@ public class IndexPlanTest extends BaseJsonTest {
             "i_lic", "driverlicense", "",
             "i_cast_int_ssn", "$CAST(id.ssn@INT)", "contact.phone",
             "i_cast_vchar_lic", "$CAST(driverlicense@STRING)","contact.email",
-            "i_state_age_lic", "address.state,personal.age,driverlicense", "name.fname",
+            "i_state_age_phone", "address.state,personal.age,contact.phone", "name.fname",
             "i_age_with_fname", "personal.age", "name.fname",
             "hash_i_reverseid", "reverseid", "",
             "hash_i_cast_timestamp_firstlogin", "$CAST(activity.irs.firstlogin@TIMESTAMP)", "id.ssn"
@@ -335,7 +335,8 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
         " where t.address.state = 'pc' AND t.address.city='pfrrs'";
     test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
-    //either i_state_city or i_state_age_phone will be picked due to cost model, and they re est compositekey noncovering plan
+
+    //either i_state_city or i_state_age_phone will be picked depends on cost model, both is fine for testing composite index nonCovering plan
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_state_"},
         new String[]{}
@@ -685,11 +686,13 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test  // leading prefix of index has Equality conditions and ORDER BY last column; Sort SHOULD be dropped
   public void TestCoveringPlanSortPrefix_1() throws Exception {
-    String query = "SELECT t.driverlicense FROM hbase.`index_test_primary` as t " +
-        " where t.address.state = 'wo' and t.personal.age = 35 and t.driverlicense < 100008000 order by t.driverlicense";
+    String query = "SELECT t.contact.phone FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age = 35 and t.contact.phone < '6500003000' order by t.contact.phone";
     test(defaultHavingIndexPlan);
+
+    //we should glue to index i_state_age_phone to make sure we are testing the targeted prefix construction code path
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
         new String[]{"Sort"}
     );
 
@@ -706,11 +709,11 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test  // leading prefix of index has Non-Equality conditions and ORDER BY last column; Sort SHOULD NOT be dropped
   public void TestCoveringPlanSortPrefix_2() throws Exception {
-    String query = "SELECT t.driverlicense FROM hbase.`index_test_primary` as t " +
-        " where t.address.state = 'wo' and t.personal.age < 35 and t.driverlicense < 100008000 order by t.driverlicense";
+    String query = "SELECT t.contact.phone FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.contact.phone < '6500003000' order by t.contact.phone";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
         new String[]{}
     );
 
@@ -727,11 +730,11 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test  //ORDER BY last two columns not in the indexed order; Sort SHOULD NOT be dropped
   public void TestCoveringPlanSortPrefix_3() throws Exception {
-    String query = "SELECT CAST(t.personal.age as VARCHAR) as age, t.driverlicense FROM hbase.`index_test_primary` as t " +
-        " where t.address.state = 'wo' and t.personal.age < 35 and t.driverlicense < 100008000 order by t.driverlicense, t.personal.age";
+    String query = "SELECT CAST(t.personal.age as VARCHAR) as age, t.contact.phone FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.contact.phone < '6500003000' order by t.contact.phone, t.personal.age";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
         new String[]{}
     );
 
@@ -748,11 +751,11 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test  // last two index fields in non-Equality conditions, ORDER BY last two fields; Sort SHOULD be dropped
   public void TestCoveringPlanSortPrefix_4() throws Exception {
-    String query = "SELECT t._id as tid, t.driverlicense, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
-        " where t.address.state = 'wo' and t.personal.age < 35 and t.driverlicense < 100008000 order by t.personal.age, t.driverlicense";
+    String query = "SELECT t._id as tid, t.contact.phone, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.contact.phone < '6500003000' order by t.personal.age, t.contact.phone";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
         new String[]{"Sort"}
     );
 
@@ -769,11 +772,11 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test  // index field in two or more equality conditions, it is not leading prefix, Sort SHOULD NOT be dropped
   public void TestCoveringPlanSortPrefix_5() throws Exception {
-    String query = "SELECT t._id as tid, t.driverlicense, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
-        " where t.address.state = 'wo' and t.personal.age IN (31, 32, 33, 34) and t.driverlicense < 100008000 order by t.driverlicense";
+    String query = "SELECT t._id as tid, t.contact.phone, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age IN (31, 32, 33, 34) and t.contact.phone < '6500003000' order by t.contact.phone";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName="},
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
         new String[]{}
     );
 
@@ -854,7 +857,7 @@ public class IndexPlanTest extends BaseJsonTest {
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"Sort",
-            "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+            "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_state_city"},
         new String[]{}
     );
     return;
@@ -869,7 +872,7 @@ public class IndexPlanTest extends BaseJsonTest {
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {
-            "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+            "RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName=i_state_city"},
         new String[]{"Sort"}
     );
     return;

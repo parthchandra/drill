@@ -188,11 +188,18 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
       newRel = exch;
     }
     else {
+      RelTraitSet traits = newRel.getTraitSet().plus(rel.getCollation()).plus(Prel.DRILL_PHYSICAL);
+      RelNode convertedInput = Prule.convert(newRel, traits);
       SortPrel sortPrel = new SortPrel(rel.getCluster(),
-          rel.getTraitSet().replace(Prel.DRILL_PHYSICAL).plus(DrillDistributionTrait.SINGLETON).plus(rel.getCollation()),
+          rel.getTraitSet().replace(Prel.DRILL_PHYSICAL).plus(hashDistribution).plus(rel.getCollation()),
           Prule.convert(newRel, newRel.getTraitSet().replace(Prel.DRILL_PHYSICAL)),
           rel.getCollation());
-      newRel = sortPrel;
+      //newRel = sortPrel;
+      RelNode exch = new SingleMergeExchangePrel(newRel.getCluster(),
+          traits.replace(DrillDistributionTrait.SINGLETON),
+          sortPrel,//finalRel,//
+          indexContext.sort.getCollation());
+      newRel = exch;
     }
     return newRel;
   }
