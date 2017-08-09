@@ -23,6 +23,7 @@ import org.apache.drill.PlanTestBase;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.Ignore;
 import org.junit.experimental.categories.Category;
 
 import com.mapr.db.Table;
@@ -69,6 +70,7 @@ public class TestQueryWithIndex extends BaseJsonTest {
     }
   }
 
+  @Ignore
   @Test
   public void testSelectWithIndex() throws Exception {
     final String sql = String.format(
@@ -86,6 +88,7 @@ public class TestQueryWithIndex extends BaseJsonTest {
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
   }
 
+  @Ignore
   @Test
   public void testSelectWithHashedIndex() throws Exception {
     final String sql = "SELECT\n"

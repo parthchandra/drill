@@ -456,8 +456,8 @@ public class TestSimpleJson extends BaseJsonTest {
         + " business.`last_update` = TIMESTAMP '2012-10-20 07:42:46'");
     runSQLAndVerifyCount(sql, 1);
 
-    final String[] expectedPlan = {"condition=null"};
-    final String[] excludedPlan = {"condition=\\(last_update = \\{\"\\$date\":\"2012-10-20T07:42:46.000Z\"\\}\\)"};
+    final String[] expectedPlan = {"condition=\\(last_update = \\{\"\\$date\":\"2012-10-20T07:42:46.000Z\"\\}\\)"};
+    final String[] excludedPlan = {};
 
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
   }
