@@ -231,7 +231,8 @@ public class BaseTestQuery extends ExecTest {
       client = null;
     }
 
-    client = QueryTestUtil.createClient(config, serviceSet, MAX_WIDTH_PER_NODE, properties);
+    DrillConfig clientConfig = DrillConfig.forClient(properties);
+    client = QueryTestUtil.createClient(clientConfig, serviceSet, MAX_WIDTH_PER_NODE, properties);
   }
 
   /*
