@@ -73,6 +73,7 @@ import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
 import org.apache.drill.exec.rpc.Response;
 import org.apache.drill.exec.rpc.ResponseSender;
 import org.apache.drill.exec.rpc.RpcConnectionHandler;
+import org.apache.drill.exec.rpc.RpcConstants;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
 import org.apache.drill.exec.rpc.SSLConfig;
@@ -159,8 +160,8 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
 
       // Add a listener for SSL Handshake complete. The Drill client handshake will be enabled only
       // after this is done.
-      sslHandler.handshakeFuture().addListener( sslHandshakeListener );
-      pipe.addFirst("SSL", sslHandler);
+      sslHandler.handshakeFuture().addListener(sslHandshakeListener);
+      pipe.addFirst(RpcConstants.SSL_HANDLER, sslHandler);
     }
   }
 
