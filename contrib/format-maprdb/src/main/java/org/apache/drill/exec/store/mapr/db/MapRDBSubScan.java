@@ -36,52 +36,45 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
 // Class containing information for reading a single HBase region
 @JsonTypeName("maprdb-sub-scan")
+
 public class MapRDBSubScan extends AbstractDbSubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBSubScan.class);
 
-  @JsonProperty
-  public final StoragePluginConfig storageConfig;
-  @JsonIgnore
-  private final MapRDBFormatPluginConfig formatPluginConfig;
-  private final FileSystemPlugin storagePlugin;
+  private final MapRDBFormatPlugin formatPlugin;
   private final List<MapRDBSubScanSpec> regionScanSpecList;
   private final List<SchemaPath> columns;
   private final long maxRecordsToRead;
   private final String tableType;
 
-  private final MapRDBFormatPlugin formatPlugin;
-
   @JsonCreator
-  public MapRDBSubScan(@JacksonInject StoragePluginRegistry registry,
+  public MapRDBSubScan(@JacksonInject StoragePluginRegistry engineRegistry,
                        @JsonProperty("userName") String userName,
                        @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
-                       @JsonProperty("storageConfig") StoragePluginConfig storage,
+                       @JsonProperty("storageConfig") StoragePluginConfig storageConfig,
                        @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
                        @JsonProperty("columns") List<SchemaPath> columns,
                        @JsonProperty("maxRecordsToRead") long maxRecordsToRead,
                        @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
-    this(userName, formatPluginConfig,
-        (FileSystemPlugin) registry.getPlugin(storage),
-        storage, regionScanSpecList, columns, maxRecordsToRead, tableType);
+    this(userName,
+        (MapRDBFormatPlugin) engineRegistry.getFormatPlugin(storageConfig, formatPluginConfig),
+        regionScanSpecList,
+        columns,
+        maxRecordsToRead,
+        tableType);
   }
 
-  public MapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig, FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
+  public MapRDBSubScan(String userName, MapRDBFormatPlugin formatPlugin,
       List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, String tableType) {
-    this(userName, formatPluginConfig, storagePlugin, storageConfig, maprSubScanSpecs, columns, -1, tableType);
+    this(userName, formatPlugin, maprSubScanSpecs, columns, -1, tableType);
   }
 
-  public MapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig, FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
+  public MapRDBSubScan(String userName, MapRDBFormatPlugin formatPlugin,
                        List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, long maxRecordsToRead, String tableType) {
     super(userName);
-    this.storageConfig = storageConfig;
-    this.storagePlugin = storagePlugin;
-    this.formatPluginConfig = formatPluginConfig;
-    this.formatPlugin = (MapRDBFormatPlugin) storagePlugin.getFormatPlugin(formatPluginConfig);
-
+    this.formatPlugin = formatPlugin;
     this.regionScanSpecList = maprSubScanSpecs;
     this.columns = columns;
     this.maxRecordsToRead = maxRecordsToRead;
@@ -113,7 +106,7 @@ public class MapRDBSubScan extends AbstractDbSubScan {
   @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
     Preconditions.checkArgument(children.isEmpty());
-    return new MapRDBSubScan(getUserName(), formatPluginConfig, storagePlugin, storageConfig, regionScanSpecList, columns, tableType);
+    return new MapRDBSubScan(getUserName(), formatPlugin, regionScanSpecList, columns, tableType);
   }
 
   @Override
@@ -130,13 +123,14 @@ public class MapRDBSubScan extends AbstractDbSubScan {
     return tableType;
   }
 
-  public MapRDBFormatPluginConfig getFormatPluginConfig() {
-    return (MapRDBFormatPluginConfig) formatPlugin.getConfig();
-  }
-
   @JsonIgnore
   public MapRDBFormatPlugin getFormatPlugin() {
     return formatPlugin;
+  }
+
+  @JsonIgnore
+  public MapRDBFormatPluginConfig getFormatPluginConfig() {
+    return (MapRDBFormatPluginConfig) formatPlugin.getConfig();
   }
 
 }

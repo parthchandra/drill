@@ -184,8 +184,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
     assert minorFragmentId < endpointFragmentMapping.size() : String.format(
         "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.", endpointFragmentMapping.size(),
         minorFragmentId);
-    return new MapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(), getStoragePlugin().getConfig(),
-        endpointFragmentMapping.get(minorFragmentId), columns, TABLE_BINARY);
+    return new MapRDBSubScan(getUserName(), formatPlugin, endpointFragmentMapping.get(minorFragmentId), columns, TABLE_BINARY);
   }
 
   @Override

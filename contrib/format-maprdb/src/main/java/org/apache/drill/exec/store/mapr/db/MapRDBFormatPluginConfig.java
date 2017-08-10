@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.store.mapr.db;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.apache.drill.exec.store.mapr.TableFormatPluginConfig;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -72,22 +71,7 @@ public class MapRDBFormatPluginConfig extends TableFormatPluginConfig {
     return allTextMode;
   }
 
-  @JsonProperty("allTextMode")
-  public void setAllTextMode(boolean mode) {
-    allTextMode = mode;
-  }
-
-  @JsonProperty("disableCountOptimization")
-  public void setDisableCountOptimization(boolean mode) {
-    disableCountOptimization = mode;
-  }
-
-  @JsonProperty("readAllNumbersAsDouble")
-  public void setReadAllNumbersAsDouble(boolean read) {
-    readAllNumbersAsDouble = read;
-  }
-
-  public boolean shouldDisableCountOptimization() {
+  public boolean disableCountOptimization() {
     return disableCountOptimization;
   }
 
@@ -98,13 +82,6 @@ public class MapRDBFormatPluginConfig extends TableFormatPluginConfig {
   public boolean isIgnoreSchemaChange() {
     return ignoreSchemaChange;
   }
-
-  public void setIgnoreSchemaChange(boolean ignoreSchemaChange) {
-    this.ignoreSchemaChange = ignoreSchemaChange;
-  }
-
-  @JsonProperty("index")
-  public void setIndex(String index) { this.index = index; }
 
   public String getIndex() { return this.index; }
 }

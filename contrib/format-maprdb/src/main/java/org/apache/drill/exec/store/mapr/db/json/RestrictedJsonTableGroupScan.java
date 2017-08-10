@@ -76,7 +76,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
         "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.", endpointFragmentMapping.size(),
         minorFragmentId);
     RestrictedMapRDBSubScan subscan =
-        new RestrictedMapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(), getStoragePlugin().getConfig(),
+        new RestrictedMapRDBSubScan(getUserName(), formatPlugin,
         getEndPointFragmentMapping(minorFragmentId), columns, maxRecordsToRead, TABLE_JSON);
 
     return subscan;

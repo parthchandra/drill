@@ -20,7 +20,6 @@ package org.apache.drill.exec.store.mapr.db.json;
 import static org.apache.drill.exec.planner.index.Statistics.ROWCOUNT_UNKNOWN;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,12 +50,10 @@ import org.apache.drill.exec.planner.cost.PluginCost;
 
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.PluginConstants;
-import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
@@ -64,7 +61,6 @@ import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.MapRDBTableStats;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
-import org.apache.hadoop.hbase.HConstants;
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.ojai.store.QueryCondition;
 
@@ -245,10 +241,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @Override
   public MapRDBSubScan getSpecificScan(int minorFragmentId) {
     assert minorFragmentId < endpointFragmentMapping.size() : String.format(
-        "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.",
-        endpointFragmentMapping.size(), minorFragmentId);
-    return new MapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(),
-        getStoragePlugin().getConfig(), endpointFragmentMapping.get(minorFragmentId), columns, maxRecordsToRead, TABLE_JSON);
+        "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.", endpointFragmentMapping.size(),
+        minorFragmentId);
+    return new MapRDBSubScan(getUserName(), formatPlugin, endpointFragmentMapping.get(minorFragmentId), columns, maxRecordsToRead, TABLE_JSON);
   }
 
   @Override

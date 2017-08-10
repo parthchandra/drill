@@ -30,7 +30,6 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.StoragePluginConfig;
 import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
 import org.apache.drill.exec.store.StoragePluginRegistry;
-import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
 /**
  * A RestrictedMapRDBSubScan is intended for skip-scan (as opposed to sequential scan) operations
@@ -41,24 +40,22 @@ public class RestrictedMapRDBSubScan extends MapRDBSubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RestrictedMapRDBSubScan.class);
 
   @JsonCreator
-  public RestrictedMapRDBSubScan(@JacksonInject StoragePluginRegistry registry,
+  public RestrictedMapRDBSubScan(@JacksonInject StoragePluginRegistry engineRegistry,
                        @JsonProperty("userName") String userName,
                        @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
-                       @JsonProperty("storageConfig") StoragePluginConfig storage,
+                       @JsonProperty("storageConfig") StoragePluginConfig storageConfig,
                        @JsonProperty("regionScanSpecList") List<RestrictedMapRDBSubScanSpec> regionScanSpecList,
                        @JsonProperty("columns") List<SchemaPath> columns,
                        @JsonProperty("maxRecordsToRead") long maxRecordsToRead,
                        @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
-    this(userName, formatPluginConfig,
-        (FileSystemPlugin) registry.getPlugin(storage),
-        storage, regionScanSpecList, columns, maxRecordsToRead, tableType);
+    this(userName,
+        (MapRDBFormatPlugin) engineRegistry.getFormatPlugin(storageConfig, formatPluginConfig),
+        regionScanSpecList, columns, maxRecordsToRead, tableType);
   }
 
-  public RestrictedMapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig,
-      FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
+  public RestrictedMapRDBSubScan(String userName, MapRDBFormatPlugin formatPlugin,
       List<RestrictedMapRDBSubScanSpec> maprDbSubScanSpecs, List<SchemaPath> columns, long maxRecordsToRead, String tableType) {
-    super(userName, formatPluginConfig, storagePlugin, storageConfig,
-        new ArrayList<MapRDBSubScanSpec>(), columns, maxRecordsToRead, tableType);
+    super(userName, formatPlugin, new ArrayList<MapRDBSubScanSpec>(), columns, maxRecordsToRead, tableType);
 
     for(RestrictedMapRDBSubScanSpec restrictedSpec : maprDbSubScanSpecs) {
       getRegionScanSpecList().add(restrictedSpec);

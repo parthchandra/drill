@@ -138,7 +138,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
       condition = com.mapr.db.impl.ConditionImpl.parseFrom(ByteBufs.wrap(serializedFilter));
     }
 
-    disableCountOptimization = formatPlugin.getConfig().shouldDisableCountOptimization();
+    disableCountOptimization = formatPlugin.getConfig().disableCountOptimization();
     setColumns(projectedColumns);
     unionEnabled = context.getOptions().getOption(ExecConstants.ENABLE_UNION_TYPE);
     readNumbersAsDouble = formatPlugin.getConfig().isReadAllNumbersAsDouble();
