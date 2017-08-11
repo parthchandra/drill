@@ -35,7 +35,6 @@ import com.mapr.db.impl.IdCodec;
 import com.mapr.db.impl.TabletInfoImpl;
 import com.mapr.db.scan.ScanRange;
 
-@SuppressWarnings("deprecation")
 @JsonTypeName("jsontable-range-partition-function")
 public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunction {
 
@@ -57,7 +56,7 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   protected Table table = null;
 
   @JsonIgnore
-  List<? extends ScanRange> scanRanges = null;
+  List<ScanRange> scanRanges = null;
 
   @JsonCreator
   public JsonTableRangePartitionFunction(
@@ -90,7 +89,7 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
     // The reason is the row keys could typically belong to any one of the tablets of the table, so
     // there is no use trying to get only limited set of scan ranges (note that applying a non-null
     // condition to getScanRanges() also has a cost associated with it).
-    scanRanges = table.getMetaTable().getScanRanges(null);
+    scanRanges = table.getMetaTable().getScanRanges();
   }
 
 

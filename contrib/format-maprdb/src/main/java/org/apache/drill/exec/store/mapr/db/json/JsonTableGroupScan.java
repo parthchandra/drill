@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import com.mapr.db.impl.MapRDBImpl;
 import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.ConditionNode.RowkeyRange;
 
@@ -77,7 +76,6 @@ import com.mapr.db.impl.TabletInfoImpl;
 import com.mapr.db.index.IndexDesc;
 import com.mapr.db.scan.ScanRange;
 
-@SuppressWarnings("deprecation")
 @JsonTypeName("maprdb-json-scan")
 public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JsonTableGroupScan.class);
@@ -187,12 +185,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     logger.debug("Getting tablet locations");
     try {
       Configuration conf = new Configuration();
-
-      Table t;
-      t = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), scanSpec.getIndexDesc(), getUserName());
-      MetaTable metaTable = t.getMetaTable();
+      final Table t = this.formatPlugin.getJsonTableCache().getTable(
+          scanSpec.getTableName(), scanSpec.getIndexDesc(), getUserName());
+      final MetaTable metaTable = t.getMetaTable();
       QueryCondition scanSpecCondition = scanSpec.getCondition();
-      List<? extends ScanRange> scanRanges = metaTable.getScanRanges(scanSpecCondition);
+      List<ScanRange> scanRanges = (scanSpecCondition == null) 
+          ? metaTable.getScanRanges() : metaTable.getScanRanges(scanSpecCondition);
 
       // set the start-row of the scanspec as the start-row of the first scan range
       ScanRange firstRange = scanRanges.get(0);
@@ -210,7 +208,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       // Get the fullTableRowCount only once i.e. if not already obtained before.
       if (fullTableRowCount == 0) {
         // For condition null, we get full table stats.
-        com.mapr.db.scan.ScanStats stats = t.getMetaTable().getScanStats(null);
+        com.mapr.db.scan.ScanStats stats = metaTable.getScanStats();
         fullTableRowCount = stats.getEstimatedNumRows();
         // MapRDB client can return invalid rowCount i.e. 0, especially right after table
         // creation. It takes 15 minutes before table stats are obtained and cached in client.
@@ -446,7 +444,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     final Table table = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), index, getUserName());
 
     if (table != null) {
-      com.mapr.db.scan.ScanStats stats = table.getMetaTable().getScanStats(condition);
+      final MetaTable metaTable = table.getMetaTable();
+      final com.mapr.db.scan.ScanStats stats = (condition == null) 
+          ? metaTable.getScanStats() : metaTable.getScanStats(condition);
       // Factor reflecting confidence in the DB estimates. If a table has few tablets, the tablet-level stats
       // might be off. The decay factor will reduce estimates when one tablet represents a significant percentage
       // of the entire table.
@@ -454,7 +454,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       // Use the factor only when a condition filters out rows from the table. If no condition is present, all rows
       // should be selected. So the factor should not reduce the returned rows
       if (condition != null) {
-        factor = Math.min(1.0, 1.0 / Math.sqrt(100.0 / table.getMetaTable().getScanStats(null).getPartitionCount()));
+        factor = Math.min(1.0, 1.0 / Math.sqrt(100.0 / metaTable.getScanStats().getPartitionCount()));
       }
       return new MapRDBStatisticsPayload(factor * stats.getEstimatedNumRows(),
           ((double)stats.getEstimatedSize()/stats.getEstimatedNumRows()));
