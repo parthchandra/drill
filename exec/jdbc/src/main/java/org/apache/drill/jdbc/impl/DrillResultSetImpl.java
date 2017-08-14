@@ -1888,6 +1888,7 @@ class DrillResultSetImpl extends AvaticaResultSet implements DrillResultSet {
     }
     else {
       DrillCursor drillCursor = new DrillCursor(connection, statement, signature);
+      drillCursor.setQueryTimeout(10000);
       super.execute2(drillCursor, this.signature.columns);
 
       // Read first (schema-only) batch to initialize result-set metadata from
