@@ -77,7 +77,7 @@ public class IndexHintPlanTest extends IndexPlanTest {
 
         //default plan picked by optimizer
         PlanTestBase.testPlanMatchingPatterns(query,
-                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_lic)"},
+                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_phone)"},
                 new String[]{"RowKeyJoin"}
         );
 
@@ -91,19 +91,19 @@ public class IndexHintPlanTest extends IndexPlanTest {
     // valid index specified as hint.
     public void testHintCaseWithMultipleIndexes_2() throws Exception {
 
-        String hintquery = "SELECT t.`address`.`state` AS `state` FROM table(hbase.`index_test_primary`(type => 'maprdb', index => 'i_state_age_lic')) as t " +
+        String hintquery = "SELECT t.`address`.`state` AS `state` FROM table(hbase.`index_test_primary`(type => 'maprdb', index => 'i_state_age_phone')) as t " +
                 " where t.address.state = 'pc'";
 
         String query = "SELECT t.`address`.`state` AS `state` FROM hbase.`index_test_primary` as t where t.address.state = 'pc'";
         test(defaultHavingIndexPlan);
         PlanTestBase.testPlanMatchingPatterns(hintquery,
-                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_lic"},
+                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
                 new String[]{"RowKeyJoin"}
         );
 
         //default plan picked by query optimizer.
         PlanTestBase.testPlanMatchingPatterns(query,
-                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_lic)"},
+                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_phone)"},
                 new String[]{"RowKeyJoin"}
         );
 
@@ -122,7 +122,7 @@ public class IndexHintPlanTest extends IndexPlanTest {
                 " where t.address.state = 'pc'";
         test(defaultHavingIndexPlan);
         PlanTestBase.testPlanMatchingPatterns(hintquery,
-                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_lic)"},
+                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_phone)"},
                 new String[]{"RowKeyJoin"}
         );
 
@@ -146,7 +146,7 @@ public class IndexHintPlanTest extends IndexPlanTest {
         );
 
         PlanTestBase.testPlanMatchingPatterns(query,
-                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_lic)"},
+                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=(i_state_city|i_state_age_phone)"},
                 new String[]{"RowKeyJoin"}
         );
 

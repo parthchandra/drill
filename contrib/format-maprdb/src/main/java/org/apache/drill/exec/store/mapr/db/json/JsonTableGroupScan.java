@@ -315,7 +315,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   }
 
   private ScanStats indexScanStats() {
-    if (!this.getIndexHint().equals("")) {
+    if (!this.getIndexHint().equals("") &&
+         this.getIndexHint().equals(getIndexDesc().getIndexName())) {
       logger.debug("JsonIndexGroupScan:{} forcing index {} by making tiny cost", this, this.getIndexHint());
       return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, 1,1, 0);
     }

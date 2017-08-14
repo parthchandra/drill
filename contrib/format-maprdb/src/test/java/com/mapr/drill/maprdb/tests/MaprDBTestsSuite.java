@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.mapr.drill.maprdb.tests.index.IndexHintPlanTest;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
@@ -44,7 +45,7 @@ import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
 @SuiteClasses({
   TestMapRDBSimple.class,
   TestMapRDBFilterPushDown.class,
-  IndexPlanTest.class,
+  IndexHintPlanTest.class,
   TestQueryWithIndex.class,
   TestSimpleJson.class
 })
