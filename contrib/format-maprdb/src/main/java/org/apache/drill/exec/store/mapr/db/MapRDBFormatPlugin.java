@@ -29,6 +29,7 @@ import org.apache.drill.exec.store.StoragePluginOptimizerRule;
 import org.apache.drill.exec.store.dfs.FileSelection;
 import org.apache.drill.exec.store.dfs.FormatMatcher;
 import org.apache.drill.exec.store.hbase.HBaseScanSpec;
+import org.apache.drill.exec.store.mapr.PluginConstants;
 import org.apache.drill.exec.store.mapr.TableFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.binary.BinaryTableGroupScan;
 import org.apache.drill.exec.store.mapr.db.json.JsonScanSpec;
@@ -51,6 +52,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   private final Configuration hbaseConf;
   private final Connection connection;
   private final MapRDBTableCache jsonTableCache;
+  private final int scanRangeSizeMB;
 
   public MapRDBFormatPlugin(String name, DrillbitContext context, Configuration fsConf,
       StoragePluginConfig storageConfig, MapRDBFormatPluginConfig formatConfig) throws IOException {
@@ -60,6 +62,12 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
     hbaseConf.set(ConnectionFactory.DEFAULT_DB, ConnectionFactory.MAPR_ENGINE2);
     connection = ConnectionFactory.createConnection(hbaseConf);
     jsonTableCache = new MapRDBTableCache(context.getConfig());
+    int scanRangeSizeMBConfig = context.getConfig().getInt(PluginConstants.JSON_TABLE_SCAN_SIZE_MB);
+    if (scanRangeSizeMBConfig < 32 || scanRangeSizeMBConfig > 8192) {
+      logger.warn("Invalid scan size {} for MapR-DB tables, using default", scanRangeSizeMBConfig);
+      scanRangeSizeMBConfig = PluginConstants.JSON_TABLE_SCAN_SIZE_MB_DEFAULT;
+    }
+    scanRangeSizeMB = scanRangeSizeMBConfig;
   }
 
   @Override
@@ -112,6 +120,10 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   @JsonIgnore
   public Connection getConnection() {
     return connection;
+  }
+
+  public int getScanRangeSizeMB() {
+    return scanRangeSizeMB;
   }
 
 }

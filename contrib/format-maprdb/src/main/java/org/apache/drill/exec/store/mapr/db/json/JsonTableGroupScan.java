@@ -190,8 +190,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
           scanSpec.getTableName(), scanSpec.getIndexDesc(), getUserName());
       final MetaTable metaTable = t.getMetaTable();
       QueryCondition scanSpecCondition = scanSpec.getCondition();
-      List<ScanRange> scanRanges = (scanSpecCondition == null) 
-          ? metaTable.getScanRanges() : metaTable.getScanRanges(scanSpecCondition);
+      List<ScanRange> scanRanges = (scanSpecCondition == null)
+          ? metaTable.getScanRanges(formatPlugin.getScanRangeSizeMB())
+          : metaTable.getScanRanges(scanSpecCondition, formatPlugin.getScanRangeSizeMB());
 
       // set the start-row of the scanspec as the start-row of the first scan range
       ScanRange firstRange = scanRanges.get(0);
@@ -456,7 +457,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
     if (table != null) {
       final MetaTable metaTable = table.getMetaTable();
-      final com.mapr.db.scan.ScanStats stats = (condition == null) 
+      final com.mapr.db.scan.ScanStats stats = (condition == null)
           ? metaTable.getScanStats() : metaTable.getScanStats(condition);
       // Factor reflecting confidence in the DB estimates. If a table has few tablets, the tablet-level stats
       // might be off. The decay factor will reduce estimates when one tablet represents a significant percentage

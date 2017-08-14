@@ -59,17 +59,13 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.mapr.db.MetaTable;
 import com.mapr.db.Table;
 import com.mapr.db.Table.TableOption;
 import com.mapr.db.exceptions.DBException;
 import com.mapr.db.impl.IdCodec;
-import com.mapr.db.impl.MapRDBImpl;
 import com.mapr.db.index.IndexDesc;
 import com.mapr.db.ojai.DBDocumentReaderBase;
-import com.mapr.db.scan.ScanRange;
 import com.mapr.db.util.ByteBufs;
 
 import io.netty.buffer.DrillBuf;

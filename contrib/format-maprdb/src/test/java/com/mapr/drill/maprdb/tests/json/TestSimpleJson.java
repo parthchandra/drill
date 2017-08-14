@@ -48,12 +48,14 @@ import com.mapr.tests.annotations.ClusterTest;
 @Category(ClusterTest.class)
 public class TestSimpleJson extends BaseJsonTest {
 
-  private static final String SCHEMA = "hbase.root";
   private static final String TABLE_NAME = "business";
   private static final String JSON_FILE_URL = "/com/mapr/drill/json/business.json";
 
   private static boolean tableCreated = false;
   private static String tablePath;
+  protected String getTablePath() {
+    return tablePath;
+  }
 
   @BeforeClass
   public static void setup_TestSimpleJson() throws Exception {
@@ -75,10 +77,6 @@ public class TestSimpleJson extends BaseJsonTest {
     if (tableCreated) {
       DBTests.deleteTables(TABLE_NAME);
     }
-  }
-
-  private static String format(String sql) {
-    return String.format(sql, SCHEMA, tablePath);
   }
 
   @Test
