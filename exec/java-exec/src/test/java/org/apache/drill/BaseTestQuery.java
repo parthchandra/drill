@@ -92,6 +92,7 @@ public class BaseTestQuery extends ExecTest {
     {
       put(ExecConstants.SYS_STORE_PROVIDER_LOCAL_ENABLE_WRITE, "false");
       put(ExecConstants.HTTP_ENABLE, "false");
+      put(ExecConstants.SSL_USE_HADOOP_CONF, "false");
     }
   };
 

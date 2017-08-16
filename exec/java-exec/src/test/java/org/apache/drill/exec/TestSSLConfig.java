@@ -21,6 +21,7 @@ package org.apache.drill.exec;
 
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.test.ConfigBuilder;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.Test;
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertEquals;
@@ -34,8 +35,14 @@ public class TestSSLConfig {
     ConfigBuilder config = new ConfigBuilder();
     config.put(ExecConstants.HTTP_KEYSTORE_PATH, "");
     config.put(ExecConstants.HTTP_KEYSTORE_PASSWORD, "root");
+    config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
     try {
-      SSLConfig sslv = new SSLConfig(config.build());
+      SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+          .config(config.build())
+          .mode(SSLFactory.Mode.SERVER)
+          .initializeSSLContext(false)
+          .validateKeyStore(true)
+          .build();
       fail();
       //Expected
     } catch (Exception e) {
@@ -49,8 +56,14 @@ public class TestSSLConfig {
     ConfigBuilder config = new ConfigBuilder();
     config.put(ExecConstants.HTTP_KEYSTORE_PATH, "/root");
     config.put(ExecConstants.HTTP_KEYSTORE_PASSWORD, "");
+    config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
     try {
-      SSLConfig sslv = new SSLConfig(config.build());
+      SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+          .config(config.build())
+          .mode(SSLFactory.Mode.SERVER)
+          .initializeSSLContext(false)
+          .validateKeyStore(true)
+          .build();
       fail();
       //Expected
     } catch (Exception e) {
@@ -65,7 +78,12 @@ public class TestSSLConfig {
     config.put(ExecConstants.HTTP_KEYSTORE_PATH, "/root");
     config.put(ExecConstants.HTTP_KEYSTORE_PASSWORD, "root");
     try {
-      SSLConfig sslv = new SSLConfig(config.build());
+      SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+          .config(config.build())
+          .mode(SSLFactory.Mode.SERVER)
+          .initializeSSLContext(false)
+          .validateKeyStore(true)
+          .build();
       assertEquals("/root", sslv.getKeyStorePath());
       assertEquals("root", sslv.getKeyStorePassword());
     } catch (Exception e) {
@@ -80,7 +98,12 @@ public class TestSSLConfig {
     ConfigBuilder config = new ConfigBuilder();
     config.put("javax.net.ssl.keyStore", "/root");
     config.put("javax.net.ssl.keyStorePassword", "root");
-    SSLConfig sslv = new SSLConfig(config.build());
+    SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+        .config(config.build())
+        .mode(SSLFactory.Mode.SERVER)
+        .initializeSSLContext(false)
+        .validateKeyStore(true)
+        .build();
     assertEquals("/root",sslv.getKeyStorePath());
     assertEquals("root", sslv.getKeyStorePassword());
   }
@@ -91,7 +114,13 @@ public class TestSSLConfig {
     ConfigBuilder config = new ConfigBuilder();
     config.put(ExecConstants.HTTP_TRUSTSTORE_PATH, "/root");
     config.put(ExecConstants.HTTP_TRUSTSTORE_PASSWORD, "root");
-    SSLConfig sslv = new SSLConfig(config.build());
+    config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
+    SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+        .config(config.build())
+        .mode(SSLFactory.Mode.SERVER)
+        .initializeSSLContext(false)
+        .validateKeyStore(true)
+        .build();
     assertEquals(true, sslv.hasTrustStorePath());
     assertEquals(true,sslv.hasTrustStorePassword());
     assertEquals("/root",sslv.getTrustStorePath());

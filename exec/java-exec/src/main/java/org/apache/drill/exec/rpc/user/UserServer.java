@@ -29,6 +29,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.SSLConfig;
 import org.apache.drill.exec.exception.DrillbitStartupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
@@ -52,7 +53,6 @@ import org.apache.drill.exec.rpc.ProtobufLengthDecoder;
 import org.apache.drill.exec.rpc.RpcConstants;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
-import org.apache.drill.exec.rpc.SSLConfig;
 import org.apache.drill.exec.rpc.UserClientConnection;
 import org.apache.drill.exec.rpc.security.ServerAuthenticationHandler;
 import org.apache.drill.exec.rpc.security.plain.PlainFactory;
@@ -61,6 +61,7 @@ import org.apache.drill.exec.rpc.user.security.UserAuthenticationException;
 import org.apache.drill.exec.server.BootStrapContext;
 import org.apache.drill.exec.work.user.UserWorker;
 import org.apache.hadoop.security.HadoopKerberosName;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
 
 import com.google.protobuf.MessageLite;
@@ -91,7 +92,12 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
     this.sslChannel = null;
     try {
-      this.sslConfig = new SSLConfig(bootStrapContext.getConfig(), true); // throws startup exception
+      this.sslConfig = new SSLConfig.SSLConfigBuilder()
+          .config(bootStrapContext.getConfig())
+          .mode(SSLFactory.Mode.SERVER)
+          .initializeSSLContext(true)
+          .validateKeyStore(true)
+          .build();
     } catch (DrillException e) {
       throw new DrillbitStartupException(e.getMessage(), e.getCause());
     }
@@ -103,7 +109,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
 
   @Override
   protected void setupSSL(ChannelPipeline pipe) {
-    if (sslConfig.isSslEnabled()) {
+    if (sslConfig.isUserSslEnabled()) {
 
       SSLEngine sslEngine = sslConfig.getSslContext().createSSLEngine();
       sslEngine.setUseClientMode(false);
@@ -126,7 +132,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   }
   @Override
   protected boolean isSslEnabled() {
-    return sslConfig.isSslEnabled();
+    return sslConfig.isUserSslEnabled();
   }
 
   @Override

@@ -31,15 +31,13 @@ import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.apache.drill.common.KerberosUtil;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.SSLConfig;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
@@ -76,7 +74,6 @@ import org.apache.drill.exec.rpc.RpcConnectionHandler;
 import org.apache.drill.exec.rpc.RpcConstants;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
-import org.apache.drill.exec.rpc.SSLConfig;
 import org.apache.drill.exec.rpc.security.AuthStringUtil;
 import org.apache.drill.exec.rpc.security.AuthenticationOutcomeListener;
 import org.apache.drill.exec.rpc.security.AuthenticatorFactory;
@@ -84,6 +81,7 @@ import org.apache.drill.exec.rpc.security.ClientAuthenticatorProvider;
 import org.apache.drill.exec.rpc.security.plain.PlainFactory;
 import org.apache.drill.exec.rpc.security.SaslProperties;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.slf4j.Logger;
 
 import com.google.common.base.Strings;
@@ -133,7 +131,12 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
     this.supportComplexTypes = supportComplexTypes;
     this.sslChannel = null;
     try {
-      this.sslConfig = new SSLConfig(config, false); // throws exception
+      this.sslConfig = new SSLConfig.SSLConfigBuilder()
+          .config(config)
+          .mode(SSLFactory.Mode.CLIENT)
+          .initializeSSLContext(true)
+          .validateKeyStore(true)
+          .build();
     } catch (DrillException e) {
       throw new NonTransientRpcException(e.getMessage());
     }
@@ -142,7 +145,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
 
   @Override
   protected void setupSSL(ChannelPipeline pipe, ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener) {
-    if (sslConfig.isSslEnabled()) {
+    if (sslConfig.isUserSslEnabled()) {
 
       SSLEngine sslEngine = sslConfig.getSslContext().createSSLEngine();
       sslEngine.setUseClientMode(true);
@@ -167,7 +170,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
 
   @Override
   protected boolean isSslEnabled() {
-    return sslConfig.isSslEnabled();
+    return sslConfig.isUserSslEnabled();
   }
 
   @Override
@@ -221,7 +224,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
           Integer.parseInt(properties.getProperty(DrillProperties.TEST_SASL_LEVEL))));
     }
 
-    if(sslConfig.isSslEnabled()) {
+    if(sslConfig.isUserSslEnabled()) {
       try {
         connect(hsBuilder.build(), endpoint).checkedGet(sslConfig.getHandshakeTimeout(), TimeUnit.MILLISECONDS);
       } catch (TimeoutException e) {

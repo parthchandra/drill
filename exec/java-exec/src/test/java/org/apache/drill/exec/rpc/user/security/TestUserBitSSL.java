@@ -68,21 +68,21 @@ public class TestUserBitSSL extends BaseTestQuery {
     newConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
         .withValue(ExecConstants.USER_SSL_ENABLED,
             ConfigValueFactory.fromAnyRef(true))
-        .withValue(ExecConstants.USER_SSL_KEYSTORE_TYPE,
+        .withValue(ExecConstants.SSL_KEYSTORE_TYPE,
             ConfigValueFactory.fromAnyRef("JKS"))
-        .withValue(ExecConstants.USER_SSL_KEYSTORE_PATH,
+        .withValue(ExecConstants.SSL_KEYSTORE_PATH,
             ConfigValueFactory.fromAnyRef(ksPath))
-        .withValue(ExecConstants.USER_SSL_KEYSTORE_PASSWORD,
+        .withValue(ExecConstants.SSL_KEYSTORE_PASSWORD,
             ConfigValueFactory.fromAnyRef("drill123"))
-        .withValue(ExecConstants.USER_SSL_KEY_PASSWORD,
+        .withValue(ExecConstants.SSL_KEY_PASSWORD,
             ConfigValueFactory.fromAnyRef("drill123"))
-        .withValue(ExecConstants.USER_SSL_TRUSTSTORE_TYPE,
+        .withValue(ExecConstants.SSL_TRUSTSTORE_TYPE,
             ConfigValueFactory.fromAnyRef("JKS"))
-        .withValue(ExecConstants.USER_SSL_TRUSTSTORE_PATH,
+        .withValue(ExecConstants.SSL_TRUSTSTORE_PATH,
             ConfigValueFactory.fromAnyRef(tsPath))
-        .withValue(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD,
+        .withValue(ExecConstants.SSL_TRUSTSTORE_PASSWORD,
             ConfigValueFactory.fromAnyRef("drill123"))
-        .withValue(ExecConstants.USER_SSL_PROTOCOL,
+        .withValue(ExecConstants.SSL_PROTOCOL,
             ConfigValueFactory.fromAnyRef("TLSv1.2")),
       false);
 
@@ -98,8 +98,8 @@ public class TestUserBitSSL extends BaseTestQuery {
   public void testSSLConnection() throws Exception {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(ExecConstants.USER_SSL_ENABLED, "true");
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PATH, tsPath);
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PATH, tsPath);
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PASSWORD, "drill123");
     try {
       updateClient(connectionProps);
     } catch (Exception e) {
@@ -115,8 +115,8 @@ public class TestUserBitSSL extends BaseTestQuery {
   public void testSSLConnectionWithKeystore() throws Exception {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(ExecConstants.USER_SSL_ENABLED, "true");
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PATH, ksPath);
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PATH, ksPath);
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PASSWORD, "drill123");
     try {
       updateClient(connectionProps);
     } catch (Exception e) {
@@ -132,8 +132,8 @@ public class TestUserBitSSL extends BaseTestQuery {
   public void testSSLConnectionFailBadTrustStore() throws Exception {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(ExecConstants.USER_SSL_ENABLED, "true");
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PATH, ""); // No truststore
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PATH, ""); // No truststore
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PASSWORD, "drill123");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -147,8 +147,8 @@ public class TestUserBitSSL extends BaseTestQuery {
   public void testSSLConnectionFailBadPassword() throws Exception {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(ExecConstants.USER_SSL_ENABLED, "true");
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PATH, tsPath);
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD, "bad_password");
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PATH, tsPath);
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PASSWORD, "bad_password");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -162,8 +162,8 @@ public class TestUserBitSSL extends BaseTestQuery {
   public void testSSLConnectionFailEmptyTrustStore() throws Exception {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(ExecConstants.USER_SSL_ENABLED, "true");
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PATH, emptyTSPath);
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PATH, emptyTSPath);
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PASSWORD, "drill123");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -177,8 +177,8 @@ public class TestUserBitSSL extends BaseTestQuery {
   public void testSSLQuery() throws Exception {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(ExecConstants.USER_SSL_ENABLED, "true");
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PATH, tsPath);
-    connectionProps.setProperty(ExecConstants.USER_SSL_TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PATH, tsPath);
+    connectionProps.setProperty(ExecConstants.SSL_TRUSTSTORE_PASSWORD, "drill123");
     try {
       updateClient(connectionProps);
     } catch (Exception e) {

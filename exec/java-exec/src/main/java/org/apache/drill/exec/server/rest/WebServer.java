@@ -33,6 +33,7 @@ import org.apache.drill.exec.rpc.security.plain.PlainFactory;
 import org.apache.drill.exec.server.BootStrapContext;
 import org.apache.drill.exec.server.rest.auth.DrillRestLoginService;
 import org.apache.drill.exec.work.WorkManager;
+import org.apache.hadoop.security.ssl.SSLFactory;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
@@ -271,7 +272,12 @@ public class WebServer implements AutoCloseable {
     logger.info("Setting up HTTPS connector for web server");
 
     final SslContextFactory sslContextFactory = new SslContextFactory();
-    SSLConfig ssl = new SSLConfig(config);
+    SSLConfig ssl = new SSLConfig.SSLConfigBuilder()
+        .config(config)
+        .mode(SSLFactory.Mode.SERVER)
+        .initializeSSLContext(false)
+        .validateKeyStore(true)
+        .build();
     if(ssl.isSslValid()){
       logger.info("Using configured SSL settings for web server");
 

@@ -107,6 +107,17 @@ public interface ExecConstants {
   String HASHAGG_SPILL_DIRS = "drill.exec.hashagg.spill.directories";
   String HASHAGG_SPILL_FILESYSTEM = "drill.exec.hashagg.spill.fs";
 
+  String SSL_PROTOCOL = "drill.exec.ssl.protocol"; // valid values are SSL, SSLV2, SSLV3, TLS, TLSV1, TLSv1.1, TLSv1.2(default)
+  String SSL_KEYSTORE_TYPE = "drill.exec.ssl.keyStoreType";
+  String SSL_KEYSTORE_PATH = "drill.exec.ssl.keyStorePath";     // path to keystore. default : $JRE_HOME/lib/security/keystore.jks
+  String SSL_KEYSTORE_PASSWORD = "drill.exec.ssl.keyStorePassword"; // default: changeit
+  String SSL_KEY_PASSWORD = "drill.exec.ssl.keyPassword"; //
+  String SSL_TRUSTSTORE_TYPE = "drill.exec.ssl.trustStoreType"; // valid values are jks(default), jceks, pkcs12
+  String SSL_TRUSTSTORE_PATH = "drill.exec.ssl.trustStorePath"; // path to keystore. default : $JRE_HOME/lib/security/cacerts.jks
+  String SSL_TRUSTSTORE_PASSWORD = "drill.exec.ssl.trustStorePassword"; // default: changeit
+  String SSL_USE_HADOOP_CONF = "drill.exec.ssl.useHadoopConfig"; // Initialize ssl params from hadoop if not provided by drill. default: true
+  String SSL_HANDSHAKE_TIMEOUT = "drill.exec.security.user.encryption.ssl.handshakeTimeout"; // Default 10 seconds
+
   String TEXT_LINE_READER_BATCH_SIZE = "drill.exec.storage.file.text.batch.size";
   String TEXT_LINE_READER_BUFFER_SIZE = "drill.exec.storage.file.text.buffer.size";
   String HAZELCAST_SUBNETS = "drill.exec.cache.hazel.subnets";
@@ -122,10 +133,10 @@ public interface ExecConstants {
   String HTTP_SESSION_MEMORY_RESERVATION = "drill.exec.http.session.memory.reservation";
   String HTTP_SESSION_MEMORY_MAXIMUM = "drill.exec.http.session.memory.maximum";
   String HTTP_SESSION_MAX_IDLE_SECS = "drill.exec.http.session_max_idle_secs";
-  String HTTP_KEYSTORE_PATH = "drill.exec.ssl.keyStorePath";
-  String HTTP_KEYSTORE_PASSWORD = "drill.exec.ssl.keyStorePassword";
-  String HTTP_TRUSTSTORE_PATH = "drill.exec.ssl.trustStorePath";
-  String HTTP_TRUSTSTORE_PASSWORD = "drill.exec.ssl.trustStorePassword";
+  String HTTP_KEYSTORE_PATH = SSL_KEYSTORE_PATH;
+  String HTTP_KEYSTORE_PASSWORD = SSL_KEYSTORE_PASSWORD;
+  String HTTP_TRUSTSTORE_PATH = SSL_TRUSTSTORE_PATH;
+  String HTTP_TRUSTSTORE_PASSWORD = SSL_TRUSTSTORE_PASSWORD;
   String SYS_STORE_PROVIDER_CLASS = "drill.exec.sys.store.provider.class";
   String SYS_STORE_PROVIDER_LOCAL_PATH = "drill.exec.sys.store.provider.local.path";
   String SYS_STORE_PROVIDER_LOCAL_ENABLE_WRITE = "drill.exec.sys.store.provider.local.write";
@@ -144,15 +155,6 @@ public interface ExecConstants {
   String USER_ENCRYPTION_SASL_MAX_WRAPPED_SIZE = "drill.exec.security.user.encryption.sasl.max_wrapped_size";
 
   String USER_SSL_ENABLED = "drill.exec.security.user.encryption.ssl.enabled";
-  String USER_SSL_KEYSTORE_TYPE = "javax.net.ssl.keyStoreType"; // valid values are jks(default), jceks, pkcs12
-  String USER_SSL_KEYSTORE_PATH = HTTP_KEYSTORE_PATH;     // path to keystore. default : $JRE_HOME/lib/security/keystore.jks
-  String USER_SSL_KEYSTORE_PASSWORD = HTTP_KEYSTORE_PASSWORD; // default: changeit
-  String USER_SSL_TRUSTSTORE_TYPE = "javax.net.ssl.trustStoreType"; // valid values are jks(default), jceks, pkcs12
-  String USER_SSL_TRUSTSTORE_PATH = HTTP_TRUSTSTORE_PATH; // path to keystore. default : $JRE_HOME/lib/security/cacerts.jks
-  String USER_SSL_TRUSTSTORE_PASSWORD = HTTP_TRUSTSTORE_PASSWORD; // default: changeit
-  String USER_SSL_PROTOCOL = "drill.exec.security.user.encryption.ssl.protocol"; // valid values are SSL, SSLV2, SSLV3, TLS, TLSV1, TLSv1.1, TLSv1.2(default)
-  String USER_SSL_HANDSHAKE_TIMEOUT = "drill.exec.security.user.encryption.ssl.handshakeTimeout"; // Default 10 seconds
-  String USER_SSL_KEY_PASSWORD = "drill.exec.security.user.encryption.ssl.keyPassword"; //
   String BIT_ENCRYPTION_SASL_ENABLED = "drill.exec.security.bit.encryption.sasl.enabled";
   String BIT_ENCRYPTION_SASL_MAX_WRAPPED_SIZE = "drill.exec.security.bit.encryption.sasl.max_wrapped_size";
 
