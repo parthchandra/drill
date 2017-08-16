@@ -104,13 +104,19 @@ Build drill client
     $> cd build && cmake3 -G "Unix Makefiles" -DOPENSSL_ROOT_DIR="/usr/local/opt/openssl" -D CMAKE_BUILD_TYPE=Debug ..
     $> make
 
+2.10) Build using CLion
+CLion can recognize cmake projects automatically. Check CLion documentation for help on how to use CMake with CLion.
+To prevent CLion's cmake from picking up the system installed OpenSSL set the following define in CLion/Preferences/Build, Execution, Deployment/CMake/CMake Options
+-DOPENSSL_ROOT_DIR="/usr/local/opt/openssl
+Then reload the CMake project making sure to invalidate the CMake cache
+Tools/CMake/Reset Cache and Reload Project
 
-2.8 Test
+2.9 Test
 --------
 Run query submitter from the command line
   $> querySubmitter query='select * from dfs.`/Users/pchandra/work/data/tpc-h/customer.parquet`' type=sql connectStr=local=10.250.0.146:31010 api=async logLevel=trace user=yourUserName password=yourPassWord
 
-2.9 Valgrind
+2.10 Valgrind
 ------------
   Install valgrind using brew
   $> brew install valgrind
