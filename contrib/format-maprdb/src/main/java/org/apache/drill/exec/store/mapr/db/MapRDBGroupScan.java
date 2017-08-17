@@ -64,7 +64,7 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
 
   protected Map<Integer, List<MapRDBSubScanSpec>> endpointFragmentMapping;
 
-  protected NavigableMap<TabletFragmentInfo, String> regionsToScan;
+  protected NavigableMap<TabletFragmentInfo, String> doNotAccessRegionsToScan;
 
   protected double costFactor = 1.0;
 
@@ -87,9 +87,13 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
     this.formatPlugin = that.formatPlugin;
     this.formatPluginConfig = that.formatPluginConfig;
     this.storagePlugin = that.storagePlugin;
-    this.regionsToScan = that.regionsToScan;
     this.filterPushedDown = that.filterPushedDown;
     this.costFactor = that.costFactor;
+    /* this is the only place we access the field `doNotAccessRegionsToScan` directly
+     * because we do not want the sub-scan spec for JSON tables to be calculated
+     * during the copy-constructor
+     */
+    this.doNotAccessRegionsToScan = that.doNotAccessRegionsToScan;
   }
 
   public MapRDBGroupScan(FileSystemPlugin storagePlugin,
@@ -110,8 +114,8 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
       endpointMap.put(ep.getAddress(), ep);
     }
 
-    Map<DrillbitEndpoint, EndpointAffinity> affinityMap = new HashMap<DrillbitEndpoint, EndpointAffinity>();
-    for (String serverName : regionsToScan.values()) {
+    final Map<DrillbitEndpoint, EndpointAffinity> affinityMap = new HashMap<DrillbitEndpoint, EndpointAffinity>();
+    for (String serverName : getRegionsToScan().values()) {
       DrillbitEndpoint ep = endpointMap.get(serverName);
       if (ep != null) {
         EndpointAffinity affinity = affinityMap.get(ep);
@@ -135,6 +139,7 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
     watch.reset();
     watch.start();
 
+    final NavigableMap<TabletFragmentInfo, String> regionsToScan = getRegionsToScan();
     final int numSlots = incomingEndpoints.size();
     Preconditions.checkArgument(numSlots <= regionsToScan.size(),
         String.format("Incoming endpoints %d is greater than number of scan regions %d", numSlots, regionsToScan.size()));
@@ -243,7 +248,7 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
 
   @Override
   public int getMaxParallelizationWidth() {
-    return regionsToScan.size();
+    return getRegionsToScan().size();
   }
 
   @JsonIgnore
@@ -311,6 +316,14 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
   @JsonIgnore
   public int getRowKeyOrdinal() {
     return 0;
+  }
+
+  protected NavigableMap<TabletFragmentInfo, String> getRegionsToScan() {
+    return doNotAccessRegionsToScan;
+  }
+
+  protected void setRegionsToScan(NavigableMap<TabletFragmentInfo, String> regionsToScan) {
+    this.doNotAccessRegionsToScan = regionsToScan;
   }
 
 }

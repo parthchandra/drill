@@ -132,7 +132,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
         tableStats = new MapRDBTableStats(getHBaseConf(), hbaseScanSpec.getTableName());
       }
       boolean foundStartRegion = false;
-      regionsToScan = new TreeMap<>();
+      final TreeMap<TabletFragmentInfo, String> regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       List<HRegionLocation> regionLocations = locator.getAllRegionLocations();
       for (HRegionLocation regionLocation : regionLocations) {
         HRegionInfo regionInfo = regionLocation.getRegionInfo();
@@ -145,6 +145,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
           break;
         }
       }
+      setRegionsToScan(regionsToScan);
     } catch (Exception e) {
       throw new DrillRuntimeException("Error getting region info for table: " + hbaseScanSpec.getTableName(), e);
     }
@@ -169,7 +170,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
     MapRDBSubScanSpec subScanSpec = new MapRDBSubScanSpec(
         spec.getTableName(),
         null /* indexFid */,
-        regionsToScan.get(tfi),
+        getRegionsToScan().get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
         spec.getSerializedFilter(),
@@ -183,7 +184,8 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
     assert minorFragmentId < endpointFragmentMapping.size() : String.format(
         "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.", endpointFragmentMapping.size(),
         minorFragmentId);
-    return new MapRDBSubScan(getUserName(), formatPlugin, endpointFragmentMapping.get(minorFragmentId), columns, TABLE_BINARY);
+    return new MapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(), getStoragePlugin().getConfig(),
+        endpointFragmentMapping.get(minorFragmentId), columns, TABLE_BINARY);
   }
 
   @Override

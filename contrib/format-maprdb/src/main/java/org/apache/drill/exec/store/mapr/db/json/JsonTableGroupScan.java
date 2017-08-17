@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 
 import com.mapr.db.impl.ConditionImpl;
@@ -41,7 +42,6 @@ import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
-import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.planner.index.IndexDescriptor;
 import org.apache.drill.exec.planner.index.MapRDBIndexDescriptor;
@@ -61,7 +61,6 @@ import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScanSpec;
 import org.apache.drill.exec.store.mapr.db.MapRDBTableStats;
 import org.apache.drill.exec.store.mapr.db.TabletFragmentInfo;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HConstants;
 import org.codehaus.jackson.annotate.JsonCreator;
 import org.ojai.store.QueryCondition;
@@ -162,14 +161,38 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   }
 
   private void init() {
-    logger.debug("Getting tablet locations");
     try {
-      Configuration conf = new Configuration();
+      // Get the fullTableRowCount only once i.e. if not already obtained before.
+      if (fullTableRowCount == 0) {
+        final Table t = this.formatPlugin.getJsonTableCache().getTable(
+            scanSpec.getTableName(), scanSpec.getIndexDesc(), getUserName());
+        final MetaTable metaTable = t.getMetaTable();
+        // For condition null, we get full table stats.
+        com.mapr.db.scan.ScanStats stats = metaTable.getScanStats();
+        fullTableRowCount = stats.getEstimatedNumRows();
+        // MapRDB client can return invalid rowCount i.e. 0, especially right after table
+        // creation. It takes 15 minutes before table stats are obtained and cached in client.
+        // If we get 0 rowCount, fallback to getting rowCount using old admin API.
+        if (fullTableRowCount == 0) {
+          MapRDBTableStats tableStats = new MapRDBTableStats(storagePlugin.getFsConf(), scanSpec.getTableName());
+          fullTableRowCount = tableStats.getNumRows();
+        }
+      }
+    } catch (Exception e) {
+      throw new DrillRuntimeException("Error getting region info for table: " +
+        scanSpec.getTableName() + (scanSpec.getIndexDesc() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
+    }
+  }
+
+  protected NavigableMap<TabletFragmentInfo, String> getRegionsToScan() {
+    // If regionsToScan already computed, just return.
+    if (doNotAccessRegionsToScan == null) {
       final Table t = this.formatPlugin.getJsonTableCache().getTable(
           scanSpec.getTableName(), scanSpec.getIndexDesc(), getUserName());
       final MetaTable metaTable = t.getMetaTable();
+
       QueryCondition scanSpecCondition = scanSpec.getCondition();
-      List<ScanRange> scanRanges = (scanSpecCondition == null)
+      List<ScanRange> scanRanges = (scanSpecCondition == null) 
           ? metaTable.getScanRanges(formatPlugin.getScanRangeSizeMB())
           : metaTable.getScanRanges(scanSpecCondition, formatPlugin.getScanRangeSizeMB());
 
@@ -186,39 +209,24 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       byte[] lastStopRow = rowkeyRanges.get(rowkeyRanges.size() - 1).getStopRow();
       scanSpec.setStopRow(lastStopRow);
 
-      // Get the fullTableRowCount only once i.e. if not already obtained before.
-      if (fullTableRowCount == 0) {
-        // For condition null, we get full table stats.
-        com.mapr.db.scan.ScanStats stats = metaTable.getScanStats();
-        fullTableRowCount = stats.getEstimatedNumRows();
-        // MapRDB client can return invalid rowCount i.e. 0, especially right after table
-        // creation. It takes 15 minutes before table stats are obtained and cached in client.
-        // If we get 0 rowCount, fallback to getting rowCount using old admin API.
-        if (fullTableRowCount == 0) {
-          MapRDBTableStats tableStats = new MapRDBTableStats(conf, scanSpec.getTableName());
-          fullTableRowCount = tableStats.getNumRows();
-        }
-      }
-
-      regionsToScan = new TreeMap<TabletFragmentInfo, String>();
+      final TreeMap<TabletFragmentInfo, String> regionsToScan = new TreeMap<TabletFragmentInfo, String>();
       for (ScanRange range : scanRanges) {
         TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) range;
         regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), range.getLocations()[0]);
       }
-    } catch (Exception e) {
-      throw new DrillRuntimeException("Error getting region info for table: " +
-          scanSpec.getTableName() + (scanSpec.getIndexDesc() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
+      setRegionsToScan(regionsToScan);
     }
+    return doNotAccessRegionsToScan;
   }
 
 
   protected MapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
     // XXX/TODO check filter/Condition
-    JsonScanSpec spec = scanSpec;
+    final JsonScanSpec spec = scanSpec;
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
         spec.getTableName(),
         spec.getIndexDesc(),
-        regionsToScan.get(tfi),
+        getRegionsToScan().get(tfi),
         (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
         (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
         spec.getCondition(),
