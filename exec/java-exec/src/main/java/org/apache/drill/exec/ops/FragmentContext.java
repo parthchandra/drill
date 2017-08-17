@@ -49,6 +49,7 @@ import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
 import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.UserClientConnection;
+import org.apache.drill.exec.rpc.control.WorkEventBus;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.options.FragmentOptionManager;
 import org.apache.drill.exec.server.options.OptionList;
@@ -484,6 +485,15 @@ public class FragmentContext implements AutoCloseable, UdfUtilities, FragmentExe
    */
   public void waitForSendComplete() {
     sendingAccountor.waitForSendComplete();
+  }
+
+  public WorkEventBus getWorkEventbus() {
+    return context.getWorkBus();
+  }
+
+  public boolean isBuffersDone() {
+    Preconditions.checkState(this.buffers != null, "Incoming Buffers is not set in this fragment context");
+    return buffers.isDone();
   }
 
   public interface ExecutorState {

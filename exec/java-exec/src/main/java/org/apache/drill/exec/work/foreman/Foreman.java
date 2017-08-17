@@ -18,20 +18,16 @@
 package org.apache.drill.exec.work.foreman;
 
 import com.codahale.metrics.Counter;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelFuture;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-
-import java.io.IOException;
-import java.util.Collection;
-import java.util.Date;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-
 import org.apache.drill.common.CatastrophicFailure;
 import org.apache.drill.common.EventProcessor;
 import org.apache.drill.common.concurrent.ExtendedLatch;
@@ -71,9 +67,9 @@ import org.apache.drill.exec.proto.UserProtos.RunQuery;
 import org.apache.drill.exec.proto.helper.QueryIdHelper;
 import org.apache.drill.exec.rpc.BaseRpcOutcomeListener;
 import org.apache.drill.exec.rpc.RpcException;
+import org.apache.drill.exec.rpc.UserClientConnection;
 import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.control.Controller;
-import org.apache.drill.exec.rpc.UserClientConnection;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.server.options.OptionManager;
 import org.apache.drill.exec.testing.ControlsInjector;
@@ -83,18 +79,19 @@ import org.apache.drill.exec.util.Pointer;
 import org.apache.drill.exec.work.EndpointListener;
 import org.apache.drill.exec.work.QueryWorkUnit;
 import org.apache.drill.exec.work.WorkManager.WorkerBee;
-import org.apache.drill.exec.work.batch.IncomingBuffers;
 import org.apache.drill.exec.work.fragment.FragmentExecutor;
 import org.apache.drill.exec.work.fragment.FragmentStatusReporter;
 import org.apache.drill.exec.work.fragment.RootFragmentManager;
 import org.codehaus.jackson.map.ObjectMapper;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Sets;
-import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
+import java.util.Collection;
+import java.util.Date;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Foreman manages all the fragments (local and remote) for a single query where this
@@ -1073,26 +1070,22 @@ public class Foreman implements Runnable {
    */
   private void setupRootFragment(final PlanFragment rootFragment, final FragmentRoot rootOperator)
       throws ExecutionSetupException {
-    @SuppressWarnings("resource")
     final FragmentContext rootContext = new FragmentContext(drillbitContext, rootFragment, queryContext,
         initiatingClient, drillbitContext.getFunctionImplementationRegistry());
-    @SuppressWarnings("resource")
-    final IncomingBuffers buffers = new IncomingBuffers(rootFragment, rootContext);
-    rootContext.setBuffers(buffers);
+    final ControlTunnel tunnel = drillbitContext.getController().getTunnel(queryContext.getCurrentEndpoint());
+    final FragmentStatusReporter statusReporter = new FragmentStatusReporter(rootContext, tunnel);
+    final FragmentExecutor rootRunner = new FragmentExecutor(rootContext, rootFragment,
+        statusReporter, rootOperator);
 
     queryManager.addFragmentStatusTracker(rootFragment, true);
 
-    final ControlTunnel tunnel = drillbitContext.getController().getTunnel(queryContext.getCurrentEndpoint());
-    final FragmentExecutor rootRunner = new FragmentExecutor(rootContext, rootFragment,
-        new FragmentStatusReporter(rootContext, tunnel),
-        rootOperator);
-    final RootFragmentManager fragmentManager = new RootFragmentManager(rootFragment.getHandle(), buffers, rootRunner);
-
-    if (buffers.isDone()) {
+    // FragmentManager is setting buffer for FragmentContext
+    if (rootContext.isBuffersDone()) {
       // if we don't have to wait for any incoming data, start the fragment runner.
-      bee.addFragmentRunner(fragmentManager.getRunnable());
+      bee.addFragmentRunner(rootRunner);
     } else {
       // if we do, record the fragment manager in the workBus.
+      final RootFragmentManager fragmentManager = new RootFragmentManager(rootFragment, rootRunner, statusReporter);
       drillbitContext.getWorkBus().addFragmentManager(fragmentManager);
     }
   }
@@ -1109,7 +1102,7 @@ public class Foreman implements Runnable {
       // nothing to do here
       return;
     }
-    /*
+    /*z
      * We will send a single message to each endpoint, regardless of how many fragments will be
      * executed there. We need to start up the intermediate fragments first so that they will be
      * ready once the leaf fragments start producing data. To satisfy both of these, we will
