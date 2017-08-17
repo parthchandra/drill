@@ -118,12 +118,6 @@ public class WebServer implements AutoCloseable {
     this.config = context.getConfig();
     this.metrics = context.getMetrics();
     this.workManager = workManager;
-
-    if (config.getBoolean(ExecConstants.HTTP_ENABLE)) {
-      embeddedJetty = new Server();
-    } else {
-      embeddedJetty = null;
-    }
   }
 
   private static final String BASE_STATIC_PATH = "/rest/static/";
@@ -145,9 +139,10 @@ public class WebServer implements AutoCloseable {
    * @throws Exception
    */
   public void start() throws Exception {
-    if (embeddedJetty == null) {
+    if (!config.getBoolean(ExecConstants.HTTP_ENABLE)) {
       return;
     }
+
     final boolean authEnabled = config.getBoolean(ExecConstants.USER_AUTHENTICATION_ENABLED);
     if (authEnabled && !context.getAuthProvider().containsFactory(PlainFactory.SIMPLE_NAME)) {
       logger.warn("Not starting web server. Currently Drill supports web authentication only through " +
