@@ -135,7 +135,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
           .config(config)
           .mode(SSLFactory.Mode.CLIENT)
           .initializeSSLContext(true)
-          .validateKeyStore(true)
+          .validateKeyStore(false)
           .build();
     } catch (DrillException e) {
       throw new NonTransientRpcException(e.getMessage());

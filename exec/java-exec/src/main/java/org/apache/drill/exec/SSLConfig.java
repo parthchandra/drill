@@ -19,6 +19,7 @@ package org.apache.drill.exec;
 
 import com.google.common.base.Preconditions;
 import org.apache.drill.common.config.DrillConfig;
+import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillConfigurationException;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.hadoop.conf.Configuration;
@@ -59,6 +60,8 @@ public class SSLConfig {
   private final DrillConfig config;
   private final Configuration hadoopConfig;
   private final SSLFactory.Mode mode; // Let's reuse Hadoop's SSLFactory.Mode to distinguish client/server
+  private final boolean disableHostVerification;
+  private final boolean disableCertificateVerification;
 
   public static final String HADOOP_SSL_CONF_TPL_KEY =
       "hadoop.ssl.{0}.conf";
@@ -80,8 +83,13 @@ public class SSLConfig {
 
     this.config = config;
     this.mode = mode;
-    userSslEnabled =
-        config.hasPath(ExecConstants.USER_SSL_ENABLED) && config.getBoolean(ExecConstants.USER_SSL_ENABLED);
+    if (this.mode == SSLFactory.Mode.SERVER) {
+      userSslEnabled = config.hasPath(ExecConstants.USER_SSL_ENABLED) && config
+          .getBoolean(ExecConstants.USER_SSL_ENABLED);
+    } else {
+      userSslEnabled =
+          config.hasPath(DrillProperties.ENABLE_TLS) && config.getBoolean(DrillProperties.ENABLE_TLS);
+    }
     httpsEnabled =
         config.hasPath(ExecConstants.HTTP_ENABLE_SSL) && config.getBoolean(ExecConstants.HTTP_ENABLE_SSL);
 
@@ -108,12 +116,27 @@ public class SSLConfig {
         resolveHadoopPropertyName(HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY));
     // if no keypassword specified, use keystore password
     keyPassword = getConfigParamWithDefault(ExecConstants.SSL_KEY_PASSWORD, keyStorePassword);
-    trustStoreType = getConfigParam(ExecConstants.SSL_TRUSTSTORE_TYPE,
-        resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY));
-    trustStorePath = getConfigParam(ExecConstants.SSL_TRUSTSTORE_PATH,
-        resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_LOCATION_TPL_KEY));
-    trustStorePassword = getConfigParam(ExecConstants.SSL_TRUSTSTORE_PASSWORD,
-        resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+    if (this.mode == SSLFactory.Mode.SERVER) {
+      trustStoreType = getConfigParam(ExecConstants.SSL_TRUSTSTORE_TYPE,
+          resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY));
+      trustStorePath = getConfigParam(ExecConstants.SSL_TRUSTSTORE_PATH,
+          resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_LOCATION_TPL_KEY));
+      trustStorePassword = getConfigParam(ExecConstants.SSL_TRUSTSTORE_PASSWORD,
+          resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+      disableHostVerification = false;
+      disableCertificateVerification = false;
+    } else {
+      trustStoreType = getConfigParam(DrillProperties.TRUSTSTORE_TYPE,
+          resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY));
+      trustStorePath = getConfigParam(DrillProperties.TRUSTSTORE_PATH,
+          resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_LOCATION_TPL_KEY));
+      trustStorePassword = getConfigParam(DrillProperties.TRUSTSTORE_PASSWORD,
+          resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY));
+      disableHostVerification = config.hasPath(DrillProperties.DISABLE_HOST_VERIFICATION) && config
+          .getBoolean(DrillProperties.DISABLE_HOST_VERIFICATION);
+      disableCertificateVerification = config.hasPath(DrillProperties.DISABLE_CERT_VERIFICATION) && config
+          .getBoolean(DrillProperties.DISABLE_CERT_VERIFICATION);
+    }
     protocol = getConfigParamWithDefault(ExecConstants.SSL_PROTOCOL, DEFAULT_SSL_PROTOCOL);
     int hsTimeout = config.hasPath(ExecConstants.SSL_HANDSHAKE_TIMEOUT) ?
         config.getInt(ExecConstants.SSL_HANDSHAKE_TIMEOUT) :
@@ -131,7 +154,7 @@ public class SSLConfig {
     //HTTPS validates the keystore is not empty. User Server SSL context initialization also validates keystore, but
     // much more strictly. User Client context initialization does not validate keystore.
     /*If keystorePath or keystorePassword is provided in the configuration file use that*/
-    if (validateKeyStore) {
+    if ((isUserSslEnabled() || isHttpsEnabled() ) && validateKeyStore) {
       if (!keyStorePath.isEmpty() || !keyStorePassword.isEmpty()) {
         if (keyStorePath.isEmpty()) {
           throw new DrillException(
@@ -327,10 +350,10 @@ public class SSLConfig {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("SSL is ")
-        .append(isUserSslEnabled()?"":" not")
+        .append(isUserSslEnabled()?"":" not ")
         .append("enabled.\n");
     sb.append("HTTPS is ")
-        .append(isHttpsEnabled()?"":" not")
+        .append(isHttpsEnabled()?"":" not ")
         .append("enabled.\n");
     if(isUserSslEnabled() || isHttpsEnabled()) {
       sb.append("SSL Configuration :")
@@ -363,7 +386,8 @@ public class SSLConfig {
       if (config == null){
         throw new DrillConfigurationException("Cannot create SSL configuration from null Drill configuration.");
       }
-      SSLConfig sslConfig = new SSLConfig(config, hadoopConfig, mode, initializeSSLContext, validateKeyStore);
+      SSLConfig sslConfig;
+      sslConfig = new SSLConfig(config, hadoopConfig, mode, initializeSSLContext, validateKeyStore);
       return sslConfig;
     }
 

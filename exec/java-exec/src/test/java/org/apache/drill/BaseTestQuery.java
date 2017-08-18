@@ -216,7 +216,8 @@ public class BaseTestQuery extends ExecTest {
       TestUtilities.makeDfsTmpSchemaImmutable(pluginRegistry);
     }
 
-    client = QueryTestUtil.createClient(config,  serviceSet, MAX_WIDTH_PER_NODE, properties);
+    DrillConfig clientConfig = DrillConfig.forClient(properties);
+    client = QueryTestUtil.createClient(clientConfig,  serviceSet, MAX_WIDTH_PER_NODE, properties);
   }
 
   /**

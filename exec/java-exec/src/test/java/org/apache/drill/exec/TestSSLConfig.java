@@ -36,6 +36,7 @@ public class TestSSLConfig {
     config.put(ExecConstants.HTTP_KEYSTORE_PATH, "");
     config.put(ExecConstants.HTTP_KEYSTORE_PASSWORD, "root");
     config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
+    config.put(ExecConstants.USER_SSL_ENABLED, true);
     try {
       SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
           .config(config.build())
@@ -57,6 +58,7 @@ public class TestSSLConfig {
     config.put(ExecConstants.HTTP_KEYSTORE_PATH, "/root");
     config.put(ExecConstants.HTTP_KEYSTORE_PASSWORD, "");
     config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
+    config.put(ExecConstants.USER_SSL_ENABLED, true);
     try {
       SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
           .config(config.build())
