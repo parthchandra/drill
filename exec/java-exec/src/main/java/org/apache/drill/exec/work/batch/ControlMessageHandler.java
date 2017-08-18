@@ -41,7 +41,6 @@ import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.UserRpcException;
 import org.apache.drill.exec.rpc.control.ControlConnection;
 import org.apache.drill.exec.rpc.control.ControlRpcConfig;
-import org.apache.drill.exec.rpc.control.ControlTunnel;
 import org.apache.drill.exec.rpc.control.CustomHandlerRegistry;
 import org.apache.drill.exec.server.DrillbitContext;
 import org.apache.drill.exec.work.WorkManager.WorkerBee;
@@ -155,8 +154,7 @@ public class ControlMessageHandler implements RequestHandler<ControlConnection> 
     try {
       final FragmentContext fragmentContext = new FragmentContext(drillbitContext, fragment,
           drillbitContext.getFunctionImplementationRegistry());
-      final ControlTunnel tunnel = drillbitContext.getController().getTunnel(fragment.getForeman());
-      final FragmentStatusReporter statusReporter = new FragmentStatusReporter(fragmentContext, tunnel);
+      final FragmentStatusReporter statusReporter = new FragmentStatusReporter(fragmentContext);
       final FragmentExecutor fragmentExecutor = new FragmentExecutor(fragmentContext, fragment, statusReporter);
 
       // we either need to start the fragment if it is a leaf fragment, or set up a fragment manager if it is non leaf.
