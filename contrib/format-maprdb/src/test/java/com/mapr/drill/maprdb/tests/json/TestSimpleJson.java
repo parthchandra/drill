@@ -195,7 +195,7 @@ public class TestSimpleJson extends BaseJsonTest {
         + " name <> 'Sprint'");
     runSQLAndVerifyCount(sql, 9);
 
-    final String[] expectedPlan = {"condition=\\(name != \"Sprint\"\\)", "columns=\\[`name`, `_id`, `categories`, `full_address`\\]"};
+    final String[] expectedPlan = {"condition=\\(name != \"Sprint\"\\)", "columns=\\[`_id`, `name`, `categories`, `full_address`\\]"};
     final String[] excludedPlan = {};
 
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);

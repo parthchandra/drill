@@ -92,6 +92,27 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
     scanRanges = table.getMetaTable().getScanRanges();
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) {
+      return true;
+    }
+    if (obj instanceof JsonTableRangePartitionFunction) {
+      JsonTableRangePartitionFunction rpf = (JsonTableRangePartitionFunction) obj;
+      List<FieldReference> thisPartRefList = this.getPartitionRefList();
+      List<FieldReference> otherPartRefList = rpf.getPartitionRefList();
+      if (thisPartRefList.size() != otherPartRefList.size()) {
+        return false;
+      }
+      for (int refIdx=0; refIdx<thisPartRefList.size(); refIdx++) {
+        if (!thisPartRefList.get(refIdx).equals(otherPartRefList.get(refIdx))) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return false;
+  }
 
   @Override
   public int eval(int index, int numPartitions) {

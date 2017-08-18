@@ -89,7 +89,8 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   @Override
   @JsonIgnore
   public Set<StoragePluginOptimizerRule> getOptimizerRules() {
-    return ImmutableSet.of(MapRDBPushFilterIntoScan.FILTER_ON_SCAN, MapRDBPushFilterIntoScan.FILTER_ON_PROJECT);
+    return ImmutableSet.of(MapRDBPushFilterIntoScan.FILTER_ON_SCAN, MapRDBPushFilterIntoScan.FILTER_ON_PROJECT,
+        MapRDBPushProjectIntoScan.PROJECT_ON_SCAN);
   }
 
   public AbstractGroupScan getGroupScan(String userName, FileSelection selection,
