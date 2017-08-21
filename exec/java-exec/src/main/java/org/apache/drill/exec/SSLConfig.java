@@ -259,25 +259,16 @@ public class SSLConfig {
        * Note that it is perfectly legal, but not useful, to have a null trust manager list passed to
        * SSLContext.init
        */
-      String truststoretype = trustStoreType;
-      String truststorepath = trustStorePath;
-      String truststorepassword = trustStorePassword;
-      if (trustStorePath.isEmpty()) {
-        truststoretype = keyStoreType;
-        truststorepath = keyStorePath;
-        truststorepassword = keyStorePassword;
-      }
-      if (!truststorepath.isEmpty()) {
+      KeyStore ts = null;
+      if (!trustStorePath.isEmpty()) {
         // use default keystore type. user can customize by specifying javax.net.ssl.trustStoreType
-        KeyStore ts =
-            KeyStore.getInstance(!truststoretype.isEmpty() ? truststoretype : KeyStore.getDefaultType());
-        InputStream tsStream = new FileInputStream(truststorepath);
-        ts.load(tsStream, truststorepassword.toCharArray());
-        TrustManagerFactory tmf =
-            TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(ts);
-        tms = tmf.getTrustManagers();
+        ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
+        InputStream tsStream = new FileInputStream(trustStorePath);
+        ts.load(tsStream, trustStorePassword.toCharArray());
       }
+      TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      tmf.init(ts);
+      tms = tmf.getTrustManagers();
 
       sslCtx = SSLContext.getInstance(protocol);
       sslCtx.init(kms, tms, null);
