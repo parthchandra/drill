@@ -86,6 +86,8 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
 
   private final List<Comparator> comparators;
 
+  private RowKeyJoinState rkJoinState = RowKeyJoinState.INITIAL;
+
   // Runtime generated class implementing HashJoinProbe interface
   private HashJoinProbe hashJoinProbe = null;
 
@@ -611,6 +613,16 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
   public void killIncoming(boolean sendUpstream) {
     left.kill(sendUpstream);
     right.kill(sendUpstream);
+  }
+
+  @Override
+  public void setRowKeyJoinState(RowKeyJoinState newState) {
+    this.rkJoinState = newState;
+  }
+
+  @Override
+  public RowKeyJoinState getRowKeyJoinState() {
+    return rkJoinState;
   }
 
   @Override

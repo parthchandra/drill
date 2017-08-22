@@ -27,6 +27,21 @@ import org.apache.drill.exec.vector.ValueVector;
 public interface RowKeyJoin {
 
   /**
+   * Enum for RowKeyJoin internal state.
+   * Possible states are {INITIAL, PROCESSING, DONE}
+   *
+   * Initially RowKeyJoin will be at INITIAL state. Then the state will be transitioned
+   * by the RestrictedJsonRecordReader to PROCESSING as soon as it processes the rows
+   * related to RowKeys. Then RowKeyJoin algorithm sets to INITIAL state when leftStream has no data.
+   * Basically RowKeyJoin calls leftStream multiple times depending upon the rightStream, hence
+   * this transition from PROCESSING to INITIAL. If there is no data from rightStream or OutOfMemory
+   * condition then the state is transitioned to DONE.
+   */
+  public enum RowKeyJoinState {
+    INITIAL, PROCESSING, DONE;
+  }
+
+  /**
    * Is the next batch of row keys ready to be returned
    * @return True if ready, false if not
    */
@@ -51,4 +66,14 @@ public interface RowKeyJoin {
    */
   public void setBatchState(BatchState newState);
 
+  /**
+   * Set the RowKeyJoinState (this is useful for maintaining state for row key join algorithm)
+   * @param newState
+   */
+  public void setRowKeyJoinState(RowKeyJoinState newState);
+
+  /**
+   * Get the current RowKeyJoinState.
+   */
+  public RowKeyJoinState getRowKeyJoinState();
 }

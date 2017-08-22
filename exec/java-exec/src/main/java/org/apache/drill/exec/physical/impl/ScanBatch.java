@@ -164,6 +164,7 @@ public class ScanBatch implements CloseableRecordBatch {
 
   @Override
   public IterOutcome next() {
+    boolean isCurrentScanIterationDone = false;
     if (done) {
       return IterOutcome.NONE;
     }
@@ -183,7 +184,8 @@ public class ScanBatch implements CloseableRecordBatch {
             // We're on the last reader, and it has no (more) rows.
 
             //ask the reader if we should continue or not even there is no more record found
-            if(currentReader.hasNext()) {
+            if(currentReader.hasNext() && currentReader.isRepeatableReader()) {
+              isCurrentScanIterationDone = true;
               break;
             }
 
@@ -247,6 +249,8 @@ public class ScanBatch implements CloseableRecordBatch {
         container.buildSchema(SelectionVectorMode.NONE);
         schema = container.getSchema();
         return IterOutcome.OK_NEW_SCHEMA;
+      } else if (isCurrentScanIterationDone){
+          return IterOutcome.NONE;
       } else {
         return IterOutcome.OK;
       }

@@ -148,7 +148,6 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
 
   @Override
   public boolean hasNext() {
-    //TODO: need to consider and test the case when there are multiple batches of rowkeys
     RestrictedMapRDBSubScanSpec rss = ((RestrictedMapRDBSubScanSpec) this.subScanSpec);
 
     RowKeyJoin rjBatch = rss.getJoinForSubScan();
@@ -158,15 +157,26 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
 
     boolean hasMore = false;
     AbstractRecordBatch.BatchState state = rss.getJoinForSubScan().getBatchState();
+    RowKeyJoin.RowKeyJoinState rkState = rss.getJoinForSubScan().getRowKeyJoinState();
     if ( state == AbstractRecordBatch.BatchState.BUILD_SCHEMA ) {
       hasMore = true;
     } else if ( state == AbstractRecordBatch.BatchState.FIRST) {
        rss.getJoinForSubScan().setBatchState(AbstractRecordBatch.BatchState.NOT_FIRST);
+       rss.getJoinForSubScan().setRowKeyJoinState(RowKeyJoin.RowKeyJoinState.PROCESSING);
        hasMore = true;
+    } else if ( rkState == RowKeyJoin.RowKeyJoinState.INITIAL) {
+      rss.getJoinForSubScan().setRowKeyJoinState(RowKeyJoin.RowKeyJoinState.PROCESSING);
+      hasMore = true;
     }
 
     logger.debug("restricted reader hasMore = {}", hasMore);
 
     return hasMore;
   }
+
+  @Override
+  public boolean isRepeatableReader() {
+    return true;
+  }
+
 }

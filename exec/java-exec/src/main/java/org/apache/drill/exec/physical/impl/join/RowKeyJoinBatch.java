@@ -37,6 +37,7 @@ import org.apache.drill.exec.vector.ValueVector;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
+
 public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implements RowKeyJoin {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(RowKeyJoinBatch.class);
 
@@ -52,6 +53,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
   private final List<TransferPair> transfers = Lists.newArrayList();
   private int recordCount = 0;
   private SchemaChangeCallBack callBack = new SchemaChangeCallBack();
+  private RowKeyJoinState rkJoinState = RowKeyJoinState.INITIAL;
 
   public RowKeyJoinBatch(RowKeyJoinPOP config, FragmentContext context, RecordBatch left, RecordBatch right)
       throws OutOfMemoryException {
@@ -133,6 +135,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
       case NONE:
       case OUT_OF_MEMORY:
       case STOP:
+        rkJoinState = RowKeyJoinState.DONE;
         state = BatchState.DONE;
         return rightUpstream;
       case OK_NEW_SCHEMA:
@@ -157,7 +160,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
 
           logger.debug("left input IterOutcome: {}", leftUpstream);
 
-          if ((leftUpstream == IterOutcome.OK || leftUpstream == IterOutcome.OK_NEW_SCHEMA)) {
+          if (leftUpstream == IterOutcome.OK || leftUpstream == IterOutcome.OK_NEW_SCHEMA) {
             logger.debug("left input num records = {}", left.getRecordCount());
             if (left.getRecordCount() > 0) {
               logger.debug("Outputting the left batch with {} records.", left.getRecordCount());
@@ -172,7 +175,13 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
           }
         }
 
-        return leftUpstream;
+        if (leftUpstream == IterOutcome.NONE) {
+          container.setRecordCount(0);
+          this.recordCount = 0;
+          return rightUpstream;
+        } else {
+          return leftUpstream;
+        }
 
       default:
         throw new IllegalStateException(String.format("Unknown state %s.", rightUpstream));
@@ -180,6 +189,9 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
     } finally {
       if (state == BatchState.FIRST) {
         state = BatchState.NOT_FIRST;
+      }
+      if (leftUpstream == IterOutcome.NONE && rkJoinState == RowKeyJoinState.PROCESSING) {
+        rkJoinState = RowKeyJoinState.INITIAL;
       }
     }
   }
@@ -233,6 +245,16 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
   }
 
   @Override
+  public void setRowKeyJoinState(RowKeyJoinState newState) {
+    this.rkJoinState = newState;
+  }
+
+  @Override
+  public RowKeyJoinState getRowKeyJoinState() {
+    return rkJoinState;
+  }
+
+  @Override
   public void killIncoming(boolean sendUpstream) {
     left.kill(sendUpstream);
     right.kill(sendUpstream);
@@ -240,6 +262,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
 
   @Override
   public void close() {
+    rkJoinState = RowKeyJoinState.DONE;
     super.close();
   }
 
