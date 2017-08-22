@@ -52,12 +52,6 @@ import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
 public class MaprDBTestsSuite {
   public static final int INDEX_FLUSH_TIMEOUT = 60000;
 
-  private static final String TMP_BUSINESS_TABLE = "/tmp/business";
-
-  private static final String TMP_TABLE_WITH_INDEX = "/tmp/drill_test_table_with_index";
-  
-  private static final String TMP_TABLE_WITH_HASHED_INDEX = "/tmp/drill_test_table_with_hashed_index";
-
   private static final boolean IS_DEBUG = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
   private static volatile AtomicInteger initCount = new AtomicInteger(0);
@@ -67,34 +61,6 @@ public class MaprDBTestsSuite {
 
   @BeforeClass
   public static void setupTests() throws Exception {
-    if (initCount.get() == 0) {
-      synchronized (MaprDBTestsSuite.class) {
-        if (initCount.get() == 0) {
-          HBaseTestsSuite.configure(false /*manageHBaseCluster*/, true /*createTables*/);
-          HBaseTestsSuite.initCluster();
-
-          admin = MapRDB.newAdmin();
-          createTableWithIndex();
-          createTableWithHashedIndex();
-          createBusinessTable();
-
-          // Sleep to allow table data to be flushed to tables.
-          // Without this, the row count stats to return 0,
-          // causing the planner to reject optimized plans.
-          System.out.println("Sleeping for 5 seconds to allow table flushes");
-          Thread.sleep(5000);
-
-          conf = HBaseTestsSuite.getConf();
-          initCount.incrementAndGet(); // must increment while inside the synchronized block
-          return;
-        }
-      }
-    }
-    initCount.incrementAndGet();
-    return;
-  }
-
-  public static void setupCluster() throws Exception {
     if (initCount.get() == 0) {
       synchronized (MaprDBTestsSuite.class) {
         if (initCount.get() == 0) {
@@ -185,94 +151,7 @@ public class MaprDBTestsSuite {
   }
 
   public static InputStream getJsonStream(String resourceName) {
-    return MaprDBTestsSuite.class.getClassLoader().getResourceAsStream(resourceName);
-  }
-
-  @SuppressWarnings("deprecation")
-  public static void createTableWithIndex() throws Exception {
-    if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
-      admin.deleteTable(TMP_TABLE_WITH_INDEX);
-    }
-    try (Table table = admin.createTable(TMP_TABLE_WITH_INDEX)) {
-
-      // create index
-      TestCluster.runCommand(
-          "maprcli table index add"
-          + " -path " + table.getPath()
-          + " -index testindex"
-          + " -indexedfields '\"name.last\":1'"
-          + " -nonindexedfields '\"age\":1'");
-      // FIXME: refresh the index schema, without this the puts are not getting propagated to indexes
-      DBTests.admin().getTableIndexes(table.getPath(), true);
-
-      // insert data
-      for (int i = 0; i < 10000; ++ i) {
-    	  table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user" + i + "\", \"age\":" + i + ", \"name\": {\"first\":\"Sam" + i + "\", \"last\":\"Harris" + i + "\"}}"));
-      }
-
-      table.flush();
-
-      DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
-    }
-  }
-
-  @SuppressWarnings("deprecation")
-  public static void createTableWithHashedIndex() throws Exception {
-    if (admin.tableExists(TMP_TABLE_WITH_HASHED_INDEX)) {
-      admin.deleteTable(TMP_TABLE_WITH_HASHED_INDEX);
-    }
-    try (Table table = admin.createTable(TMP_TABLE_WITH_HASHED_INDEX)) {
-
-      // create index
-      TestCluster.runCommand(
-          "maprcli table index add"
-          + " -path " + table.getPath()
-          + " -index testhashedindex"
-          + " -indexedfields '\"name.last\":1'"
-          + " -nonindexedfields '\"age\":1'"
-          + " -hashed true"
-          + " -numhashpartitions 5");
-      // FIXME: refresh the index schema, without this the puts are not getting propagated to indexes
-      DBTests.admin().getTableIndexes(table.getPath(), true);
-
-      // insert data
-      for (int i = 0; i < 10000; ++ i) {
-    	  table.insertOrReplace(MapRDB.newDocument("{\"_id\":\"user" + i + "\", \"age\":" + i + ", \"name\": {\"first\":\"Sam" + i + "\", \"last\":\"Harris" + i + "\"}}"));
-      }
-
-      table.flush();
-
-      DBTests.waitForIndexFlush(table.getPath(), INDEX_FLUSH_TIMEOUT);
-    }
-  }
-  
-  public static void createBusinessTable() throws IOException {
-    if (admin.tableExists(TMP_BUSINESS_TABLE)) {
-      admin.deleteTable(TMP_BUSINESS_TABLE);
-    }
-
-    try (Table table = admin.createTable(TMP_BUSINESS_TABLE);
-         InputStream in = getJsonStream("json/business.json");
-         DocumentStream stream = Json.newDocumentStream(in)) {
-      for (Document document : stream) {
-        table.insert(document, "business_id");
-      }
-      table.flush();
-    }
-  }
-
-  public static void deleteJsonTables() {
-    if (admin != null) {
-      if (admin.tableExists(TMP_BUSINESS_TABLE)) {
-        admin.deleteTable(TMP_BUSINESS_TABLE);
-      }
-      if (admin.tableExists(TMP_TABLE_WITH_INDEX)) {
-        admin.deleteTable(TMP_TABLE_WITH_INDEX);
-      }
-      if (admin.tableExists(TMP_TABLE_WITH_HASHED_INDEX)) {
-        admin.deleteTable(TMP_TABLE_WITH_HASHED_INDEX);
-      }
-    }
+    return MaprDBTestsSuite.class.getResourceAsStream(resourceName);
   }
 
 }
