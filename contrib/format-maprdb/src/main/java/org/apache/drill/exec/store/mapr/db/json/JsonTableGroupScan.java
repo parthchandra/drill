@@ -18,7 +18,6 @@
 package org.apache.drill.exec.store.mapr.db.json;
 
 import static org.apache.drill.exec.planner.index.Statistics.ROWCOUNT_UNKNOWN;
-import static org.apache.drill.exec.store.mapr.db.util.CommonFns.isNullOrEmpty;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -157,6 +156,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   public GroupScan clone(JsonScanSpec scanSpec) {
     JsonTableGroupScan newScan = new JsonTableGroupScan(this);
     newScan.scanSpec = scanSpec;
+    newScan.resetRegionsToScan(); // resetting will force recalculation
     return newScan;
   }
 
@@ -192,7 +192,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       final MetaTable metaTable = t.getMetaTable();
 
       QueryCondition scanSpecCondition = scanSpec.getCondition();
-      List<ScanRange> scanRanges = (scanSpecCondition == null) 
+      List<ScanRange> scanRanges = (scanSpecCondition == null)
           ? metaTable.getScanRanges(formatPlugin.getScanRangeSizeMB())
           : metaTable.getScanRanges(scanSpecCondition, formatPlugin.getScanRangeSizeMB());
 
@@ -219,16 +219,15 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     return doNotAccessRegionsToScan;
   }
 
-
-  protected MapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
+  protected MapRDBSubScanSpec getSubScanSpec(final TabletFragmentInfo tfi) {
     // XXX/TODO check filter/Condition
     final JsonScanSpec spec = scanSpec;
+    final String serverHostName = getRegionsToScan().get(tfi);
     JsonSubScanSpec subScanSpec = new JsonSubScanSpec(
         spec.getTableName(),
         spec.getIndexDesc(),
-        getRegionsToScan().get(tfi),
-        (!isNullOrEmpty(spec.getStartRow()) && tfi.containsRow(spec.getStartRow())) ? spec.getStartRow() : tfi.getStartKey(),
-        (!isNullOrEmpty(spec.getStopRow()) && tfi.containsRow(spec.getStopRow())) ? spec.getStopRow() : tfi.getEndKey(),
+        serverHostName,
+        tfi.getTabletInfoImpl().getCondition(),
         spec.getCondition(),
         getUserName());
     return subScanSpec;

@@ -47,6 +47,7 @@ import com.mapr.tests.annotations.ClusterTest;
 
 @Category(ClusterTest.class)
 public class TestScanRanges extends BaseJsonTest {
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestScanRanges.class);
 
   private static final int TOTAL_ROW_COUNT = 1000000;
   private static final String TABLE_NAME = "large_table_TestScanRanges";
@@ -81,6 +82,8 @@ public class TestScanRanges extends BaseJsonTest {
       }
       table.flush();
       DBTests.waitForRowCount(table.getPath(), TOTAL_ROW_COUNT);
+
+      setSessionOption("planner.width.max_per_node", "5");
    }
   }
 
@@ -93,9 +96,8 @@ public class TestScanRanges extends BaseJsonTest {
 
   @Test
   public void test_scan_ranges() throws Exception {
-    setSessionOption("planner.width.max_per_node", "5");
-    final PersistentStore<UserBitShared.QueryProfile> completed = getDrillbitContext().getProfileStoreContext().getCompletedProfileStore();
-    
+    final PersistentStore<UserBitShared.QueryProfile> completed = getDrillbitContext().getStoreProvider().getOrCreateStore(QueryManager.QUERY_PROFILE);
+
     setColumnWidths(new int[] {25, 40, 25, 45});
     final String sql = format("SELECT\n"
         + "  *\n"
@@ -106,15 +108,51 @@ public class TestScanRanges extends BaseJsonTest {
     final AwaitableUserResultsListener listener = new AwaitableUserResultsListener(resultListener);
     testWithListener(QueryType.SQL, sql, listener);
     listener.await();
-    
+
     assertEquals(TOTAL_ROW_COUNT, resultListener.getRowCount());
     String queryId = QueryIdHelper.getQueryId(resultListener.getQueryId());
-    
+
     QueryProfile profile = completed.get(queryId);
+    String profileString = String.valueOf(profile);
+    logger.debug(profileString);
     assertNotNull(profile);
-    assertTrue(profile.getTotalFragments() >= 5); // should at least as many as 
-    String profileString = profile.toString();
-    System.out.println(profileString);
+    assertTrue(profile.getTotalFragments() >= 5); // should at least as many as
+  }
+
+  @Test
+  public void test_scan_ranges_with_filter_on_id() throws Exception {
+    setColumnWidths(new int[] {25, 25, 25});
+    final String sql = format("SELECT\n"
+        + "  _id, business_id, city\n"
+        + "FROM\n"
+        + "  %s.`%s` business\n"
+        + "WHERE\n"
+        + " _id > 'M' AND _id < 'Q'");
+
+    final SilentListener resultListener = new SilentListener();
+    final AwaitableUserResultsListener listener = new AwaitableUserResultsListener(resultListener);
+    testWithListener(QueryType.SQL, sql, listener);
+    listener.await();
+
+    assertEquals(200000, resultListener.getRowCount());
+  }
+
+  @Test
+  public void test_scan_ranges_with_filter_on_non_id_field() throws Exception {
+    setColumnWidths(new int[] {25, 25, 25});
+    final String sql = format("SELECT\n"
+        + "  _id, business_id, documentId\n"
+        + "FROM\n"
+        + "  %s.`%s` business\n"
+        + "WHERE\n"
+        + " documentId >= 100 AND documentId < 150");
+
+    final SilentListener resultListener = new SilentListener();
+    final AwaitableUserResultsListener listener = new AwaitableUserResultsListener(resultListener);
+    testWithListener(QueryType.SQL, sql, listener);
+    listener.await();
+
+    assertEquals(10000, resultListener.getRowCount());
   }
 
 }

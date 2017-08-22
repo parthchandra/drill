@@ -322,6 +322,10 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
     return doNotAccessRegionsToScan;
   }
 
+  protected void resetRegionsToScan() {
+    this.doNotAccessRegionsToScan = null;
+  }
+
   protected void setRegionsToScan(NavigableMap<TabletFragmentInfo, String> regionsToScan) {
     this.doNotAccessRegionsToScan = regionsToScan;
   }

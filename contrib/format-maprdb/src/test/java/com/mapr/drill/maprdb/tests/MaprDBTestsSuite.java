@@ -37,8 +37,8 @@ import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBFilterPushDown;
 import com.mapr.drill.maprdb.tests.binary.TestMapRDBSimple;
-import com.mapr.drill.maprdb.tests.index.IndexPlanTest;
 import com.mapr.drill.maprdb.tests.json.TestQueryWithIndex;
+import com.mapr.drill.maprdb.tests.json.TestScanRanges;
 import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
 
 @RunWith(Suite.class)
@@ -47,7 +47,8 @@ import com.mapr.drill.maprdb.tests.json.TestSimpleJson;
   TestMapRDBFilterPushDown.class,
   IndexHintPlanTest.class,
   TestQueryWithIndex.class,
-  TestSimpleJson.class
+  TestSimpleJson.class,
+  TestScanRanges.class
 })
 public class MaprDBTestsSuite {
   public static final int INDEX_FLUSH_TIMEOUT = 60000;
