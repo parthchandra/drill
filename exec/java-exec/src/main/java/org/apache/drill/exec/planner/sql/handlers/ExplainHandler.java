@@ -62,7 +62,7 @@ public class ExplainHandler extends DefaultSqlHandler {
     if (context.getPlannerSettings().isUseSimpleOptimizer()) {
       drel = convertToDrelSimpleOpt(queryRelNode, validatedRowType);
     } else {
-      drel = convertToDrel(queryRelNode, validatedRowType);
+      drel = convertToDrel(queryRelNode);
     }
 
     if (mode == ResultMode.LOGICAL) {
@@ -74,7 +74,7 @@ public class ExplainHandler extends DefaultSqlHandler {
     if (context.getPlannerSettings().isUseSimpleOptimizer()) {
       prel = convertToPrelSimpleOpt(drel);
     } else {
-      prel = convertToPrel(drel);
+      prel = convertToPrel(drel, validatedRowType);
     }
 
     logAndSetTextPlan("Drill Physical", prel, logger);

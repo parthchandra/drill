@@ -35,6 +35,8 @@ import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelTraitSet;
 
+import static org.apache.drill.exec.planner.index.Statistics.ROWCOUNT_UNKNOWN;
+
 /**
  * A RangePartitionExchange provides the ability to divide up the rows into separate ranges or 'buckets'
  * based on the values of a set of columns (the range partitioning columns).
@@ -60,12 +62,12 @@ public class RangePartitionExchangePrel extends ExchangePrel {
   }
 
   @Override
-  public RelOptCost computeSelfCost(RelOptPlanner planner) {
+  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     if (PrelUtil.getSettings(getCluster()).useDefaultCosting()) {
       return super.computeSelfCost(planner).multiplyBy(.1);
     }
     RelNode child = this.getInput();
-    double inputRows = RelMetadataQuery.getRowCount(child);
+    double inputRows = (mq == null)? ROWCOUNT_UNKNOWN : mq.getRowCount(child);
 
     // int  rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
 

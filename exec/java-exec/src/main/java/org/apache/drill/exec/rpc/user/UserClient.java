@@ -150,8 +150,15 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
         .setSaslSupport(SaslSupport.SASL_AUTH)
         .setProperties(properties.serializeForServer())
         .setEnableMultiplex(properties.containsKey(DrillProperties.MULTIPLEX) &&
-            Boolean.parseBoolean(properties.getProperty(DrillProperties.MULTIPLEX)))
-        .build();
+            Boolean.parseBoolean(properties.getProperty(DrillProperties.MULTIPLEX)));
+
+    // Only used for testing purpose
+    if (properties.containsKey(DrillProperties.TEST_SASL_LEVEL)) {
+      hsBuilder.setSaslSupport(SaslSupport.valueOf(
+          Integer.parseInt(properties.getProperty(DrillProperties.TEST_SASL_LEVEL))));
+    }
+
+    connect(hsBuilder.build(), endpoint).checkedGet();
 
     // Check if client needs encryption and server is not configured for encryption.
     final boolean clientNeedsEncryption = properties.containsKey(DrillProperties.SASL_ENCRYPT)

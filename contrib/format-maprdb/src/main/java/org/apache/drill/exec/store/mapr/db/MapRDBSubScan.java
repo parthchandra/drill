@@ -36,6 +36,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
+import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
 // Class containing information for reading a single HBase region
 @JsonTypeName("maprdb-sub-scan")
@@ -48,24 +49,26 @@ public class MapRDBSubScan extends AbstractDbSubScan {
   private final String tableType;
 
   @JsonCreator
-  public MapRDBSubScan(@JacksonInject StoragePluginRegistry engineRegistry,
-                       @JsonProperty("userName") String userName,
-                       @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
-                       @JsonProperty("storageConfig") StoragePluginConfig storageConfig,
-                       @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
-                       @JsonProperty("columns") List<SchemaPath> columns,
-                       @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
-    this(userName,
-        (MapRDBFormatPlugin) engineRegistry.getFormatPlugin(storageConfig, formatPluginConfig),
-        regionScanSpecList,
-        columns,
-        tableType);
+  public MapRDBSubScan(@JacksonInject StoragePluginRegistry registry,
+                        @JsonProperty("userName") String userName,
+                        @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
+                        @JsonProperty("storageConfig") StoragePluginConfig storage,
+                        @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
+                        @JsonProperty("columns") List<SchemaPath> columns,
+                        @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
+     this(userName, formatPluginConfig,
+         (FileSystemPlugin) registry.getPlugin(storage),
+         storage, regionScanSpecList, columns, tableType);
   }
 
-  public MapRDBSubScan(String userName, MapRDBFormatPlugin formatPlugin,
-      List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, String tableType) {
+  public MapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig, FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
+                       List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, String tableType) {
     super(userName);
-    this.formatPlugin = formatPlugin;
+    this.storageConfig = storageConfig;
+    this.storagePlugin = storagePlugin;
+    this.formatPluginConfig = formatPluginConfig;
+    this.formatPlugin = (MapRDBFormatPlugin) storagePlugin.getFormatPlugin(formatPluginConfig);
+
     this.regionScanSpecList = maprSubScanSpecs;
     this.columns = columns;
     this.tableType = tableType;

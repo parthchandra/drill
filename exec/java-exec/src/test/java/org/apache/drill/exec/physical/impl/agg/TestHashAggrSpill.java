@@ -29,7 +29,7 @@ import org.apache.drill.test.ClusterFixture;
 import org.apache.drill.test.FixtureBuilder;
 import org.apache.drill.test.LogFixture;
 import org.apache.drill.test.ProfileParser;
-import org.apache.drill.test.QueryBuilder;
+import org.apache.drill.test.QuerySummary;
 import org.junit.Test;
 
 import java.util.List;
@@ -45,7 +45,7 @@ public class TestHashAggrSpill extends BaseTestQuery {
     private void runAndDump(ClientFixture client, String sql, long expectedRows, long spillCycle, long spilledPartitions) throws Exception {
         String plan = client.queryBuilder().sql(sql).explainJson();
 
-        QueryBuilder.QuerySummary summary = client.queryBuilder().sql(sql).run();
+        QuerySummary summary = client.queryBuilder().sql(sql).run();
         if ( expectedRows > 0 ) {
             assertEquals(expectedRows, summary.recordCount());
         }

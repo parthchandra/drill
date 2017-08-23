@@ -155,27 +155,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     return newScan;
   }
 
-
-  /**
-   * Compute regions to scan based on the scanSpec
-   */
-  private void computeRegionsToScan() {
-    boolean foundStartRegion = false;
-
-    regionsToScan = new TreeMap<TabletFragmentInfo, String>();
-    for (TabletInfo tabletInfo : tabletInfos) {
-      TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) tabletInfo;
-      if (!foundStartRegion && !isNullOrEmpty(scanSpec.getStartRow()) && !tabletInfoImpl.containsRow(scanSpec.getStartRow())) {
-        continue;
-      }
-      foundStartRegion = true;
-      regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), tabletInfo.getLocations()[0]);
-      if (!isNullOrEmpty(scanSpec.getStopRow()) && tabletInfoImpl.containsRow(scanSpec.getStopRow())) {
-        break;
-      }
-    }
-  }
-
   public GroupScan clone(JsonScanSpec scanSpec) {
     JsonTableGroupScan newScan = new JsonTableGroupScan(this);
     newScan.scanSpec = scanSpec;
@@ -226,14 +205,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         TabletInfoImpl tabletInfoImpl = (TabletInfoImpl) range;
         regionsToScan.put(new TabletFragmentInfo(tabletInfoImpl), range.getLocations()[0]);
       }
-
-      computeRegionsToScan();
-
     } catch (Exception e) {
       throw new DrillRuntimeException("Error getting region info for table: " +
-        scanSpec.getTableName() + (scanSpec.getIndexDesc() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
+          scanSpec.getTableName() + (scanSpec.getIndexDesc() == null ? "" : (", index: " + scanSpec.getIndexName())), e);
     }
   }
+
 
   protected MapRDBSubScanSpec getSubScanSpec(TabletFragmentInfo tfi) {
     // XXX/TODO check filter/Condition
@@ -255,7 +232,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.",
         endpointFragmentMapping.size(), minorFragmentId);
     return new MapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(),
-        getStoragePlugin().getConfig(), endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
+          getStoragePlugin().getConfig(), endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
   }
 
   @Override

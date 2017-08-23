@@ -59,7 +59,7 @@ public interface HashTable {
 
   public int getHashCode(int incomingRowIdx) throws SchemaChangeException;
 
-  public PutStatus put(int incomingRowIdx, IndexPointer htIdxHolder, int retryCount);
+  public PutStatus put(int incomingRowIdx, IndexPointer htIdxHolder, int retryCount) throws SchemaChangeException;
 
   public int containsKey(int incomingRowIdx, boolean isProbe) throws SchemaChangeException;
 

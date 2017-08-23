@@ -172,8 +172,8 @@ public class DefaultSqlHandler extends AbstractSqlHandler {
       final DrillRel drel = convertToDrelSimpleOpt(queryRelNode, validatedRowType);
       prel = convertToPrelSimpleOpt(drel);
     } else {
-      final DrillRel drel = convertToDrel(queryRelNode, validatedRowType);
-      prel = convertToPrel(drel);
+      final DrillRel drel = convertToDrel(queryRelNode);
+      prel = convertToPrel(drel, validatedRowType);
     }
 
     logAndSetTextPlan("Drill Physical", prel, logger);

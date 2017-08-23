@@ -23,6 +23,7 @@ import org.apache.calcite.rel.metadata.ReflectiveRelMetadataProvider;
 import org.apache.calcite.rel.metadata.RelMdSelectivity;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rel.metadata.RelMetadataProvider;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -38,14 +39,14 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
 
   public static final RelMetadataProvider SOURCE = ReflectiveRelMetadataProvider.reflectiveSource(BuiltInMethod.SELECTIVITY.method, INSTANCE);
 
-  @Override
+
   public Double getSelectivity(RelNode rel, RexNode predicate) {
     if (rel instanceof RelSubset) {
       return getSelectivity((RelSubset) rel, predicate);
     } else if (rel instanceof DrillScanRel) {
       return getSelectivity((DrillScanRel) rel, predicate);
     } else {
-      return super.getSelectivity(rel, predicate);
+      return super.getSelectivity(rel, RelMetadataQuery.instance(), predicate);
     }
   }
 
@@ -61,6 +62,8 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
     return RelMdUtil.guessSelectivity(predicate);
   }
 
+
+
   private Double getSelectivity(DrillScanRel rel, RexNode predicate) {
     double ROWCOUNT_UNKNOWN = -1.0;
     PlannerSettings settings = PrelUtil.getPlannerSettings(rel.getCluster().getPlanner());
@@ -74,6 +77,6 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
         return filterRows/totalRows;
       }
     }
-    return super.getSelectivity(rel, predicate);
+    return super.getSelectivity(rel, RelMetadataQuery.instance(), predicate);
   }
 }

@@ -101,25 +101,46 @@ public class DrillOptiq {
   }
 
   public static class RexToDrill extends RexVisitorImpl<LogicalExpression> {
-    private final RelDataType rowType;
-    private final RexBuilder builder;
+    private final List<RelNode> inputs;
     private final DrillParseContext context;
     private final List<RelDataTypeField> fieldList;
+    private final RelDataType rowType;
+    private final RexBuilder builder;
 
-    public RexToDrill(DrillParseContext context, RelNode input) {
+    RexToDrill(DrillParseContext context, List<RelNode> inputs) {
       super(true);
       this.context = context;
-      if (input != null) {
-        this.rowType = input.getRowType();
-        this.builder = input.getCluster().getRexBuilder();
-      } else {
-        this.rowType = null;
-        this.builder = null;
+      this.inputs = inputs;
+      this.fieldList = Lists.newArrayList();
+      this.rowType = inputs.size() > 0? inputs.get(0).getRowType() : null;
+      this.builder = inputs.size() > 0? inputs.get(0).getCluster().getRexBuilder() : null;
+      /*
+         Fields are enumerated by their presence order in input. Details {@link org.apache.calcite.rex.RexInputRef}.
+         Thus we can merge field list from several inputs by adding them into the list in order of appearance.
+         Each field index in the list will match field index in the RexInputRef instance which will allow us
+         to retrieve field from filed list by index in {@link #visitInputRef(RexInputRef)} method. Example:
+
+         Query: select t1.c1, t2.c1. t2.c2 from t1 inner join t2 on t1.c1 between t2.c1 and t2.c2
+
+         Input 1: $0
+         Input 2: $1, $2
+
+         Result: $0, $1, $2
+       */
+      for (RelNode input : inputs) {
+        if (input != null) {
+          fieldList.addAll(input.getRowType().getFieldList());
+        }
       }
+    }
+    public RexToDrill(DrillParseContext context, RelNode input) {
+      this(context, Lists.newArrayList(input));
     }
 
     public RexToDrill(DrillParseContext context, RelDataType rowType, RexBuilder builder) {
       super(true);
+      this.inputs = Lists.newArrayList();
+      this.fieldList = Lists.newArrayList();
       this.context = context;
       this.rowType = rowType;
       this.builder = builder;

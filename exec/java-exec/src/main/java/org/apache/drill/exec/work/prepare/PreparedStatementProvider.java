@@ -63,6 +63,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import static org.apache.drill.exec.ExecConstants.CREATE_PREPARE_STATEMENT_TIMEOUT_MILLIS;
 import static org.apache.drill.exec.proto.UserProtos.RequestStatus.FAILED;
@@ -227,7 +228,6 @@ public class PreparedStatementProvider {
    */
   private static class UserClientConnectionWrapper extends AbstractDisposableUserClientConnection {
     private final UserClientConnection inner;
-
     private volatile List<SerializedField> fields;
 
     UserClientConnectionWrapper(UserClientConnection inner) {
@@ -247,24 +247,6 @@ public class PreparedStatementProvider {
     @Override
     public SocketAddress getRemoteAddress() {
       return inner.getRemoteAddress();
-    }
-
-    @Override
-    public void close() {
-    }
-
-    @Override
-    public void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result) {
-      // Release the wait latch if the query is terminated.
-      final QueryState state = result.getQueryState();
-      if (state == QueryState.FAILED || state  == QueryState.CANCELED || state == QueryState.COMPLETED) {
-        if (state == QueryState.FAILED) {
-          error = result.getError(0);
-        }
-        latch.countDown();
-      }
-
-      listener.success(Acks.OK, null);
     }
 
     @Override

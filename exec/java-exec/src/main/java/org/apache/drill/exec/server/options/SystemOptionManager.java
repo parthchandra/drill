@@ -211,9 +211,9 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.QUERY_TRANSIENT_STATE_UPDATE,
       ExecConstants.PERSISTENT_TABLE_UMASK_VALIDATOR,
       ExecConstants.CPU_LOAD_AVERAGE,
-      ExecConstants.ENABLE_VECTOR_VALIDATOR,
       ExecConstants.ENABLE_ITERATOR_VALIDATOR,
-      ExecConstants.ROWKEY_JOIN_BATCHSIZE
+      ExecConstants.ENABLE_VECTOR_VALIDATOR,
+      ExecConstants.ROWKEY_JOIN_BATCHSIZE,
       ExecConstants.QUERY_ROWKEYJOIN_BATCHSIZE
     };
     final Map<String, OptionValidator> tmp = new HashMap<>();

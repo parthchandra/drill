@@ -406,7 +406,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
         // For every record in the build batch , hash the key columns
         for (int i = 0; i < currentRecordCount; i++) {
           int hashCode = hashTable.getHashCode(i);
-          hashTable.put(i, htIndex, hashCode);
+          HashTable.PutStatus putResult = hashTable.put(i, htIndex, hashCode);
 
                         /* Use the global index returned by the hash table, to store
                          * the current record index and batch index. This will be used

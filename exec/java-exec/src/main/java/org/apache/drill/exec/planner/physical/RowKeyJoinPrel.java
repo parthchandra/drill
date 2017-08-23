@@ -55,7 +55,7 @@ public class RowKeyJoinPrel extends JoinPrel implements Prel {
   }
 
   @Override
-  public double getRows() {
+  public double estimateRowCount(RelMetadataQuery mq) {
     return this.getLeft().getRows();
   }
 
@@ -70,11 +70,11 @@ public class RowKeyJoinPrel extends JoinPrel implements Prel {
   }
 
   @Override
-  public RelOptCost computeSelfCost(RelOptPlanner planner) {
+  public RelOptCost computeSelfCost(RelOptPlanner planner, RelMetadataQuery mq) {
     if(PrelUtil.getSettings(getCluster()).useDefaultCosting()) {
       return super.computeSelfCost(planner).multiplyBy(.1);
     }
-    double rowCount = RelMetadataQuery.getRowCount(this.getRight());
+    double rowCount = mq.getRowCount(this.getRight());
     DrillCostFactory costFactory = (DrillCostFactory) planner.getCostFactory();
     return costFactory.makeCost(rowCount, 0, 0, 0,
         0 /* mem cost is 0 because this operator does not make any extra copy of either the left or right batches */);

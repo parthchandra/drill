@@ -337,14 +337,6 @@ public class PlannerSettings implements Context{
     return options.getOption(JOIN_OPTIMIZATION);
   }
 
-  public boolean isIndexPlanningEnabled() {
-    return options.getOption(INDEX_PLANNING);
-  }
-
-  public boolean isIndexForceSortNonCovering() {
-    return options.getOption(INDEX_FORCE_SORT_NONCOVERING);
-  }
-
   public boolean isUseSimpleOptimizer() {
     return options.getOption(USE_SIMPLE_OPTIMIZER);
   }

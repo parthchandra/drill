@@ -34,7 +34,7 @@ public enum CoreOperatorType implements com.dyuproject.protostuff.EnumLite<CoreO
     ORDERED_PARTITION_SENDER(9),
     PROJECT(10),
     UNORDERED_RECEIVER(11),
-    RANGE_SENDER(12),
+    RANGE_PARTITION_SENDER(12),
     SCREEN(13),
     SELECTION_VECTOR_REMOVER(14),
     STREAMING_AGGREGATE(15),
@@ -91,7 +91,7 @@ public enum CoreOperatorType implements com.dyuproject.protostuff.EnumLite<CoreO
             case 9: return ORDERED_PARTITION_SENDER;
             case 10: return PROJECT;
             case 11: return UNORDERED_RECEIVER;
-            case 12: return RANGE_SENDER;
+            case 12: return RANGE_PARTITION_SENDER;
             case 13: return SCREEN;
             case 14: return SELECTION_VECTOR_REMOVER;
             case 15: return STREAMING_AGGREGATE;

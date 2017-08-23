@@ -38,7 +38,7 @@ import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.testing.Controls;
 import org.apache.drill.exec.testing.ControlsInjectionUtil;
 import org.apache.drill.test.ClusterFixture.FixtureTestServices;
-import org.apache.drill.test.QueryBuilder.QuerySummary;
+import org.apache.drill.test.QuerySummary;
 import org.apache.drill.test.rowSet.RowSetBuilder;
 
 /**

@@ -40,7 +40,7 @@ import org.apache.drill.exec.rpc.Response;
 import org.apache.drill.exec.rpc.ResponseSender;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.RpcOutcomeListener;
-import org.apache.drill.exec.rpc.user.UserServer.UserClientConnection;
+import org.apache.drill.exec.rpc.UserClientConnection;
 import org.apache.drill.exec.work.user.UserWorker;
 
 import java.net.SocketAddress;
@@ -136,7 +136,13 @@ public class MultiUserServerRequestHandler implements RequestHandler<UserServer.
 
       final UserClientConnection removedConnection = sessions.remove(handle);
       if (removedConnection != null) {
-        removedConnection.close();
+        if (removedConnection instanceof AutoCloseable) {
+          try {
+            ((AutoCloseable) removedConnection).close();
+          } catch (Exception e) {
+            throw new RpcException("Failure while decoding SessionHandle body.", e);
+          }
+        }
         sender.send(new Response(RpcType.ACK, Acks.OK));
       } else {
         sender.send(new Response(RpcType.ACK, Acks.FAIL));
@@ -201,10 +207,6 @@ public class MultiUserServerRequestHandler implements RequestHandler<UserServer.
         return underlyingConnection.getRemoteAddress();
       }
 
-      @Override
-      public void close() {
-        userSession.close(); // when this specific session is closed
-      }
     };
   }
 }
