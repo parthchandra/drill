@@ -118,6 +118,7 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.HASHAGG_NUM_PARTITIONS_VALIDATOR,
       ExecConstants.HASHAGG_MAX_MEMORY_VALIDATOR,
       ExecConstants.HASHAGG_MIN_BATCHES_PER_PARTITION_VALIDATOR, // for tuning
+      ExecConstants.HASHAGG_FALLBACK_ENABLED_VALIDATOR, // for enable/disable unbounded HashAgg
       PlannerSettings.INDEX_PLANNING,
       PlannerSettings.INDEX_FORCE_SORT_NONCOVERING,
       PlannerSettings.INDEX_USE_HASHJOIN_NONCOVERING,
