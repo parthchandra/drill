@@ -112,8 +112,14 @@ public class DrillOptiq {
       this.context = context;
       this.inputs = inputs;
       this.fieldList = Lists.newArrayList();
-      this.rowType = inputs.size() > 0? inputs.get(0).getRowType() : null;
-      this.builder = inputs.size() > 0? inputs.get(0).getCluster().getRexBuilder() : null;
+      if (inputs.size() > 0 && inputs.get(0)!=null) {
+        this.rowType = inputs.get(0).getRowType();
+        this.builder = inputs.get(0).getCluster().getRexBuilder();
+      }
+      else {
+        this.rowType = null;
+        this.builder = null;
+      }
       /*
          Fields are enumerated by their presence order in input. Details {@link org.apache.calcite.rex.RexInputRef}.
          Thus we can merge field list from several inputs by adding them into the list in order of appearance.
@@ -139,11 +145,11 @@ public class DrillOptiq {
 
     public RexToDrill(DrillParseContext context, RelDataType rowType, RexBuilder builder) {
       super(true);
-      this.inputs = Lists.newArrayList();
-      this.fieldList = Lists.newArrayList();
       this.context = context;
       this.rowType = rowType;
       this.builder = builder;
+      this.inputs = Lists.newArrayList();
+      this.fieldList = rowType.getFieldList();
     }
 
     protected RelDataType getRowType() {
@@ -157,7 +163,7 @@ public class DrillOptiq {
     @Override
     public LogicalExpression visitInputRef(RexInputRef inputRef) {
       final int index = inputRef.getIndex();
-      final RelDataTypeField field = getRowType().getFieldList().get(index);
+      final RelDataTypeField field = fieldList.get(index);
       return FieldReference.getWithQuotedRef(field.getName());
     }
 

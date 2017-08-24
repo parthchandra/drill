@@ -23,7 +23,7 @@ import org.apache.drill.exec.memory.BufferAllocator;
 import java.io.Closeable;
 import java.util.Properties;
 
-public interface DrillConnection {
+public interface DrillConnection extends AutoCloseable {
 
   /**
    * Gets the {@link BufferAllocator buffer allocator} used by this connection.
@@ -45,6 +45,6 @@ public interface DrillConnection {
    * Release resources, and close all {@link DrillSession sessions} created
    * over this connection.
    **/
-  void close();
+  //void close();
 
 }

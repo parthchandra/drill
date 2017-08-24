@@ -19,7 +19,7 @@ package org.apache.drill.exec.rpc.user.clusterclient;
 
 import org.apache.drill.exec.memory.BufferAllocator;
 
-public interface DrillClusterClient {
+public interface DrillClusterClient extends AutoCloseable {
 
   /**
    * Gets the {@link BufferAllocator buffer allocator} used by this client.
@@ -32,6 +32,6 @@ public interface DrillClusterClient {
    * Release resources, and close all {@link DrillConnection connections}
    * created using this client.
    **/
-  void close();
+  //void close();
 
 }

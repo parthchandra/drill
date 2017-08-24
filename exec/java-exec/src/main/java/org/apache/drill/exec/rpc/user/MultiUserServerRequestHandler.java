@@ -172,41 +172,55 @@ public class MultiUserServerRequestHandler implements RequestHandler<UserServer.
     }
   }
 
+  private static class SessionConnection implements UserClientConnection, AutoCloseable {
+    final UserServer.BitToUserConnection underlyingConnection;
+    final UserSession userSession;
+
+    public SessionConnection(final UserServer.BitToUserConnection underlyingConnection,
+                             final UserSession userSession) {
+      this.underlyingConnection = underlyingConnection;
+      this.userSession = userSession;
+    }
+
+    @Override
+    public UserSession getSession() {
+      return userSession;
+    }
+
+    @Override
+    public void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result) {
+      underlyingConnection.sendResult(listener, result);
+    }
+
+    @Override
+    public void sendData(RpcOutcomeListener<Ack> listener, QueryWritableBatch result) {
+      underlyingConnection.sendData(listener, result);
+    }
+
+    @Override
+    public ChannelFuture getChannelClosureFuture() {
+      return underlyingConnection.getChannelClosureFuture()
+          .addListener(new GenericFutureListener<Future<? super Void>>() {
+            @Override
+            public void operationComplete(Future<? super Void> future) throws Exception {
+              userSession.close(); // when the underlying connection is closed
+            }
+          });
+    }
+
+    @Override
+    public SocketAddress getRemoteAddress() {
+      return underlyingConnection.getRemoteAddress();
+    }
+
+    @Override
+    public void close() {
+      userSession.close(); // when this specific session is closed
+    }
+  }
+
   private static UserClientConnection newSession(final UserServer.BitToUserConnection underlyingConnection,
                                                  final UserSession userSession) {
-    return new UserClientConnection() {
-
-      @Override
-      public UserSession getSession() {
-        return userSession;
-      }
-
-      @Override
-      public void sendResult(RpcOutcomeListener<Ack> listener, QueryResult result) {
-        underlyingConnection.sendResult(listener, result);
-      }
-
-      @Override
-      public void sendData(RpcOutcomeListener<Ack> listener, QueryWritableBatch result) {
-        underlyingConnection.sendData(listener, result);
-      }
-
-      @Override
-      public ChannelFuture getChannelClosureFuture() {
-        return underlyingConnection.getChannelClosureFuture()
-            .addListener(new GenericFutureListener<Future<? super Void>>() {
-              @Override
-              public void operationComplete(Future<? super Void> future) throws Exception {
-                userSession.close(); // when the underlying connection is closed
-              }
-            });
-      }
-
-      @Override
-      public SocketAddress getRemoteAddress() {
-        return underlyingConnection.getRemoteAddress();
-      }
-
-    };
+    return new SessionConnection(underlyingConnection, userSession);
   }
 }

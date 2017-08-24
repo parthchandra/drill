@@ -528,8 +528,6 @@ public interface ExecConstants {
    */
   String ENABLE_VECTOR_VALIDATION = "drill.exec.debug.validate_vectors";
 
-  String ROWKEY_JOIN_BATCHSIZE_KEY = "exec.query.rowkeyjoin.batchsize";
-  PositiveLongValidator ROWKEY_JOIN_BATCHSIZE = new PositiveLongValidator(ROWKEY_JOIN_BATCHSIZE_KEY, Long.MAX_VALUE, 128);
   String QUERY_ROWKEYJOIN_BATCHSIZE_KEY = "exec.query.rowkeyjoin_batchsize";
-  PositiveLongValidator QUERY_ROWKEYJOIN_BATCHSIZE = new PositiveLongValidator(QUERY_ROWKEYJOIN_BATCHSIZE_KEY, Long.MAX_VALUE, 128);
+  PositiveLongValidator QUERY_ROWKEYJOIN_BATCHSIZE = new PositiveLongValidator(QUERY_ROWKEYJOIN_BATCHSIZE_KEY, Long.MAX_VALUE);
 }
