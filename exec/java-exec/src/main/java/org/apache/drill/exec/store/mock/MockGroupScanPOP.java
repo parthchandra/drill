@@ -126,7 +126,7 @@ public class MockGroupScanPOP extends AbstractGroupScan {
 
       rowWidth = Math.max(rowWidth, groupRowWidth);
     }
-    int dataSize = rowCount * rowWidth;
+    long dataSize = rowCount * rowWidth;
     scanStats = new ScanStats(GroupScanProperty.EXACT_ROW_COUNT,
                                rowCount,
                                DrillCostBase.BASE_CPU_COST * dataSize,
