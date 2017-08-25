@@ -83,6 +83,8 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
   }
 
   private final BitSet dirs;
+  // Flag used to restrict PartialPush for OR predicates.
+  private final boolean enableORPartialPush;
 
   // The Scan could be projecting several dirN columns but we are only interested in the
   // ones that are referenced by the Filter, so keep track of such referenced dirN columns.
@@ -104,18 +106,20 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
   private RexNode resultCondition = null;
 
   public FindPartitionConditions(BitSet dirs) {
-    // go deep
-    super(true);
-    this.dirs = dirs;
-    this.referencedDirs = new BitSet(dirs.size());
+    this(dirs,null,true);
   }
 
   public FindPartitionConditions(BitSet dirs, RexBuilder builder) {
+    this(dirs, builder, true);
+  }
+
+  public FindPartitionConditions(BitSet dirs, RexBuilder builder, boolean enableORPartialPush) {
     // go deep
     super(true);
     this.dirs = dirs;
     this.builder = builder;
     this.referencedDirs = new BitSet(dirs.size());
+    this.enableORPartialPush = enableORPartialPush;
   }
 
   public void analyze(RexNode exp) {
@@ -289,12 +293,30 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
     // look for NO_PUSH operands
     int operandCount = call.getOperands().size();
     List<PushDirFilter> operandStack = Util.last(pushStatusStack, operandCount);
+    int partialpushcnt = 0; int nopushcnt = 0;
     for (PushDirFilter operandPushDirFilter : operandStack) {
       if (operandPushDirFilter == PushDirFilter.NO_PUSH) {
-        callPushDirFilter = PushDirFilter.NO_PUSH;
+        nopushcnt++;
       } else if (operandPushDirFilter == PushDirFilter.PARTIAL_PUSH) {
-        callPushDirFilter = PushDirFilter.PARTIAL_PUSH;
+        partialpushcnt++;
       }
+    }
+    int pushcnt = operandCount - (nopushcnt + partialpushcnt);
+    if (operandCount > 0 && opStack.size() > 0) {
+      OpState currentOp = opStack.peek();
+      boolean isORAndCanBePushed = enableORPartialPush && currentOp.sqlOperator.kind == SqlKind.OR;
+      if (isORAndCanBePushed && partialpushcnt > 0 && nopushcnt == 0 ||
+          currentOp.sqlOperator.kind == SqlKind.AND && partialpushcnt > 0 ) {
+        callPushDirFilter = PushDirFilter.PARTIAL_PUSH;
+      } else if (currentOp.sqlOperator.kind == SqlKind.AND && nopushcnt > 0 && nopushcnt < operandCount) {
+        callPushDirFilter = PushDirFilter.PARTIAL_PUSH;
+      } else if (pushcnt == operandCount) {
+        callPushDirFilter = PushDirFilter.PUSH;
+      } else {
+        callPushDirFilter = PushDirFilter.NO_PUSH;
+      }
+    } else {
+      callPushDirFilter = PushDirFilter.NO_PUSH;
     }
 
     // Even if all operands are PUSH, the call itself may
@@ -312,19 +334,8 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
       callPushDirFilter = PushDirFilter.NO_PUSH;
     }
 
-
     if (callPushDirFilter == PushDirFilter.NO_PUSH) {
-      OpState currentOp = opStack.peek();
-      if (currentOp != null) {
-        if (currentOp.sqlOperator.getKind() != SqlKind.AND) {
-          clearChildren();
-        } else {
-          // AND op, check if we pushed some children
-          if (currentOp.children.size() > 0) {
-            callPushDirFilter = PushDirFilter.PARTIAL_PUSH;
-          }
-        }
-      }
+      clearChildren();
     }
 
     // pop operands off of the stack

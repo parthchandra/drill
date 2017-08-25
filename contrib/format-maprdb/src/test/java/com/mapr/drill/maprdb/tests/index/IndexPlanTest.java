@@ -1052,6 +1052,22 @@ public class IndexPlanTest extends BaseJsonTest {
         new String[] {},
         new String[]{"indexName="}
     );
+  }
 
+  @Test
+  public void testAndOrConditionQuery() throws Exception {
+    String query = "select count(*) as numOfRows from hbase.`index_test_primary` t where t.name.fname <= 'AfbYTz' or t.name.fname < 'UcCsBNUYZ' and  t.`id`.`ssn` > '100009990'";
+
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+            new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary"},
+            new String[]{"RowKeyJoin", "indexName="}
+    );
+
+    testBuilder()
+            .sqlQuery(query)
+            .ordered()
+            .baselineColumns("numOfRows").baselineValues(131L)
+            .go();
   }
 }

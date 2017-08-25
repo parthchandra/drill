@@ -240,7 +240,7 @@ public class IndexConditionInfo {
 
       condition = condition.accept(reverseVisitor);
 
-      RexSeparator separator = new RexSeparator(relevantPaths, scan, builder);
+      RexSeparator separator = new RexSeparator(relevantPaths, scan, builder, false);
       RexNode indexCondition = separator.getSeparatedCondition(condition);
 
       if (indexCondition == null) {
