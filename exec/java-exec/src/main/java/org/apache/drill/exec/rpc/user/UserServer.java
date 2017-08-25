@@ -22,6 +22,7 @@ import java.net.SocketAddress;
 import java.util.UUID;
 
 import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import javax.security.sasl.SaslException;
 
 import io.netty.channel.Channel;
@@ -29,7 +30,7 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillException;
-import org.apache.drill.exec.SSLConfig;
+import org.apache.drill.exec.ssl.SSLConfig;
 import org.apache.drill.exec.exception.DrillbitStartupException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.physical.impl.materialize.QueryWritableBatch;
@@ -59,6 +60,7 @@ import org.apache.drill.exec.rpc.security.plain.PlainFactory;
 import org.apache.drill.exec.rpc.user.UserServer.BitToUserConnection;
 import org.apache.drill.exec.rpc.user.security.UserAuthenticationException;
 import org.apache.drill.exec.server.BootStrapContext;
+import org.apache.drill.exec.ssl.SSLConfigBuilder;
 import org.apache.drill.exec.work.user.UserWorker;
 import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -78,6 +80,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   private static final String SERVER_NAME = "Apache Drill Server";
 
   private final BootStrapContext bootStrapContext;
+  private final BufferAllocator allocator;
   private final UserConnectionConfig config;
   private final SSLConfig sslConfig;
   private Channel sslChannel;
@@ -89,10 +92,11 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
         allocator.getAsByteBufAllocator(),
         eventLoopGroup);
     this.bootStrapContext = context;
+    this.allocator = allocator;
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
     this.sslChannel = null;
     try {
-      this.sslConfig = new SSLConfig.SSLConfigBuilder()
+      this.sslConfig = new SSLConfigBuilder()
           .config(bootStrapContext.getConfig())
           .mode(SSLFactory.Mode.SERVER)
           .initializeSSLContext(true)
@@ -111,7 +115,8 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   protected void setupSSL(ChannelPipeline pipe) {
     if (sslConfig.isUserSslEnabled()) {
 
-      SSLEngine sslEngine = sslConfig.getSslContext().createSSLEngine();
+      //SSLEngine sslEngine = sslConfig.getSslContext().createSSLEngine();
+      SSLEngine sslEngine = sslConfig.getSslContext().newEngine(allocator.getAsByteBufAllocator());
       sslEngine.setUseClientMode(false);
 
       // No need for client side authentication (HTTPS like behaviour)

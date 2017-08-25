@@ -17,36 +17,26 @@
  */
 package org.apache.drill.exec.rpc.user.security;
 
-import com.google.common.collect.Lists;
 import com.typesafe.config.ConfigValueFactory;
+import io.netty.handler.ssl.util.SelfSignedCertificate;
 import junit.framework.TestCase;
 import org.apache.drill.BaseTestQuery;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.rpc.NonTransientRpcException;
-import org.apache.drill.exec.rpc.RpcException;
-import org.apache.drill.exec.rpc.security.KerberosHelper;
-import org.apache.drill.exec.rpc.user.security.testing.UserAuthenticatorTestImpl;
-import org.apache.drill.exec.server.BootStrapContext;
-import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.apache.hadoop.security.authentication.util.KerberosUtil;
-import org.apache.kerby.kerberos.kerb.client.JaasKrbUtil;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
-import javax.security.auth.Subject;
 import java.io.File;
-import java.lang.reflect.Field;
-import java.security.PrivilegedExceptionAction;
+import java.io.FileOutputStream;
+import java.net.InetAddress;
+import java.security.KeyStore;
 import java.util.Properties;
 
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertEquals;
 
-@Ignore("See DRILL-5387")
 public class TestUserBitSSL extends BaseTestQuery {
   private static final org.slf4j.Logger logger =
       org.slf4j.LoggerFactory.getLogger(TestUserBitSSL.class);
@@ -57,6 +47,7 @@ public class TestUserBitSSL extends BaseTestQuery {
   private static String ksPath;
   private static String tsPath;
   private static String emptyTSPath;
+  private static String unknownKsPath;
 
   @BeforeClass
   public static void setupTest() throws Exception {
@@ -64,6 +55,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     // Create a new DrillConfig
     classLoader = TestUserBitSSL.class.getClassLoader();
     ksPath = new File(classLoader.getResource("ssl/keystore.ks").getFile()).getAbsolutePath();
+    unknownKsPath = new File(classLoader.getResource("ssl/unknownkeystore.ks").getFile()).getAbsolutePath();
     tsPath = new File(classLoader.getResource("ssl/truststore.ks").getFile()).getAbsolutePath();
     emptyTSPath = new File(classLoader.getResource("ssl/emptytruststore.ks").getFile()).getAbsolutePath();
     newConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
@@ -98,6 +90,9 @@ public class TestUserBitSSL extends BaseTestQuery {
 
   @AfterClass
   public static void cleanTest() throws Exception {
+    DrillConfig restoreConfig =
+        new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties()), false);
+    updateTestCluster(1, restoreConfig);
   }
 
   @Test
@@ -195,6 +190,138 @@ public class TestUserBitSSL extends BaseTestQuery {
           .toString());
     }
     test("SELECT * FROM cp.`region.json`");
+  }
+
+  @Test
+  public void testClientConfigHostnameVerification() {
+    String password = "test_password";
+    String trustStoreFileName = "drillTestTrustStore";
+    String keyStoreFileName = "drillTestKeyStore";
+    KeyStore ts, ks;
+    File tempFile1, tempFile2;
+    String trustStorePath;
+    String keyStorePath;
+
+    try {
+      String fqdn = InetAddress.getLocalHost().getHostName();
+      SelfSignedCertificate certificate = new SelfSignedCertificate(fqdn);
+
+      tempFile1 = File.createTempFile(trustStoreFileName, ".ks");
+      tempFile1.deleteOnExit();
+      trustStorePath = tempFile1.getAbsolutePath();
+      //generate a truststore.
+      ts = KeyStore.getInstance(KeyStore.getDefaultType());
+      ts.load(null, password.toCharArray());
+      ts.setCertificateEntry("drillTest", certificate.cert());
+      // Store away the truststore.
+      FileOutputStream fos1 = new FileOutputStream(tempFile1);
+      ts.store(fos1, password.toCharArray());
+      fos1.close();
+
+      tempFile2 = File.createTempFile(keyStoreFileName, ".ks");
+      tempFile2.deleteOnExit();
+      keyStorePath = tempFile2.getAbsolutePath();
+      //generate a keystore.
+      ts = KeyStore.getInstance(KeyStore.getDefaultType());
+      ts.load(null, password.toCharArray());
+      ts.setKeyEntry("drillTest", certificate.key(), password.toCharArray(), new java.security.cert.Certificate[]{certificate.cert()});
+      // Store away the keystore.
+      FileOutputStream fos2 = new FileOutputStream(tempFile2);
+      ts.store(fos2, password.toCharArray());
+      fos2.close();
+
+      final Properties connectionProps = new Properties();
+      connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
+      connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, trustStorePath);
+      connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, password);
+      connectionProps.setProperty(DrillProperties.ENABLE_HOST_VERIFICATION, "true");
+
+      DrillConfig sslConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
+          .withValue(ExecConstants.USER_SSL_ENABLED, ConfigValueFactory.fromAnyRef(true))
+          .withValue(ExecConstants.SSL_KEYSTORE_TYPE, ConfigValueFactory.fromAnyRef("JKS"))
+          .withValue(ExecConstants.SSL_KEYSTORE_PATH, ConfigValueFactory.fromAnyRef(keyStorePath))
+          .withValue(ExecConstants.SSL_KEYSTORE_PASSWORD, ConfigValueFactory.fromAnyRef("test_password"))
+          .withValue(ExecConstants.SSL_PROTOCOL, ConfigValueFactory.fromAnyRef("TLSv1.2")), false);
+
+      updateTestCluster(1, sslConfig, connectionProps);
+
+    } catch (Exception e) {
+      fail(e.getMessage());
+    }
+    //reset cluster
+    updateTestCluster(1, newConfig, initProps);
+
+  }
+
+  @Test
+  public void testClientConfigHostNameVerificationFail() throws Exception {
+    final Properties connectionProps = new Properties();
+    connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
+    connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
+    connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "bad_password");
+    connectionProps.setProperty(DrillProperties.ENABLE_HOST_VERIFICATION, "true");
+    boolean failureCaught = false;
+    try {
+      updateClient(connectionProps);
+    } catch (Exception e) {
+      failureCaught = true;
+    }
+    assertEquals(failureCaught, true);
+  }
+
+  @Test
+  public void testClientConfigCertificateVerification() {
+    // Fail if certificate is not valid
+    boolean failureCaught = false;
+    try {
+      final Properties connectionProps = new Properties();
+      connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
+      connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
+      connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+      //connectionProps.setProperty(DrillProperties.DISABLE_CERT_VERIFICATION, "true");
+
+      DrillConfig sslConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
+          .withValue(ExecConstants.USER_SSL_ENABLED, ConfigValueFactory.fromAnyRef(true))
+          .withValue(ExecConstants.SSL_KEYSTORE_TYPE, ConfigValueFactory.fromAnyRef("JKS"))
+          .withValue(ExecConstants.SSL_KEYSTORE_PATH, ConfigValueFactory.fromAnyRef(unknownKsPath))
+          .withValue(ExecConstants.SSL_KEYSTORE_PASSWORD, ConfigValueFactory.fromAnyRef("drill123"))
+          .withValue(ExecConstants.SSL_PROTOCOL, ConfigValueFactory.fromAnyRef("TLSv1.2")), false);
+
+      updateTestCluster(1, sslConfig, connectionProps);
+
+    } catch (Exception e) {
+      failureCaught = true;
+    }
+    //reset cluster
+    updateTestCluster(1, newConfig, initProps);
+    assertEquals(failureCaught, true);
+  }
+
+  @Test
+  public void testClientConfigNoCertificateVerification() {
+    // Pass if certificate is not valid, but mode is insecure.
+    try {
+      final Properties connectionProps = new Properties();
+      connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
+      connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
+      connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+      connectionProps.setProperty(DrillProperties.DISABLE_CERT_VERIFICATION, "true");
+
+      DrillConfig sslConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
+          .withValue(ExecConstants.USER_SSL_ENABLED, ConfigValueFactory.fromAnyRef(true))
+          .withValue(ExecConstants.SSL_KEYSTORE_TYPE, ConfigValueFactory.fromAnyRef("JKS"))
+          .withValue(ExecConstants.SSL_KEYSTORE_PATH, ConfigValueFactory.fromAnyRef(unknownKsPath))
+          .withValue(ExecConstants.SSL_KEYSTORE_PASSWORD, ConfigValueFactory.fromAnyRef("drill123"))
+          .withValue(ExecConstants.SSL_PROTOCOL, ConfigValueFactory.fromAnyRef("TLSv1.2")), false);
+
+      updateTestCluster(1, sslConfig, connectionProps);
+
+    } catch (Exception e) {
+      fail(e.getMessage());
+    }
+    //reset cluster
+    updateTestCluster(1, newConfig, initProps);
+
   }
 
 }

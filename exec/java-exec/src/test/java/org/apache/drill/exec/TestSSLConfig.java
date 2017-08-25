@@ -20,9 +20,12 @@ package org.apache.drill.exec;
 
 
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.ssl.SSLConfig;
+import org.apache.drill.exec.ssl.SSLConfigBuilder;
 import org.apache.drill.test.ConfigBuilder;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.Test;
+
 import static junit.framework.TestCase.fail;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -38,7 +41,7 @@ public class TestSSLConfig {
     config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
     config.put(ExecConstants.USER_SSL_ENABLED, true);
     try {
-      SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+      SSLConfig sslv = new SSLConfigBuilder()
           .config(config.build())
           .mode(SSLFactory.Mode.SERVER)
           .initializeSSLContext(false)
@@ -60,7 +63,7 @@ public class TestSSLConfig {
     config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
     config.put(ExecConstants.USER_SSL_ENABLED, true);
     try {
-      SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+      SSLConfig sslv = new SSLConfigBuilder()
           .config(config.build())
           .mode(SSLFactory.Mode.SERVER)
           .initializeSSLContext(false)
@@ -80,7 +83,7 @@ public class TestSSLConfig {
     config.put(ExecConstants.HTTP_KEYSTORE_PATH, "/root");
     config.put(ExecConstants.HTTP_KEYSTORE_PASSWORD, "root");
     try {
-      SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+      SSLConfig sslv = new SSLConfigBuilder()
           .config(config.build())
           .mode(SSLFactory.Mode.SERVER)
           .initializeSSLContext(false)
@@ -100,7 +103,7 @@ public class TestSSLConfig {
     ConfigBuilder config = new ConfigBuilder();
     config.put("javax.net.ssl.keyStore", "/root");
     config.put("javax.net.ssl.keyStorePassword", "root");
-    SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+    SSLConfig sslv = new SSLConfigBuilder()
         .config(config.build())
         .mode(SSLFactory.Mode.SERVER)
         .initializeSSLContext(false)
@@ -117,7 +120,7 @@ public class TestSSLConfig {
     config.put(ExecConstants.HTTP_TRUSTSTORE_PATH, "/root");
     config.put(ExecConstants.HTTP_TRUSTSTORE_PASSWORD, "root");
     config.put(ExecConstants.SSL_USE_HADOOP_CONF, false);
-    SSLConfig sslv = new SSLConfig.SSLConfigBuilder()
+    SSLConfig sslv = new SSLConfigBuilder()
         .config(config.build())
         .mode(SSLFactory.Mode.SERVER)
         .initializeSSLContext(false)
@@ -128,4 +131,5 @@ public class TestSSLConfig {
     assertEquals("/root",sslv.getTrustStorePath());
     assertEquals("root",sslv.getTrustStorePassword());
   }
+
 }
