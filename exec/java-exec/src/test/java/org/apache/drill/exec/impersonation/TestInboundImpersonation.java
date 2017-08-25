@@ -33,6 +33,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Map;
@@ -122,6 +123,7 @@ public class TestInboundImpersonation extends BaseTestImpersonation {
     test("ALTER SYSTEM RESET `%s`", ExecConstants.IMPERSONATION_POLICIES_KEY);
   }
 
+  @Ignore//mark as Ignore due to DRILL-5383
   @Test
   public void selectChainedView() throws Exception {
     // Connect as PROXY_NAME and query for IMPERSONATION_TARGET
