@@ -52,7 +52,9 @@ struct Option{
     {"auth", "Authentication mechanism to use", false},
     {"sasl_encrypt", "Negotiate for encrypted connection", false},
     {"enableSSL", "Enable SSL", false},
-    {"certPath", "Path to SSL certificate file", false}
+    {"certPath", "Path to SSL certificate file", false},
+    {"enableHostnameVerification", "enable host name verification", false},
+    {"disableCertVerification", "disable certificate verification", false}
 };
 
 std::map<std::string, std::string> qsOptionValues;
@@ -306,6 +308,8 @@ int main(int argc, char* argv[]) {
         std::string auth=qsOptionValues["auth"];
         std::string enableSSL=qsOptionValues["enableSSL"];
         std::string certPath=qsOptionValues["certPath"];
+        std::string enableHostnameVerification=qsOptionValues["enableHostnameVerification"];
+        std::string disableCertVerification=qsOptionValues["disableCertVerification"];
 
         Drill::QueryType type;
 
@@ -401,6 +405,8 @@ int main(int argc, char* argv[]) {
                 return -1;
             }
             props.setProperty(USERPROP_CERTFILEPATH, certPath);
+            props.setProperty(USERPROP_ENABLE_HOSTVERIFICATION, enableHostnameVerification);
+            props.setProperty(USERPROP_DISABLE_CERTVERIFICATION, disableCertVerification);
         }
 
         if(client.connect(connectStr.c_str(), &props)!=Drill::CONN_SUCCESS){

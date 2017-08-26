@@ -73,15 +73,14 @@ class UserProperties;
         public:
             SSLChannelContext(DrillUserProperties* props):
                 ChannelContext(props),
-                m_SSLContext(boost::asio::ssl::context::sslv23) {
+                m_SSLContext(boost::asio::ssl::context::tlsv12) {
                 m_SSLContext.set_default_verify_paths();
                 m_SSLContext.set_options(
                         boost::asio::ssl::context::default_workarounds
                         | boost::asio::ssl::context::no_sslv2
                         | boost::asio::ssl::context::single_dh_use
                         );
-                m_SSLContext.set_verify_mode(boost::asio::ssl::context::verify_peer);
-
+                m_SSLContext.set_verify_mode(boost::asio::ssl::context::verify_none);
             };
             ~SSLChannelContext(){};
             boost::asio::ssl::context& getSslContext(){ return m_SSLContext;}
@@ -148,6 +147,7 @@ class UserProperties;
             boost::asio::io_service& m_ioService;
             boost::asio::io_service m_ioServiceFallback; // used if m_ioService is not provided
             AsioStreamSocket* m_pSocket;
+            ConnectionEndpoint *m_pEndpoint;
 
         private:
             typedef 
@@ -169,7 +169,6 @@ class UserProperties;
                 return status;
             }
 
-            ConnectionEndpoint* m_pEndpoint;
 
             channelState_t m_state;
             DrillClientError* m_pError;
