@@ -100,10 +100,15 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
 
     Table table = super.formatPlugin.getJsonTableCache().getTable(subScanSpec.getTableName(), subScanSpec.getUserName());
     int idx = 0;
-    String [] projections = new String[this.getColumns().size()];
-    for (SchemaPath path : this.getColumns()) {
-      projections[idx] = FieldPathHelper.schemaPath2FieldPath(path).asPathString();
-      ++idx;
+    String [] projections = null;
+
+    // only populate projections for non-star query (for star, null is interpreted as all fields)
+    if (!this.isStarQuery()) {
+      projections = new String[this.getColumns().size()];
+      for (SchemaPath path : this.getColumns()) {
+        projections[idx] = FieldPathHelper.schemaPath2FieldPath(path).asPathString();
+        ++idx;
+      }
     }
     final MultiGet multiGet = new MultiGet((BaseJsonTable) table, null, false, projections);
     int recordCount = 0;

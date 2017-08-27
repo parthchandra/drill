@@ -109,7 +109,7 @@ public abstract class AbstractIndexPlanGenerator extends SubsetTransformer<RelNo
 
     fields.addAll(origRowType.getFieldList());
     fields.add(new RelDataTypeFieldImpl(
-        ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), 0,
+        ((DbGroupScan)origScan.getGroupScan()).getRowKeyName(), fields.size(),
             typeFactory.createSqlType(SqlTypeName.ANY)));
     return new RelRecordType(fields);
   }
