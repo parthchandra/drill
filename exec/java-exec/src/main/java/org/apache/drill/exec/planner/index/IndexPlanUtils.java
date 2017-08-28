@@ -357,8 +357,7 @@ public class IndexPlanUtils {
   }
 
   public static boolean scanIsPartition(GroupScan scan) {
-    return (scan.getMaxParallelizationWidth() > 1
-        || scan.getDistributionAffinity() == DistributionAffinity.HARD);
+    return (scan.isDistributed() || scan.getDistributionAffinity() == DistributionAffinity.HARD);
   }
 
   public static ScanPrel buildCoveringIndexScan(DrillScanRel origScan,

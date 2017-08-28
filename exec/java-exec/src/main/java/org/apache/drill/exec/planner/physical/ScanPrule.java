@@ -44,7 +44,7 @@ public class ScanPrule extends Prule{
     GroupScan groupScan = scan.getGroupScan();
 
     DrillDistributionTrait partition =
-        (groupScan.getMaxParallelizationWidth() > 1 || groupScan.getDistributionAffinity() == DistributionAffinity.HARD)
+        (groupScan.isDistributed()  || groupScan.getDistributionAffinity() == DistributionAffinity.HARD)
             ? DrillDistributionTrait.RANDOM_DISTRIBUTED : DrillDistributionTrait.SINGLETON;
 
     final RelTraitSet traits = scan.getTraitSet().plus(Prel.DRILL_PHYSICAL).plus(partition);

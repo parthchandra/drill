@@ -52,6 +52,7 @@ import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
+import org.apache.drill.exec.store.mapr.PluginConstants;
 import org.apache.drill.exec.store.mapr.db.MapRDBCost;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPluginConfig;
@@ -514,6 +515,23 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
           fullTableRowCount);
     }
     return rowcount;
+  }
+
+  @Override
+  public boolean isDistributed() {
+    double rowCount, rowSize;
+    double scanRangeSize = storagePlugin.getContext().getConfig().getInt(PluginConstants.JSON_TABLE_SCAN_SIZE_MB) * 1024 * 1024;
+
+    if (scanSpec.getIndexDesc() != null) {
+      String idxIdentifier = stats.buildUniqueIndexIdentifier(scanSpec.getIndexDesc().getPrimaryTablePath(), scanSpec.getIndexName());
+      rowCount = stats.getRowCount(scanSpec.getCondition(), idxIdentifier);
+      rowSize = stats.getAvgRowSize(scanSpec.getCondition(), idxIdentifier, false);
+    } else {
+      rowCount = stats.getRowCount(scanSpec.getCondition(), null);
+      rowSize = stats.getAvgRowSize(scanSpec.getCondition(), null, false);
+    }
+
+    return (long)(rowCount * rowSize)/scanRangeSize > 1 ? true : false;
   }
 
   @Override
