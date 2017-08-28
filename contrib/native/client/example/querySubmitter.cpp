@@ -25,7 +25,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include "drill/drillc.hpp"
 
-int nOptions=24;
+int nOptions=21;
 
 struct Option{
     char name[32];
@@ -52,8 +52,7 @@ struct Option{
     {"auth", "Authentication mechanism to use", false},
     {"sasl_encrypt", "Negotiate for encrypted connection", false},
     {"enableSSL", "Enable SSL", false},
-    {"TLSProtocol", "TLS protocol version", false},
-    {"certFilePath", "Path to SSL certificate file", false},
+    {"certPath", "Path to SSL certificate file", false},
     {"enableHostnameVerification", "enable host name verification", false},
     {"disableCertVerification", "disable certificate verification", false}
 };
@@ -310,8 +309,7 @@ int main(int argc, char* argv[]) {
         std::string serviceName=qsOptionValues["service_name"];
         std::string auth=qsOptionValues["auth"];
         std::string enableSSL=qsOptionValues["enableSSL"];
-        std::string tlsProtocol=qsOptionValues["TLSProtocol"];
-        std::string certFilePath=qsOptionValues["certFilePath"];
+        std::string certPath=qsOptionValues["certPath"];
         std::string enableHostnameVerification=qsOptionValues["enableHostnameVerification"];
         std::string disableCertVerification=qsOptionValues["disableCertVerification"];
 
@@ -404,12 +402,11 @@ int main(int argc, char* argv[]) {
         }
         if(enableSSL.length()>0){
             props.setProperty(USERPROP_USESSL, enableSSL);
-            if(enableSSL=="true" && certFilePath.length()<=0){
+            if(enableSSL=="true" && certPath.length()<=0){
                 std::cerr<< "SSL is enabled but no certificate provided. " << std::endl;
                 return -1;
             }
-            props.setProperty(USERPROP_TLSPROTOCOL, tlsProtocol);
-            props.setProperty(USERPROP_CERTFILEPATH, certFilePath);
+            props.setProperty(USERPROP_CERTFILEPATH, certPath);
             props.setProperty(USERPROP_ENABLE_HOSTVERIFICATION, enableHostnameVerification);
             props.setProperty(USERPROP_DISABLE_CERTVERIFICATION, disableCertVerification);
         }
