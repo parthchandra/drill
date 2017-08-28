@@ -171,7 +171,7 @@ typedef enum{
 #define USERPROP_PASSWORD "password"
 #define USERPROP_SCHEMA   "schema"
 #define USERPROP_USESSL   "enableTLS"
-#define USERPROP_SSLPROTOCOL "TLSProtocol" //TLS version
+#define USERPROP_TLSPROTOCOL "TLSProtocol" //TLS version
 #define USERPROP_CERTFILEPATH "certFilePath" // pem file path and name
 #define USERPROP_CERTPASSWORD "certPassword" // Password for certificate file
 #define USERPROP_ENABLE_HOSTVERIFICATION "enableHostVerification"

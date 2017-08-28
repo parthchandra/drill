@@ -74,22 +74,22 @@ class UserProperties;
             static boost::asio::ssl::context::method getTlsVersion(std::string version){
                 if(version.empty()){
                     return boost::asio::ssl::context::tlsv12;
-                } else if (version.compare("tlsv12") == 0) {
+                } else if (version == "tlsv12") {
                     return boost::asio::ssl::context::tlsv12;
-                } else if (version.compare("tlsv11") == 0) {
+                } else if (version == "tlsv11") {
                     return boost::asio::ssl::context::tlsv11;
-                } else if (version.compare("sslv23") == 0) {
+                } else if (version == "sslv23") {
                     return boost::asio::ssl::context::sslv23;
-                } else if (version.compare("tlsv1") == 0) {
+                } else if (version == "tlsv1") {
                     return boost::asio::ssl::context::tlsv1;
-                } else if (version.compare("sslv3") == 0) {
+                } else if (version == "sslv3") {
                     return boost::asio::ssl::context::sslv3;
                 } else {
                     return boost::asio::ssl::context::tlsv12;
                 }
             }
 
-        SSLChannelContext(DrillUserProperties *props, boost::asio::ssl::context::method tlsVersion) :
+        SSLChannelContext(DrillUserProperties *props, boost::asio::ssl::context::method tlsVersion, boost::asio::ssl::verify_mode verifyMode) :
                 ChannelContext(props),
                 m_SSLContext(tlsVersion) {
                 m_SSLContext.set_default_verify_paths();
@@ -98,7 +98,7 @@ class UserProperties;
                         | boost::asio::ssl::context::no_sslv2
                         | boost::asio::ssl::context::single_dh_use
                         );
-                m_SSLContext.set_verify_mode(boost::asio::ssl::context::verify_none);
+                m_SSLContext.set_verify_mode(verifyMode);
             };
             ~SSLChannelContext(){};
             boost::asio::ssl::context& getSslContext(){ return m_SSLContext;}

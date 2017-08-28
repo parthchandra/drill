@@ -159,10 +159,19 @@ ChannelContext* ChannelContextFactory::getChannelContext(channelType_t t, DrillU
             break;
 #if defined(IS_SSL_ENABLED)
         case CHANNEL_TYPE_SSLSTREAM: {
+
             std::string protocol;
-            props->getProp(USERPROP_SSLPROTOCOL, protocol);
+            props->getProp(USERPROP_TLSPROTOCOL, protocol);
             boost::asio::ssl::context::method tlsVersion = SSLChannelContext::getTlsVersion(protocol);
-            pChannelContext = new SSLChannelContext(props, tlsVersion);
+
+            std::string noVerifyCert;
+            props->getProp(USERPROP_DISABLE_CERTVERIFICATION, noVerifyCert);
+            boost::asio::ssl::context::verify_mode verifyMode = boost::asio::ssl::context::verify_peer;
+            if (noVerifyCert == "true") {
+                verifyMode = boost::asio::ssl::context::verify_none;
+            }
+
+            pChannelContext = new SSLChannelContext(props, tlsVersion, verifyMode);
         }
             break;
 #endif
@@ -403,18 +412,21 @@ connectionStatus_t SSLStreamChannel::init(ChannelContext_t* pContext){
         handleError(CONN_SSLERROR, getMessage(ERR_CONN_SSLCERTFAIL, certFile.c_str(), e.what()));
         ret=CONN_FAILURE;
     }
+
     std::string enableHostVerification;
     props->getProp(USERPROP_ENABLE_HOSTVERIFICATION, enableHostVerification);
-    if(enableHostVerification.compare("true")){
-        std::string hostPortStr = m_pEndpoint->getHost()+":"+m_pEndpoint->getPort();
+    if (enableHostVerification == "true") {
+        std::string hostPortStr = m_pEndpoint->getHost() + ":" + m_pEndpoint->getPort();
         ((SSLChannelContext_t *) pContext)->getSslContext().set_verify_callback(
-            boost::asio::ssl::rfc2818_verification(hostPortStr.c_str()));
+                boost::asio::ssl::rfc2818_verification(hostPortStr.c_str()));
     }
+
     std::string disableCertificateVerification;
     props->getProp(USERPROP_DISABLE_CERTVERIFICATION, disableCertificateVerification);
-    if (disableCertificateVerification.compare("true")){
+    if (disableCertificateVerification == "true") {
         ((SSLChannelContext_t *) pContext)->getSslContext().set_verify_mode(boost::asio::ssl::context::verify_none);
-   }
+    }
+
     m_pSocket=new SslSocket(m_ioService, ((SSLChannelContext_t*)pContext)->getSslContext() );
     if(m_pSocket!=NULL){
         ret=Channel::init(pContext);
