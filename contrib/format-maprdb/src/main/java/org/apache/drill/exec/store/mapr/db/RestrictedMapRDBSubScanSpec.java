@@ -114,7 +114,7 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
 
     // if there is pending rows from the current batch, read them first
     // in chunks of numRowsToRead rows
-    if (rowKeyVector != null && currentIndex < maxOccupiedIndex) {
+    if (rowKeyVector != null && currentIndex <= maxOccupiedIndex) {
         numKeys = Math.min(numRowKeysToRead, maxOccupiedIndex - currentIndex + 1);
         return numKeys;
     }
