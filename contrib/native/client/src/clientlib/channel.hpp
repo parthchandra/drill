@@ -71,9 +71,27 @@ class UserProperties;
 
     class SSLChannelContext: public ChannelContext{
         public:
-            SSLChannelContext(DrillUserProperties* props):
+            static boost::asio::ssl::context::method getTlsVersion(std::string version){
+                if(version.empty()){
+                    return boost::asio::ssl::context::tlsv12;
+                } else if (version.compare("tlsv12") == 0) {
+                    return boost::asio::ssl::context::tlsv12;
+                } else if (version.compare("tlsv11") == 0) {
+                    return boost::asio::ssl::context::tlsv11;
+                } else if (version.compare("sslv23") == 0) {
+                    return boost::asio::ssl::context::sslv23;
+                } else if (version.compare("tlsv1") == 0) {
+                    return boost::asio::ssl::context::tlsv1;
+                } else if (version.compare("sslv3") == 0) {
+                    return boost::asio::ssl::context::sslv3;
+                } else {
+                    return boost::asio::ssl::context::tlsv12;
+                }
+            }
+
+        SSLChannelContext(DrillUserProperties *props, boost::asio::ssl::context::method tlsVersion) :
                 ChannelContext(props),
-                m_SSLContext(boost::asio::ssl::context::tlsv12) {
+                m_SSLContext(tlsVersion) {
                 m_SSLContext.set_default_verify_paths();
                 m_SSLContext.set_options(
                         boost::asio::ssl::context::default_workarounds

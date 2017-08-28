@@ -158,8 +158,12 @@ ChannelContext* ChannelContextFactory::getChannelContext(channelType_t t, DrillU
             pChannelContext=new ChannelContext(props);
             break;
 #if defined(IS_SSL_ENABLED)
-        case CHANNEL_TYPE_SSLSTREAM:
-            pChannelContext=new SSLChannelContext(props);
+        case CHANNEL_TYPE_SSLSTREAM: {
+            std::string protocol;
+            props->getProp(USERPROP_SSLPROTOCOL, protocol);
+            boost::asio::ssl::context::method tlsVersion = SSLChannelContext::getTlsVersion(protocol);
+            pChannelContext = new SSLChannelContext(props, tlsVersion);
+        }
             break;
 #endif
         default:
