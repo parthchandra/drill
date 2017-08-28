@@ -26,6 +26,7 @@ import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.List;
@@ -135,12 +136,13 @@ public class TestHivePartitionPruning extends HiveTestBase {
     }
   }
 
+  @Ignore
   @Test // DRILL-3579
   public void selectFromPartitionedTableWithNullPartitions() throws Exception {
     final String query = "SELECT count(*) nullCount FROM hive.partition_pruning_test " +
         "WHERE c IS NULL OR d IS NULL OR e IS NULL";
     final String plan = getPlanInString("EXPLAIN PLAN FOR " + query, OPTIQ_FORMAT);
-
+    System.out.print(plan);
     // Check and make sure that Filter is not present in the plan
     assertFalse(plan.contains("Filter"));
 
