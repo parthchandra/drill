@@ -23,7 +23,6 @@ import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.ssl.SSLConfig;
 import org.apache.drill.exec.ssl.SSLConfigBuilder;
 import org.apache.drill.test.ConfigBuilder;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.junit.Test;
 
