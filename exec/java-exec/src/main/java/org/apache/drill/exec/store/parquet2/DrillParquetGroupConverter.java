@@ -180,6 +180,10 @@ public class DrillParquetGroupConverter extends GroupConverter {
           return new DrillIntConverter(writer);
         }
         switch(type.getOriginalType()) {
+          case INT_32: {
+            IntWriter writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).integer() : mapWriter.integer(name);
+            return new DrillIntConverter(writer);
+          }
           case DECIMAL: {
             ParquetReaderUtility.checkDecimalTypeEnabled(options);
             Decimal9Writer writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).decimal9() : mapWriter.decimal9(name);
@@ -216,6 +220,10 @@ public class DrillParquetGroupConverter extends GroupConverter {
           return new DrillBigIntConverter(writer);
         }
         switch(type.getOriginalType()) {
+          case INT_64: {
+            BigIntWriter writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).bigInt() : mapWriter.bigInt(name);
+            return new DrillBigIntConverter(writer);
+          }
           case DECIMAL: {
             ParquetReaderUtility.checkDecimalTypeEnabled(options);
             Decimal18Writer writer = type.getRepetition() == Repetition.REPEATED ? mapWriter.list(name).decimal18() : mapWriter.decimal18(name);
