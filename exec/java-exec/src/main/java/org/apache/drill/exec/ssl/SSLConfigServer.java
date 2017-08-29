@@ -107,6 +107,7 @@ public class SSLConfigServer extends SSLConfig {
       sslCtx = SslContextBuilder.forServer(kmf)
           .trustManager(tmf)
           .protocols(protocol)
+          .sslProvider(getProvider())
           .build(); // Will throw an exception if the key password is not correct
     } catch (Exception e) {
       // Catch any SSL initialization Exceptions here and abort.

@@ -155,12 +155,12 @@ public class UserClient
 
       sslEngine.setUseClientMode(true);
 
-      // set Security property jdk.certpath.disabledAlgorithms  to disable specific ssl algorithms
-      sslEngine.setEnabledProtocols(sslEngine.getEnabledProtocols());
-
-      // set Security property jdk.tls.disabledAlgorithms to disable specific cipher suites
-      sslEngine.setEnabledCipherSuites(sslEngine.getEnabledCipherSuites());
-      sslEngine.setEnableSessionCreation(true);
+      try {
+        sslEngine.setEnableSessionCreation(true);
+      } catch (Exception e) {
+        // Openssl implementation may throw this.
+        logger.debug("Session creation not enabled. Exception: {}", e.getMessage());
+      }
 
       // Add SSL handler into pipeline
       SslHandler sslHandler = new SslHandler(sslEngine);
