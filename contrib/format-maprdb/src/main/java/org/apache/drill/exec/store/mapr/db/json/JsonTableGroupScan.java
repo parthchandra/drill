@@ -30,6 +30,7 @@ import java.util.TreeMap;
 import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.ConditionNode.RowkeyRange;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -50,6 +51,7 @@ import org.apache.drill.exec.planner.cost.PluginCost;
 
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -265,26 +267,21 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     final int numColumns = (columns == null || columns.isEmpty()) ? STAR_COLS : columns.size();
     // index will be NULL for FTS
     double rowCount = stats.getRowCount(scanSpec.getCondition(), null);
+    boolean filterPushed = (scanSpec.getSerializedFilter() != null);
     double avgRowSize = stats.getAvgRowSize(null, null, true);
     double totalRowCount = stats.getRowCount(null, null);
     // If UNKNOWN, or DB stats sync issues(manifests as 0 rows) use defaults.
     if (rowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
       rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * fullTableRowCount;
     }
-    if (totalRowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
+    if (totalRowCount == ROWCOUNT_UNKNOWN || totalRowCount == 0) {
       totalRowCount = fullTableRowCount;
     }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
     }
-    double rowsFromDisk = rowCount;
-    if (Arrays.equals(scanSpec.getStartRow(), HConstants.EMPTY_START_ROW) &&
-        Arrays.equals(scanSpec.getStopRow(), HConstants.EMPTY_END_ROW)) {
-      // both start and stop rows are empty, indicating this is a full scan so
-      // use the total rows for calculating disk i/o
-      rowsFromDisk = totalRowCount;
-    }
-
+    double rowsFromDisk = totalRowCount;
+    //TODO: Add case where QueryCondition is on _id field which would result in pruning
     double totalBlocks = Math.ceil((avgRowSize * totalRowCount)/pluginCostModel.getBlockSize(this));
     double numBlocks = Math.ceil((avgRowSize * rowsFromDisk)/pluginCostModel.getBlockSize(this));
     numBlocks = Math.min(totalBlocks, numBlocks);
@@ -334,8 +331,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       avgRowSize = avgColumnSize * numColumns;
     }
     double rowsFromDisk = rowCount;
-    if (Arrays.equals(scanSpec.getStartRow(), HConstants.EMPTY_START_ROW) &&
-        Arrays.equals(scanSpec.getStopRow(), HConstants.EMPTY_END_ROW)) {
+    if (!filterPushed) {
       // both start and stop rows are empty, indicating this is a full scan so
       // use the total rows for calculating disk i/o
       rowsFromDisk = fullTableRowCount;
@@ -501,7 +497,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    */
   @Override
   @JsonIgnore
-  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
+  public double getRowCount(RexNode condition, RelNode scanRel) {
     // Do not use statistics if row count is forced. Forced rowcounts take precedence over stats
     double rowcount;
     if (forcedRowCountMap.get(condition) != null) {

@@ -304,7 +304,7 @@ public class IndexPlanTest extends BaseJsonTest {
     String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
         " where t.personal.age = 53 AND t.personal.income=45";
     test(defaultHavingIndexPlan);
-    test(preferIntersectPlans);
+    test(preferIntersectPlans + ";" + disableFTS);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=(i_age|i_income)(.*[\n\r])+.*JsonTableGroupScan.*indexName=(i_age|i_income)"},
         new String[]{}
@@ -325,7 +325,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .sqlBaselineQuery(query)
         .build()
         .run();
-    test(defaultIntersectPlans);
+    test(defaultIntersectPlans + ";" + enableFTS);
     return;
   }
 

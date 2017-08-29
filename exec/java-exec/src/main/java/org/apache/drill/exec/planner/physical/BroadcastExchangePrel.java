@@ -51,7 +51,6 @@ public class BroadcastExchangePrel extends ExchangePrel{
     }
 
     RelNode child = this.getInput();
-
     final int numEndPoints = PrelUtil.getSettings(getCluster()).numEndPoints();
     final double broadcastFactor = PrelUtil.getSettings(getCluster()).getBroadcastFactor();
     final double inputRows = mq.getRowCount(child);

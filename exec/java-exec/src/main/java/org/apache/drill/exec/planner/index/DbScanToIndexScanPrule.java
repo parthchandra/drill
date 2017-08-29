@@ -470,6 +470,7 @@ public class DbScanToIndexScanPrule extends Prule {
       logger.debug("index_plan_info: ",strBuf.toString());
     }
 
+    GroupScan primaryTableScan = indexContext.scan.getGroupScan();
     // Only non-covering indexes can be intersected. Check if
     // (a) there are no covering indexes. Intersect plans will almost always be more
     // expensive than a covering index, so no need to generate one if there is covering.
@@ -478,6 +479,10 @@ public class DbScanToIndexScanPrule extends Prule {
     if (coveringIndexes.size() == 0 && nonCoveringIndexes.size() > 1) {
       List<IndexDescriptor> indexList = Lists.newArrayList();
       for (IndexGroup index : nonCoveringIndexes) {
+        IndexDescriptor indexDesc = index.getIndexProps().get(0).getIndexDesc();
+        IndexGroupScan idxScan = indexDesc.getIndexGroupScan();
+        //Copy primary table statistics to index table
+        idxScan.setStatistics(((DbGroupScan) primaryTableScan).getStatistics());
         indexList.add(index.getIndexProps().get(0).getIndexDesc());
       }
 
@@ -550,7 +555,6 @@ public class DbScanToIndexScanPrule extends Prule {
     }
 
     // Create non-covering index plans.
-    GroupScan primaryTableScan = indexContext.scan.getGroupScan();
 
     //First, check if the primary table scan supports creating a restricted scan
     if (primaryTableScan instanceof DbGroupScan &&

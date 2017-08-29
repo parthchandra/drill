@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.physical.base;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
@@ -28,7 +29,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.index.Statistics;
-import org.apache.drill.exec.planner.logical.DrillScanRel;
 
 import java.util.List;
 
@@ -60,11 +60,11 @@ public interface DbGroupScan extends GroupScan {
   /**
    * Get the row count after applying the {@link RexNode} condition
    * @param condition, filter to apply
-   * @param scanRel, the current scan logical rel
+   * @param scanRel, the current scan rel
    * @return row count post filtering
    */
   @JsonIgnore
-  public double getRowCount(RexNode condition, DrillScanRel scanRel);
+  public double getRowCount(RexNode condition, RelNode scanRel);
 
   /**
    * Get the statistics for this {@link DbGroupScan}

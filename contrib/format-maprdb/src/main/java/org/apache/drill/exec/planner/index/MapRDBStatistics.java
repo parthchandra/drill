@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.metadata.RelMdUtil;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
@@ -42,6 +43,7 @@ import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 import org.apache.drill.exec.store.hbase.HBaseRegexParser;
 import org.apache.drill.exec.store.mapr.db.json.JsonTableGroupScan;
 import org.apache.hadoop.hbase.HConstants;
@@ -109,14 +111,15 @@ public class MapRDBStatistics implements Statistics {
   }
 
   @Override
-  public double getRowCount(RexNode condition, String tabIdxName, DrillScanRel scanRel) {
+  public double getRowCount(RexNode condition, String tabIdxName, RelNode scanRel) {
     String conditionAsStr = nullConditionAsString;
     Map<String, StatisticsPayload> payloadMap;
-    if (scanRel.getGroupScan() instanceof DbGroupScan) {
+    if ((scanRel instanceof DrillScanRel && ((DrillScanRel)scanRel).getGroupScan() instanceof DbGroupScan)
+        || (scanRel instanceof ScanPrel && ((ScanPrel)scanRel).getGroupScan() instanceof DbGroupScan)) {
       if (condition == null && fullTableScanPayload != null) {
         return fullTableScanPayload.getRowCount();
       } else {
-        conditionAsStr = convertRexToString(condition, scanRel);
+        conditionAsStr = convertRexToString(condition, scanRel.getRowType());
         payloadMap = statsCache.get(conditionAsStr);
         if (payloadMap != null) {
           if (payloadMap.get(tabIdxName) != null) {
@@ -149,7 +152,7 @@ public class MapRDBStatistics implements Statistics {
           return computeIdxRowSizeForNullCondition();
         }
       } else {
-        conditionAsStr = convertRexToString(condition, scanRel);
+        conditionAsStr = convertRexToString(condition, scanRel.getRowType());
         payloadMap = statsCache.get(conditionAsStr);
         if (payloadMap != null && payloadMap.get(tabIdxName) != null) {
           return payloadMap.get(tabIdxName).getAvgRowSize();
@@ -257,7 +260,7 @@ public class MapRDBStatistics implements Statistics {
     PlannerSettings settings = PrelUtil.getPlannerSettings(scanRel.getCluster().getPlanner());
     rowKeyJoinBackIOFactor = settings.getIndexRowKeyJoinCostFactor();
     if (scanRel.getGroupScan() instanceof DbGroupScan) {
-      String conditionAsStr = convertRexToString(condition, scanRel);
+      String conditionAsStr = convertRexToString(condition, scanRel.getRowType());
       scan = scanRel.getGroupScan();
       if (statsCache.get(conditionAsStr) == null) {
         IndexCollection indexes = ((DbGroupScan)scan).getSecondaryIndexCollection(scanRel);
@@ -377,7 +380,7 @@ public class MapRDBStatistics implements Statistics {
         && !condition.isAlwaysTrue()) {
       RexBuilder builder = scanRel.getCluster().getRexBuilder();
       PlannerSettings settings = PrelUtil.getSettings(scanRel.getCluster());
-      String conditionAsStr = convertRexToString(condition, scanRel);
+      String conditionAsStr = convertRexToString(condition, scanRel.getRowType());
       if (statsCache.get(conditionAsStr) == null
               && payload.getRowCount() != Statistics.ROWCOUNT_UNKNOWN) {
         Map<String, StatisticsPayload> payloadMap = new HashMap<>();
@@ -425,7 +428,7 @@ public class MapRDBStatistics implements Statistics {
    * expressions may differ in the RexInputRef positions but otherwise the same.
    * e.g. $1 = 'CA' projection (State, Country) , $2 = 'CA' projection (Country, State)
    */
-  private String convertRexToString(RexNode condition, DrillScanRel scanRel) {
+  private String convertRexToString(RexNode condition, RelDataType rowType) {
     StringBuilder sb = new StringBuilder();
     if (condition == null) {
       return null;
@@ -434,11 +437,11 @@ public class MapRDBStatistics implements Statistics {
       boolean first = true;
       for(RexNode pred : RelOptUtil.conjunctions(condition)) {
         if (first) {
-          sb.append(convertRexToString(pred, scanRel));
+          sb.append(convertRexToString(pred, rowType));
           first = false;
         } else {
           sb.append(" " + SqlKind.AND.toString() + " ");
-          sb.append(convertRexToString(pred, scanRel));
+          sb.append(convertRexToString(pred, rowType));
         }
       }
       return sb.toString();
@@ -446,11 +449,11 @@ public class MapRDBStatistics implements Statistics {
       boolean first = true;
       for(RexNode pred : RelOptUtil.disjunctions(condition)) {
         if (first) {
-          sb.append(convertRexToString(pred, scanRel));
+          sb.append(convertRexToString(pred, rowType));
           first = false;
         } else {
           sb.append(" " + SqlKind.OR.toString() + " ");
-          sb.append(convertRexToString(pred, scanRel));
+          sb.append(convertRexToString(pred, rowType));
         }
       }
       return sb.toString();
@@ -460,7 +463,7 @@ public class MapRDBStatistics implements Statistics {
        * during planning. We want the cache to be agnostic to it. Hence, the entry stored
        * in the cache has the input reference ($i) replaced with the column name
        */
-      getInputRefMapping(condition, scanRel, inputRefMapping);
+      getInputRefMapping(condition, rowType, inputRefMapping);
       if (inputRefMapping.keySet().size() > 0) {
         //Found input ref - replace it
         String replCondition = condition.toString();
@@ -478,15 +481,15 @@ public class MapRDBStatistics implements Statistics {
    * Generate the input reference to column mapping for reference replacement. Please
    * look at the usage in convertRexToString() to understand why this mapping is required.
    */
-  private void getInputRefMapping(RexNode condition, DrillScanRel scanRel,
+  private void getInputRefMapping(RexNode condition, RelDataType rowType,
       HashMap<String, String> mapping) {
     if (condition instanceof RexCall) {
       for (RexNode op : ((RexCall) condition).getOperands()) {
-        getInputRefMapping(op, scanRel, mapping);
+        getInputRefMapping(op, rowType, mapping);
       }
     } else if (condition instanceof RexInputRef) {
       mapping.put(condition.toString(),
-          scanRel.getRowType().getFieldNames().get(condition.hashCode()));
+          rowType.getFieldNames().get(condition.hashCode()));
     }
   }
 
@@ -689,7 +692,7 @@ public class MapRDBStatistics implements Statistics {
   private double computeSelectivity(RexNode condition, IndexDescriptor idx, double totalRows, DrillScanRel scanRel) {
     double selectivity;
     Map<String, StatisticsPayload> payloadMap;
-    String conditionAsStr = convertRexToString(condition, scanRel);
+    String conditionAsStr = convertRexToString(condition, scanRel.getRowType());
     payloadMap = statsCache.get(conditionAsStr);
     if (payloadMap != null &&
         payloadMap.get(buildUniqueIndexIdentifier(idx)) != null) {
@@ -724,7 +727,7 @@ public class MapRDBStatistics implements Statistics {
   private double computeRowSize(RexNode condition, IndexDescriptor idx, double tableRowSize, DrillScanRel scanRel) {
     double rowSize = 0.0;
     Map<String, StatisticsPayload> payloadMap;
-    String conditionAsStr = convertRexToString(condition, scanRel);
+    String conditionAsStr = convertRexToString(condition, scanRel.getRowType());
     payloadMap = statsCache.get(conditionAsStr);
     if (payloadMap != null &&
         payloadMap.get(idx) != null) {

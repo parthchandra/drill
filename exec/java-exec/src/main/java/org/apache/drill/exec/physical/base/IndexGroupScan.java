@@ -19,10 +19,12 @@ package org.apache.drill.exec.physical.base;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.planner.index.Statistics;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.List;
 
@@ -54,7 +56,7 @@ public interface IndexGroupScan extends GroupScan {
    * @return row count post filtering
    */
   @JsonIgnore
-  public double getRowCount(RexNode condition, DrillScanRel scanRel);
+  public double getRowCount(RexNode condition, RelNode scanRel);
 
   /**
    * Set the statistics for {@link IndexGroupScan}

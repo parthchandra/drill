@@ -28,9 +28,11 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.util.BuiltInMethod;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.physical.base.Scan;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.apache.drill.exec.planner.physical.PrelUtil;
+import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.List;
 
@@ -44,8 +46,10 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
     if (rel instanceof RelSubset) {
       return getSelectivity((RelSubset) rel, predicate);
     } else if (rel instanceof DrillScanRel) {
-      return getSelectivity((DrillScanRel) rel, predicate);
-    } else {
+      return getScanSelectivity(rel, predicate);
+    } else if (rel instanceof ScanPrel) {
+      return getScanSelectivity(rel, predicate);
+    }else {
       return super.getSelectivity(rel, RelMetadataQuery.instance(), predicate);
     }
   }
@@ -62,19 +66,24 @@ public class DrillRelMdSelectivity extends RelMdSelectivity {
     return RelMdUtil.guessSelectivity(predicate);
   }
 
-
-
-  private Double getSelectivity(DrillScanRel rel, RexNode predicate) {
+  private Double getScanSelectivity(RelNode rel, RexNode predicate) {
     double ROWCOUNT_UNKNOWN = -1.0;
+    GroupScan scan = null;
     PlannerSettings settings = PrelUtil.getPlannerSettings(rel.getCluster().getPlanner());
-    GroupScan scan = rel.getGroupScan();
-    if (settings.isStatisticsEnabled()
-      && scan instanceof DbGroupScan) {
-      double filterRows = ((DbGroupScan) scan).getRowCount(predicate, rel);
-      double totalRows = ((DbGroupScan) scan).getRowCount(null, rel);
-      if (filterRows != ROWCOUNT_UNKNOWN &&
-          totalRows != ROWCOUNT_UNKNOWN && totalRows > 0) {
-        return filterRows/totalRows;
+    if (rel instanceof DrillScanRel) {
+      scan = ((DrillScanRel) rel).getGroupScan();
+    } else if (rel instanceof ScanPrel) {
+      scan = ((ScanPrel) rel).getGroupScan();
+    }
+    if (scan != null) {
+      if (settings.isStatisticsEnabled()
+          && scan instanceof DbGroupScan) {
+        double filterRows = ((DbGroupScan) scan).getRowCount(predicate, rel);
+        double totalRows = ((DbGroupScan) scan).getRowCount(null, rel);
+        if (filterRows != ROWCOUNT_UNKNOWN &&
+            totalRows != ROWCOUNT_UNKNOWN && totalRows > 0) {
+          return Math.min(1.0, filterRows / totalRows);
+        }
       }
     }
     return super.getSelectivity(rel, RelMetadataQuery.instance(), predicate);

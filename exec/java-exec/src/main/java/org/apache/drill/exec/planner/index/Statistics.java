@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 
@@ -28,15 +29,29 @@ public interface Statistics {
   double AVG_ROWSIZE_UNKNOWN = -1;
   long AVG_COLUMN_SIZE = 10;
 
+  /** Returns whether statistics are available. Should be called prior to using the statistics
+   */
   boolean isStatsAvailable();
 
+  /** Returns a unique index identifier
+   *  @param idx - Index specified as a {@link IndexDescriptor}
+   *  @return The unique index identifier
+   */
   String buildUniqueIndexIdentifier(IndexDescriptor idx);
-  /** Returns the statistics given the specified filter condition
-   * @param condition - Filter specified as a {@link RexNode}
+
+  /** Returns the rowcount for the specified filter condition
+   *  @param condition - Filter specified as a {@link RexNode}
+   *  @param tabIdxName - The index name generated using {@code buildUniqueIndexIdentifier}
    *  @param scanRel - The current scan rel
    */
-  double getRowCount(RexNode condition, String tabIdxName, DrillScanRel scanRel);
+  double getRowCount(RexNode condition, String tabIdxName, RelNode scanRel);
 
+  /** Returns the average row size for the specified filter condition
+   *  @param condition - Filter specified as a {@link RexNode}
+   *  @param tabIdxName - The index name generated using {@code buildUniqueIndexIdentifier}
+   *  @param scanRel - The current scan rel
+   *  @param isIndexScan - Whether the current rel is an index scan (false for primary table)
+   */
   double getAvgRowSize(RexNode condition, String tabIdxName, DrillScanRel scanRel, boolean isIndexScan);
 
   boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context);

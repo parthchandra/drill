@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
@@ -32,7 +33,6 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.ScanStats;
 import org.apache.drill.exec.physical.base.ScanStats.GroupScanProperty;
 import org.apache.drill.exec.planner.index.Statistics;
-import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -238,7 +238,7 @@ public class BinaryTableGroupScan extends MapRDBGroupScan implements DrillHBaseC
   }
 
   @Override
-  public double getRowCount(RexNode condition, DrillScanRel scanRel) {
+  public double getRowCount(RexNode condition, RelNode scanRel) {
     return Statistics.ROWCOUNT_UNKNOWN;
   }
 

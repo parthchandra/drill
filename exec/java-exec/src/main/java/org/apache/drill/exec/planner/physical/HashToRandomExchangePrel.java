@@ -71,12 +71,12 @@ public class HashToRandomExchangePrel extends ExchangePrel {
     RelNode child = this.getInput();
     double inputRows = mq.getRowCount(child);
 
-    int rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
+    int  rowWidth = child.getRowType().getFieldCount() * DrillCostBase.AVG_FIELD_WIDTH;
 
     double hashCpuCost = DrillCostBase.HASH_CPU_COST * inputRows / fields.size();
     double svrCpuCost = DrillCostBase.SVR_CPU_COST * inputRows;
     double networkCost = DrillCostBase.BYTE_NETWORK_COST * inputRows * rowWidth;
-    DrillCostFactory costFactory = (DrillCostFactory) planner.getCostFactory();
+    DrillCostFactory costFactory = (DrillCostFactory)planner.getCostFactory();
     return costFactory.makeCost(inputRows, hashCpuCost + svrCpuCost, 0, networkCost);
   }
 

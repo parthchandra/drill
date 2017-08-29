@@ -194,12 +194,14 @@ public class IndexIntersectPlanGenerator extends AbstractIndexPlanGenerator {
         indexFilterPrel, indexProjectExprs, indexProjectRowType);
 
     RelTraitSet indexTraits = newTraitSet().plus(Prel.DRILL_PHYSICAL);
-
     //if build(right) side does not exist, this index scan is the right most.
     if(right == null) {
-      final DrillDistributionTrait distRight =
-          new DrillDistributionTrait(DrillDistributionTrait.DistributionType.BROADCAST_DISTRIBUTED);
-      indexTraits = newTraitSet(distRight).plus(Prel.DRILL_PHYSICAL);
+      if (partition == DrillDistributionTrait.RANDOM_DISTRIBUTED &&
+          settings.getSliceTarget() < indexProjectPrel.getRows()) {
+        final DrillDistributionTrait distRight =
+            new DrillDistributionTrait(DrillDistributionTrait.DistributionType.BROADCAST_DISTRIBUTED);
+        indexTraits = newTraitSet(distRight).plus(Prel.DRILL_PHYSICAL);
+      }
     }
 
     RelNode converted = Prule.convert(indexProjectPrel, indexTraits);
