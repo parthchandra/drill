@@ -43,26 +43,39 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 public class MapRDBSubScan extends AbstractDbSubScan {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBSubScan.class);
 
-  private final MapRDBFormatPlugin formatPlugin;
+  @JsonProperty
+  public final StoragePluginConfig storageConfig;
+  @JsonIgnore
+  private final MapRDBFormatPluginConfig formatPluginConfig;
+  private final FileSystemPlugin storagePlugin;
   private final List<MapRDBSubScanSpec> regionScanSpecList;
   private final List<SchemaPath> columns;
+  private final long maxRecordsToRead;
   private final String tableType;
+
+  private final MapRDBFormatPlugin formatPlugin;
 
   @JsonCreator
   public MapRDBSubScan(@JacksonInject StoragePluginRegistry registry,
-                        @JsonProperty("userName") String userName,
-                        @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
-                        @JsonProperty("storageConfig") StoragePluginConfig storage,
-                        @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
-                        @JsonProperty("columns") List<SchemaPath> columns,
-                        @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
-     this(userName, formatPluginConfig,
-         (FileSystemPlugin) registry.getPlugin(storage),
-         storage, regionScanSpecList, columns, tableType);
+                       @JsonProperty("userName") String userName,
+                       @JsonProperty("formatPluginConfig") MapRDBFormatPluginConfig formatPluginConfig,
+                       @JsonProperty("storageConfig") StoragePluginConfig storage,
+                       @JsonProperty("regionScanSpecList") List<MapRDBSubScanSpec> regionScanSpecList,
+                       @JsonProperty("columns") List<SchemaPath> columns,
+                       @JsonProperty("maxRecordsToRead") long maxRecordsToRead,
+                       @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
+    this(userName, formatPluginConfig,
+        (FileSystemPlugin) registry.getPlugin(storage),
+        storage, regionScanSpecList, columns, maxRecordsToRead, tableType);
   }
 
   public MapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig, FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
-                       List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, String tableType) {
+      List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, String tableType) {
+    this(userName, formatPluginConfig, storagePlugin, storageConfig, maprSubScanSpecs, columns, -1, tableType);
+  }
+
+  public MapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig, FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
+                       List<MapRDBSubScanSpec> maprSubScanSpecs, List<SchemaPath> columns, long maxRecordsToRead, String tableType) {
     super(userName);
     this.storageConfig = storageConfig;
     this.storagePlugin = storagePlugin;
@@ -71,6 +84,7 @@ public class MapRDBSubScan extends AbstractDbSubScan {
 
     this.regionScanSpecList = maprSubScanSpecs;
     this.columns = columns;
+    this.maxRecordsToRead = maxRecordsToRead;
     this.tableType = tableType;
   }
 
@@ -80,6 +94,10 @@ public class MapRDBSubScan extends AbstractDbSubScan {
 
   public List<SchemaPath> getColumns() {
     return columns;
+  }
+
+  public long getMaxRecordsToRead() {
+    return maxRecordsToRead;
   }
 
   @Override
@@ -95,7 +113,7 @@ public class MapRDBSubScan extends AbstractDbSubScan {
   @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
     Preconditions.checkArgument(children.isEmpty());
-    return new MapRDBSubScan(getUserName(), formatPlugin, regionScanSpecList, columns, tableType);
+    return new MapRDBSubScan(getUserName(), formatPluginConfig, storagePlugin, storageConfig, regionScanSpecList, columns, tableType);
   }
 
   @Override

@@ -460,4 +460,20 @@ public class TestSimpleJson extends BaseJsonTest {
     PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
   }
 
+  @Test
+  public void testLimit() throws Exception {
+    final String sql = format("SELECT\n"
+        + "  _id, name, start_date, last_update\n"
+        + "FROM\n"
+        + "  %s.`%s` business\n"
+        + "limit 1"
+    );
+
+    final String[] expectedPlan = {"JsonTableGroupScan.*limit=1"};
+    final String[] excludedPlan = {};
+
+    PlanTestBase.testPlanMatchingPatterns(sql, expectedPlan, excludedPlan);
+    runSQLAndVerifyCount(sql, 1);
+  }
+
 }

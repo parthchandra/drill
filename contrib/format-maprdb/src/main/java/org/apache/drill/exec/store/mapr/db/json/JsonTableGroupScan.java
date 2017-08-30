@@ -97,8 +97,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
    */
   protected MapRDBStatistics stats;
   protected JsonScanSpec scanSpec;
-  protected long rowCount;
   protected double fullTableRowCount;
+
+  /**
+   * need only read maxRecordsToRead records.
+   */
+  protected long maxRecordsToRead = -1;
 
   @JsonCreator
   public JsonTableGroupScan(@JsonProperty("userName") final String userName,
@@ -143,6 +147,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     this.stats = that.stats;
     this.fullTableRowCount = that.fullTableRowCount;
     this.forcedRowCountMap = that.forcedRowCountMap;
+    this.maxRecordsToRead = that.maxRecordsToRead;
     init();
   }
 
@@ -239,7 +244,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         "Mappings length [%d] should be greater than minor fragment id [%d] but it isn't.",
         endpointFragmentMapping.size(), minorFragmentId);
     return new MapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(),
-          getStoragePlugin().getConfig(), endpointFragmentMapping.get(minorFragmentId), columns, TABLE_JSON);
+        getStoragePlugin().getConfig(), endpointFragmentMapping.get(minorFragmentId), columns, maxRecordsToRead, TABLE_JSON);
   }
 
   @Override
@@ -368,7 +373,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   @Override
   public String toString() {
-    return "JsonTableGroupScan [ScanSpec=" + scanSpec + ", columns=" + columns + "]";
+    return "JsonTableGroupScan [ScanSpec=" + scanSpec + ", columns=" + columns
+        + (maxRecordsToRead>0? ", limit=" + maxRecordsToRead : "") + "]";
   }
 
   public JsonScanSpec getScanSpec() {
@@ -547,5 +553,23 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     } else {
       return null;
     }
+  }
+
+  /**
+   * Json table reader support limit
+   * @return
+   */
+  @Override
+  public boolean supportsLimitPushdown() {
+    if (maxRecordsToRead < 0) {
+      return true;
+    }
+    return false;//limit is already pushed. No more pushdown of limit
+  }
+
+  @Override
+  public GroupScan applyLimit(long maxRecords) {
+    maxRecordsToRead = Math.max(maxRecords, 1);
+    return this;
   }
 }

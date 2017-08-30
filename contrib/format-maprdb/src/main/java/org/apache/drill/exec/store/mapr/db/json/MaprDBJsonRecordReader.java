@@ -112,6 +112,13 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
 
   protected OjaiValueWriter valueWriter;
   protected DocumentReaderVectorWriter documentWriter;
+  protected long maxRecordsToRead = -1;
+
+  public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec, MapRDBFormatPlugin formatPlugin,
+                                List<SchemaPath> projectedColumns, FragmentContext context, long maxRecords) {
+    this(subScanSpec, formatPlugin, projectedColumns, context);
+    this.maxRecordsToRead = maxRecords;
+  }
 
   public MaprDBJsonRecordReader(MapRDBSubScanSpec subScanSpec, MapRDBFormatPlugin formatPlugin,
                                 List<SchemaPath> projectedColumns, FragmentContext context) {
@@ -271,7 +278,10 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     int recordCount = 0;
     DBDocumentReaderBase reader = null;
 
-    while(recordCount < BaseValueVector.INITIAL_VALUE_ALLOCATION) {
+    long maxRecordsForThisBatch = this.maxRecordsToRead >= 0?
+        Math.min(BaseValueVector.INITIAL_VALUE_ALLOCATION, this.maxRecordsToRead) : BaseValueVector.INITIAL_VALUE_ALLOCATION;
+
+    while(recordCount < maxRecordsForThisBatch) {
       vectorWriter.setPosition(recordCount);
       try {
         reader = nextDocumentReader();
@@ -299,6 +309,9 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     }
 
     vectorWriter.setValueCount(recordCount);
+    if (maxRecordsToRead > 0) {
+      maxRecordsToRead -= recordCount;
+    }
     logger.debug("Took {} ms to get {} records", watch.elapsed(TimeUnit.MILLISECONDS), recordCount);
     return recordCount;
   }

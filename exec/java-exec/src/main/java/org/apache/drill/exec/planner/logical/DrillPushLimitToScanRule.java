@@ -44,7 +44,7 @@ public abstract class DrillPushLimitToScanRule extends RelOptRule {
     public boolean matches(RelOptRuleCall call) {
       DrillLimitRel limitRel = call.rel(0);
       DrillScanRel scanRel = call.rel(1);
-      // For now only applies to Parquet. And pushdown only apply limit but not offset,
+      // pushdown only apply limit but not offset,
       // so if getFetch() return null no need to run this rule.
       if (scanRel.getGroupScan().supportsLimitPushdown() && (limitRel.getFetch() != null)) {
         return true;
@@ -66,7 +66,7 @@ public abstract class DrillPushLimitToScanRule extends RelOptRule {
     public boolean matches(RelOptRuleCall call) {
       DrillLimitRel limitRel = call.rel(0);
       DrillScanRel scanRel = call.rel(2);
-      // For now only applies to Parquet. And pushdown only apply limit but not offset,
+      // pushdown only apply limit but not offset,
       // so if getFetch() return null no need to run this rule.
       if (scanRel.getGroupScan().supportsLimitPushdown() && (limitRel.getFetch() != null)) {
         return true;
