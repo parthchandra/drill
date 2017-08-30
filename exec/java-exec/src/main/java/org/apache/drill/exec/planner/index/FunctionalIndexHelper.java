@@ -197,7 +197,7 @@ public class FunctionalIndexHelper {
             if (expr.getInput().equals(indexedCast.getInput())
                 && expr.getMajorType().getMinorType().equals(indexedCast.getMajorType().getMinorType())
                 //if expr's length < indexedCast's length, we should convert equal to LIKE for this condition
-                && expr.getMajorType().getWidth() < indexedCast.getMajorType().getWidth()) {
+                && expr.getMajorType().getPrecision() < indexedCast.getMajorType().getPrecision()) {
               toRewriteEqualCastMap.put(entry.getKey(), entry.getValue());
             }
           }
