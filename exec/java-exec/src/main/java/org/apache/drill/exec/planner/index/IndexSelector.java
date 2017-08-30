@@ -177,7 +177,7 @@ public class IndexSelector  {
     PlannerSettings settings = PrelUtil.getPlannerSettings(planner);
     List<IndexProperties> candidateIndexes = Lists.newArrayList();
 
-    logger.info("Analyzing indexes for prefix matches");
+    logger.info("index_plan_info: Analyzing indexes for prefix matches");
     // analysis phase
     for (IndexProperties p : indexPropList) {
       analyzePrefixMatches(p);
@@ -196,7 +196,7 @@ public class IndexSelector  {
     }
 
     if (candidateIndexes.size() == 0) {
-      logger.info("No suitable indexes found !");
+      logger.info("index_plan_info: No suitable indexes found !");
       return;
     }
 
@@ -210,7 +210,7 @@ public class IndexSelector  {
       Collections.sort(candidateIndexes, new IndexComparator(planner));
     }
 
-    logger.info("The top ranked indexes are: ");
+    logger.info("index_plan_info: The top ranked indexes are: ");
 
     int count = 0;
     boolean foundCovering = false;
@@ -225,11 +225,11 @@ public class IndexSelector  {
           // if previously we already found a higher ranked covering index that satisfies collation,
           // then skip this one (note that selectivity and cost considerations were already handled
           // by the ranking phase)
-          logger.debug("Skipping covering index {} because a higher ranked covering index with collation already exists.", index.getIndexDesc().getIndexName());
+          logger.debug("index_plan_info: Skipping covering index {} because a higher ranked covering index with collation already exists.", index.getIndexDesc().getIndexName());
           continue;
         }
         coveringIndexes.add(index);
-        logger.info("name: {}, covering, collation: {}, leadingSelectivity: {}, cost: {}",
+        logger.info("index_plan_info: name: {}, covering, collation: {}, leadingSelectivity: {}, cost: {}",
             index.getIndexDesc().getIndexName(),
             index.satisfiesCollation(),
             index.getLeadingSelectivity(),
@@ -246,7 +246,7 @@ public class IndexSelector  {
         // non-covering index does not have collation
         if (foundCoveringCollation ||
             (foundCovering && !index.satisfiesCollation())) {
-          logger.debug("Skipping non-covering index {} because it does not have collation and a higher ranked covering index already exists.",
+          logger.debug("index_plan_info: Skipping non-covering index {} because it does not have collation and a higher ranked covering index already exists.",
               index.getIndexDesc().getIndexName());
           continue;
         }
@@ -255,7 +255,7 @@ public class IndexSelector  {
         // be considered for intersection later; currently the index selector is not costing the index intersection
         // TODO: enhance index selector for doing cost-based analysis of index intersection
         nonCoveringIndexes.add(index);
-        logger.info("name: {}, non-covering, collation: {}, leadingSelectivity: {}, cost: {}",
+        logger.info("index_plan_info: name: {}, non-covering, collation: {}, leadingSelectivity: {}, cost: {}",
             index.getIndexDesc().getIndexName(),
             index.satisfiesCollation(),
             index.getLeadingSelectivity(),
@@ -367,7 +367,7 @@ public class IndexSelector  {
       this.satisfiesCollation = satisfiesCollation;
       leadingPrefixMap = prefixMap;
 
-      logger.debug("Index {}: leading prefix map: {}, whether satisfies collation: {}, index columns remainder condition: {}",
+      logger.debug("index_plan_info: Index {}: leading prefix map: {}, whether satisfies collation: {}, index columns remainder condition: {}",
           indexDescriptor.getIndexName(), leadingPrefixMap, satisfiesCollation, indexColumnsRemainderFilter);
 
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
@@ -393,23 +393,23 @@ public class IndexSelector  {
         double sel = 1.0;
         if (filterRows != Statistics.ROWCOUNT_UNKNOWN) {
           sel = filterRows/totalRows;
-          logger.debug("Filter: {}, filterRows = {}, totalRows = {}, selectivity = {}",
+          logger.debug("index_plan_info: Filter: {}, filterRows = {}, totalRows = {}, selectivity = {}",
               filter, filterRows, totalRows, sel);
         } else {
           sel = RelMdUtil.guessSelectivity(filter);
           if (stats.isStatsAvailable()) {
-            logger.warn("Filter row count is UNKNOWN for filter: {}, using guess {}", filter, sel);
+            logger.warn("index_plan_info: Filter row count is UNKNOWN for filter: {}, using guess {}", filter, sel);
           }
         }
         leadingSel *= sel;
       }
 
-      logger.debug("Combined selectivity of all leading filters: {}", leadingSel);
+      logger.debug("index_plan_info: Combined selectivity of all leading filters: {}", leadingSel);
 
       if (indexColumnsRemainderFilter != null) {
         // The remainder filter is evaluated against the primary table i.e. NULL index
         remainderSel = stats.getRowCount(indexColumnsRemainderFilter, null, primaryTableScan)/totalRows;
-        logger.debug("Selectivity of index columns remainder filters: {}", remainderSel);
+        logger.debug("index_plan_info: Selectivity of index columns remainder filters: {}", remainderSel);
       }
 
       // get the average row size based on the leading column filter
@@ -418,12 +418,12 @@ public class IndexSelector  {
       if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN) {
         avgRowSize = numProjectedFields * Statistics.AVG_COLUMN_SIZE;
         if (stats.isStatsAvailable()) {
-          logger.warn("Average row size is UNKNOWN based on leading filter: {}, using guess {}, columns {}, columnSize {}",
+          logger.warn("index_plan_info: Average row size is UNKNOWN based on leading filter: {}, using guess {}, columns {}, columnSize {}",
               leadingFilters.size() > 0 ? leadingFilters.get(0).toString() : "<NULL>",
               avgRowSize, numProjectedFields, Statistics.AVG_COLUMN_SIZE);
         }
       } else {
-        logger.debug("Filter: {}, Average row size: {}",
+        logger.debug("index_plan_info: Filter: {}, Average row size: {}",
             leadingFilters.size() > 0 ? leadingFilters.get(0).toString() : "<NULL>", avgRowSize);
       }
     }
