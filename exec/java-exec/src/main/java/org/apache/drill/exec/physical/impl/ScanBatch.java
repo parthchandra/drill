@@ -477,7 +477,6 @@ public class ScanBatch implements CloseableRecordBatch {
       v.clear();
     }
     mutator.clear();
-    fieldVectorMap.clear();
     if (isRepeatableScan && readerList != null) {
       for (RecordReader r : readerList) {
         r.close();

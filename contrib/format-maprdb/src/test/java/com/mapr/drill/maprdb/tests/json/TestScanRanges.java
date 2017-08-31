@@ -96,7 +96,7 @@ public class TestScanRanges extends BaseJsonTest {
 
   @Test
   public void test_scan_ranges() throws Exception {
-    final PersistentStore<UserBitShared.QueryProfile> completed = getDrillbitContext().getStoreProvider().getOrCreateStore(QueryManager.QUERY_PROFILE);
+    final PersistentStore<UserBitShared.QueryProfile> completed = getDrillbitContext().getProfileStoreContext().getCompletedProfileStore();
 
     setColumnWidths(new int[] {25, 40, 25, 45});
     final String sql = format("SELECT\n"
