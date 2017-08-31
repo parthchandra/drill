@@ -449,8 +449,9 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @Test
   public void TestCastVarCharCoveringPlan() throws Exception {
-    String query = "SELECT t._id as tid, cast(t.driverlicense as varchar(128)) as driverlicense FROM hbase.`index_test_primary` as t " +
-        " where cast(t.driverlicense as varchar(128))='100007423'";
+    //length 256 is to exact match the casted indexed field's length
+    String query = "SELECT t._id as tid, cast(t.driverlicense as varchar(256)) as driverlicense FROM hbase.`index_test_primary` as t " +
+        " where cast(t.driverlicense as varchar(256))='100007423'";
     test(defaultHavingIndexPlan);
     PlanTestBase.testPlanMatchingPatterns(query,
         new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_cast_vchar_lic"},

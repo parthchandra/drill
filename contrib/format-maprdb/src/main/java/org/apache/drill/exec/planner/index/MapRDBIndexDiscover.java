@@ -63,6 +63,8 @@ import java.util.Set;
 
 public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDiscover {
 
+  static final String DEFAULT_STRING_CAST_LEN_STR = "256";
+
   public MapRDBIndexDiscover(GroupScan inScan, DrillScanRelBase scanRel) {
     super((AbstractDbGroupScan) inScan, scanRel);
   }
@@ -148,10 +150,16 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
 
   String getDrillTypeStr(String maprdbTypeStr) {
     String typeStr = maprdbTypeStr.toUpperCase();
+    String[] typeTokens = typeStr.split("[)(]");
+    String typeData = DEFAULT_STRING_CAST_LEN_STR;
+    if(typeTokens.length > 1) {
+      typeStr = typeTokens[0];
+      typeData = typeTokens[1];
+    }
     switch(typeStr){
       case "STRING":
         // set default width since it is not specified
-        return "VARCHAR(128)";
+        return "VARCHAR("+typeData+")";
       case "LONG":
         return "BIGINT";
       case "INT":
@@ -254,9 +262,13 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         if (tokens.length != 3) {
           throw new InvalidIndexDefinitionException("cast function definition not recognized: " + functionDef);
         }
-        return castFunctionSQLSyntax(fieldName, tokens[2]);
+        LogicalExpression idxExpr = castFunctionSQLSyntax(fieldName, tokens[2]);
+        if (idxExpr == null) {
+          throw new InvalidIndexDefinitionException("got null expression for function definition: " + functionDef);
+        }
+        return idxExpr;
       } else {
-        throw new InvalidIndexDefinitionException("function {} is not supported for indexing" + functionDef);
+        throw new InvalidIndexDefinitionException("function definition is not supported for indexing: " + functionDef);
       }
     }
     //else it is a schemaPath
