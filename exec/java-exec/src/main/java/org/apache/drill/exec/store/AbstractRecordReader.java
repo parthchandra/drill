@@ -120,11 +120,6 @@ public abstract class AbstractRecordReader implements RecordReader {
     return false;
   }
 
-  @Override
-  public boolean isRepeatableReader() {
-    return false;
-  }
-
   protected List<SchemaPath> getDefaultColumnsToRead() {
     return GroupScan.ALL_COLUMNS;
   }

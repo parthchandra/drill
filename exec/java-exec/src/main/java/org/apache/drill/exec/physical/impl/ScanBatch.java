@@ -83,6 +83,8 @@ public class ScanBatch implements CloseableRecordBatch {
   private Iterator<Map<String, String>> implicitColumns;
   private Map<String, String> implicitValues;
   private final BufferAllocator allocator;
+  private List<RecordReader> readerList = null; // needed for repeatable scanners
+  private boolean isRepeatableScan = false;     // needed for repeatable scanners
 
   public ScanBatch(PhysicalOperator subScanConfig, FragmentContext context,
                    OperatorContext oContext, Iterator<RecordReader> readers,
@@ -126,6 +128,16 @@ public class ScanBatch implements CloseableRecordBatch {
     this(subScanConfig, context,
         context.newOperatorContext(subScanConfig),
         readers, Collections.<Map<String, String>> emptyList());
+  }
+
+  public ScanBatch(PhysicalOperator subScanConfig, FragmentContext context,
+      List<RecordReader> readerList, boolean isRepeatableScan)
+          throws ExecutionSetupException {
+    this(subScanConfig, context,
+        context.newOperatorContext(subScanConfig),
+        readerList.iterator(), Collections.<Map<String, String>> emptyList());
+    this.readerList = readerList;
+    this.isRepeatableScan = isRepeatableScan;
   }
 
   @Override
@@ -183,13 +195,21 @@ public class ScanBatch implements CloseableRecordBatch {
           if (!readers.hasNext()) {
             // We're on the last reader, and it has no (more) rows.
 
-            //ask the reader if we should continue or not even there is no more record found
-            if(currentReader.hasNext() && currentReader.isRepeatableReader()) {
+            // ask the reader if we should continue or not even if there are no more records found
+            if(isRepeatableScan && currentReader.hasNext()) {
               isCurrentScanIterationDone = true;
+
+              assert readerList != null ;
+              // for repeatable readers, reset the iterator to the beginning of the list of readers since subsequent
+              // scans should start at the first reader
+              readers = readerList.iterator();
+
               break;
             }
 
-            currentReader.close();
+            if (!isRepeatableScan) {
+              currentReader.close();
+            }
             releaseAssets();
 
             done = true;  // have any future call to next() return NONE
@@ -215,7 +235,9 @@ public class ScanBatch implements CloseableRecordBatch {
             mutator.clear();
           }
 
-          currentReader.close();
+          if (!isRepeatableScan) {
+            currentReader.close();
+          }
           currentReader = readers.next();
           implicitValues = implicitColumns.hasNext() ? implicitColumns.next() : null;
           currentReader.setup(oContext, mutator);
@@ -455,7 +477,14 @@ public class ScanBatch implements CloseableRecordBatch {
       v.clear();
     }
     mutator.clear();
-    currentReader.close();
+    fieldVectorMap.clear();
+    if (isRepeatableScan && readerList != null) {
+      for (RecordReader r : readerList) {
+        r.close();
+      }
+    } else {
+      currentReader.close();
+    }
   }
 
   @Override

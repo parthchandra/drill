@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.mapr.db.impl.BaseJsonTable;
 import com.mapr.db.impl.MultiGet;
+
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.ExecConstants;
@@ -41,6 +42,7 @@ import com.google.common.base.Stopwatch;
 import com.mapr.db.Table;
 import com.mapr.db.impl.IdCodec;
 import com.mapr.db.ojai.DBDocumentReaderBase;
+
 import org.ojai.Document;
 
 
@@ -93,8 +95,11 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     vectorWriter.reset();
 
     if (!rss.readyToGetRowKey()) {
-      //not ready to get rowkey, so we just load a record to initialize schema
-      readToInitSchema();
+      // not ready to get rowkey, so we just load a record to initialize schema; only do this
+      // when we are in the build schema phase
+      if (rss.isBuildSchemaPhase()) {
+        readToInitSchema();
+      }
       return 0;
     }
 
@@ -177,11 +182,6 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     logger.debug("restricted reader hasMore = {}", hasMore);
 
     return hasMore;
-  }
-
-  @Override
-  public boolean isRepeatableReader() {
-    return true;
   }
 
 }

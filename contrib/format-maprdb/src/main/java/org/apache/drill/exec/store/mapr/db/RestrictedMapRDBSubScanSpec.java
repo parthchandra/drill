@@ -18,12 +18,15 @@
 package org.apache.drill.exec.store.mapr.db;
 
 import com.mapr.db.impl.IdCodec;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.exec.physical.impl.join.RowKeyJoin;
+import org.apache.drill.exec.record.AbstractRecordBatch.BatchState;
 import org.apache.drill.exec.vector.ValueVector;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.nio.ByteBuffer;
 
 /**
@@ -71,11 +74,19 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
   }
 
   /**
-   *
+   * Return {@code true} if a valid rowkey batch is available, {@code false} otherwise
    */
   @JsonIgnore
   public boolean readyToGetRowKey() {
     return rjbatch != null && rjbatch.hasRowKeyBatch();
+  }
+
+  /**
+   * Return {@code true} if the row key join is in the build schema phase
+   */
+  @JsonIgnore
+  public boolean isBuildSchemaPhase() {
+    return rjbatch.getBatchState() == BatchState.BUILD_SCHEMA;
   }
 
   /**

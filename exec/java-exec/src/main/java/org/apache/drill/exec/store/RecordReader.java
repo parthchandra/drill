@@ -43,19 +43,10 @@ public interface RecordReader extends AutoCloseable {
   void allocate(Map<String, ValueVector> vectorMap) throws OutOfMemoryException;
 
   /**
-   *
-   * @return return true if the reader is repeatable i.e it can be called again to read a different set of rows.
-   * Currently all the readers are not repeatable except RestrictedJsonRecordReader which is called multiple times
-   * depending upon the rightStream from RowKeyJoin.
-   */
-  boolean isRepeatableReader();
-
-  /**
-   *
-   * @return return true if there could be more read. This method is called at the time when correspondent ScanBatch gets
-   * no more records and is going to close the reader. However, for restricted scan, whether it is done is not decided by
-   * itself, but decided by who demand restricted scan to read and what records to read(e.g. Index Scan).
-   * So this method will allow ScanBatch to check with the reader before closing it.
+   * Check if the reader may have potentially more data to be read in subsequent iterations. Certain types of readers
+   * such as repeatable readers can be invoked multiple times, so this method will allow ScanBatch to check with
+   * the reader before closing it.
+   * @return return true if there could potentially be more reads, false otherwise
    */
   boolean hasNext();
 

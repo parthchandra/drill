@@ -43,7 +43,7 @@ public class MapRDBRestrictedScanBatchCreator implements BatchCreator<Restricted
         throw new ExecutionSetupException(e1);
       }
     }
-    return new ScanBatch(subScan, context, readers.iterator());
+    return new ScanBatch(subScan, context, readers, true);
   }
 
 }
