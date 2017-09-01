@@ -76,7 +76,7 @@ public class SSLConfigClient extends SSLConfig {
         .getBoolean(DrillProperties.DISABLE_CERT_VERIFICATION);
     protocol = getConfigParamWithDefault(DrillProperties.TLS_PROTOCOL, DEFAULT_SSL_PROTOCOL);
     int hsTimeout = config.hasPath(DrillProperties.TLS_HANDSHAKE_TIMEOUT) ?
-        config.getInt(ExecConstants.SSL_HANDSHAKE_TIMEOUT) :
+        config.getInt(DrillProperties.TLS_HANDSHAKE_TIMEOUT) :
         DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
     if (hsTimeout <= 0) {
       hsTimeout = DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
