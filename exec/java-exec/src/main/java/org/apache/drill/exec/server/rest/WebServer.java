@@ -283,6 +283,7 @@ public class WebServer implements AutoCloseable {
 
       sslContextFactory.setKeyStorePath(ssl.getKeyStorePath());
       sslContextFactory.setKeyStorePassword(ssl.getKeyStorePassword());
+      sslContextFactory.setKeyManagerPassword(ssl.getKeyPassword());
       if(ssl.hasTrustStorePath()){
         sslContextFactory.setTrustStorePath(ssl.getTrustStorePath());
         if(ssl.hasTrustStorePassword()){
