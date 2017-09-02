@@ -44,8 +44,7 @@ public class MapRDBFormatMatcher extends TableFormatMatcher {
   protected boolean isSupportedTable(MapRFileStatus status) throws IOException {
     return !getFormatPlugin()
         .getMaprFS()
-        .getTableProperties(status.getPath())
-        .getAttr()
+        .getTableBasicAttrs(status.getPath())
         .getIsMarlinTable();
   }
 

@@ -43,7 +43,7 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
 import com.mapr.db.index.IndexDesc;
-import com.mapr.fs.tables.TableProperties;
+import com.mapr.fs.tables.TableBasicAttrs;
 
 public class MapRDBFormatPlugin extends TableFormatPlugin {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MapRDBFormatPlugin.class);
@@ -95,9 +95,9 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
     List<String> files = selection.getFiles();
     assert (files.size() == 1);
     String tableName = files.get(0);
-    TableProperties props = getMaprFS().getTableProperties(new Path(tableName));
+    TableBasicAttrs attrs = getMaprFS().getTableBasicAttrs(new Path(tableName));
 
-    if (props.getAttr().getJson()) {
+    if (attrs.getIsJson()) {
       JsonScanSpec scanSpec = new JsonScanSpec(tableName, indexDesc, null/*condition*/);
       return new JsonTableGroupScan(userName, getStoragePlugin(), this, scanSpec, columns);
     } else {
