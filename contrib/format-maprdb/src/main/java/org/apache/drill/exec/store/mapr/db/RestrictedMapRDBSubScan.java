@@ -47,17 +47,18 @@ public class RestrictedMapRDBSubScan extends MapRDBSubScan {
                        @JsonProperty("storageConfig") StoragePluginConfig storage,
                        @JsonProperty("regionScanSpecList") List<RestrictedMapRDBSubScanSpec> regionScanSpecList,
                        @JsonProperty("columns") List<SchemaPath> columns,
+                       @JsonProperty("maxRecordsToRead") long maxRecordsToRead,
                        @JsonProperty("tableType") String tableType) throws ExecutionSetupException {
     this(userName, formatPluginConfig,
         (FileSystemPlugin) registry.getPlugin(storage),
-        storage, regionScanSpecList, columns, tableType);
+        storage, regionScanSpecList, columns, maxRecordsToRead, tableType);
   }
 
   public RestrictedMapRDBSubScan(String userName, MapRDBFormatPluginConfig formatPluginConfig,
       FileSystemPlugin storagePlugin, StoragePluginConfig storageConfig,
-      List<RestrictedMapRDBSubScanSpec> maprDbSubScanSpecs, List<SchemaPath> columns, String tableType) {
+      List<RestrictedMapRDBSubScanSpec> maprDbSubScanSpecs, List<SchemaPath> columns, long maxRecordsToRead, String tableType) {
     super(userName, formatPluginConfig, storagePlugin, storageConfig,
-        new ArrayList<MapRDBSubScanSpec>(), columns, tableType);
+        new ArrayList<MapRDBSubScanSpec>(), columns, maxRecordsToRead, tableType);
 
     for(RestrictedMapRDBSubScanSpec restrictedSpec : maprDbSubScanSpecs) {
       getRegionScanSpecList().add(restrictedSpec);

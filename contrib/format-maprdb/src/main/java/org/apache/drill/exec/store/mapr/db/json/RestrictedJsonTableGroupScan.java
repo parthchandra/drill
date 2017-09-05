@@ -77,7 +77,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
         minorFragmentId);
     RestrictedMapRDBSubScan subscan =
         new RestrictedMapRDBSubScan(getUserName(), formatPluginConfig, getStoragePlugin(), getStoragePlugin().getConfig(),
-        getEndPointFragmentMapping(minorFragmentId), columns, TABLE_JSON);
+        getEndPointFragmentMapping(minorFragmentId), columns, maxRecordsToRead, TABLE_JSON);
 
     return subscan;
   }
