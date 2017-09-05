@@ -314,6 +314,7 @@ template <typename SettableSocketOption> void Channel::setOption(SettableSocketO
 connectionStatus_t Channel::init(ChannelContext_t* pContext){
     connectionStatus_t ret=CONN_SUCCESS;
     this->m_state=CHANNEL_INITIALIZED;
+    this->m_pContext = pContext;
     return ret;
 }
 
@@ -342,26 +343,26 @@ connectionStatus_t Channel::handleError(connectionStatus_t status, std::string m
     return status;
 }
 
-connectionStatus_t Channel::connectInternal(){
+connectionStatus_t Channel::connectInternal() {
     using boost::asio::ip::tcp;
     tcp::endpoint endpoint;
-    const char* host=m_pEndpoint->getHost().c_str();
-    const char* port=m_pEndpoint->getPort().c_str();
-    try{
+    const char *host = m_pEndpoint->getHost().c_str();
+    const char *port = m_pEndpoint->getPort().c_str();
+    try {
         tcp::resolver resolver(m_ioService);
         tcp::resolver::query query(tcp::v4(), host, port);
         tcp::resolver::iterator iter = resolver.resolve(query);
         tcp::resolver::iterator end;
-        while(iter != end){
+        while (iter != end) {
             endpoint = *iter++;
             DRILL_LOG(LOG_TRACE) << endpoint << std::endl;
         }
         boost::system::error_code ec;
         m_pSocket->getInnerSocket().connect(endpoint, ec);
-        if(ec){
+        if (ec) {
             return handleError(CONN_FAILURE, getMessage(ERR_CONN_FAILURE, host, port, ec.message().c_str()));
         }
-    }catch(std::exception e){
+    } catch (std::exception e) {
         // Handle case when the hostname cannot be resolved. "resolve" is hard-coded in boost asio resolver.resolve
         if (!strcmp(e.what(), "resolve")) {
             return handleError(CONN_HOSTNAME_RESOLUTION_ERROR, getMessage(ERR_CONN_EXCEPT, e.what()));
@@ -372,13 +373,17 @@ connectionStatus_t Channel::connectInternal(){
     // set socket keep alive
     boost::asio::socket_base::keep_alive keepAlive(true);
     m_pSocket->getInnerSocket().set_option(keepAlive);
-	// set no_delay
+    // set no_delay
     boost::asio::ip::tcp::no_delay noDelay(true);
     m_pSocket->getInnerSocket().set_option(noDelay);
     // set reuse addr
     boost::asio::socket_base::reuse_address reuseAddr(true);
     m_pSocket->getInnerSocket().set_option(reuseAddr);
-    return this->protocolHandshake();
+
+    std::string useSystemTrustStore;
+    m_pContext->getUserProperties()->getProp(USERPROP_USESYSTEM_TRUSTSTORE, useSystemTrustStore);
+
+    return this->protocolHandshake(useSystemTrustStore=="true");
 
 }
 

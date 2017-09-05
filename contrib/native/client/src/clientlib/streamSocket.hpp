@@ -22,6 +22,7 @@
 
 #include "drill/common.hpp"
 #include "env.h"
+#include "wincert.ipp"
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -86,7 +87,10 @@ class AsioStreamSocket{
         //
         virtual void asyncRead( const MutableBufferSequence & buffers, ReadHandler handler) = 0;
 
-        virtual void protocolHandshake() = 0;
+        // call the underlying protocol's handshake method.
+        // if the useSystemConfig flag is true, then use properties read
+        // from the underlying operating system
+        virtual void protocolHandshake(bool useSystemConfig) = 0;
         virtual void protocolClose() = 0;
 };
 
@@ -124,7 +128,7 @@ class Socket:
             return async_read(*this, buffers, handler);
         }
 
-        void protocolHandshake(){}; //nothing to do
+        void protocolHandshake(bool useSystemConfig){}; //nothing to do
         void protocolClose(){ 
             // shuts down the socket!
             boost::system::error_code ignorederr;
@@ -171,7 +175,13 @@ class SslSocket:
         //
         // public method that can be invoked by callers to invoke the ssl handshake
         // throws: boost::system::system_error
-        void protocolHandshake(){
+        void protocolHandshake(bool useSystemConfig){
+            if(useSystemConfig){
+                if (loadSystemTrustStore(this->native_handle())) {
+                    boost::system::error_code ec(EPROTO, boost::system::system_category());
+                    boost::asio::detail::throw_error(ec, "Failed to load system trust store");
+                }
+            }
             this->handshake(boost::asio::ssl::stream<boost::asio::ip::tcp::socket>::client);
             return;
         };

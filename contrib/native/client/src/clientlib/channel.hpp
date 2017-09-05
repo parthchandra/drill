@@ -166,6 +166,7 @@ class UserProperties;
             boost::asio::io_service m_ioServiceFallback; // used if m_ioService is not provided
             AsioStreamSocket* m_pSocket;
             ConnectionEndpoint *m_pEndpoint;
+            ChannelContext_t *m_pContext;
 
         private:
             typedef 
@@ -177,10 +178,10 @@ class UserProperties;
             } channelState_t;
             
             connectionStatus_t connectInternal();
-            connectionStatus_t protocolHandshake(){
+            connectionStatus_t protocolHandshake(bool useSystemConfig){
                 connectionStatus_t status = CONN_SUCCESS;
                 try{
-                    m_pSocket->protocolHandshake();
+                    m_pSocket->protocolHandshake(useSystemConfig);
                 } catch (boost::system::system_error e) {
                     status = handleError(CONN_HANDSHAKE_FAILED, e.what());
                 }
