@@ -381,7 +381,7 @@ connectionStatus_t Channel::connectInternal() {
     m_pSocket->getInnerSocket().set_option(reuseAddr);
 
     std::string useSystemTrustStore;
-    m_pContext->getUserProperties()->getProp(USERPROP_USESYSTEM_TRUSTSTORE, useSystemTrustStore);
+    m_pContext->getUserProperties()->getProp(USERPROP_USESYSTEMTRUSTSTORE, useSystemTrustStore);
 
     return this->protocolHandshake(useSystemTrustStore=="true");
 
@@ -405,18 +405,23 @@ connectionStatus_t SSLStreamChannel::init(ChannelContext_t* pContext){
     connectionStatus_t ret=CONN_SUCCESS;
 
     const DrillUserProperties* props = pContext->getUserProperties();
-    std::string certFile;
-    props->getProp(USERPROP_CERTFILEPATH, certFile);
-    try{
-        ((SSLChannelContext_t*)pContext)->getSslContext().load_verify_file(certFile);
-    }catch(boost::system::system_error e){
-        DRILL_LOG(LOG_ERROR) << "Channel initialization failure. Certificate file  " 
-            << certFile 
-            << " could not be loaded."
-            << std::endl;
-        handleError(CONN_SSLERROR, getMessage(ERR_CONN_SSLCERTFAIL, certFile.c_str(), e.what()));
-        ret=CONN_FAILURE;
-    }
+	std::string useSystemTrustStore;
+	props->getProp(USERPROP_USESYSTEMTRUSTSTORE, useSystemTrustStore);
+	if (useSystemTrustStore != "true"){
+		std::string certFile;
+		props->getProp(USERPROP_CERTFILEPATH, certFile);
+		try{
+			((SSLChannelContext_t*)pContext)->getSslContext().load_verify_file(certFile);
+		}
+		catch (boost::system::system_error e){
+			DRILL_LOG(LOG_ERROR) << "Channel initialization failure. Certificate file  "
+				<< certFile
+				<< " could not be loaded."
+				<< std::endl;
+			handleError(CONN_SSLERROR, getMessage(ERR_CONN_SSLCERTFAIL, certFile.c_str(), e.what()));
+			ret = CONN_FAILURE;
+		}
+	}
 
     std::string enableHostVerification;
     props->getProp(USERPROP_ENABLE_HOSTVERIFICATION, enableHostVerification);

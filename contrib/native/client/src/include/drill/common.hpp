@@ -176,7 +176,7 @@ typedef enum{
 #define USERPROP_CERTPASSWORD "certPassword" // Password for certificate file
 #define USERPROP_ENABLE_HOSTVERIFICATION "enableHostVerification"
 #define USERPROP_DISABLE_CERTVERIFICATION "disableCertVerification"
-#define USERPROP_USESYSTEM_TRUSTSTORE "useSystemTrustStore" //Windows only, use the system trust store
+#define USERPROP_USESYSTEMTRUSTSTORE "useSystemTrustStore" //Windows only, use the system trust store
 #define USERPROP_IMPERSONATION_TARGET "impersonation_target"
 #define USERPROP_AUTH_MECHANISM "auth"
 #define USERPROP_SERVICE_NAME "service_name"

@@ -18,7 +18,8 @@
 
 #if defined(IS_SSL_ENABLED)
 
-#include "openssl/x509.h"
+#include <openssl/x509.h>
+#include <openssl/ssl.h>
 
 #if defined _WIN32  || defined _WIN64
 
@@ -40,12 +41,18 @@ int loadSystemTrustStore(const SSL *ssl) {
     HCERTSTORE hStore;
     PCCERT_CONTEXT pContext = NULL;
     X509 *x509;
-    //X509_STORE *store = X509_STORE_new();
+	char* stores[] = {
+	    "CA",
+		"MY",
+		"ROOT",
+		"SPC"
+	};
      
     SSL_CTX * ctx = SSL_get_SSL_CTX(ssl);
     X509_STORE *store = SSL_CTX_get_cert_store(ctx);
 
-    hStore = CertOpenSystemStore(NULL, L"ROOT");
+	for(int i=0; i<4; i++){
+    hStore = CertOpenSystemStore(NULL, stores[i]);
 
     if (!hStore)
         return 1;
@@ -57,10 +64,10 @@ int loadSystemTrustStore(const SSL *ssl) {
         x509 = NULL;
         x509 = d2i_X509(NULL, (const unsigned char **)&pContext->pbCertEncoded, pContext->cbCertEncoded);
         if (x509) {
-            int i = X509_STORE_add_cert(store, x509);
+            int ret = X509_STORE_add_cert(store, x509);
 
-            if (i == 1)
-                std::cout << "certificate added" << std::endl;
+            if (ret == 1)
+                std::cout << "Added certificate " << x509->name << " from " << stores[i] << std::endl;
 
             X509_free(x509);
         }
@@ -68,7 +75,7 @@ int loadSystemTrustStore(const SSL *ssl) {
 
     CertFreeCertificateContext(pContext);
     CertCloseStore(hStore, 0);
-    system("pause");
+	}
     return 0;
 
 }
