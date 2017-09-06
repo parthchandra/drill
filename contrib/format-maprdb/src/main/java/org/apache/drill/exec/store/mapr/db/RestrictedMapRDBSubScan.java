@@ -34,7 +34,7 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 
 /**
  * A RestrictedMapRDBSubScan is intended for skip-scan (as opposed to sequential scan) operations
- * where the set of rowkeys is obtained from a corresponding HashJoinBatch instance
+ * where the set of rowkeys is obtained from a corresponding RowKeyJoin instance
 */
 @JsonTypeName("maprdb-restricted-subscan")
 public class RestrictedMapRDBSubScan extends MapRDBSubScan {

@@ -307,8 +307,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       newRel = getSortNode(indexContext, newRel);
     }
 
-    //RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
-    RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet().replace(DrillDistributionTrait.ANY));
+    RelNode finalRel = Prule.convert(newRel, newRel.getTraitSet());
     logger.trace("NonCoveringIndexPlanGenerator got finalRel {} from origScan {}",
         finalRel.toString(), origScan.toString());
     return finalRel;
