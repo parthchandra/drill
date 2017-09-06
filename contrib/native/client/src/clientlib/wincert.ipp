@@ -66,8 +66,8 @@ int loadSystemTrustStore(const SSL *ssl) {
         if (x509) {
             int ret = X509_STORE_add_cert(store, x509);
 
-            if (ret == 1)
-                std::cout << "Added certificate " << x509->name << " from " << stores[i] << std::endl;
+            //if (ret == 1)
+            //    std::cout << "Added certificate " << x509->name << " from " << stores[i] << std::endl;
 
             X509_free(x509);
         }
