@@ -172,6 +172,7 @@ public class UserClient
       sslHandler.handshakeFuture().addListener(sslHandshakeListener);
       pipe.addFirst(RpcConstants.SSL_HANDLER, sslHandler);
     }
+    logger.debug(sslConfig.toString());
   }
 
   @Override protected boolean isSslEnabled() {

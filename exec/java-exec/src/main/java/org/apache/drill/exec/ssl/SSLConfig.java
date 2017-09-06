@@ -64,6 +64,8 @@ public abstract class SSLConfig {
       }
       String hadoopSSLConfigFile =
           this.hadoopConfig.get(resolveHadoopPropertyName(HADOOP_SSL_CONF_TPL_KEY, mode));
+      logger.debug("Using Hadoop configuration for SSL");
+      logger.debug("Hadoop SSL configuration file: {}", hadoopSSLConfigFile);
       this.hadoopConfig.addResource(hadoopSSLConfigFile);
     } else {
       this.hadoopConfig = null;
@@ -72,11 +74,11 @@ public abstract class SSLConfig {
 
   protected String getConfigParam(String name, String hadoopName) {
     String value = "";
-    if (config.hasPath(name)) {
-      value = config.getString(name);
-    }
-    if (value.isEmpty() && hadoopConfig != null) {
+    if (hadoopConfig != null) {
       value = getHadoopConfigParam(hadoopName);
+    }
+    if (value.isEmpty() && config.hasPath(name)) {
+      value = config.getString(name);
     }
     value = value.trim();
     return value;
@@ -168,7 +170,10 @@ public abstract class SSLConfig {
           .append("\n\ttrustStoreType: ") .append(getTrustStoreType())
           .append("\n\ttrustStorePath: ") .append(getTrustStorePath())
           .append("\n\ttrustStorePassword: ") .append(getTrustStorePassword())
-          .append("\n\thandshakeTimeout: ").append(getHandshakeTimeout());
+          .append("\n\thandshakeTimeout: ").append(getHandshakeTimeout())
+          .append("\n\tenableHostVerification: ").append(isEnableHostVerification())
+          .append("\n\tdisableCertificateVerification: ").append(isDisableCertificateVerification())
+      ;
     }
     return sb.toString();
   }
