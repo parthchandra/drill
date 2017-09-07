@@ -418,6 +418,7 @@ public class IndexPlanTest extends BaseJsonTest {
     return;
   }
 
+  @Ignore ("Needs MD-2620 fix")
   @Test
   public void TestNonCoveringRangePartition_1() throws Exception {
 
@@ -635,6 +636,8 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("fname").baselineValues("vSAEsyFN")
         .go();
 
+    // @Ignore ("Needs MD-2620 fix").
+    /*
     test(sliceTargetSmall);
     try {
       PlanTestBase.testPlanMatchingPatterns(query2,
@@ -645,6 +648,7 @@ public class IndexPlanTest extends BaseJsonTest {
     } finally {
       test(sliceTargetDefault);
     }
+    */
   }
 
   @Test  // 2 table join, each table has local predicate on top-level column
@@ -899,6 +903,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .go();
   }
 
+  @Ignore ("Needs MD-2620 fix")
   @Test
   public void orderByLimitNonCoveringPlan() throws Exception {
     String query = "SELECT t.name.lname as lname FROM hbase.`index_test_primary` as t " +
