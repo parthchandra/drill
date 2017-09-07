@@ -58,18 +58,14 @@ public class SSLConfigClient extends SSLConfig {
 
   private final String emptyString = new String();
 
-  public SSLConfigClient(DrillConfig config, Configuration hadoopConfig, boolean initContext,
-      boolean validateKeyStore) throws DrillException {
+  public SSLConfigClient(DrillConfig config, Configuration hadoopConfig) throws DrillException {
     super(config, hadoopConfig, SSLFactory.Mode.CLIENT);
     this.mode = SSLFactory.Mode.CLIENT;
     userSslEnabled =
         config.hasPath(DrillProperties.ENABLE_TLS) && config.getBoolean(DrillProperties.ENABLE_TLS);
-    trustStoreType = getConfigParam(DrillProperties.TRUSTSTORE_TYPE,
-        resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY, mode));
-    trustStorePath = getConfigParam(DrillProperties.TRUSTSTORE_PATH,
-        resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_LOCATION_TPL_KEY, mode));
-    trustStorePassword = getConfigParam(DrillProperties.TRUSTSTORE_PASSWORD,
-        resolveHadoopPropertyName(HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY, mode));
+    trustStoreType = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_TYPE, "JKS");
+    trustStorePath = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_PATH, "");
+    trustStorePassword = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_PASSWORD, "");
     enableHostVerification = config.hasPath(DrillProperties.ENABLE_HOST_VERIFICATION) && config
         .getBoolean(DrillProperties.ENABLE_HOST_VERIFICATION);
     disableCertificateVerification = config.hasPath(DrillProperties.DISABLE_CERT_VERIFICATION) && config

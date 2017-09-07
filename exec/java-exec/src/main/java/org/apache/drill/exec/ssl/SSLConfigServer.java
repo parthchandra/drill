@@ -55,8 +55,7 @@ public class SSLConfigServer extends SSLConfig {
   private final String protocol;
   private final String provider;
 
-  public SSLConfigServer(DrillConfig config, Configuration hadoopConfig, boolean initContext,
-      boolean validateKeyStore) throws DrillException {
+  public SSLConfigServer(DrillConfig config, Configuration hadoopConfig) throws DrillException {
     super(config, hadoopConfig, SSLFactory.Mode.SERVER);
     this.mode = SSLFactory.Mode.SERVER;
     userSslEnabled =
@@ -74,7 +73,9 @@ public class SSLConfigServer extends SSLConfig {
     keyStorePassword = getConfigParam(ExecConstants.SSL_KEYSTORE_PASSWORD,
         resolveHadoopPropertyName(HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY, mode));
     // if no keypassword specified, use keystore password
-    keyPassword = getConfigParamWithDefault(ExecConstants.SSL_KEY_PASSWORD, keyStorePassword);
+    String keyPass = getConfigParam(ExecConstants.SSL_KEY_PASSWORD,
+        resolveHadoopPropertyName(HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY, mode));
+    keyPassword = keyPass.isEmpty() ? keyStorePassword : keyPass;
     protocol = getConfigParamWithDefault(ExecConstants.SSL_PROTOCOL, DEFAULT_SSL_PROTOCOL);
     provider = getConfigParamWithDefault(ExecConstants.SSL_PROVIDER, DEFAULT_SSL_PROVIDER);
   }

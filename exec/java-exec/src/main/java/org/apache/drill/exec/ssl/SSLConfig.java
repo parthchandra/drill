@@ -44,6 +44,8 @@ public abstract class SSLConfig {
   public static final String HADOOP_SSL_KEYSTORE_LOCATION_TPL_KEY = "ssl.{0}.keystore.location";
   public static final String HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY = "ssl.{0}.keystore.password";
   public static final String HADOOP_SSL_KEYSTORE_TYPE_TPL_KEY = "ssl.{0}.keystore.type";
+  public static final String HADOOP_SSL_KEYSTORE_KEYPASSWORD_TPL_KEY =
+      "ssl.{0}.keystore.keypassword";
   public static final String HADOOP_SSL_TRUSTSTORE_LOCATION_TPL_KEY = "ssl.{0}.truststore.location";
   public static final String HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY = "ssl.{0}.truststore.password";
   public static final String HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY = "ssl.{0}.truststore.type";
@@ -163,13 +165,13 @@ public abstract class SSLConfig {
     if(isUserSslEnabled() || isHttpsEnabled()) {
       sb.append("SSL Configuration :")
           .append("\n\tprotocol: ").append(getProtocol())
-          .append("\n\tkeyStoreType: ") .append(getKeyStoreType())
-          .append("\n\tkeyStorePath: ") .append(getKeyStorePath())
-          .append("\n\tkeyStorePassword: ") .append(getKeyStorePassword())
-          .append("\n\tkeyPassword: ").append(getKeyPassword())
-          .append("\n\ttrustStoreType: ") .append(getTrustStoreType())
-          .append("\n\ttrustStorePath: ") .append(getTrustStorePath())
-          .append("\n\ttrustStorePassword: ") .append(getTrustStorePassword())
+          .append("\n\tkeyStoreType: ").append(getKeyStoreType())
+          .append("\n\tkeyStorePath: ").append(getKeyStorePath())
+          .append("\n\tkeyStorePassword: ").append(getPrintablePassword(getKeyStorePassword()))
+          .append("\n\tkeyPassword: ").append(getPrintablePassword(getKeyPassword()))
+          .append("\n\ttrustStoreType: ").append(getTrustStoreType())
+          .append("\n\ttrustStorePath: ").append(getTrustStorePath())
+          .append("\n\ttrustStorePassword: ").append(getPrintablePassword(getTrustStorePassword()))
           .append("\n\thandshakeTimeout: ").append(getHandshakeTimeout())
           .append("\n\tenableHostVerification: ").append(isEnableHostVerification())
           .append("\n\tdisableCertificateVerification: ").append(isDisableCertificateVerification())
@@ -178,4 +180,12 @@ public abstract class SSLConfig {
     return sb.toString();
   }
 
+  private String getPrintablePassword(String password) {
+    StringBuilder sb = new StringBuilder();
+    if(password == null || password.length()<2 ){
+      return password;
+    }
+    sb.append(password.charAt(0)).append("****").append(password.charAt(password.length()-1));
+    return sb.toString();
+  }
 }

@@ -46,9 +46,9 @@ public class SSLConfigBuilder {
     }
     SSLConfig sslConfig;
     if (mode == SSLFactory.Mode.SERVER) {
-      sslConfig = new SSLConfigServer(config, hadoopConfig, initializeSSLContext, validateKeyStore);
+      sslConfig = new SSLConfigServer(config, hadoopConfig);
     } else {
-      sslConfig = new SSLConfigClient(config, hadoopConfig, initializeSSLContext, validateKeyStore);
+      sslConfig = new SSLConfigClient(config, hadoopConfig);
     }
     if(initializeSSLContext){
       sslConfig.initSslContext();

@@ -59,6 +59,8 @@ public class TestUserBitSSL extends BaseTestQuery {
     tsPath = new File(classLoader.getResource("ssl/truststore.ks").getFile()).getAbsolutePath();
     emptyTSPath = new File(classLoader.getResource("ssl/emptytruststore.ks").getFile()).getAbsolutePath();
     newConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
+        .withValue(ExecConstants.SSL_USE_HADOOP_CONF,
+            ConfigValueFactory.fromAnyRef(false))
         .withValue(ExecConstants.USER_SSL_ENABLED,
             ConfigValueFactory.fromAnyRef(true))
         .withValue(ExecConstants.SSL_KEYSTORE_TYPE,
