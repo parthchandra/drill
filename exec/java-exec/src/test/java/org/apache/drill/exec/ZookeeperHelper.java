@@ -25,7 +25,6 @@ import java.lang.management.ManagementFactory;
 import java.util.Properties;
 
 import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.exec.util.MiniZooKeeperCluster;
 
 /**
