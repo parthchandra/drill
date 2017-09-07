@@ -74,7 +74,7 @@ public class SSLConfigServer extends SSLConfig {
         resolveHadoopPropertyName(HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY, mode));
     // if no keypassword specified, use keystore password
     String keyPass = getConfigParam(ExecConstants.SSL_KEY_PASSWORD,
-        resolveHadoopPropertyName(HADOOP_SSL_KEYSTORE_PASSWORD_TPL_KEY, mode));
+        resolveHadoopPropertyName(HADOOP_SSL_KEYSTORE_KEYPASSWORD_TPL_KEY, mode));
     keyPassword = keyPass.isEmpty() ? keyStorePassword : keyPass;
     protocol = getConfigParamWithDefault(ExecConstants.SSL_PROTOCOL, DEFAULT_SSL_PROTOCOL);
     provider = getConfigParamWithDefault(ExecConstants.SSL_PROVIDER, DEFAULT_SSL_PROVIDER);
