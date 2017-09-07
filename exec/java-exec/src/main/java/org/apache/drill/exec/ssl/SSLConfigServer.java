@@ -17,27 +17,18 @@
  */
 package org.apache.drill.exec.ssl;
 
-import com.google.common.base.Preconditions;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.common.config.DrillProperties;
-import org.apache.drill.common.exceptions.DrillConfigurationException;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
-import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.security.KeyStore;
-import java.text.MessageFormat;
 
 public class SSLConfigServer extends SSLConfig {
 
@@ -97,6 +88,7 @@ public class SSLConfigServer extends SSLConfig {
     }
   }
 
+  @Override
   public SslContext initSslContext() throws DrillException {
     final SslContext sslCtx;
 
@@ -110,46 +102,8 @@ public class SSLConfigServer extends SSLConfig {
       if (keyStorePath.isEmpty()) {
         throw new DrillException("No Keystore provided.");
       }
-      KeyStore ks =
-          KeyStore.getInstance(!keyStoreType.isEmpty() ? keyStoreType : KeyStore.getDefaultType());
-      try {
-        //initialize the key manager factory
-        // Will throw an exception if the file is not found/accessible.
-        InputStream ksStream = new FileInputStream(keyStorePath);
-        // A key password CANNOT be null or an empty string.
-        if (keyStorePassword.isEmpty()) {
-          throw new DrillException("The Keystore password cannot be empty.");
-        }
-        ks.load(ksStream, keyStorePassword.toCharArray());
-        // Empty Keystore. (Remarkably, it is possible to do this).
-        if (ks.size() == 0) {
-          throw new DrillException("The Keystore has no entries.");
-        }
-        kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-        kmf.init(ks, keyPassword.toCharArray());
-
-      } catch (Exception e) {
-        throw new DrillException(new StringBuilder()
-            .append("Exception while initializing the keystore: ")
-            .append(e.getMessage()).toString());
-      }
-      try {
-        //initialize the trust manager factory
-        KeyStore ts = null;
-        // if truststore is not provided then we will use the default. Note that the default depends on
-        // the TrustManagerFactory that in turn depends on the Security Provider
-        if (!trustStorePath.isEmpty()) {
-          ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
-          InputStream tsStream = new FileInputStream(trustStorePath);
-          ts.load(tsStream, trustStorePassword.toCharArray());
-        }
-        tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        tmf.init(ts);
-      } catch (Exception e) {
-        throw new DrillException(new StringBuilder()
-            .append("Exception while initializing the truststore: ")
-            .append(e.getMessage()).toString());
-      }
+      kmf = initializeKeyManagerFactory();
+      tmf = initializeTrustManagerFactory();
       sslCtx = SslContextBuilder.forServer(kmf)
           .trustManager(tmf)
           .protocols(protocol)
@@ -159,87 +113,139 @@ public class SSLConfigServer extends SSLConfig {
       // Catch any SSL initialization Exceptions here and abort.
       throw new DrillException(new StringBuilder()
           .append("SSL is enabled but cannot be initialized - ")
-          .append(e.getMessage()).toString());
+          .append("[ ")
+          .append(e.getMessage())
+          .append("]. ")
+          .toString());
     }
-    this.sslContext = sslCtx;
+    this.nettySslContext = sslCtx;
+    return sslCtx;
+  }
+
+  @Override
+  public SSLContext initSSLContext() throws DrillException {
+    final SSLContext sslCtx;
+
+    if (!userSslEnabled) {
+      return null;
+    }
+
+    KeyManagerFactory kmf;
+    TrustManagerFactory tmf;
+    try {
+      if (keyStorePath.isEmpty()) {
+        throw new DrillException("No Keystore provided.");
+      }
+      kmf = initializeKeyManagerFactory();
+      tmf = initializeTrustManagerFactory();
+      sslCtx = SSLContext.getInstance(protocol);
+      sslCtx.init(kmf.getKeyManagers(), tmf.getTrustManagers(), null);
+    } catch (Exception e) {
+      // Catch any SSL initialization Exceptions here and abort.
+      throw new DrillException(
+          new StringBuilder().append("SSL is enabled but cannot be initialized - ")
+              .append("[ ")
+              .append(e.getMessage())
+              .append("]. ")
+              .toString());
+    }
+    this.jdkSSlContext = sslCtx;
     return sslCtx;
   }
 
 
+  @Override
   public boolean isUserSslEnabled() {
     return userSslEnabled;
   }
 
+  @Override
   public boolean isHttpsEnabled() {
     return httpsEnabled;
   }
 
+  @Override
   public String getKeyStoreType() {
     return keyStoreType;
   }
 
+  @Override
   public String getKeyStorePath() {
     return keyStorePath;
   }
 
+  @Override
   public String getKeyStorePassword() {
     return keyStorePassword;
   }
 
+  @Override
   public String getKeyPassword() {
     return keyPassword;
   }
 
+  @Override
   public String getTrustStoreType() {
     return trustStoreType;
   }
 
+  @Override
   public boolean hasTrustStorePath() {
     return !trustStorePath.isEmpty();
   }
 
+  @Override
   public String getTrustStorePath() {
     return trustStorePath;
   }
 
+  @Override
   public boolean hasTrustStorePassword() {
     return !trustStorePassword.isEmpty();
   }
 
+  @Override
   public String getTrustStorePassword() {
     return trustStorePassword;
   }
 
+  @Override
   public String getProtocol() {
     return protocol;
   }
 
+  @Override
   public SslProvider getProvider() {
     return provider.equalsIgnoreCase("JDK") ? SslProvider.JDK : SslProvider.OPENSSL;
   }
 
+  @Override
   public int getHandshakeTimeout() {
     return 0;
   }
 
+  @Override
   public SSLFactory.Mode getMode() {
     return mode;
   }
 
-  public boolean isEnableHostVerification() {
+  @Override
+  public boolean enableHostVerification() {
     return false;
   }
 
-  public boolean isDisableCertificateVerification() {
+  @Override
+  public boolean disableCertificateVerification() {
     return false;
+  }
+
+  @Override
+  public boolean useSystemTrustStore() {
+    return false; // Client only, notsupported by the server
   }
 
   public boolean isSslValid() {
     return !keyStorePath.isEmpty() && !keyStorePassword.isEmpty();
-  }
-
-  public SslContext getSslContext() {
-    return sslContext;
   }
 
 }

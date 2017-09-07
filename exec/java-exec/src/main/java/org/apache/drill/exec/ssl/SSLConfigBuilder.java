@@ -51,7 +51,7 @@ public class SSLConfigBuilder {
       sslConfig = new SSLConfigClient(config, hadoopConfig);
     }
     if(initializeSSLContext){
-      sslConfig.initSslContext();
+      sslConfig.initContext();
     }
     if(validateKeyStore){
       sslConfig.validateKeyStore();

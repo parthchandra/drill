@@ -20,26 +20,14 @@ package org.apache.drill.exec.ssl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
-import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillException;
-import org.apache.drill.exec.ExecConstants;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
-import javax.net.ssl.SSLEngine;
-import javax.net.ssl.TrustManager;
+import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
-import javax.net.ssl.TrustManagerFactorySpi;
-import javax.net.ssl.X509ExtendedTrustManager;
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.net.Socket;
-import java.security.KeyStore;
-import java.security.Provider;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 
 public class SSLConfigClient extends SSLConfig {
 
@@ -52,6 +40,7 @@ public class SSLConfigClient extends SSLConfig {
   private final String trustStorePassword;
   private final boolean enableHostVerification;
   private final boolean disableCertificateVerification;
+  private final boolean useSystemTrustStore;
   private final String protocol;
   private final int handshakeTimeout;
   private final String provider;
@@ -70,6 +59,8 @@ public class SSLConfigClient extends SSLConfig {
         .getBoolean(DrillProperties.ENABLE_HOST_VERIFICATION);
     disableCertificateVerification = config.hasPath(DrillProperties.DISABLE_CERT_VERIFICATION) && config
         .getBoolean(DrillProperties.DISABLE_CERT_VERIFICATION);
+    useSystemTrustStore = config.hasPath(DrillProperties.USE_SYSTEM_TRUSTSTORE) && config
+        .getBoolean(DrillProperties.USE_SYSTEM_TRUSTSTORE);
     protocol = getConfigParamWithDefault(DrillProperties.TLS_PROTOCOL, DEFAULT_SSL_PROTOCOL);
     int hsTimeout = config.hasPath(DrillProperties.TLS_HANDSHAKE_TIMEOUT) ?
         config.getInt(DrillProperties.TLS_HANDSHAKE_TIMEOUT) :
@@ -85,6 +76,7 @@ public class SSLConfigClient extends SSLConfig {
 
   }
 
+  @Override
   public SslContext initSslContext() throws DrillException {
     final SslContext sslCtx;
 
@@ -92,22 +84,9 @@ public class SSLConfigClient extends SSLConfig {
       return null;
     }
 
+    TrustManagerFactory tmf;
     try {
-      KeyStore ts = null;
-      // if truststore is not provided then we will use the default. Note that the default depends on
-      // the TrustManagerFactory that in turn depends on the Security Provider
-      if (!trustStorePath.isEmpty()) {
-        ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
-        InputStream tsStream = new FileInputStream(trustStorePath);
-        ts.load(tsStream, trustStorePassword.toCharArray());
-      }
-      TrustManagerFactory tmf;
-      if (disableCertificateVerification) {
-        tmf = InsecureTrustManagerFactory.INSTANCE;
-      } else {
-        tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-      }
-      tmf.init(ts);
+      tmf = initializeTrustManagerFactory();
       sslCtx = SslContextBuilder.forClient()
           .sslProvider(getProvider())
           .trustManager(tmf)
@@ -117,86 +96,134 @@ public class SSLConfigClient extends SSLConfig {
       // Catch any SSL initialization Exceptions here and abort.
       throw new DrillException(new StringBuilder()
           .append("SSL is enabled but cannot be initialized due to the following exception: ")
-          .append(e.getMessage()).toString());
+          .append("[ ")
+          .append(e.getMessage())
+          .append("]. ")
+          .toString());
     }
-    this.sslContext = sslCtx;
+    this.nettySslContext = sslCtx;
     return sslCtx;
   }
 
+  @Override
+  public SSLContext initSSLContext() throws DrillException {
+    final SSLContext sslCtx;
+
+    if (!userSslEnabled) {
+      return null;
+    }
+
+    TrustManagerFactory tmf;
+    try {
+      tmf = initializeTrustManagerFactory();
+      sslCtx = SSLContext.getInstance(protocol);
+      sslCtx.init(null, tmf.getTrustManagers(), null);
+    } catch (Exception e) {
+      // Catch any SSL initialization Exceptions here and abort.
+      throw new DrillException(new StringBuilder()
+          .append("SSL is enabled but cannot be initialized due to the following exception: ")
+          .append("[ ")
+          .append(e.getMessage())
+          .append("]. ")
+          .toString());
+    }
+    this.jdkSSlContext = sslCtx;
+    return sslCtx;
+  }
+
+
+  @Override
   public boolean isUserSslEnabled() {
     return userSslEnabled;
   }
 
+  @Override
   public boolean isHttpsEnabled() {
     return httpsEnabled;
   }
 
+  @Override
   public String getKeyStoreType() {
     return emptyString;
   }
 
+  @Override
   public String getKeyStorePath() {
     return emptyString;
   }
 
+  @Override
   public String getKeyStorePassword() {
     return emptyString;
   }
 
+  @Override
   public String getKeyPassword() {
     return emptyString;
   }
 
+  @Override
   public String getTrustStoreType() {
     return trustStoreType;
   }
 
+  @Override
   public boolean hasTrustStorePath() {
     return !trustStorePath.isEmpty();
   }
 
+  @Override
   public String getTrustStorePath() {
     return trustStorePath;
   }
 
+  @Override
   public boolean hasTrustStorePassword() {
     return !trustStorePassword.isEmpty();
   }
 
+  @Override
   public String getTrustStorePassword() {
     return trustStorePassword;
   }
 
+  @Override
   public String getProtocol() {
     return protocol;
   }
 
+  @Override
   public SslProvider getProvider() {
     return provider.equalsIgnoreCase("JDK") ? SslProvider.JDK : SslProvider.OPENSSL;
   }
 
+  @Override
   public int getHandshakeTimeout() {
     return handshakeTimeout;
   }
 
+  @Override
   public SSLFactory.Mode getMode() {
     return mode;
   }
 
-  public boolean isEnableHostVerification() {
+  @Override
+  public boolean enableHostVerification() {
     return enableHostVerification;
   }
 
-  public boolean isDisableCertificateVerification() {
+  @Override
+  public boolean disableCertificateVerification() {
     return disableCertificateVerification;
+  }
+
+  @Override
+  public boolean useSystemTrustStore() {
+    return useSystemTrustStore;
   }
 
   public boolean isSslValid() {
     return true;
-  }
-
-  public SslContext getSslContext() {
-    return sslContext;
   }
 
 }

@@ -81,6 +81,7 @@ public final class DrillProperties extends Properties {
   public static final String DISABLE_CERT_VERIFICATION = "disableCertificateVerification";
   public static final String TLS_HANDSHAKE_TIMEOUT = "TLSHandshakeTimeout";
   public static final String TLS_PROVIDER = "TLSProvider";
+  public static final String USE_SYSTEM_TRUSTSTORE = "useSystemTrustStore";
 
   // Although all properties from the application are sent to the server (from the client), the following
   // sets of properties are used by the client and server respectively. These are reserved words.
@@ -91,8 +92,9 @@ public final class DrillProperties extends Properties {
           SCHEMA,
           USER, PASSWORD, IMPERSONATION_TARGET, AUTH_MECHANISM,
           SERVICE_PRINCIPAL, SERVICE_NAME, SERVICE_HOST, REALM, KEYTAB, KERBEROS_FROM_SUBJECT,
-          ENABLE_TLS, TLS_PROTOCOL, TRUSTSTORE_PATH, TRUSTSTORE_PASSWORD, ENABLE_HOST_VERIFICATION,
-          DISABLE_CERT_VERIFICATION, TLS_HANDSHAKE_TIMEOUT, TLS_PROVIDER
+          ENABLE_TLS, TLS_PROTOCOL, TRUSTSTORE_TYPE, TRUSTSTORE_PATH, TRUSTSTORE_PASSWORD,
+          ENABLE_HOST_VERIFICATION, DISABLE_CERT_VERIFICATION, TLS_HANDSHAKE_TIMEOUT, TLS_PROVIDER,
+          USE_SYSTEM_TRUSTSTORE
       );
 
   public static final ImmutableSet<String> ACCEPTED_BY_SERVER = ImmutableSet.of(

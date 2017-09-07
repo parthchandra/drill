@@ -19,12 +19,22 @@ package org.apache.drill.exec.ssl;
 
 import com.google.common.base.Preconditions;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.TrustManagerFactory;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.security.KeyStore;
 import java.text.MessageFormat;
 
 public abstract class SSLConfig {
@@ -38,7 +48,14 @@ public abstract class SSLConfig {
   protected final boolean httpsEnabled;
   protected final DrillConfig config;
   protected final Configuration hadoopConfig;
-  protected SslContext sslContext;
+
+  // Either the Netty SSL context or the JDK SSL context will be initialized
+  // The JDK SSL context is use iff the useSystemTrustStore setting is enabled.
+  protected SslContext nettySslContext;
+  protected SSLContext jdkSSlContext;
+
+  private static final boolean isWindows = System.getProperty("os.name").toLowerCase().indexOf("win") >= 0;
+  private static final boolean isMacOs = System.getProperty("os.name").toLowerCase().indexOf("mac") >= 0;
 
   public static final String HADOOP_SSL_CONF_TPL_KEY = "hadoop.ssl.{0}.conf";
   public static final String HADOOP_SSL_KEYSTORE_LOCATION_TPL_KEY = "ssl.{0}.keystore.location";
@@ -58,7 +75,7 @@ public abstract class SSLConfig {
         config.hasPath(ExecConstants.HTTP_ENABLE_SSL) && config.getBoolean(ExecConstants.HTTP_ENABLE_SSL);
     // For testing we will mock up a hadoop configuration, however for regular use, we find the actual hadoop config.
     boolean enableHadoopConfig = config.getBoolean(ExecConstants.SSL_USE_HADOOP_CONF);
-    if (enableHadoopConfig) {
+    if (enableHadoopConfig && this instanceof SSLConfigServer) {
       if (hadoopConfig == null) {
         this.hadoopConfig = new Configuration(); // get hadoop configuration
       } else {
@@ -114,6 +131,8 @@ public abstract class SSLConfig {
 
   public abstract SslContext initSslContext() throws DrillException;
 
+  public abstract SSLContext initSSLContext() throws DrillException;
+
   public abstract boolean isUserSslEnabled();
 
   public abstract boolean isHttpsEnabled();
@@ -138,19 +157,132 @@ public abstract class SSLConfig {
 
   public abstract String getProtocol();
 
+  public abstract SslProvider getProvider();
+
   public abstract int getHandshakeTimeout();
 
   public abstract SSLFactory.Mode getMode();
 
-  public abstract boolean isEnableHostVerification();
+  public abstract boolean enableHostVerification();
 
-  public abstract boolean isDisableCertificateVerification();
+  public abstract boolean disableCertificateVerification();
 
+  public abstract boolean useSystemTrustStore();
 
   public abstract boolean isSslValid();
 
-  public SslContext getSslContext() {
-    return sslContext;
+  public SslContext getNettySslContext() {
+    return nettySslContext;
+  }
+
+  public TrustManagerFactory initializeTrustManagerFactory() throws DrillException {
+    TrustManagerFactory tmf;
+    KeyStore ts = null;
+    //Support Windows/MacOs system trust store
+    try {
+      String trustStoreType = getTrustStoreType();
+      if ((isWindows || isMacOs) && useSystemTrustStore()) {
+        // This is valid for MS-Windows and MacOs
+        logger.debug("Initializing System truststore.");
+        ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
+        ts.load(null, null);
+      } else if (!getTrustStorePath().isEmpty()) {
+          // if truststore is not provided then we will use the default. Note that the default depends on
+          // the TrustManagerFactory that in turn depends on the Security Provider.
+          // Use null as the truststore which will result in the default truststore being picked up
+          logger.debug("Initializing truststore {}.", getTrustStorePath());
+          ts = KeyStore.getInstance(!trustStoreType.isEmpty() ? trustStoreType : KeyStore.getDefaultType());
+          InputStream tsStream = new FileInputStream(getTrustStorePath());
+          ts.load(tsStream, getTrustStorePassword().toCharArray());
+      } else {
+        logger.debug("Initializing default truststore.");
+      }
+      if (disableCertificateVerification()) {
+        tmf = InsecureTrustManagerFactory.INSTANCE;
+      } else {
+        tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+      }
+      tmf.init(ts);
+    } catch (Exception e) {
+      // Catch any SSL initialization Exceptions here and abort.
+      throw new DrillException(
+          new StringBuilder()
+              .append("Exception while initializing the truststore: [")
+              .append(e.getMessage())
+              .append("]. ")
+              .toString());
+    }
+    return tmf;
+  }
+
+  public KeyManagerFactory initializeKeyManagerFactory() throws DrillException {
+    KeyManagerFactory kmf;
+    String keyStorePath = getKeyStorePath();
+    String keyStorePassword = getKeyStorePassword();
+    String keyStoreType = getKeyStoreType();
+    try {
+      if (keyStorePath.isEmpty()) {
+        throw new DrillException("No Keystore provided.");
+      }
+      KeyStore ks =
+          KeyStore.getInstance(!keyStoreType.isEmpty() ? keyStoreType : KeyStore.getDefaultType());
+      //initialize the key manager factory
+      // Will throw an exception if the file is not found/accessible.
+      InputStream ksStream = new FileInputStream(keyStorePath);
+      // A key password CANNOT be null or an empty string.
+      if (keyStorePassword.isEmpty()) {
+        throw new DrillException("The Keystore password cannot be empty.");
+      }
+      ks.load(ksStream, keyStorePassword.toCharArray());
+      // Empty Keystore. (Remarkably, it is possible to do this).
+      if (ks.size() == 0) {
+        throw new DrillException("The Keystore has no entries.");
+      }
+      kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+      kmf.init(ks, getKeyPassword().toCharArray());
+
+    } catch (Exception e) {
+      throw new DrillException(
+          new StringBuilder()
+              .append("Exception while initializing the keystore: [")
+              .append(e.getMessage())
+              .append("]. ")
+              .toString());
+    }
+    return kmf;
+  }
+
+  public void initContext() throws DrillException {
+    if ((isWindows || isMacOs) && useSystemTrustStore()) {
+      initSSLContext();
+      logger.debug("Initialized Windows SSL context using JDK.");
+    } else {
+      initSslContext();
+      logger.debug("Initialized SSL context.");
+    }
+    return;
+  }
+
+  public SSLEngine createSSLEngine(BufferAllocator allocator, String peerHost, int peerPort) {
+    SSLEngine engine;
+    if ((isWindows || isMacOs) && useSystemTrustStore()) {
+      if (peerHost != null) {
+        engine = jdkSSlContext.createSSLEngine(peerHost, peerPort);
+        logger.debug("Initializing Windows SSLEngine with hostname verification.");
+      } else {
+        engine = jdkSSlContext.createSSLEngine();
+        logger.debug("Initializing Windows SSLEngine with no hostname verification.");
+      }
+    } else {
+      if (peerHost != null) {
+        engine = nettySslContext.newEngine(allocator.getAsByteBufAllocator(), peerHost, peerPort);
+        logger.debug("Initializing SSLEngine with hostname verification.");
+      } else {
+        engine = nettySslContext.newEngine(allocator.getAsByteBufAllocator());
+        logger.debug("Initializing SSLEngine with no hostname verification.");
+      }
+    }
+    return engine;
   }
 
   @Override
@@ -164,6 +296,8 @@ public abstract class SSLConfig {
         .append("enabled.\n");
     if(isUserSslEnabled() || isHttpsEnabled()) {
       sb.append("SSL Configuration :")
+          .append("OS:").append(System.getProperty("os.name"))
+          .append("\n\tUsing system trust store: ").append(useSystemTrustStore())
           .append("\n\tprotocol: ").append(getProtocol())
           .append("\n\tkeyStoreType: ").append(getKeyStoreType())
           .append("\n\tkeyStorePath: ").append(getKeyStorePath())
@@ -173,8 +307,8 @@ public abstract class SSLConfig {
           .append("\n\ttrustStorePath: ").append(getTrustStorePath())
           .append("\n\ttrustStorePassword: ").append(getPrintablePassword(getTrustStorePassword()))
           .append("\n\thandshakeTimeout: ").append(getHandshakeTimeout())
-          .append("\n\tenableHostVerification: ").append(isEnableHostVerification())
-          .append("\n\tdisableCertificateVerification: ").append(isDisableCertificateVerification())
+          .append("\n\tenableHostVerification: ").append(enableHostVerification())
+          .append("\n\tdisableCertificateVerification: ").append(disableCertificateVerification())
       ;
     }
     return sb.toString();

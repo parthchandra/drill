@@ -22,7 +22,6 @@ import java.net.SocketAddress;
 import java.util.UUID;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
 import javax.security.sasl.SaslException;
 
 import io.netty.channel.Channel;
@@ -115,8 +114,7 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   protected void setupSSL(ChannelPipeline pipe) {
     if (sslConfig.isUserSslEnabled()) {
 
-      //SSLEngine sslEngine = sslConfig.getSslContext().createSSLEngine();
-      SSLEngine sslEngine = sslConfig.getSslContext().newEngine(allocator.getAsByteBufAllocator());
+      SSLEngine sslEngine = sslConfig.createSSLEngine(allocator, null, 0);
       sslEngine.setUseClientMode(false);
 
       // No need for client side authentication (HTTPS like behaviour)
