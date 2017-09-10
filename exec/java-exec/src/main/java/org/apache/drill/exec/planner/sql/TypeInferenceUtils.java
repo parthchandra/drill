@@ -140,6 +140,8 @@ public class TypeInferenceUtils {
       .put("CONVERT_TO", DrillConvertToSqlReturnTypeInference.INSTANCE)
       .put("EXTRACT", DrillExtractSqlReturnTypeInference.INSTANCE)
       .put("SQRT", DrillSqrtSqlReturnTypeInference.INSTANCE)
+      .put("SUBSTR", DrillSubstringSqlReturnTypeInference.INSTANCE)
+      .put("SUBSTRING", DrillSubstringSqlReturnTypeInference.INSTANCE)
       .put("CAST", DrillCastSqlReturnTypeInference.INSTANCE)
       .put("FLATTEN", DrillDeferToExecSqlReturnTypeInference.INSTANCE)
       .put("KVGEN", DrillDeferToExecSqlReturnTypeInference.INSTANCE)
@@ -512,10 +514,18 @@ public class TypeInferenceUtils {
 
     @Override
     public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
-      return createCalciteTypeWithNullability(
-          opBinding.getTypeFactory(),
-          SqlTypeName.VARCHAR,
-          isNullable(opBinding.collectOperandTypes()));
+      boolean isNullable = isNullable(opBinding.collectOperandTypes());
+
+      int last = opBinding.getOperandCount() - 1;
+      boolean isScalarString = isScalarStringType(opBinding.getOperandType(last).getSqlTypeName());
+      int precision = opBinding.getOperandType(last).getPrecision();
+
+      if (isScalarString && precision != RelDataType.PRECISION_NOT_SPECIFIED) {
+        RelDataType sqlType = opBinding.getTypeFactory().createSqlType(SqlTypeName.VARCHAR, precision);
+        return opBinding.getTypeFactory().createTypeWithNullability(sqlType, isNullable);
+      }
+
+      return opBinding.getTypeFactory().createTypeWithNullability(opBinding.getOperandType(last), true);
     }
   }
 
@@ -688,10 +698,7 @@ public class TypeInferenceUtils {
         opBinding = convertDecimalLiteralToDouble(opBinding);
       }
 
-      return createCalciteTypeWithNullability(
-          opBinding.getTypeFactory(),
-          opBinding.getOperandType(0).getSqlTypeName(),
-          true);
+      return opBinding.getTypeFactory().createTypeWithNullability(opBinding.getOperandType(0), true);
     }
   }
 
