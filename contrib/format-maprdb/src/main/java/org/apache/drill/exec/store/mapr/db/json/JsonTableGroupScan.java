@@ -464,12 +464,12 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         factor = Math.min(1.0, 1.0 / Math.sqrt(100.0 / metaTable.getScanStats().getPartitionCount()));
       }
       logger.debug("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: condition: {} rowCount: {}, avgRowSize: {}",
-          this, condition.toString(), stats.getEstimatedNumRows(), stats.getEstimatedSize());
+          this, (condition == null ? "null" : condition.toString()), stats.getEstimatedNumRows(), stats.getEstimatedSize());
       return new MapRDBStatisticsPayload(factor * stats.getEstimatedNumRows(),
           ((double)stats.getEstimatedSize()/stats.getEstimatedNumRows()));
     } else {
       logger.debug("index_plan_info: getEstimatedRowCount: {} condition: {} rowCount: UNKNOWN, avgRowSize: UNKNOWN", this,
-          condition.toString());
+          (condition == null ? "null" : condition.toString()));
       return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, Statistics.AVG_ROWSIZE_UNKNOWN);
     }
   }
