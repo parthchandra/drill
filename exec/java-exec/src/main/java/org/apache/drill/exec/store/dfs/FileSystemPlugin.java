@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -134,16 +134,7 @@ public class FileSystemPlugin extends AbstractStoragePlugin {
   public AbstractGroupScan getPhysicalScan(String userName, JSONOptions selection, List<SchemaPath> columns)
       throws IOException {
     FormatSelection formatSelection = selection.getWith(lpPersistance, FormatSelection.class);
-    FormatPlugin plugin;
-    if (formatSelection.getFormat() instanceof NamedFormatPluginConfig) {
-      plugin = formatCreator.getFormatPluginByName( ((NamedFormatPluginConfig) formatSelection.getFormat()).name);
-    } else {
-      plugin = formatPluginsByConfig.get(formatSelection.getFormat());
-    }
-    if (plugin == null) {
-      plugin = formatCreator.newFormatPlugin(formatSelection.getFormat());
-      formatPluginsByConfig.put(formatSelection.getFormat(), plugin);
-    }
+    FormatPlugin plugin = getFormatPlugin(formatSelection.getFormat());
     return plugin.getGroupScan(userName, formatSelection.getSelection(), columns);
   }
 
@@ -157,11 +148,18 @@ public class FileSystemPlugin extends AbstractStoragePlugin {
   }
 
   public FormatPlugin getFormatPlugin(FormatPluginConfig config) {
+    FormatPlugin plugin;
     if (config instanceof NamedFormatPluginConfig) {
-      return formatCreator.getFormatPluginByName(((NamedFormatPluginConfig) config).name);
+      plugin = formatCreator.getFormatPluginByName(((NamedFormatPluginConfig) config).name);
     } else {
-      return formatPluginsByConfig.get(config);
+      plugin = formatPluginsByConfig.get(config);
     }
+
+    if (plugin == null) {
+      plugin = formatCreator.newFormatPlugin(config);
+      formatPluginsByConfig.put(config, plugin);
+    }
+    return plugin;
   }
 
   @Override
