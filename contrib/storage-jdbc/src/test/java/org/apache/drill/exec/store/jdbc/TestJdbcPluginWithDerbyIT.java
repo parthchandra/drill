@@ -112,13 +112,13 @@ public class TestJdbcPluginWithDerbyIT extends PlanTestBase {
 
   @Test
   public void showTablesDefaultSchema() throws Exception {
-    testNoResult("use derby");
+    testNoResult("use derby.DRILL_DERBY_TEST");
     assertEquals(1, testRunAndPrint(UserBitShared.QueryType.SQL, "show tables like 'PERSON'"));
   }
 
   @Test
   public void describe() throws Exception {
-    testNoResult("use derby");
+    testNoResult("use derby.DRILL_DERBY_TEST");
     assertEquals(19, testRunAndPrint(UserBitShared.QueryType.SQL, "describe PERSON"));
   }
 

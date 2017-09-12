@@ -153,7 +153,7 @@ public class TestSampleHiveUDFs extends HiveTestBase {
   @Test
   public void decimalInOut() throws Exception{
     try {
-      test(String.format("alter session set `%s` = true", PlannerSettings.ENABLE_DECIMAL_DATA_TYPE_KEY));
+      test(String.format("alter system set `%s` = true", PlannerSettings.ENABLE_DECIMAL_DATA_TYPE_KEY));
       String query = "SELECT " +
           "testHiveUDFDecimal(cast('1234567891234567891234567891234567891.4' as decimal(38, 1))) as col1 " +
           "FROM hive.kv LIMIT 1";
@@ -161,7 +161,7 @@ public class TestSampleHiveUDFs extends HiveTestBase {
       String expected = "col1\n" + "1234567891234567891234567891234567891.4\n";
       helper(query, expected);
     } finally {
-      test(String.format("alter session set `%s` = false", PlannerSettings.ENABLE_DECIMAL_DATA_TYPE_KEY));
+      test(String.format("alter system set `%s` = false", PlannerSettings.ENABLE_DECIMAL_DATA_TYPE_KEY));
     }
   }
 }
