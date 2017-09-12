@@ -82,6 +82,8 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 
     partitionKeyVector = v.getValueVector();
 
+    assert subScan != null : "subScan has not yet been initialized";
+
     // initialize the table handle from the table cache
     table = subScan.getFormatPlugin().getJsonTableCache().getTable(tableName, subScan.getUserName());
 
