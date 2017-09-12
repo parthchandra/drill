@@ -459,13 +459,17 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       if (condition != null) {
         factor = Math.min(1.0, 1.0 / Math.sqrt(100.0 / metaTable.getScanStats().getPartitionCount()));
       }
-      logger.debug("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: condition: {} rowCount: {}, avgRowSize: {}",
-          this, (condition == null ? "null" : condition.toString()), stats.getEstimatedNumRows(), stats.getEstimatedSize());
+      logger.debug("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
+              "condition: {} rowCount: {}, avgRowSize: {}",
+          this, (index == null ? "null" : index.getIndexName()), (index == null ? "null" : index.getIndexInfo()),
+          (condition == null ? "null" : condition.toString()), stats.getEstimatedNumRows(),
+          (stats.getEstimatedNumRows() == 0 ? 0 : stats.getEstimatedSize()/stats.getEstimatedNumRows()));
       return new MapRDBStatisticsPayload(factor * stats.getEstimatedNumRows(),
-          ((double)stats.getEstimatedSize()/stats.getEstimatedNumRows()));
+          ((stats.getEstimatedNumRows() == 0 ? 0 : (double)stats.getEstimatedSize()/stats.getEstimatedNumRows())));
     } else {
-      logger.debug("index_plan_info: getEstimatedRowCount: {} condition: {} rowCount: UNKNOWN, avgRowSize: UNKNOWN", this,
-          (condition == null ? "null" : condition.toString()));
+      logger.debug("index_plan_info: getEstimatedRowCount: {} indexName: {}, indexInfo: {}, " +
+              "condition: {} rowCount: UNKNOWN, avgRowSize: UNKNOWN", this, (index == null ? "null" : index.getIndexName()),
+          (index == null ? "null" : index.getIndexInfo()), (condition == null ? "null" : condition.toString()));
       return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, Statistics.AVG_ROWSIZE_UNKNOWN);
     }
   }
