@@ -124,6 +124,11 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
         logger.debug("First batch, outputting the batch with {} records.", left.getRecordCount());
         // there is already a pending batch from left, output it
         outputCurrentLeftBatch();
+        // Check if schema has changed (this is just to guard against potential changes to the
+        // output schema by outputCurrentLeftBatch.
+        if (callBack.getSchemaChangedAndReset()) {
+          return IterOutcome.OK_NEW_SCHEMA;
+        }
         return IterOutcome.OK;
       }
 
@@ -197,7 +202,12 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
   }
 
   private void outputCurrentLeftBatch() {
-    if (state == BatchState.NOT_FIRST) {
+    //Schema change when state is FIRST shouldn't happen as buildSchema should
+    //take care of building the schema for the first batch. This check is introduced
+    //to guard against any schema change after buildSchema phase and reading
+    //the first batch of rows.
+    if (leftUpstream == IterOutcome.OK_NEW_SCHEMA && state == BatchState.FIRST ||
+        state == BatchState.NOT_FIRST) {
       container.zeroVectors();
       transfers.clear();
 
@@ -205,6 +215,10 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
         final TransferPair pair = v.getValueVector().makeTransferPair(
             container.addOrGet(v.getField(), callBack));
         transfers.add(pair);
+      }
+
+      if (container.isSchemaChanged()) {
+        container.buildSchema(left.getSchema().getSelectionVectorMode());
       }
     }
 
