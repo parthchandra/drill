@@ -180,9 +180,17 @@ public class ScanBatch implements CloseableRecordBatch {
     try {
       while (true) {
         if (currentReader == null && !getNextReaderIfHas()) {
-            releaseAssets(); // All data has been read. Release resource.
-            done = true;
+          if (isRepeatableScan) {
+            // for repeatable readers, reset the iterator to the beginning of the list of readers since subsequent
+            // scans should start at the first reader
+            // TODO: should return ITERATION_NONE, to indicate it's the end of one iteration for repeated scan.
+            readers = readerList.iterator();
             return IterOutcome.NONE;
+          }
+
+          releaseAssets(); // All data has been read. Release resource.
+          done = true;
+          return IterOutcome.NONE;
         }
         injector.injectChecked(context.getExecutionControls(), "next-allocate", OutOfMemoryException.class);
         currentReader.allocate(mutator.fieldVectorMap());
