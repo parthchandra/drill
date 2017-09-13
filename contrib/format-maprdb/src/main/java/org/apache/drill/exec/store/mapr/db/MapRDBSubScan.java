@@ -130,14 +130,13 @@ public class MapRDBSubScan extends AbstractDbSubScan {
     return tableType;
   }
 
-  @JsonIgnore
-  public MapRDBFormatPlugin getFormatPlugin() {
-    return formatPlugin;
+  public MapRDBFormatPluginConfig getFormatPluginConfig() {
+    return (MapRDBFormatPluginConfig) formatPlugin.getConfig();
   }
 
   @JsonIgnore
-  public MapRDBFormatPluginConfig getFormatPluginConfig() {
-    return (MapRDBFormatPluginConfig) formatPlugin.getConfig();
+  public MapRDBFormatPlugin getFormatPlugin() {
+    return formatPlugin;
   }
 
 }
