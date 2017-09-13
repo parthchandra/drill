@@ -27,6 +27,7 @@ import org.apache.drill.exec.rpc.user.clusterclient.zkbased.ZKBasedConnectionPoo
 import org.apache.drill.exec.rpc.user.clusterclient.zkbased.ZKBasedEndpointProvider;
 import org.apache.drill.test.QuerySummaryFuture;
 import org.apache.drill.test.SummaryOnlyQueryEventListener;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -37,6 +38,8 @@ import java.util.concurrent.ExecutionException;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+//should run this individually before we move to exclusive runs of the tests that start cluster
+@Ignore
 public class TestDrillClusterClient extends DrillSystemTestBase {
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestDrillClusterClient.class);
 
