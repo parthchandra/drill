@@ -30,9 +30,7 @@ public class TestLateLimit0Optimization extends BaseTestQuery {
   private static void checkThatQueryIsOptimized(final String query) throws Exception {
     PlanTestBase.testPlanMatchingPatterns(wrapLimit0(query),
         new String[]{
-            ".*Limit\\(offset=\\[0\\], fetch=\\[0\\]\\).*\n" +
-                ".*\n" +
-                ".*Scan.*"
+            ".*Limit\\(offset=\\[0\\], fetch=\\[0\\]\\)(.*[\n\r])+.*Scan.*"
         }, new String[]{});
   }
 
@@ -40,9 +38,7 @@ public class TestLateLimit0Optimization extends BaseTestQuery {
     PlanTestBase.testPlanMatchingPatterns(wrapLimit0(query),
         new String[]{},
         new String[]{
-            ".*Limit\\(offset=\\[0\\], fetch=\\[0\\]\\).*\n" +
-                ".*\n" +
-                ".*Scan.*"
+            ".*Limit\\(offset=\\[0\\], fetch=\\[0\\]\\)(.*[\n\r])+.*Scan.*"
         });
   }
 
