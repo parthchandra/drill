@@ -796,6 +796,7 @@ public class IndexPlanTest extends BaseJsonTest {
         .run();
   }
 
+  @Ignore//MD-2703
   @Test
   public void orderByCastCoveringPlan() throws Exception {
     String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
