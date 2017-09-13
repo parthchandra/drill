@@ -54,7 +54,7 @@ struct Option{
     {"enableSSL", "Enable SSL", false},
     {"TLSProtocol", "TLS protocol version", false},
     {"certFilePath", "Path to SSL certificate file", false},
-    {"enableHostnameVerification", "enable host name verification", false},
+    {"disableHostnameVerification", "disable host name verification", false},
     {"disableCertVerification", "disable certificate verification", false},
 	{"useSystemTrustStore", "[Windows only]. Use the system truststore.", false }
 
@@ -314,7 +314,7 @@ int main(int argc, char* argv[]) {
         std::string enableSSL=qsOptionValues["enableSSL"];
         std::string tlsProtocol=qsOptionValues["TLSProtocol"];
         std::string certFilePath=qsOptionValues["certFilePath"];
-        std::string enableHostnameVerification=qsOptionValues["enableHostnameVerification"];
+        std::string disableHostnameVerification=qsOptionValues["disableHostnameVerification"];
         std::string disableCertVerification=qsOptionValues["disableCertVerification"];
 		std::string useSystemTrustStore = qsOptionValues["useSystemTrustStore"];
 
@@ -407,13 +407,13 @@ int main(int argc, char* argv[]) {
         }
         if(enableSSL.length()>0){
             props.setProperty(USERPROP_USESSL, enableSSL);
-			if (enableSSL == "true" && certFilePath.length() <= 0 && useSystemTrustStore.length() < 0){
+			if (enableSSL == "true" && certFilePath.length() <= 0 && useSystemTrustStore.length() <= 0){
                 std::cerr<< "SSL is enabled but no certificate or truststore provided. " << std::endl;
                 return -1;
             }
             props.setProperty(USERPROP_TLSPROTOCOL, tlsProtocol);
             props.setProperty(USERPROP_CERTFILEPATH, certFilePath);
-            props.setProperty(USERPROP_ENABLE_HOSTVERIFICATION, enableHostnameVerification);
+            props.setProperty(USERPROP_DISABLE_HOSTVERIFICATION, disableHostnameVerification);
             props.setProperty(USERPROP_DISABLE_CERTVERIFICATION, disableCertVerification);
 			if (useSystemTrustStore.length() > 0){
 				props.setProperty(USERPROP_USESYSTEMTRUSTSTORE, useSystemTrustStore);

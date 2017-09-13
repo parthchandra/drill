@@ -423,9 +423,9 @@ connectionStatus_t SSLStreamChannel::init(ChannelContext_t* pContext){
 		}
 	}
 
-    std::string enableHostVerification;
-    props->getProp(USERPROP_ENABLE_HOSTVERIFICATION, enableHostVerification);
-    if (enableHostVerification == "true") {
+    std::string disableHostVerification;
+    props->getProp(USERPROP_DISABLE_HOSTVERIFICATION, disableHostVerification);
+    if (disableHostVerification != "true") {
         std::string hostPortStr = m_pEndpoint->getHost() + ":" + m_pEndpoint->getPort();
         ((SSLChannelContext_t *) pContext)->getSslContext().set_verify_callback(
                 boost::asio::ssl::rfc2818_verification(hostPortStr.c_str()));
