@@ -152,4 +152,20 @@ public class IndexHintPlanTest extends IndexPlanTest {
 
         return;
     }
+
+
+    @Test
+    //Covering index should be generated for a simple query instead of a RowKeyJoin.
+    public void testSimpleNoRowKeyJoin() throws Exception {
+        String query = "SELECT `reverseid` from table(hbase.`index_test_primary`(type => 'maprdb', index => 'hash_i_reverseid'))  " +
+                "where `reverseid` = 1234";
+
+        test(defaultHavingIndexPlan);
+        PlanTestBase.testPlanMatchingPatterns(query,
+                new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=hash_i_reverseid"},
+                new String[]{"RowKeyJoin"}
+        );
+
+        return;
+   }
 }

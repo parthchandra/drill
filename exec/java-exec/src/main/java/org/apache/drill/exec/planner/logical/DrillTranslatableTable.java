@@ -46,7 +46,9 @@ public class DrillTranslatableTable implements TranslatableTable {
 
   @Override
   public RelDataType getRowType(RelDataTypeFactory typeFactory) {
-    return drillTable.getRowType(typeFactory);
+    RelDataType dataType = drillTable.getRowType(typeFactory);
+    dataType.getFieldList();
+    return dataType;
   }
 
   @Override
