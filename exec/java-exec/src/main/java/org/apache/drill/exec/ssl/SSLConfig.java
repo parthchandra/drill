@@ -163,7 +163,7 @@ public abstract class SSLConfig {
 
   public abstract SSLFactory.Mode getMode();
 
-  public abstract boolean enableHostVerification();
+  public abstract boolean disableHostVerification();
 
   public abstract boolean disableCertificateVerification();
 
@@ -307,7 +307,7 @@ public abstract class SSLConfig {
           .append("\n\ttrustStorePath: ").append(getTrustStorePath())
           .append("\n\ttrustStorePassword: ").append(getPrintablePassword(getTrustStorePassword()))
           .append("\n\thandshakeTimeout: ").append(getHandshakeTimeout())
-          .append("\n\tenableHostVerification: ").append(enableHostVerification())
+          .append("\n\tdisableHostVerification: ").append(disableHostVerification())
           .append("\n\tdisableCertificateVerification: ").append(disableCertificateVerification())
       ;
     }

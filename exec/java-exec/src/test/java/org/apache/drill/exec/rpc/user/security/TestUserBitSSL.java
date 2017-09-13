@@ -85,6 +85,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     initProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     initProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
     initProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    initProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
 
     // Start an SSL enabled cluster
     updateTestCluster(1, newConfig, initProps);
@@ -103,6 +104,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
     try {
       updateClient(connectionProps);
     } catch (Exception e) {
@@ -120,6 +122,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, ksPath);
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
     try {
       updateClient(connectionProps);
     } catch (Exception e) {
@@ -137,6 +140,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, ""); // NO truststore
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -152,6 +156,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "bad_password");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -167,6 +172,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, emptyTSPath);
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -182,6 +188,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
     try {
       updateClient(connectionProps);
     } catch (Exception e) {
@@ -236,7 +243,7 @@ public class TestUserBitSSL extends BaseTestQuery {
       connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
       connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, trustStorePath);
       connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, password);
-      connectionProps.setProperty(DrillProperties.ENABLE_HOST_VERIFICATION, "true");
+      connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "false");
 
       DrillConfig sslConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
           .withValue(ExecConstants.USER_SSL_ENABLED, ConfigValueFactory.fromAnyRef(true))
@@ -260,8 +267,8 @@ public class TestUserBitSSL extends BaseTestQuery {
     final Properties connectionProps = new Properties();
     connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
-    connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "bad_password");
-    connectionProps.setProperty(DrillProperties.ENABLE_HOST_VERIFICATION, "true");
+    connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "password");
+    connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "false");
     boolean failureCaught = false;
     try {
       updateClient(connectionProps);
@@ -280,6 +287,7 @@ public class TestUserBitSSL extends BaseTestQuery {
       connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
       connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
       connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+      connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
       //connectionProps.setProperty(DrillProperties.DISABLE_CERT_VERIFICATION, "true");
 
       DrillConfig sslConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())
@@ -307,6 +315,7 @@ public class TestUserBitSSL extends BaseTestQuery {
       connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
       connectionProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
       connectionProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+      connectionProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
       connectionProps.setProperty(DrillProperties.DISABLE_CERT_VERIFICATION, "true");
 
       DrillConfig sslConfig = new DrillConfig(DrillConfig.create(cloneDefaultTestConfigProperties())

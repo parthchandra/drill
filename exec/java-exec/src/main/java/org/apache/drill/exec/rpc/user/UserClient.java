@@ -146,7 +146,7 @@ public class UserClient
       int peerPort = endpoint.getUserPort();
       SSLEngine sslEngine = sslConfig.createSSLEngine(allocator, peerHost, peerPort);
 
-      if (sslConfig.enableHostVerification()) {
+      if (!sslConfig.disableHostVerification()) {
         SSLParameters sslParameters = sslEngine.getSSLParameters();
         // only available since Java 7
         sslParameters.setEndpointIdentificationAlgorithm("HTTPS");

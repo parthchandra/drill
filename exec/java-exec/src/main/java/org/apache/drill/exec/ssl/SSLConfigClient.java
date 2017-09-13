@@ -38,7 +38,7 @@ public class SSLConfigClient extends SSLConfig {
   private final String trustStoreType;
   private final String trustStorePath;
   private final String trustStorePassword;
-  private final boolean enableHostVerification;
+  private final boolean disableHostVerification;
   private final boolean disableCertificateVerification;
   private final boolean useSystemTrustStore;
   private final String protocol;
@@ -55,8 +55,8 @@ public class SSLConfigClient extends SSLConfig {
     trustStoreType = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_TYPE, "JKS");
     trustStorePath = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_PATH, "");
     trustStorePassword = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_PASSWORD, "");
-    enableHostVerification = config.hasPath(DrillProperties.ENABLE_HOST_VERIFICATION) && config
-        .getBoolean(DrillProperties.ENABLE_HOST_VERIFICATION);
+    disableHostVerification = config.hasPath(DrillProperties.DISABLE_HOST_VERIFICATION) && config
+        .getBoolean(DrillProperties.DISABLE_HOST_VERIFICATION);
     disableCertificateVerification = config.hasPath(DrillProperties.DISABLE_CERT_VERIFICATION) && config
         .getBoolean(DrillProperties.DISABLE_CERT_VERIFICATION);
     useSystemTrustStore = config.hasPath(DrillProperties.USE_SYSTEM_TRUSTSTORE) && config
@@ -208,8 +208,8 @@ public class SSLConfigClient extends SSLConfig {
   }
 
   @Override
-  public boolean enableHostVerification() {
-    return enableHostVerification;
+  public boolean disableHostVerification() {
+    return disableHostVerification;
   }
 
   @Override

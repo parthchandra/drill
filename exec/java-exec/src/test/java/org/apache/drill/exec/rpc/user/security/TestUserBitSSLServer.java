@@ -65,6 +65,7 @@ public class TestUserBitSSLServer extends BaseTestQuery {
     initProps.setProperty(DrillProperties.ENABLE_TLS, "true");
     initProps.setProperty(DrillProperties.TRUSTSTORE_PATH, tsPath);
     initProps.setProperty(DrillProperties.TRUSTSTORE_PASSWORD, "drill123");
+    initProps.setProperty(DrillProperties.DISABLE_HOST_VERIFICATION, "true");
   }
 
   @AfterClass

@@ -230,7 +230,7 @@ public class SSLConfigServer extends SSLConfig {
   }
 
   @Override
-  public boolean enableHostVerification() {
+  public boolean disableHostVerification() {
     return false;
   }
 
