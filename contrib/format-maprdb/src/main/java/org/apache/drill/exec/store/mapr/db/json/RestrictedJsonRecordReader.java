@@ -44,6 +44,7 @@ import com.mapr.db.impl.IdCodec;
 import com.mapr.db.ojai.DBDocumentReaderBase;
 
 import org.ojai.Document;
+import org.ojai.DocumentStream;
 
 
 public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
@@ -62,8 +63,11 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   public void readToInitSchema() {
     DBDocumentReaderBase reader = null;
     vectorWriter.setPosition(0);
+    DocumentStream dstream = null;
+
     try {
-      reader = (DBDocumentReaderBase) table.find().iterator().next().asReader();
+      dstream = table.find();
+      reader = (DBDocumentReaderBase) dstream.iterator().next().asReader();
       documentWriter.writeDBDocument(vectorWriter, reader);
     }
     catch(UserException e) {
@@ -81,6 +85,9 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
       }
     }
     finally {
+      if (dstream != null) {
+        dstream.close();
+      }
       vectorWriter.setPosition(0);
     }
   }
