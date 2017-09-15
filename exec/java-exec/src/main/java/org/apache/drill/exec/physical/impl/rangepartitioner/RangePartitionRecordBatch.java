@@ -82,18 +82,24 @@ public class RangePartitionRecordBatch extends AbstractSingleRecordBatch<RangePa
 
   @Override
   protected IterOutcome doWork() {
-    // first setup the partition columns.  This needs to be done whenever we have
-    // a new batch (not just a new schema) because the partitioning function needs
-    // access to the correct value vector.
-    setupPartitionCols(incoming);
     int num = incoming.getRecordCount();
-    partitionIdVector.allocateNew(num);
+    if (num > 0) {
+      // first setup the partition columns.  This needs to be done whenever we have
+      // a new batch (not just a new schema) because the partitioning function needs
+      // access to the correct value vector.
+      setupPartitionCols(incoming);
 
-    recordCount = projectRecords(num, 0);
-    for (VectorWrapper<?> v : container) {
-      ValueVector.Mutator m = v.getValueVector().getMutator();
-      m.setValueCount(recordCount);
+      partitionIdVector.allocateNew(num);
+
+      recordCount = projectRecords(num, 0);
+      for (VectorWrapper<?> v : container) {
+        ValueVector.Mutator m = v.getValueVector().getMutator();
+        m.setValueCount(recordCount);
+      }
     }
+    // returning OK here is fine because the base class AbstractSingleRecordBatch
+    // is handling the actual return status; thus if there was a new schema, the
+    // parent will get an OK_NEW_SCHEMA based on innerNext() in base class.
     return IterOutcome.OK;
   }
 

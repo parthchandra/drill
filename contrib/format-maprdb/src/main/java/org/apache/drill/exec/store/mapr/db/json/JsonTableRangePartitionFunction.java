@@ -75,7 +75,8 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 	@Override
   public void setup(List<VectorWrapper<?>> partitionKeys) {
     if (partitionKeys.size() != 1) {
-      throw new UnsupportedOperationException("Currently exactly 1 range partition column is allowed");
+      throw new UnsupportedOperationException(
+          "Range partitioning function supports exactly one partition column; encountered " + partitionKeys.size());
     }
 
     VectorWrapper<?> v = partitionKeys.get(0);
