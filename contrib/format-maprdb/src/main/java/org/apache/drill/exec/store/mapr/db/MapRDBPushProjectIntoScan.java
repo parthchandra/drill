@@ -20,6 +20,9 @@ package org.apache.drill.exec.store.mapr.db;
 import com.google.common.collect.Lists;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelOptRuleOperand;
+import org.apache.calcite.plan.RelTrait;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -84,8 +87,14 @@ public abstract class MapRDBPushProjectIntoScan extends StoragePluginOptimizerRu
           || !groupScan.canPushdownProjects(columnInfo.columns)) {
         return;
       }
-
-      final ScanPrel newScan = new ScanPrel(scan.getCluster(), scan.getTraitSet().plus(Prel.DRILL_PHYSICAL),
+      RelTraitSet newTraits = call.getPlanner().emptyTraitSet();
+      // Clear out collation trait
+      for (RelTrait trait : scan.getTraitSet()) {
+        if (!(trait instanceof RelCollation)) {
+          newTraits.plus(trait);
+        }
+      }
+      final ScanPrel newScan = new ScanPrel(scan.getCluster(), newTraits.plus(Prel.DRILL_PHYSICAL),
           groupScan.clone(columnInfo.columns),
           columnInfo.createNewRowType(project.getInput().getCluster().getTypeFactory()));
 
