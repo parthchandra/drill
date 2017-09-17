@@ -144,8 +144,12 @@
           <groupId>com.hazelcast</groupId>
         </exclusion>
         <exclusion>
-	      <groupId>nl.basjes.parse.httpdlog</groupId>
-	      <artifactId>httpdlog-parser</artifactId>
+          <groupId>nl.basjes.parse.httpdlog</groupId>
+          <artifactId>httpdlog-parser</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.glassfish.jersey.media</groupId>
+          <artifactId>jersey-media-json-jackson</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
