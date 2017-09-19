@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.index;
 
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.drill.common.expression.LogicalExpression;
 
 import java.util.Collection;
@@ -95,5 +96,11 @@ public interface IndexDefinition {
   RelCollation getCollation();
 
   Map<LogicalExpression, RelFieldCollation> getCollationMap();
+
+  /**
+   * Get the nulls ordering of this index
+   * @return True, if nulls first. False otherwise
+   */
+  NullDirection getNullsOrderingDirection();
 
 }

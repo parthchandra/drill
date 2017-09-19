@@ -21,15 +21,13 @@ import java.util.List;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
-import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.index.IndexSelector.IndexProperties;
-import org.apache.drill.exec.planner.logical.DrillScanRel;
 
 /**
  * Abstract base class for an Index descriptor
@@ -39,13 +37,14 @@ public abstract class AbstractIndexDescriptor extends DrillIndexDefinition imple
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(AbstractIndexDescriptor .class);
 
   public AbstractIndexDescriptor(List<LogicalExpression> indexCols,
-                               CollationContext indexCollationContext,
-                               List<LogicalExpression> nonIndexCols,
-                               List<LogicalExpression> rowKeyColumns,
-                               String indexName,
-                               String tableName,
-                               IndexDescriptor.IndexType type) {
-    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+                                 CollationContext indexCollationContext,
+                                 List<LogicalExpression> nonIndexCols,
+                                 List<LogicalExpression> rowKeyColumns,
+                                 String indexName,
+                                 String tableName,
+                                 IndexType type,
+                                 NullDirection nullsDirection) {
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type, nullsDirection);
   }
 
   @Override

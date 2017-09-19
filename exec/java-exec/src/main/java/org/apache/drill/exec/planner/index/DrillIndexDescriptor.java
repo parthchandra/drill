@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.planner.index;
 
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rex.RexNode;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -38,18 +39,19 @@ public class DrillIndexDescriptor extends AbstractIndexDescriptor {
   private DrillTable table;
 
   public DrillIndexDescriptor(List<LogicalExpression> indexCols,
-                               CollationContext indexCollationContext,
-                               List<LogicalExpression> nonIndexCols,
-                               List<LogicalExpression> rowKeyColumns,
-                               String indexName,
-                               String tableName,
-                               IndexDescriptor.IndexType type) {
-    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+                              CollationContext indexCollationContext,
+                              List<LogicalExpression> nonIndexCols,
+                              List<LogicalExpression> rowKeyColumns,
+                              String indexName,
+                              String tableName,
+                              IndexType type,
+                              NullDirection nullsDirection) {
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type, nullsDirection);
   }
 
   public DrillIndexDescriptor(DrillIndexDefinition def) {
     this(def.indexColumns, def.indexCollationContext, def.nonIndexColumns, def.rowKeyColumns, def.indexName,
-        def.getTableName(), def.getIndexType());
+        def.getTableName(), def.getIndexType(), def.nullsDirection);
   }
 
   @Override

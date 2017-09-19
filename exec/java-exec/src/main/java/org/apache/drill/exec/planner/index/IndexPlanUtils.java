@@ -470,13 +470,13 @@ public class IndexPlanUtils {
       }
 
       RelCollation idxCollation = indexDesc.getCollation();
+      RelFieldCollation.NullDirection nullsDir = indexDesc.getNullsOrderingDirection();
       RelFieldCollation.Direction dir = (idxCollation == null)?
           null : idxCollation.getFieldCollations().get(idxFieldCount).direction;
       if ( dir == null) {
         break;
       }
-      newFields.add(new RelFieldCollation(projectExprs.get(expr), dir,
-          RelFieldCollation.NullDirection.UNSPECIFIED));
+      newFields.add(new RelFieldCollation(projectExprs.get(expr), dir, nullsDir));
     }
 
     return RelCollations.of(newFields);

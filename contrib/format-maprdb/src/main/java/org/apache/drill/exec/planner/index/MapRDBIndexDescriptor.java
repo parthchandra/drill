@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 
 import org.apache.calcite.plan.RelOptCost;
 import org.apache.calcite.plan.RelOptPlanner;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.expr.CloneVisitor;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -56,10 +57,11 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
                                List<LogicalExpression> rowKeyColumns,
                                String indexName,
                                String tableName,
-                               IndexDescriptor.IndexType type,
+                               IndexType type,
                                Object desc,
-                               DbGroupScan scan) {
-    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type);
+                               DbGroupScan scan,
+                               NullDirection nullsDirection) {
+    super(indexCols, indexCollationContext, nonIndexCols, rowKeyColumns, indexName, tableName, type, nullsDirection);
     this.desc = desc;
     this.indexedFields = ImmutableSet.copyOf(indexColumns);
     this.allFields = new ImmutableSet.Builder<LogicalExpression>()

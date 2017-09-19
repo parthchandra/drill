@@ -806,6 +806,49 @@ public class IndexPlanTest extends BaseJsonTest {
         .run();
   }
 
+  @Test  // last two index fields in non-Equality conditions, ORDER BY last two fields NULLS FIRST; Sort SHOULD NOT be dropped
+  public void TestCoveringPlanSortPrefix_6() throws Exception {
+    String query = "SELECT t._id as tid, t.contact.phone, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.contact.phone < '6500003000' order by t.personal.age, t.contact.phone NULLS FIRST";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"Sort", ".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
+        new String[]{}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .optionSettingQueriesForBaseline(noIndexPlan)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+  }
+
+  @Test  // last two index fields in non-Equality conditions, ORDER BY last two fields NULLS LAST; Sort SHOULD be dropped
+  public void TestCoveringPlanSortPrefix_7() throws Exception {
+    String query = "SELECT t._id as tid, t.contact.phone, CAST(t.personal.age as VARCHAR) as age FROM hbase.`index_test_primary` as t " +
+        " where t.address.state = 'wo' and t.personal.age < 35 and t.contact.phone < '6500003000' order by t.personal.age, t.contact.phone NULLS LAST";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {".*JsonTableGroupScan.*tableName=.*index_test_primary.*indexName=i_state_age_phone"},
+        new String[]{"Sort"}
+    );
+
+    // compare the results of index plan with the no-index plan
+    testBuilder()
+        .optionSettingQueriesForTestQuery(defaultHavingIndexPlan)
+        .optionSettingQueriesForBaseline(noIndexPlan)
+        .unOrdered()
+        .sqlQuery(query)
+        .sqlBaselineQuery(query)
+        .build()
+        .run();
+  }
+
+  @Ignore//MD-2703
   @Test
   public void orderByCastCoveringPlan() throws Exception {
     String query = "SELECT t.contact.phone as phone FROM hbase.`index_test_primary` as t " +

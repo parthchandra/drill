@@ -23,10 +23,12 @@ import com.mapr.db.Admin;
 import com.mapr.db.MapRDB;
 import com.mapr.db.exceptions.DBException;
 import com.mapr.db.index.IndexDesc;
+import com.mapr.db.index.IndexDesc.MissingAndNullOrdering;
 import com.mapr.db.index.IndexFieldDesc;
 import org.antlr.runtime.ANTLRStringStream;
 import org.antlr.runtime.CommonTokenStream;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.expression.ExpressionPosition;
@@ -288,7 +290,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     return listSchema;
   }
 
-  private List<RelFieldCollation> getFieldCollations(Collection<IndexFieldDesc> descCollection) {
+  private List<RelFieldCollation> getFieldCollations(IndexDesc desc, Collection<IndexFieldDesc> descCollection) {
     List<RelFieldCollation> fieldCollations = new ArrayList<>();
     int i=0;
     for (IndexFieldDesc field : descCollection) {
@@ -297,7 +299,10 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
               RelFieldCollation.Direction.DESCENDING : null);
       if (direction != null) {
         // assume null direction of NULLS UNSPECIFIED for now until MapR-DB adds that to the APIs
-        RelFieldCollation.NullDirection nulldir = RelFieldCollation.NullDirection.UNSPECIFIED;
+        RelFieldCollation.NullDirection nulldir =
+            desc.getMissingAndNullOrdering() == MissingAndNullOrdering.MissingAndNullFirst ? NullDirection.FIRST :
+            (desc.getMissingAndNullOrdering() == MissingAndNullOrdering.MissingAndNullLast ?
+                NullDirection.LAST : NullDirection.UNSPECIFIED);
         RelFieldCollation c = new RelFieldCollation(i++, direction, nulldir);
         fieldCollations.add(c);
       } else {
@@ -332,7 +337,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
     coveringFields.add(SchemaPath.getSimplePath("_id"));
     CollationContext collationContext = null;
     if (!desc.isHashed()) { // hash index has no collation property
-      List<RelFieldCollation> indexFieldCollations = getFieldCollations(desc.getIndexedFields());
+      List<RelFieldCollation> indexFieldCollations = getFieldCollations(desc, desc.getIndexedFields());
       collationContext = buildCollationContext(indexFields, indexFieldCollations);
     }
 
@@ -345,7 +350,10 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         tableName,
         idxType,
         desc,
-        this.getOriginalScan());
+        this.getOriginalScan(),
+        desc.getMissingAndNullOrdering() == MissingAndNullOrdering.MissingAndNullFirst ? NullDirection.FIRST :
+            (desc.getMissingAndNullOrdering() == MissingAndNullOrdering.MissingAndNullLast ?
+                NullDirection.LAST : NullDirection.UNSPECIFIED));
 
     String storageName = this.getOriginalScan().getStoragePlugin().getName();
     materializeIndex(storageName, idx);

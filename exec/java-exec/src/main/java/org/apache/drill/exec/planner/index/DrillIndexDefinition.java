@@ -24,6 +24,7 @@ import com.google.common.collect.Sets;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
@@ -70,13 +71,17 @@ public class DrillIndexDefinition implements IndexDefinition {
   @JsonProperty
   protected final IndexDescriptor.IndexType indexType;
 
+  @JsonProperty
+  protected final NullDirection nullsDirection;
+
   public DrillIndexDefinition(List<LogicalExpression> indexCols,
-                                 CollationContext indexCollationContext,
-                                 List<LogicalExpression> nonIndexCols,
-                                 List<LogicalExpression> rowKeyColumns,
-                                 String indexName,
-                                 String tableName,
-                                 IndexDescriptor.IndexType type) {
+                              CollationContext indexCollationContext,
+                              List<LogicalExpression> nonIndexCols,
+                              List<LogicalExpression> rowKeyColumns,
+                              String indexName,
+                              String tableName,
+                              IndexType type,
+                              NullDirection nullsDirection) {
     this.indexColumns = indexCols;
     this.nonIndexColumns = nonIndexCols;
     this.rowKeyColumns = rowKeyColumns;
@@ -86,6 +91,7 @@ public class DrillIndexDefinition implements IndexDefinition {
     this.allIndexColumns = Sets.newHashSet(indexColumns);
     this.allIndexColumns.addAll(nonIndexColumns);
     this.indexCollationContext = indexCollationContext;
+    this.nullsDirection = nullsDirection;
 
   }
 
@@ -265,4 +271,9 @@ public class DrillIndexDefinition implements IndexDefinition {
     return indexCollationContext.collationMap;
   }
 
+  @Override
+  @JsonIgnore
+  public NullDirection getNullsOrderingDirection() {
+    return nullsDirection;
+  }
 }
