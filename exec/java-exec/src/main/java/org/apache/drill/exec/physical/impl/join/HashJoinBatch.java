@@ -24,6 +24,7 @@ import com.sun.codemodel.JExpression;
 import com.sun.codemodel.JVar;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.drill.common.exceptions.RetryAfterSpillException;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.common.logical.data.NamedExpression;
@@ -388,8 +389,9 @@ public class HashJoinBatch extends AbstractBinaryRecordBatch<HashJoinPOP> implem
         // For every record in the build batch , hash the key columns
         for (int i = 0; i < currentRecordCount; i++) {
           int hashCode = hashTable.getHashCode(i);
-          HashTable.PutStatus putResult = hashTable.put(i, htIndex, hashCode);
-
+          try {
+            hashTable.put(i, htIndex, hashCode);
+          } catch (RetryAfterSpillException RE) { throw new OutOfMemoryException("HT put");} // Hash Join can not retry yet
                         /* Use the global index returned by the hash table, to store
                          * the current record index and batch index. This will be used
                          * later when we probe and find a match.
