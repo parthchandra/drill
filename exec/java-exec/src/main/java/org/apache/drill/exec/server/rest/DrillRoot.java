@@ -64,7 +64,9 @@ public class DrillRoot {
     final String currentVersion = currentDrillbit.getVersion();
 
     final DrillConfig config = work.getContext().getConfig();
-    final boolean userEncryptionEnabled = config.getBoolean(ExecConstants.USER_ENCRYPTION_SASL_ENABLED);
+    final boolean userEncryptionEnabled =
+        config.getBoolean(ExecConstants.USER_ENCRYPTION_SASL_ENABLED) ||
+            config .getBoolean(ExecConstants.USER_SSL_ENABLED);
     final boolean bitEncryptionEnabled = config.getBoolean(ExecConstants.BIT_ENCRYPTION_SASL_ENABLED);
 
     for (DrillbitEndpoint endpoint : work.getContext().getBits()) {
