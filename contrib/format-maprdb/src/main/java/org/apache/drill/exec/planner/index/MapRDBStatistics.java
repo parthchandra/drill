@@ -182,7 +182,13 @@ public class MapRDBStatistics implements Statistics {
         } else {
           // We might not have computed rowcount for the given condition from the tab/index in question.
           // For rowcount it does not matter which index was used to get the rowcount for the given condition.
-          // Hence, just use the first one!
+          // if tabIdxName is null, most likely we have found one from payloadMap and won't come to here.
+          // If we come to here, we are looking for payload for an index, so let us use any index's payload first!
+          for (String payloadKey : payloadMap.keySet()) {
+            if (payloadKey != null && payloadMap.get(payloadKey) != null) {
+              return payloadMap.get(payloadKey).getRowCount();
+            }
+          }
           StatisticsPayload anyPayload = payloadMap.entrySet().iterator().next().getValue();
           return anyPayload.getRowCount();
         }

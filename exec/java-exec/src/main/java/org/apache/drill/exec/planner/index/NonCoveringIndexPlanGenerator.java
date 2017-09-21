@@ -123,6 +123,9 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         origScan, indexScanRowType, builder, functionInfo);
     FilterPrel  rightIndexFilterPrel = new FilterPrel(indexScanPrel.getCluster(), indexScanPrel.getTraitSet(),
           indexScanPrel, convertedIndexCondition);
+
+    double finalRowCount = indexGroupScan.getRowCount(indexContext.origPushedCondition, origScan);
+
     // project the rowkey column from the index scan
     List<RexNode> rightProjectExprs = Lists.newArrayList();
     int rightRowKeyIndex = getRowKeyIndex(indexScanPrel.getRowType(), origScan);//indexGroupScan.getRowKeyOrdinal();
@@ -198,11 +201,12 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     final RelDataTypeFactory.FieldInfoBuilder leftFieldTypeBuilder =
         dbScan.getCluster().getTypeFactory().builder();
 
-    //we are applying the original condition to primary table, instead of remainder condition, the reason
-    // for this is, the sub-queries on index and primary table are not a transaction, meaning that _after_ index scan,
-    // primary table might already have data updated, thus some rows picked by index were modified and no more satisfy the
-    // index condition part of the original filter condition. By applying original filter again here, we will avoid
+    //we are applying the same index condition to primary table's restricted scan, the reason
+    // for this is, the scans on index table and primary table are not a transaction, meaning that _after_ index scan,
+    // primary table might already have data get updated, thus some rows picked by index were modified and no more satisfy the
+    // index condition. By applying the same index condition again here, we will avoid the possibility to have some
     //not-wanted records get into downstream operators in such scenarios.
+    //the remainder condition will be applied on top of RowKeyJoin.
     FilterPrel leftIndexFilterPrel = new FilterPrel(dbScan.getCluster(), dbScan.getTraitSet(),
           dbScan, indexContext.origPushedCondition);
 
@@ -262,6 +266,8 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       RowKeyJoinPrel rjPrel = new RowKeyJoinPrel(topRel.getCluster(),
           collation != null ? leftTraits.plus(collation) : leftTraits,
           convertedLeft, convertedRight, joinCondition, JoinRelType.INNER);
+
+      rjPrel.setEstimatedRowCount(finalRowCount);
       newRel = rjPrel;
     }
 

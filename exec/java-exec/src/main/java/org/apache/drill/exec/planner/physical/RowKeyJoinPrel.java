@@ -40,6 +40,7 @@ import com.google.common.base.Preconditions;
 
 public class RowKeyJoinPrel extends JoinPrel implements Prel {
 
+  double estimatedRowCount = -1;
   public RowKeyJoinPrel(RelOptCluster cluster, RelTraitSet traits, RelNode left, RelNode right,
       RexNode condition, JoinRelType joinType) throws InvalidRelException {
     super(cluster, traits, left, right, condition, joinType);
@@ -56,6 +57,9 @@ public class RowKeyJoinPrel extends JoinPrel implements Prel {
 
   @Override
   public double estimateRowCount(RelMetadataQuery mq) {
+    if (estimatedRowCount >= 0) {
+      return estimatedRowCount;
+    }
     return this.getLeft().getRows();
   }
 
@@ -63,8 +67,10 @@ public class RowKeyJoinPrel extends JoinPrel implements Prel {
   public Join copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right,
       JoinRelType joinType, boolean semiJoinDone) {
     try {
-      return new RowKeyJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType);
-    }catch (InvalidRelException e) {
+      RowKeyJoinPrel rkj = new RowKeyJoinPrel(this.getCluster(), traitSet, left, right, conditionExpr, joinType);
+      rkj.setEstimatedRowCount(this.estimatedRowCount);
+      return rkj;
+    } catch (InvalidRelException e) {
       throw new AssertionError(e);
     }
   }
@@ -105,4 +111,7 @@ public class RowKeyJoinPrel extends JoinPrel implements Prel {
     return false;
   }
 
+  public void setEstimatedRowCount(double rowCount) {
+    estimatedRowCount = rowCount;
+  }
 }
