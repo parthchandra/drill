@@ -20,6 +20,7 @@ package org.apache.drill.exec.rpc.user;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -38,6 +39,7 @@ import org.apache.drill.common.KerberosUtil;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.client.InvalidConnectionInfoException;
 import org.apache.drill.exec.ssl.SSLConfig;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
@@ -119,7 +121,7 @@ public class UserClient
   private Channel sslChannel;
   private DrillbitEndpoint endpoint;
 
-  public UserClient(String clientName, DrillConfig config, boolean supportComplexTypes,
+  public UserClient(String clientName, DrillConfig config, Properties properties, boolean supportComplexTypes,
       BufferAllocator allocator, EventLoopGroup eventLoopGroup, Executor eventExecutor,
       DrillbitEndpoint endpoint) throws NonTransientRpcException {
     super(UserRpcConfig.getMapping(config, eventExecutor), allocator.getAsByteBufAllocator(),
@@ -130,7 +132,7 @@ public class UserClient
     this.supportComplexTypes = supportComplexTypes;
     this.sslChannel = null;
     try {
-      this.sslConfig = new SSLConfigBuilder().config(config).mode(SSLFactory.Mode.CLIENT)
+      this.sslConfig = new SSLConfigBuilder().properties(properties).mode(SSLFactory.Mode.CLIENT)
           .initializeSSLContext(true).validateKeyStore(false).build();
     } catch (DrillException e) {
       throw new NonTransientRpcException(e.getMessage());
@@ -228,9 +230,10 @@ public class UserClient
         connect(hsBuilder.build(), endpoint)
             .checkedGet(sslConfig.getHandshakeTimeout(), TimeUnit.MILLISECONDS);
       } catch (TimeoutException e) {
-        throw new NonTransientRpcException(
-            "Connecting to the server timed out. This is sometimes due to a mismatch in the SSL configuration between client and server.",
-            e);
+        String msg = new StringBuilder().append(
+            "Connecting to the server timed out. This is sometimes due to a mismatch in the SSL configuration between client and server. [ Exception: ")
+            .append(e.getMessage()).append("]").toString();
+        throw new InvalidConnectionInfoException(msg);
       }
     } else {
       connect(hsBuilder.build(), endpoint).checkedGet();

@@ -368,7 +368,11 @@ public class DrillClient implements Closeable, ConnectionThrottle {
 
     while (triedEndpointIndex < connectTriesVal) {
       endpoint = endpoints.get(triedEndpointIndex);
-      client = new UserClient(clientName, config, supportComplexTypes, allocator, eventLoopGroup, executor, endpoint);
+      // Note: the properties member is a DrillProperties instance which lower cases names of
+      // properties. That does not work too well with properties that are mixed case.
+      // For user client severla properties are mixed case so we do not use the properties member
+      // but instead pass the props parameter.
+      client = new UserClient(clientName, config, props, supportComplexTypes, allocator, eventLoopGroup, executor, endpoint);
       logger.debug("Connecting to server {}:{}", endpoint.getAddress(), endpoint.getUserPort());
 
       if (!properties.containsKey(DrillProperties.SERVICE_HOST)) {

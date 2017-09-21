@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.ssl;
 
+import com.google.common.base.Preconditions;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
@@ -29,13 +30,17 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import java.text.MessageFormat;
 
 public class SSLConfigServer extends SSLConfig {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfigServer.class);
 
+  private final DrillConfig config;
+  private final Configuration hadoopConfig;
   private final SSLFactory.Mode mode; // Let's reuse Hadoop's SSLFactory.Mode to distinguish client/server
   private final boolean userSslEnabled;
+  private final boolean httpsEnabled;
   private final String keyStoreType;
   private final String keyStorePath;
   private final String keyStorePassword;
@@ -47,8 +52,26 @@ public class SSLConfigServer extends SSLConfig {
   private final String provider;
 
   public SSLConfigServer(DrillConfig config, Configuration hadoopConfig) throws DrillException {
-    super(config, hadoopConfig, SSLFactory.Mode.SERVER);
+    this.config = config;
     this.mode = SSLFactory.Mode.SERVER;
+    httpsEnabled =
+        config.hasPath(ExecConstants.HTTP_ENABLE_SSL) && config.getBoolean(ExecConstants.HTTP_ENABLE_SSL);
+    // For testing we will mock up a hadoop configuration, however for regular use, we find the actual hadoop config.
+    boolean enableHadoopConfig = config.getBoolean(ExecConstants.SSL_USE_HADOOP_CONF);
+    if (enableHadoopConfig) {
+      if (hadoopConfig == null) {
+        this.hadoopConfig = new Configuration(); // get hadoop configuration
+      } else {
+        this.hadoopConfig = hadoopConfig;
+      }
+      String hadoopSSLConfigFile =
+          this.hadoopConfig.get(resolveHadoopPropertyName(HADOOP_SSL_CONF_TPL_KEY, mode));
+      logger.debug("Using Hadoop configuration for SSL");
+      logger.debug("Hadoop SSL configuration file: {}", hadoopSSLConfigFile);
+      this.hadoopConfig.addResource(hadoopSSLConfigFile);
+    } else {
+      this.hadoopConfig = null;
+    }
     userSslEnabled =
         config.hasPath(ExecConstants.USER_SSL_ENABLED) && config.getBoolean(ExecConstants.USER_SSL_ENABLED);
     trustStoreType = getConfigParam(ExecConstants.SSL_TRUSTSTORE_TYPE,
@@ -152,6 +175,43 @@ public class SSLConfigServer extends SSLConfig {
     this.jdkSSlContext = sslCtx;
     return sslCtx;
   }
+
+  private String getConfigParam(String name, String hadoopName) {
+    String value = "";
+    if (hadoopConfig != null) {
+      value = getHadoopConfigParam(hadoopName);
+    }
+    if (value.isEmpty() && config.hasPath(name)) {
+      value = config.getString(name);
+    }
+    value = value.trim();
+    return value;
+  }
+
+  private String getHadoopConfigParam(String name) {
+    Preconditions.checkArgument(this.hadoopConfig != null);
+    String value = "";
+    value = hadoopConfig.get(name, "");
+    value = value.trim();
+    return value;
+  }
+
+  private String getConfigParamWithDefault(String name, String defaultValue) {
+    String value = "";
+    if (config.hasPath(name)) {
+      value = config.getString(name);
+    }
+    if (value.isEmpty()) {
+      value = defaultValue;
+    }
+    value = value.trim();
+    return value;
+  }
+
+  private String resolveHadoopPropertyName(String nameTemplate, SSLFactory.Mode mode) {
+    return MessageFormat.format(nameTemplate, mode.toString().toLowerCase());
+  }
+
 
 
   @Override

@@ -17,15 +17,12 @@
  */
 package org.apache.drill.exec.ssl;
 
-import com.google.common.base.Preconditions;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.DrillException;
-import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.memory.BufferAllocator;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -45,10 +42,6 @@ public abstract class SSLConfig {
   public static final String DEFAULT_SSL_PROTOCOL = "TLSv1.2";
   public static final int DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS = 10 * 1000; // 10 seconds
 
-  protected final boolean httpsEnabled;
-  protected final DrillConfig config;
-  protected final Configuration hadoopConfig;
-
   // Either the Netty SSL context or the JDK SSL context will be initialized
   // The JDK SSL context is use iff the useSystemTrustStore setting is enabled.
   protected SslContext nettySslContext;
@@ -67,64 +60,8 @@ public abstract class SSLConfig {
   public static final String HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY = "ssl.{0}.truststore.password";
   public static final String HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY = "ssl.{0}.truststore.type";
 
-  public SSLConfig(DrillConfig config, Configuration hadoopConfig, SSLFactory.Mode mode)
+  public SSLConfig()
       throws DrillException {
-
-    this.config = config;
-    httpsEnabled =
-        config.hasPath(ExecConstants.HTTP_ENABLE_SSL) && config.getBoolean(ExecConstants.HTTP_ENABLE_SSL);
-    // For testing we will mock up a hadoop configuration, however for regular use, we find the actual hadoop config.
-    boolean enableHadoopConfig = config.getBoolean(ExecConstants.SSL_USE_HADOOP_CONF);
-    if (enableHadoopConfig && this instanceof SSLConfigServer) {
-      if (hadoopConfig == null) {
-        this.hadoopConfig = new Configuration(); // get hadoop configuration
-      } else {
-        this.hadoopConfig = hadoopConfig;
-      }
-      String hadoopSSLConfigFile =
-          this.hadoopConfig.get(resolveHadoopPropertyName(HADOOP_SSL_CONF_TPL_KEY, mode));
-      logger.debug("Using Hadoop configuration for SSL");
-      logger.debug("Hadoop SSL configuration file: {}", hadoopSSLConfigFile);
-      this.hadoopConfig.addResource(hadoopSSLConfigFile);
-    } else {
-      this.hadoopConfig = null;
-    }
-  }
-
-  protected String getConfigParam(String name, String hadoopName) {
-    String value = "";
-    if (hadoopConfig != null) {
-      value = getHadoopConfigParam(hadoopName);
-    }
-    if (value.isEmpty() && config.hasPath(name)) {
-      value = config.getString(name);
-    }
-    value = value.trim();
-    return value;
-  }
-
-  protected String getHadoopConfigParam(String name) {
-    Preconditions.checkArgument(this.hadoopConfig != null);
-    String value = "";
-    value = hadoopConfig.get(name, "");
-    value = value.trim();
-    return value;
-  }
-
-  protected String getConfigParamWithDefault(String name, String defaultValue) {
-    String value = "";
-    if (config.hasPath(name)) {
-      value = config.getString(name);
-    }
-    if (value.isEmpty()) {
-      value = defaultValue;
-    }
-    value = value.trim();
-    return value;
-  }
-
-  protected String resolveHadoopPropertyName(String nameTemplate, SSLFactory.Mode mode) {
-    return MessageFormat.format(nameTemplate, mode.toString().toLowerCase());
   }
 
   public abstract void validateKeyStore() throws DrillException;

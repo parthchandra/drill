@@ -28,11 +28,13 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
+import java.util.Properties;
 
 public class SSLConfigClient extends SSLConfig {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfigClient.class);
 
+  Properties properties;
   private final SSLFactory.Mode mode; // Let's reuse Hadoop's SSLFactory.Mode to distinguish client/server
   private final boolean userSslEnabled;
   private final String trustStoreType;
@@ -47,29 +49,48 @@ public class SSLConfigClient extends SSLConfig {
 
   private final String emptyString = new String();
 
-  public SSLConfigClient(DrillConfig config, Configuration hadoopConfig) throws DrillException {
-    super(config, hadoopConfig, SSLFactory.Mode.CLIENT);
+  public SSLConfigClient(Properties properties) throws DrillException {
+    this.properties = properties;
     this.mode = SSLFactory.Mode.CLIENT;
-    userSslEnabled =
-        config.hasPath(DrillProperties.ENABLE_TLS) && config.getBoolean(DrillProperties.ENABLE_TLS);
-    trustStoreType = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_TYPE, "JKS");
-    trustStorePath = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_PATH, "");
-    trustStorePassword = getConfigParamWithDefault(DrillProperties.TRUSTSTORE_PASSWORD, "");
-    disableHostVerification = config.hasPath(DrillProperties.DISABLE_HOST_VERIFICATION) && config
-        .getBoolean(DrillProperties.DISABLE_HOST_VERIFICATION);
-    disableCertificateVerification = config.hasPath(DrillProperties.DISABLE_CERT_VERIFICATION) && config
-        .getBoolean(DrillProperties.DISABLE_CERT_VERIFICATION);
-    useSystemTrustStore = config.hasPath(DrillProperties.USE_SYSTEM_TRUSTSTORE) && config
-        .getBoolean(DrillProperties.USE_SYSTEM_TRUSTSTORE);
-    protocol = getConfigParamWithDefault(DrillProperties.TLS_PROTOCOL, DEFAULT_SSL_PROTOCOL);
-    int hsTimeout = config.hasPath(DrillProperties.TLS_HANDSHAKE_TIMEOUT) ?
-        config.getInt(DrillProperties.TLS_HANDSHAKE_TIMEOUT) :
-        DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
+    userSslEnabled = getBooleanProperty(DrillProperties.ENABLE_TLS);
+    trustStoreType = getStringProperty(DrillProperties.TRUSTSTORE_TYPE, "JKS");
+    trustStorePath = getStringProperty(DrillProperties.TRUSTSTORE_PATH, "");
+    trustStorePassword = getStringProperty(DrillProperties.TRUSTSTORE_PASSWORD, "");
+    disableHostVerification = getBooleanProperty(DrillProperties.DISABLE_HOST_VERIFICATION);
+    disableCertificateVerification = getBooleanProperty(DrillProperties.DISABLE_CERT_VERIFICATION);
+    useSystemTrustStore = getBooleanProperty(DrillProperties.USE_SYSTEM_TRUSTSTORE);
+    protocol = getStringProperty(DrillProperties.TLS_PROTOCOL, DEFAULT_SSL_PROTOCOL);
+    int hsTimeout = getIntProperty(DrillProperties.TLS_HANDSHAKE_TIMEOUT, DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS);
     if (hsTimeout <= 0) {
       hsTimeout = DEFAULT_SSL_HANDSHAKE_TIMEOUT_MS;
     }
     handshakeTimeout = hsTimeout;
-    provider = getConfigParamWithDefault(DrillProperties.TLS_PROVIDER, DEFAULT_SSL_PROVIDER);
+    provider = getStringProperty(DrillProperties.TLS_PROVIDER, DEFAULT_SSL_PROVIDER);
+  }
+
+  private boolean getBooleanProperty(String propName) {
+    return (properties != null) && (properties.containsKey(propName))
+        && (properties.getProperty(propName).compareToIgnoreCase("true") == 0);
+  }
+
+  private String getStringProperty(String name, String defaultValue) {
+    String value = "";
+    if ( (properties != null) && (properties.containsKey(name))) {
+      value = properties.getProperty(name);
+    }
+    if (value.isEmpty()) {
+      value = defaultValue;
+    }
+    value = value.trim();
+    return value;
+  }
+
+  private int getIntProperty(String name, int defaultValue) {
+    int value = defaultValue;
+    if ( (properties != null) && (properties.containsKey(name))) {
+      value = new Integer(properties.getProperty(name)).intValue();
+    }
+    return value;
   }
 
   public void validateKeyStore() throws DrillException {
@@ -139,7 +160,7 @@ public class SSLConfigClient extends SSLConfig {
 
   @Override
   public boolean isHttpsEnabled() {
-    return httpsEnabled;
+    return false;
   }
 
   @Override
