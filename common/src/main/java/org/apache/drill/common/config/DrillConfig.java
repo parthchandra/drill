@@ -110,8 +110,8 @@ public class DrillConfig extends NestedConfig {
    *
    * @return {@link DrillConfig} instance
    */
-  public static DrillConfig forClient(Properties props) {
-    return create(null, props, false);
+  public static DrillConfig forClient() {
+    return create(null, false);
   }
 
 

@@ -140,12 +140,12 @@ class DrillConnectionImpl extends AvaticaConnection
 
         this.client = new DrillClient(dConfig, set.getCoordinator());
       } else if(config.isDirect()) {
-        final DrillConfig dConfig = DrillConfig.forClient(info);
+        final DrillConfig dConfig = DrillConfig.forClient();
         this.allocator = RootAllocatorFactory.newRoot(dConfig);
         this.client = new DrillClient(dConfig, true); // Get a direct connection
         connect = config.getZookeeperConnectionString();
       } else {
-        final DrillConfig dConfig = DrillConfig.forClient(info);
+        final DrillConfig dConfig = DrillConfig.forClient();
         this.allocator = RootAllocatorFactory.newRoot(dConfig);
         // TODO:  Check:  Why does new DrillClient() create another DrillConfig,
         // with enableServerConfigs true, and cause scanning for function
