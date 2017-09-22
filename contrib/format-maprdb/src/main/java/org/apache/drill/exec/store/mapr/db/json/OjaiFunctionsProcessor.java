@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -147,7 +147,7 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final String relOp = getStringArg(call.args.get(1));
       final long size = getLongArg(call.args.get(2));
       queryCond = MapRDBImpl.newCondition()
-          .sizeOf(schemaPath.getAsUnescapedPath(), STRING_TO_RELOP.get(relOp), size)
+          .sizeOf(schemaPath.toExpr(), STRING_TO_RELOP.get(relOp), size)
           .build();
       break;
     }
@@ -160,9 +160,9 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final Value.Type typeValue = Value.Type.valueOf(typeCode);
       queryCond = MapRDBImpl.newCondition();
       if (functionName.equals("ojai_typeof")) {
-        queryCond.typeOf(schemaPath.getAsUnescapedPath(), typeValue);
+        queryCond.typeOf(schemaPath.toExpr(), typeValue);
       } else {
-        queryCond.notTypeOf(schemaPath.getAsUnescapedPath(), typeValue);
+        queryCond.notTypeOf(schemaPath.toExpr(), typeValue);
       }
       queryCond.build();
       break;
@@ -175,10 +175,10 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final String regex = getStringArg(call.args.get(1));
       if (functionName.equals("ojai_matches")) {
         queryCond = MapRDBImpl.newCondition()
-            .matches(schemaPath.getAsUnescapedPath(), regex);
+            .matches(schemaPath.toExpr(), regex);
       } else {
         queryCond = MapRDBImpl.newCondition()
-            .notMatches(schemaPath.getAsUnescapedPath(), regex);
+            .notMatches(schemaPath.toExpr(), regex);
       }
       queryCond.build();
       break;

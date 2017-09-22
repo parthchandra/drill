@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -143,7 +143,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       fieldName = fieldName.split(":")[1];
     }
     if (fieldName.contains(".")) {
-      return SchemaPath.getCompoundPath(fieldName.split("\\."));
+      return SchemaPath.parseFrom(fieldName);
     }
     return SchemaPath.getSimplePath(fieldName);
   }

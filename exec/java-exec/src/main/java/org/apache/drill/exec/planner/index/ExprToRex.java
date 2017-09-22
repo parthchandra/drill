@@ -17,21 +17,20 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import org.apache.calcite.avatica.SqlType;
+import com.google.common.collect.Lists;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
-import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.expression.CastExpression;
-import org.apache.drill.common.expression.FunctionCall;
-import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
-import org.apache.drill.exec.planner.sql.TypeInferenceUtils;
+
+import java.util.List;
 
 /**
  * Convert a logicalExpression to RexNode, notice the inputRel could be in an old plan, but newRowType is the newly built rowType
@@ -39,9 +38,9 @@ import org.apache.drill.exec.planner.sql.TypeInferenceUtils;
  */
 public class ExprToRex extends AbstractExprVisitor<RexNode, Void, RuntimeException> {
 
-  final private RexBuilder builder;
-  final private RelDataType newRowType;
-  final RelNode inputRel;
+  private final RexBuilder builder;
+  private final RelDataType newRowType;
+  private final RelNode inputRel;
 
   public ExprToRex(RelNode inputRel, RelDataType newRowType, RexBuilder builder) {
     this.inputRel = inputRel;
@@ -50,8 +49,7 @@ public class ExprToRex extends AbstractExprVisitor<RexNode, Void, RuntimeExcepti
   }
 
   public static RelDataTypeField findField(String fieldName, RelDataType rowType) {
-    final String[] parts = fieldName.replaceAll("`", "").split("\\.");
-    final String rootPart = parts[0];
+    final String rootPart = SchemaPath.parseFrom(fieldName).getRootSegmentPath();
 
     for (RelDataTypeField f : rowType.getFieldList()) {
       if (rootPart.equalsIgnoreCase(f.getName())) {
@@ -61,23 +59,29 @@ public class ExprToRex extends AbstractExprVisitor<RexNode, Void, RuntimeExcepti
     return null;
   }
 
-  private RexNode makeItemOperator(String[] paths, int index, RelDataType rowType) {
-    if( index == 0 ) {//last one, return ITEM([0]-inputRef, [1] Literal)
-      final RelDataTypeField field = findField(paths[0], rowType);
-      return builder.makeInputRef(field.getType(), field.getIndex());
+  private RexNode makeItemOperator(List<String> paths, int index, RelDataType rowType) {
+    if (index == 0) {//last one, return ITEM([0]-inputRef, [1] Literal)
+      final RelDataTypeField field = findField(paths.get(0), rowType);
+      return field == null ? null : builder.makeInputRef(field.getType(), field.getIndex());
     }
-    return builder.makeCall(SqlStdOperatorTable.ITEM, makeItemOperator(paths,index-1, rowType), builder.makeLiteral(paths[index]));
+    return builder.makeCall(SqlStdOperatorTable.ITEM,
+                            makeItemOperator(paths, index - 1, rowType),
+                            builder.makeLiteral(paths.get(index)));
   }
 
   @Override
   public RexNode visitSchemaPath(SchemaPath path, Void value) throws RuntimeException {
-    String strPath = path.getAsUnescapedPath();
-    if( ! strPath.contains(".") ) {
-      final RelDataTypeField field = findField(strPath, newRowType);
+    PathSegment.NameSegment rootSegment = path.getRootSegment();
+    if (rootSegment.isLastPath()) {
+      final RelDataTypeField field = findField(rootSegment.getPath(), newRowType);
       return field == null ? null : builder.makeInputRef(field.getType(), field.getIndex());
     }
-    String[] paths = strPath.split("\\.");
-    return makeItemOperator(paths, paths.length-1, newRowType);
+    List<String> paths = Lists.newArrayList();
+    while (rootSegment != null) {
+      paths.add(rootSegment.getPath());
+      rootSegment = (PathSegment.NameSegment) rootSegment.getChild();
+    }
+    return makeItemOperator(paths, paths.size() - 1, newRowType);
   }
 
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -113,7 +113,7 @@ public class DrillIndexDefinition implements IndexDefinition {
   public boolean pathExactIn(SchemaPath path, Collection<LogicalExpression> exprs) {
     for (LogicalExpression expr : exprs) {
       if (expr instanceof SchemaPath) {
-        if (((SchemaPath) expr).getAsUnescapedPath().equals(path.getAsUnescapedPath()) ) {
+        if (((SchemaPath) expr).getRootSegmentPath().equals(path.getRootSegmentPath())) {
           return true;
         }
       }

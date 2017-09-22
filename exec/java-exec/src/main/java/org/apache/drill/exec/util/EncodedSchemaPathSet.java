@@ -116,7 +116,7 @@ public class EncodedSchemaPathSet {
     String[] schemaPathStrings = new String[encodedPaths.size()];
     Iterator<SchemaPath> encodedPathsItr = encodedPaths.iterator();
     for (int i = 0; i < schemaPathStrings.length; i++) {
-      schemaPathStrings[i] = encodedPathsItr.next().getAsUnescapedPath();
+      schemaPathStrings[i] = encodedPathsItr.next().getRootSegmentPath();
     }
     String[] decodedStrings = decode(schemaPathStrings);
     if (decodedStrings == schemaPathStrings) {
