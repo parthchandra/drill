@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -31,8 +31,6 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelFieldCollation.NullDirection;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.common.exceptions.DrillRuntimeException;
-import org.apache.drill.common.expression.ExpressionPosition;
-import org.apache.drill.common.expression.FunctionCallFactory;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.parser.ExprLexer;
@@ -149,7 +147,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       fieldName = fieldName.split(":")[1];
     }
     if (fieldName.contains(".")) {
-      return SchemaPath.getCompoundPath(fieldName.split("\\."));
+      return SchemaPath.parseFrom(fieldName);
     }
     return SchemaPath.getSimplePath(fieldName);
   }
@@ -223,20 +221,6 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
         return null;
       default: return Types.required(TypeProtos.MinorType.valueOf(typeStr));
     }
-  }
-
-  /**
-   * build castExpression withe the type and field defined in indexDesc
-   * @param field
-   * @param type
-   * @return
-   */
-  private LogicalExpression castFunctionCall(String field, String type) {
-    TypeProtos.MajorType castType = getDrillType(type);
-    if(castType == null) {//no cast
-      return fieldName2SchemaPath(field);
-    }
-    return FunctionCallFactory.createCast(castType, ExpressionPosition.UNKNOWN, fieldName2SchemaPath(field));
   }
 
   private LogicalExpression castFunctionSQLSyntax(String field, String type) throws InvalidIndexDefinitionException {

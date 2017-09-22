@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -27,10 +27,7 @@ import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
-import org.apache.drill.exec.planner.logical.DrillOptiq;
-import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
-import org.apache.drill.exec.planner.physical.PrelUtil;
 
 import java.util.BitSet;
 import java.util.List;
@@ -61,8 +58,8 @@ public class RexSeparator {
       if ( idxFound >= 0 ) {
         if (relevantExpr instanceof SchemaPath) {
           //case sensitive comparison
-          if (! ((SchemaPath)relevantExpr).getAsUnescapedPath().equals(
-              ((SchemaPath)relatedPaths.get(idxFound)).getAsUnescapedPath()) ) {
+          if (!((SchemaPath) relevantExpr).toExpr().equals(
+              ((SchemaPath) relatedPaths.get(idxFound)).toExpr())) {
             continue;
           }
         }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -114,13 +114,13 @@ public class EncodedSchemaPathSet {
     String[] schemaPathStrings = new String[encodedPaths.size()];
     Iterator<SchemaPath> encodedPathsItr = encodedPaths.iterator();
     for (int i = 0; i < schemaPathStrings.length; i++) {
-      schemaPathStrings[i] = encodedPathsItr.next().getAsUnescapedPath();
+      schemaPathStrings[i] = encodedPathsItr.next().asPathString(false);
     }
     String[] decodedStrings = decode(schemaPathStrings);
     if (decodedStrings == schemaPathStrings) {
       return encodedPaths; // return the original collection as no encoded SchemaPath was found
     } else {
-      ImmutableList.Builder<SchemaPath> builder = new ImmutableList.Builder<SchemaPath>();
+      ImmutableList.Builder<SchemaPath> builder = new ImmutableList.Builder<>();
       for (String decodedString : decodedStrings) {
         if ("*".equals(decodedString)) {
           builder.add(Utilities.STAR_COLUMN);
@@ -163,7 +163,7 @@ public class EncodedSchemaPathSet {
     }
 
     if (sb.length() > 0) {
-      byte[] decodedBytes = null;
+      byte[] decodedBytes;
       try {
         decodedBytes = CODEC.decode(sb);
       } catch (IllegalArgumentException e) {

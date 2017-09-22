@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -35,7 +35,6 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
-import org.apache.drill.exec.planner.physical.ScanPrel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,13 +62,13 @@ public class FunctionalIndexHelper {
     Set<String> leftOutFieldNames  = Sets.newHashSet();
     if (indexContext.leftOutPathsInFunctions != null) {
       for (LogicalExpression expr : indexContext.leftOutPathsInFunctions) {
-        leftOutFieldNames.add(getRootSeg(((SchemaPath) expr).getAsUnescapedPath()));
+        leftOutFieldNames.add(((SchemaPath) expr).getRootSegmentPath());
       }
     }
 
     Set<String> fieldInFunctions  = Sets.newHashSet();
     for (SchemaPath path: functionInfo.allPathsInFunction()) {
-      fieldInFunctions.add(getRootSeg(path.getAsUnescapedPath()));
+      fieldInFunctions.add(path.getRootSegmentPath());
     }
 
     RelDataTypeFactory typeFactory = origScan.getCluster().getTypeFactory();
@@ -81,30 +80,20 @@ public class FunctionalIndexHelper {
           continue;
         }
       }
-      //this should be preserved
-      String pathSeg = fieldName.replaceAll("`", "");
-      final String[] segs = pathSeg.split("\\.");
 
       fields.add(new RelDataTypeFieldImpl(
-          segs[0], fields.size(),
+          SchemaPath.parseFrom(fieldName).getRootSegmentPath(), fields.size(),
           typeFactory.createSqlType(SqlTypeName.ANY)));
     }
 
     //TODO: we should have the information about which $N was needed
     for(SchemaPath dollarPath: functionInfo.allNewSchemaPaths()) {
       fields.add(
-          new RelDataTypeFieldImpl(dollarPath.getAsUnescapedPath(), fields.size(),
+          new RelDataTypeFieldImpl(dollarPath.getRootSegmentPath(), fields.size(),
               origScan.getCluster().getTypeFactory().createSqlType(SqlTypeName.ANY)));
     }
     return new RelRecordType(fields);
   }
-
-  private static String getRootSeg(String fullPathString) {
-    String pathSeg = fullPathString.replaceAll("`", "");
-    final String[] segs = pathSeg.split("\\.");
-    return segs[0];
-  }
-
 
   /**
    * For IndexScan in non-covering case, rowType to return contains only row_key('_id') of primary table.
@@ -140,13 +129,13 @@ public class FunctionalIndexHelper {
     for (LogicalExpression indexedExpr : idxExprMap.values()) {
       if (indexedExpr instanceof SchemaPath) {
         fields.add(new RelDataTypeFieldImpl(
-            ((SchemaPath)indexedExpr).getAsUnescapedPath(), fields.size(),
+            ((SchemaPath) indexedExpr).getRootSegmentPath(), fields.size(),
             typeFactory.createSqlType(SqlTypeName.ANY)));
       }
       else if(indexedExpr instanceof CastExpression) {
         SchemaPath newPath = functionInfo.getNewPathFromExpr(indexedExpr);
         fields.add(new RelDataTypeFieldImpl(
-            newPath.getAsUnescapedPath(), fields.size(),
+            newPath.getRootSegmentPath(), fields.size(),
             typeFactory.createSqlType(SqlTypeName.ANY)));
       }
     }
@@ -155,12 +144,9 @@ public class FunctionalIndexHelper {
     Set<RelDataTypeField> rowfields = Sets.newLinkedHashSet();
     final List<SchemaPath> columns = Lists.newArrayList();
     for (RelDataTypeField f : fields) {
-      SchemaPath path;
-      String pathSeg = f.getName().replaceAll("`", "");
-      final String[] segs = pathSeg.split("\\.");
-      path = SchemaPath.getCompoundPath(segs);
+      SchemaPath path = SchemaPath.parseFrom(f.getName());
       rowfields.add(new RelDataTypeFieldImpl(
-          segs[0], rowfields.size(),
+          path.getRootSegmentPath(), rowfields.size(),
           typeFactory.createMapType(typeFactory.createSqlType(SqlTypeName.VARCHAR),
               typeFactory.createSqlType(SqlTypeName.ANY))
       ));
