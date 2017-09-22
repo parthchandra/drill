@@ -66,7 +66,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     RestrictedMapRDBSubScanSpec subScanSpec =
         new RestrictedMapRDBSubScanSpec(
         spec.getTableName(),
-        getRegionsToScan().get(tfi), getUserName());
+        getRegionsToScan().get(tfi), spec.getSerializedFilter(), getUserName());
     return subScanSpec;
   }
 
@@ -97,6 +97,14 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
    */
   private RestrictedJsonTableGroupScan(RestrictedJsonTableGroupScan that) {
     super(that);
+  }
+
+  @Override
+  public GroupScan clone(JsonScanSpec scanSpec) {
+    RestrictedJsonTableGroupScan newScan = new RestrictedJsonTableGroupScan(this);
+    newScan.scanSpec = scanSpec;
+    newScan.resetRegionsToScan(); // resetting will force recalculation
+    return newScan;
   }
 
   @Override
@@ -143,8 +151,8 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
   private double computeRestrictedScanRowcount() {
     double rowCount = Statistics.ROWCOUNT_UNKNOWN;
     // The rowcount should be the same as the build side which was FORCED by putting it in forcedRowCountMap
-    if (forcedRowCountMap.get(scanSpec.getCondition()) != null) {
-      rowCount = forcedRowCountMap.get(scanSpec.getCondition());
+    if (forcedRowCountMap.get(null) != null) {
+      rowCount = forcedRowCountMap.get(null);
     }
     if (rowCount == Statistics.ROWCOUNT_UNKNOWN || rowCount == 0) {
       rowCount = (0.001f * fullTableRowCount);

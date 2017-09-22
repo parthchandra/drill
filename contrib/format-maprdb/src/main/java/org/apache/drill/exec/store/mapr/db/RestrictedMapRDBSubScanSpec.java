@@ -50,8 +50,8 @@ public class RestrictedMapRDBSubScanSpec extends MapRDBSubScanSpec {
   private int currentIndex = 0;  // the current index within the row key vector
   private int maxOccupiedIndex = -1; // max occupied index within a row key vector
 
-  public RestrictedMapRDBSubScanSpec(String tableName, String regionServer, String userName) {
-    super(tableName, null, regionServer, null, null, null, null, userName);
+  public RestrictedMapRDBSubScanSpec(String tableName, String regionServer, byte[] serializedFilter, String userName) {
+    super(tableName, null, regionServer, null, null, serializedFilter, null, userName);
   }
   /* package */ RestrictedMapRDBSubScanSpec() {
     // empty constructor, to be used with builder pattern;

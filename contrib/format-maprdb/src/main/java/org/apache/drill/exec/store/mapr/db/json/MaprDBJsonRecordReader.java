@@ -76,7 +76,7 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   protected static final FieldPath[] ID_ONLY_PROJECTION = { ID_FIELD };
 
   protected Table table;
-  private QueryCondition condition;
+  protected QueryCondition condition;
 
   /**
    * A set of projected FieldPaths that are pushed into MapR-DB Scanner.

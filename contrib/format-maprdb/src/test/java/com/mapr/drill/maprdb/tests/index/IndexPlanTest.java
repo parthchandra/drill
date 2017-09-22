@@ -99,6 +99,7 @@ public class IndexPlanTest extends BaseJsonTest {
             "i_age", "personal.age", "",
             "i_income", "personal.income", "",
             "i_lic", "driverlicense", "reverseid",
+            "i_state_city_dl", "address.state,address.city", "driverlicense",
             "i_cast_int_ssn", "$CAST(id.ssn@INT)", "contact.phone",
             "i_cast_vchar_lic", "$CAST(driverlicense@STRING)","contact.email",
             "i_state_age_phone", "address.state,personal.age,contact.phone", "name.fname",
@@ -378,10 +379,10 @@ public class IndexPlanTest extends BaseJsonTest {
   public void CompositeIndexNonCoveringFilterWithAllFieldsPlan() throws Exception {
 
     String query = "SELECT t.`id`.`ssn` AS `ssn` FROM hbase.`index_test_primary` as t " +
-        " where t.address.state = 'pc' AND t.address.city='pfrrs' AND t.id.ssn IN (100007423, 100007424)";
+        " where t.address.state = 'pc' AND t.address.city='pfrrs' AND t.driverlicense IN (100007423, 100007424)";
     test(defaultHavingIndexPlan+";"+lowRowKeyJoinBackIOFactor+";");
     PlanTestBase.testPlanMatchingPatterns(query,
-        new String[] {"RowKeyJoin(.*[\n\r])+.*Filter.*state.*city.*ssn(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
+        new String[] {"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan.*condition=.*state.*city.*driverlicense.*or.*driverlicense.*(.*[\n\r])+.*JsonTableGroupScan.*indexName="},
         new String[]{}
     );
 

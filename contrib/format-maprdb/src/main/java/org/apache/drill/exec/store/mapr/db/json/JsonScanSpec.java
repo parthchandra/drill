@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.apache.hadoop.fs.Path;
@@ -81,11 +82,13 @@ public class JsonScanSpec {
     return this.stopRow;
   }
 
-  public Object getSerializedFilter() {
+  public byte[] getSerializedFilter() {
     if (this.condition != null) {
-      return ((ConditionImpl)this.condition).getDescriptor().getSerialized();
+      ByteBuffer bbuf = ((ConditionImpl)this.condition).getDescriptor().getSerialized();
+      byte[] serFilter = new byte[bbuf.limit() - bbuf.position()];
+      bbuf.get(serFilter);
+      return serFilter;
     }
-
     return null;
   }
 

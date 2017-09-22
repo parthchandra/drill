@@ -61,10 +61,6 @@ public abstract class MapRDBPushFilterIntoScan extends StoragePluginOptimizerRul
       } else {
         assert(scan.getGroupScan() instanceof JsonTableGroupScan);
         JsonTableGroupScan groupScan = (JsonTableGroupScan)scan.getGroupScan();
-        //do not push down for restricted scan
-        if (groupScan.isRestrictedScan()) {
-          return;
-        }
         doPushFilterIntoJsonGroupScan(call, filter, null, scan, groupScan, condition);
       }
     }
@@ -97,10 +93,6 @@ public abstract class MapRDBPushFilterIntoScan extends StoragePluginOptimizerRul
       } else {
         assert(scan.getGroupScan() instanceof JsonTableGroupScan);
         JsonTableGroupScan groupScan = (JsonTableGroupScan)scan.getGroupScan();
-        //do not push down for restricted scan
-        if (groupScan.isRestrictedScan()) {
-          return;
-        }
         doPushFilterIntoJsonGroupScan(call, filter, project, scan, groupScan, condition);
       }
     }
