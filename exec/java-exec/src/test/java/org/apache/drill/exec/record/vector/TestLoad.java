@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -25,8 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.drill.common.config.DrillConfig;
-import org.apache.drill.common.expression.ExpressionPosition;
-import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.TypeProtos.MinorType;
 import org.apache.drill.exec.ExecTest;
@@ -93,7 +91,7 @@ public class TestLoad extends ExecTest {
       } else {
         System.out.print("\t");
       }
-      System.out.print(v.getField().getPath());
+      System.out.print(v.getField().getName());
       System.out.print("[");
       System.out.print(v.getField().getType().getMinorType());
       System.out.print("]");

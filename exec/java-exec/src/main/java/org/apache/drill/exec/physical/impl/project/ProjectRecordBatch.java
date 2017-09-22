@@ -203,7 +203,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
       this.recordCount = remainderIndex;
     } else {
       setValueCount(incomingRecordCount);
-      for(final VectorWrapper<?> v: incoming) {
+      for (final VectorWrapper<?> v: incoming) {
         v.clear();
       }
       this.recordCount = outputRecords;
@@ -331,8 +331,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
     final ClassifierResult result = new ClassifierResult();
     final boolean classify = isClassificationNeeded(exprs);
 
-    for (int i = 0; i < exprs.size(); i++) {
-      final NamedExpression namedExpression = exprs.get(i);
+    for (NamedExpression namedExpression : exprs) {
       result.clear();
 
       if (classify && namedExpression.getExpr() instanceof SchemaPath) {
@@ -345,11 +344,11 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
             int k = 0;
             for (final VectorWrapper<?> wrapper : incomingBatch) {
               final ValueVector vvIn = wrapper.getValueVector();
-              if (k > result.outputNames.size()-1) {
+              if (k > result.outputNames.size() - 1) {
                 assert false;
               }
               final String name = result.outputNames.get(k++);  // get the renamed column names
-              if (name == EMPTY_STRING) {
+              if (name.isEmpty()) {
                 continue;
               }
 
@@ -362,16 +361,16 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
               final TransferPair tp = vvIn.makeTransferPair(vvOut);
               transfers.add(tp);
             }
-          } else if (value != null && value.intValue() > 1) { // subsequent wildcards should do a copy of incoming valuevectors
+          } else if (value != null && value > 1) { // subsequent wildcards should do a copy of incoming valuevectors
             int k = 0;
             for (final VectorWrapper<?> wrapper : incomingBatch) {
               final ValueVector vvIn = wrapper.getValueVector();
-              final SchemaPath originalPath = SchemaPath.getSimplePath(vvIn.getField().getPath());
-              if (k > result.outputNames.size()-1) {
+              final SchemaPath originalPath = SchemaPath.getSimplePath(vvIn.getField().getName());
+              if (k > result.outputNames.size() - 1) {
                 assert false;
               }
               final String name = result.outputNames.get(k++);  // get the renamed column names
-              if (name == EMPTY_STRING) {
+              if (name.isEmpty()) {
                 continue;
               }
 
@@ -387,7 +386,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
               final MaterializedField outputField = MaterializedField.create(name, expr.getMajorType());
               final ValueVector vv = container.addOrGet(outputField, callBack);
               allocationVectors.add(vv);
-              final TypedFieldId fid = container.getValueVectorId(SchemaPath.getSimplePath(outputField.getPath()));
+              final TypedFieldId fid = container.getValueVectorId(SchemaPath.getSimplePath(outputField.getName()));
               final ValueVectorWriteExpression write = new ValueVectorWriteExpression(fid, expr, true);
               final HoldingContainer hc = cg.addExpr(write, ClassGenerator.BlkCreateMode.TRUE_IF_BOUND);
             }
@@ -406,14 +405,14 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
       if (result != null && result.outputNames != null && result.outputNames.size() > 0) {
         boolean isMatched = false;
         for (int j = 0; j < result.outputNames.size(); j++) {
-          if (!result.outputNames.get(j).equals(EMPTY_STRING)) {
+          if (!result.outputNames.get(j).isEmpty()) {
             outputName = result.outputNames.get(j);
             isMatched = true;
             break;
           }
         }
 
-        if(!isMatched) {
+        if (!isMatched) {
           continue;
         }
       }
@@ -437,7 +436,8 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
         Preconditions.checkNotNull(incomingBatch);
 
         final FieldReference ref = getRef(namedExpression);
-        final ValueVector vvOut = container.addOrGet(MaterializedField.create(ref.getAsUnescapedPath(), vectorRead.getMajorType()), callBack);
+        final ValueVector vvOut = container.addOrGet(MaterializedField.create(ref.getLastSegment().getNameSegment().getPath(),
+                                                                              vectorRead.getMajorType()), callBack);
         final TransferPair tp = vvIn.makeTransferPair(vvOut);
         transfers.add(tp);
         transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
@@ -463,7 +463,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
         // need to do evaluation.
         final ValueVector vector = container.addOrGet(outputField, callBack);
         allocationVectors.add(vector);
-        final TypedFieldId fid = container.getValueVectorId(SchemaPath.getSimplePath(outputField.getPath()));
+        final TypedFieldId fid = container.getValueVectorId(SchemaPath.getSimplePath(outputField.getName()));
         final boolean useSetSafe = !(vector instanceof FixedWidthVector);
         final ValueVectorWriteExpression write = new ValueVectorWriteExpression(fid, expr, useSetSafe);
         final HoldingContainer hc = cg.addExpr(write, ClassGenerator.BlkCreateMode.TRUE_IF_BOUND);
@@ -515,17 +515,19 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
 
     final List<NamedExpression> exprs = Lists.newArrayList();
     for (final MaterializedField field : incoming.getSchema()) {
+      String fieldName = field.getName();
       if (Types.isComplex(field.getType()) || Types.isRepeated(field.getType())) {
-        final LogicalExpression convertToJson = FunctionCallFactory.createConvert(ConvertExpression.CONVERT_TO, "JSON", SchemaPath.getSimplePath(field.getPath()), ExpressionPosition.UNKNOWN);
+        final LogicalExpression convertToJson = FunctionCallFactory.createConvert(ConvertExpression.CONVERT_TO, "JSON",
+                                                            SchemaPath.getSimplePath(fieldName), ExpressionPosition.UNKNOWN);
         final String castFuncName = CastFunctions.getCastFunc(MinorType.VARCHAR);
         final List<LogicalExpression> castArgs = Lists.newArrayList();
         castArgs.add(convertToJson);  //input_expr
         // implicitly casting to varchar, since we don't know actual source length, cast to undefined length, which will preserve source length
         castArgs.add(new ValueExpressions.LongExpression(Types.MAX_VARCHAR_LENGTH, null));
         final FunctionCall castCall = new FunctionCall(castFuncName, castArgs, ExpressionPosition.UNKNOWN);
-        exprs.add(new NamedExpression(castCall, new FieldReference(field.getPath())));
+        exprs.add(new NamedExpression(castCall, new FieldReference(fieldName)));
       } else {
-        exprs.add(new NamedExpression(SchemaPath.getSimplePath(field.getPath()), new FieldReference(field.getPath())));
+        exprs.add(new NamedExpression(SchemaPath.getSimplePath(fieldName), new FieldReference(fieldName)));
       }
     }
     return exprs;
@@ -533,8 +535,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
 
   private boolean isClassificationNeeded(final List<NamedExpression> exprs) {
     boolean needed = false;
-    for (int i = 0; i < exprs.size(); i++) {
-      final NamedExpression ex = exprs.get(i);
+    for (NamedExpression ex : exprs) {
       if (!(ex.getExpr() instanceof SchemaPath)) {
         continue;
       }
@@ -575,7 +576,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
   * @param origName            the original input name of the column
   * @param result              the data structure to keep track of the used names and decide what output name should be
   *                            to ensure uniqueness
-  * @Param allowDupsWithRename if the original name has been used, is renaming allowed to ensure output name unique
+  * @param allowDupsWithRename if the original name has been used, is renaming allowed to ensure output name unique
   */
   private void addToResultMaps(final String origName, final ClassifierResult result, final boolean allowDupsWithRename) {
     String name = origName;
@@ -615,7 +616,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
     boolean exprIsFirstWildcard = false;
     if (exprContainsStar) {
       result.isStar = true;
-      final Integer value = (Integer) result.prefixMap.get(exprPrefix);
+      final Integer value = result.prefixMap.get(exprPrefix);
       if (value == null) {
         final Integer n = 1;
         result.prefixMap.put(exprPrefix, n);
@@ -639,9 +640,9 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
       assert(components.length == 2);
       final String prefix = components[0];
       result.outputNames = Lists.newArrayList();
-      for(final VectorWrapper<?> wrapper : incoming) {
+      for (final VectorWrapper<?> wrapper : incoming) {
         final ValueVector vvIn = wrapper.getValueVector();
-        final String name = vvIn.getField().getPath();
+        final String name = vvIn.getField().getName();
 
         // add the prefix to the incoming column name
         final String newName = prefix + StarColumnHelper.PREFIX_DELIMITER + name;
@@ -661,7 +662,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
 
         for (final VectorWrapper<?> wrapper : incoming) {
           final ValueVector vvIn = wrapper.getValueVector();
-          final String incomingName = vvIn.getField().getPath();
+          final String incomingName = vvIn.getField().getName();
           // get the prefix of the name
           final String[] nameComponents = incomingName.split(StarColumnHelper.PREFIX_DELIMITER, 2);
           // if incoming valuevector does not have a prefix, ignore it since this expression is not referencing it
@@ -671,10 +672,9 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
           }
           final String namePrefix = nameComponents[0];
           if (exprPrefix.equalsIgnoreCase(namePrefix)) {
-            final String newName = incomingName;
-            if (!result.outputMap.containsKey(newName)) {
-              result.outputNames.set(k, newName);
-              result.outputMap.put(newName,  newName);
+            if (!result.outputMap.containsKey(incomingName)) {
+              result.outputNames.set(k, incomingName);
+              result.outputMap.put(incomingName, incomingName);
             }
           }
           k++;
@@ -684,7 +684,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
         if (exprContainsStar) {
           for (final VectorWrapper<?> wrapper : incoming) {
             final ValueVector vvIn = wrapper.getValueVector();
-            final String incomingName = vvIn.getField().getPath();
+            final String incomingName = vvIn.getField().getName();
             if (refContainsStar) {
               addToResultMaps(incomingName, result, true); // allow dups since this is likely top-level project
             } else {
@@ -703,11 +703,11 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
     }
 
     // input is wildcard and it is not the first wildcard
-    else if(exprIsStar) {
+    else if (exprIsStar) {
       result.outputNames = Lists.newArrayList();
       for (final VectorWrapper<?> wrapper : incoming) {
         final ValueVector vvIn = wrapper.getValueVector();
-        final String incomingName = vvIn.getField().getPath();
+        final String incomingName = vvIn.getField().getName();
         addToResultMaps(incomingName, result, true); // allow dups since this is likely top-level project
       }
     }
@@ -728,7 +728,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
 
       for (final VectorWrapper<?> wrapper : incoming) {
         final ValueVector vvIn = wrapper.getValueVector();
-        final String name = vvIn.getField().getPath();
+        final String name = vvIn.getField().getName();
         final String[] components = name.split(StarColumnHelper.PREFIX_DELIMITER, 2);
         if (components.length <= 1)  {
           k++;
@@ -765,7 +765,7 @@ public class ProjectRecordBatch extends AbstractSingleRecordBatch<Project> {
       result.outputNames = Lists.newArrayList();
       for (final VectorWrapper<?> wrapper : incoming) {
         final ValueVector vvIn = wrapper.getValueVector();
-        final String incomingName = vvIn.getField().getPath();
+        final String incomingName = vvIn.getField().getName();
         if (expr.getPath().equalsIgnoreCase(incomingName)) {  // case insensitive matching of field name.
           final String newName = ref.getPath();
           addToResultMaps(newName, result, true);

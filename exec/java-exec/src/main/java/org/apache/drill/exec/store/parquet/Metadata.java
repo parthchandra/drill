@@ -81,6 +81,7 @@ import com.google.common.collect.Maps;
 
 import javax.annotation.Nullable;
 
+import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.SUPPORTED_VERSIONS;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V1;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V2;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V3;
@@ -237,7 +238,8 @@ public class Metadata {
         childFiles.add(file);
       }
     }
-    ParquetTableMetadata_v3 parquetTableMetadata = new ParquetTableMetadata_v3(V3_1, DrillVersionInfo.getVersion());
+    ParquetTableMetadata_v3 parquetTableMetadata = new ParquetTableMetadata_v3(SUPPORTED_VERSIONS.last().toString(),
+                                                                                DrillVersionInfo.getVersion());
     if (childFiles.size() > 0) {
       List<ParquetFileMetadata_v3 > childFilesMetadata =
           getParquetFileMetadata_v3(parquetTableMetadata, childFiles);
@@ -311,7 +313,8 @@ public class Metadata {
    */
   private ParquetTableMetadata_v3 getParquetTableMetadata(List<FileStatus> fileStatuses)
       throws IOException {
-    ParquetTableMetadata_v3 tableMetadata = new ParquetTableMetadata_v3(V3_1, DrillVersionInfo.getVersion());
+    ParquetTableMetadata_v3 tableMetadata = new ParquetTableMetadata_v3(SUPPORTED_VERSIONS.last().toString(),
+                                                                        DrillVersionInfo.getVersion());
     List<ParquetFileMetadata_v3> fileMetadataList = getParquetFileMetadata_v3(tableMetadata, fileStatuses);
     tableMetadata.files = fileMetadataList;
     tableMetadata.directories = new ArrayList<String>();
@@ -1702,16 +1705,20 @@ public class Metadata {
     }
 
     private static class Key {
-      private String[] name;
+      private SchemaPath name;
       private int hashCode = 0;
 
       public Key(String[] name) {
-        this.name = name;
+        this.name = SchemaPath.getCompoundPath(name);
+      }
+
+      public Key(SchemaPath name) {
+        this.name = new SchemaPath(name);
       }
 
       @Override public int hashCode() {
         if (hashCode == 0) {
-          hashCode = Arrays.hashCode(name);
+          hashCode = name.hashCode();
         }
         return hashCode;
       }
@@ -1724,20 +1731,11 @@ public class Metadata {
           return false;
         }
         final Key other = (Key) obj;
-        return Arrays.equals(this.name, other.name);
+        return this.name.equals(other.name);
       }
 
       @Override public String toString() {
-        String s = null;
-        for (String namePart : name) {
-          if (s != null) {
-            s += ".";
-            s += namePart;
-          } else {
-            s = namePart;
-          }
-        }
-        return s;
+        return name.toString();
       }
 
       public static class DeSerializer extends KeyDeserializer {
@@ -1749,6 +1747,10 @@ public class Metadata {
         @Override
         public Object deserializeKey(String key, com.fasterxml.jackson.databind.DeserializationContext ctxt)
             throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
+          // key string should contain '`' char if the field was serialized as SchemaPath object
+          if (key.contains("`")) {
+            return new Key(SchemaPath.parseFrom(key));
+          }
           return new Key(key.split("\\."));
         }
       }
@@ -1961,8 +1963,8 @@ public class Metadata {
         filesWithRelativePaths.add(new ParquetFileMetadata_v3(
             relativize(baseDir, file.getPath()), file.length, file.rowGroups));
       }
-      return new ParquetTableMetadata_v3(V3_1, tableMetadataWithAbsolutePaths, filesWithRelativePaths,
-          directoriesWithRelativePaths, DrillVersionInfo.getVersion());
+      return new ParquetTableMetadata_v3(SUPPORTED_VERSIONS.last().toString(), tableMetadataWithAbsolutePaths,
+          filesWithRelativePaths, directoriesWithRelativePaths, DrillVersionInfo.getVersion());
     }
 
     /**

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -90,7 +90,7 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
     final Map<String, ValueVector> oldFields = CaseInsensitiveMap.newHashMap();
     for(final VectorWrapper<?> wrapper : container) {
       final ValueVector vector = wrapper.getValueVector();
-      oldFields.put(vector.getField().getPath(), vector);
+      oldFields.put(vector.getField().getName(), vector);
     }
 
     final VectorContainer newVectors = new VectorContainer();
@@ -99,7 +99,7 @@ public class RecordBatchLoader implements VectorAccessible, Iterable<VectorWrapp
       int bufOffset = 0;
       for(final SerializedField field : fields) {
         final MaterializedField fieldDef = MaterializedField.create(field);
-        ValueVector vector = oldFields.remove(fieldDef.getPath());
+        ValueVector vector = oldFields.remove(fieldDef.getName());
 
         if (vector == null) {
           // Field did not exist previously--is schema change.

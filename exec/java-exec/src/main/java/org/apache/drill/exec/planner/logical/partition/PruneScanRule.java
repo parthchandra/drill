@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -161,7 +161,7 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
          metaContext = ((FormatSelection)selection).getSelection().getMetaContext();
     }
 
-    RexNode condition = null;
+    RexNode condition;
     if (projectRel == null) {
       condition = filterRel.getCondition();
     } else {
@@ -245,7 +245,7 @@ public abstract class PruneScanRule extends StoragePluginOptimizerRule {
         for (int partitionColumnIndex : BitSets.toIter(partitionColumnBitSet)) {
           SchemaPath column = SchemaPath.getSimplePath(fieldNameMap.get(partitionColumnIndex));
           MajorType type = descriptor.getVectorType(column, settings);
-          MaterializedField field = MaterializedField.create(column.getAsUnescapedPath(), type);
+          MaterializedField field = MaterializedField.create(column.getLastSegment().getNameSegment().getPath(), type);
           ValueVector v = TypeHelper.getNewVector(field, allocator);
           v.allocateNew();
           vectors[partitionColumnIndex] = v;

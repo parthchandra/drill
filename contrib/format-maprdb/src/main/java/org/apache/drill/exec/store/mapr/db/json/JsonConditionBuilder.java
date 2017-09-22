@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -186,60 +186,60 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
     switch (functionName) {
     case "equal":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getAsUnescapedPath(), Op.EQUAL, fieldValue);
+      setIsCondition(cond, field.getRootSegmentPath(), Op.EQUAL, fieldValue);
       break;
 
     case "not_equal":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getAsUnescapedPath(), Op.NOT_EQUAL, fieldValue);
+      setIsCondition(cond, field.getRootSegmentPath(), Op.NOT_EQUAL, fieldValue);
       break;
 
     case "less_than":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getAsUnescapedPath(), Op.LESS, fieldValue);
+      setIsCondition(cond, field.getRootSegmentPath(), Op.LESS, fieldValue);
       break;
 
     case "less_than_or_equal_to":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getAsUnescapedPath(), Op.LESS_OR_EQUAL, fieldValue);
+      setIsCondition(cond, field.getRootSegmentPath(), Op.LESS_OR_EQUAL, fieldValue);
       break;
 
     case "greater_than":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getAsUnescapedPath(), Op.GREATER, fieldValue);
+      setIsCondition(cond, field.getRootSegmentPath(), Op.GREATER, fieldValue);
       break;
 
     case "greater_than_or_equal_to":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getAsUnescapedPath(), Op.GREATER_OR_EQUAL, fieldValue);
+      setIsCondition(cond, field.getRootSegmentPath(), Op.GREATER_OR_EQUAL, fieldValue);
       break;
 
     case "isnull":
-      cond = MapRDBImpl.newCondition().notExists(field.getAsUnescapedPath());
+      cond = MapRDBImpl.newCondition().notExists(field.getRootSegmentPath());
       break;
 
     case "isnotnull":
-      cond = MapRDBImpl.newCondition().exists(field.getAsUnescapedPath());
+      cond = MapRDBImpl.newCondition().exists(field.getRootSegmentPath());
       break;
 
     case "istrue":
-      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.EQUAL, true);
+      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.EQUAL, true);
       break;
 
     case "isnotfalse":
-      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.NOT_EQUAL, false);
+      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.NOT_EQUAL, false);
       break;
 
     case "isfalse":
-      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.EQUAL, false);
+      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.EQUAL, false);
       break;
 
     case "isnottrue":
-      cond = MapRDBImpl.newCondition().is(field.getAsUnescapedPath(), Op.NOT_EQUAL, true);
+      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.NOT_EQUAL, true);
       break;
 
     case "like":
-      cond = MapRDBImpl.newCondition().like(field.getAsUnescapedPath(), fieldValue.getString());
+      cond = MapRDBImpl.newCondition().like(field.getRootSegmentPath(), fieldValue.getString());
       break;
 
     default:
