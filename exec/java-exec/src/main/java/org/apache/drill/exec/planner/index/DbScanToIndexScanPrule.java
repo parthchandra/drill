@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.util.Pair;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.DbGroupScan;
@@ -341,7 +342,9 @@ public class DbScanToIndexScanPrule extends Prule {
         else {//two projects are null
           SchemaPath path;
           RelDataTypeField f = indexContext.scan.getRowType().getFieldList().get(idx);
-          path = SchemaPath.parseFrom(f.getName());
+          String pathSeg = f.getName().replaceAll("`", "");
+          final String[] segs = pathSeg.split("\\.");
+          path = SchemaPath.getCompoundPath(segs);
           indexContext.sortExprs.add(path);
         }
       }

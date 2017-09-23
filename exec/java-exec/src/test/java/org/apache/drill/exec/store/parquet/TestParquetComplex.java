@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,6 +18,7 @@
 package org.apache.drill.exec.store.parquet;
 
 import org.apache.drill.BaseTestQuery;
+import org.apache.drill.exec.proto.UserBitShared;
 import org.junit.Test;
 
 public class TestParquetComplex extends BaseTestQuery {
@@ -179,11 +180,8 @@ public class TestParquetComplex extends BaseTestQuery {
 
   @Test //DRILL-3533
   public void notxistsField() throws Exception {
-    String query = String.format("select t.`marketing_info`.notexists as notexists1,\n" +
-                                        "t.`marketing_info`.camp_id as id,\n" +
-                                        "t.`marketing_info.camp_id` as notexists2\n" +
-                                  "from %s t", DATAFILE);
-    String[] columns = {"notexists1", "id", "notexists2"};
+    String query = String.format("select t.`marketing_info`.notexists as notexists, t.`marketing_info`.camp_id as id from %s t", DATAFILE);
+    String[] columns = {"notexists", "id"};
     testBuilder()
         .sqlQuery(query)
         .unOrdered()

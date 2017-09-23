@@ -108,6 +108,7 @@ public class ParquetSchema {
    * Build the schema for this read as a combination of the schema specified in
    * the Parquet footer and the list of columns selected in the query.
    *
+   * @param footer Parquet metadata
    * @param batchSize target size of the batch, in rows
    * @throws Exception if anything goes wrong
    */
@@ -187,7 +188,7 @@ public class ParquetSchema {
   /**
    * Determine if a Parquet field is selected for the query. It is selected
    * either if this is a star query (we want all columns), or the column
-   * appears in the select list.
+   * appers in the select list.
    *
    * @param field the Parquet column expressed as as Drill field.
    * @return true if the column is to be included in the scan, false
@@ -204,7 +205,7 @@ public class ParquetSchema {
 
     int i = 0;
     for (SchemaPath expr : selectedCols) {
-      if (field.getName().equalsIgnoreCase(expr.getRootSegmentPath())) {
+      if ( field.getPath().equalsIgnoreCase(expr.getAsUnescapedPath())) {
         columnsFound[i] = true;
         return true;
       }
@@ -242,9 +243,8 @@ public class ParquetSchema {
    */
 
   private NullableIntVector createMissingColumn(SchemaPath col, OutputMutator output) throws SchemaChangeException {
-    // col.toExpr() is used here as field name since we don't want to see these fields in the existing maps
-    MaterializedField field = MaterializedField.create(col.toExpr(),
-                                                    Types.optional(TypeProtos.MinorType.INT));
+    MaterializedField field = MaterializedField.create(col.getAsUnescapedPath(),
+                          Types.optional(TypeProtos.MinorType.INT));
     return (NullableIntVector) output.addField(field,
               TypeHelper.getValueVectorClass(TypeProtos.MinorType.INT, DataMode.OPTIONAL));
   }

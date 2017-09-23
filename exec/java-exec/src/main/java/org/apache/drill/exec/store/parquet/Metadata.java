@@ -80,12 +80,10 @@ import com.google.common.collect.Maps;
 
 import javax.annotation.Nullable;
 
-import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.SUPPORTED_VERSIONS;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V1;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V2;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V3;
 import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V3_1;
-import static org.apache.drill.exec.store.parquet.MetadataVersion.Constants.V3_2;
 
 public class Metadata {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(Metadata.class);
@@ -236,8 +234,7 @@ public class Metadata {
         childFiles.add(file);
       }
     }
-    ParquetTableMetadata_v3 parquetTableMetadata = new ParquetTableMetadata_v3(SUPPORTED_VERSIONS.last().toString(),
-                                                                                DrillVersionInfo.getVersion());
+    ParquetTableMetadata_v3 parquetTableMetadata = new ParquetTableMetadata_v3(V3_1, DrillVersionInfo.getVersion());
     if (childFiles.size() > 0) {
       List<ParquetFileMetadata_v3 > childFilesMetadata =
           getParquetFileMetadata_v3(parquetTableMetadata, childFiles);
@@ -311,8 +308,7 @@ public class Metadata {
    */
   private ParquetTableMetadata_v3 getParquetTableMetadata(List<FileStatus> fileStatuses)
       throws IOException {
-    ParquetTableMetadata_v3 tableMetadata = new ParquetTableMetadata_v3(SUPPORTED_VERSIONS.last().toString(),
-                                                                        DrillVersionInfo.getVersion());
+    ParquetTableMetadata_v3 tableMetadata = new ParquetTableMetadata_v3(V3_1, DrillVersionInfo.getVersion());
     List<ParquetFileMetadata_v3> fileMetadataList = getParquetFileMetadata_v3(tableMetadata, fileStatuses);
     tableMetadata.files = fileMetadataList;
     tableMetadata.directories = new ArrayList<String>();
@@ -699,8 +695,7 @@ public class Metadata {
       @JsonSubTypes.Type(value = ParquetTableMetadata_v1.class, name = V1),
       @JsonSubTypes.Type(value = ParquetTableMetadata_v2.class, name = V2),
       @JsonSubTypes.Type(value = ParquetTableMetadata_v3.class, name = V3),
-      @JsonSubTypes.Type(value = ParquetTableMetadata_v3.class, name = V3_1),
-      @JsonSubTypes.Type(value = ParquetTableMetadata_v3.class, name = V3_2)
+      @JsonSubTypes.Type(value = ParquetTableMetadata_v3.class, name = V3_1)
       })
   public static abstract class ParquetTableMetadataBase {
 
@@ -1426,7 +1421,7 @@ public class Metadata {
 
   }
 
-  @JsonTypeName(V3_2)
+  @JsonTypeName(V3_1)
   public static class ParquetTableMetadata_v3 extends ParquetTableMetadataBase {
     @JsonProperty(value = "metadata_version", access = JsonProperty.Access.WRITE_ONLY) private String metadataVersion;
     /*
@@ -1659,20 +1654,16 @@ public class Metadata {
     }
 
     private static class Key {
-      private SchemaPath name;
+      private String[] name;
       private int hashCode = 0;
 
       public Key(String[] name) {
-        this.name = SchemaPath.getCompoundPath(name);
-      }
-
-      public Key(SchemaPath name) {
-        this.name = new SchemaPath(name);
+        this.name = name;
       }
 
       @Override public int hashCode() {
         if (hashCode == 0) {
-          hashCode = name.hashCode();
+          hashCode = Arrays.hashCode(name);
         }
         return hashCode;
       }
@@ -1685,11 +1676,20 @@ public class Metadata {
           return false;
         }
         final Key other = (Key) obj;
-        return this.name.equals(other.name);
+        return Arrays.equals(this.name, other.name);
       }
 
       @Override public String toString() {
-        return name.toString();
+        String s = null;
+        for (String namePart : name) {
+          if (s != null) {
+            s += ".";
+            s += namePart;
+          } else {
+            s = namePart;
+          }
+        }
+        return s;
       }
 
       public static class DeSerializer extends KeyDeserializer {
@@ -1701,10 +1701,6 @@ public class Metadata {
         @Override
         public Object deserializeKey(String key, com.fasterxml.jackson.databind.DeserializationContext ctxt)
             throws IOException, com.fasterxml.jackson.core.JsonProcessingException {
-          // key string should contain '`' char if the field was serialized as SchemaPath object
-          if (key.contains("`")) {
-            return new Key(SchemaPath.parseFrom(key));
-          }
           return new Key(key.split("\\."));
         }
       }
@@ -1888,8 +1884,8 @@ public class Metadata {
         filesWithRelativePaths.add(new ParquetFileMetadata_v3(
             relativize(baseDir, file.getPath()), file.length, file.rowGroups));
       }
-      return new ParquetTableMetadata_v3(SUPPORTED_VERSIONS.last().toString(), tableMetadataWithAbsolutePaths,
-          filesWithRelativePaths, directoriesWithRelativePaths, DrillVersionInfo.getVersion());
+      return new ParquetTableMetadata_v3(V3_1, tableMetadataWithAbsolutePaths, filesWithRelativePaths,
+          directoriesWithRelativePaths, DrillVersionInfo.getVersion());
     }
 
     /**

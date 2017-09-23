@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.store.hbase;
+package org.apache.drill.exec.store.mapr.db.binary;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -42,6 +42,7 @@ import org.apache.hadoop.hbase.util.Order;
 import org.apache.hadoop.hbase.util.PositionedByteRange;
 import org.apache.hadoop.hbase.util.SimplePositionedMutableByteRange;
 
+import org.apache.drill.exec.store.hbase.DrillHBaseConstants;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.PrefixFilter;
@@ -118,11 +119,11 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
   }
 
   public boolean isRowKeyPrefixComparison() {
-  return isRowKeyPrefixComparison;
+	return isRowKeyPrefixComparison;
   }
 
   public byte[] getRowKeyPrefixStartRow() {
-  return rowKeyPrefixStartRow;
+    return rowKeyPrefixStartRow;
   }
 
   public byte[] getRowKeyPrefixStopRow() {
@@ -195,6 +196,7 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
 
       if (e.getInput() instanceof SchemaPath) {
         ByteBuf bb = null;
+
         switch (encodingType) {
         case "INT_BE":
         case "INT":
@@ -220,7 +222,7 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
           break;
         case "FLOAT":
           if (valueArg instanceof FloatExpression && isEqualityFn) {
-          bb = newByteBuf(4, true);
+            bb = newByteBuf(4, true);
             bb.writeFloat(((FloatExpression)valueArg).getFloat());
           }
           break;
@@ -310,8 +312,24 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
             }
           }
           break;
+        case "UTF8_OB":
+        case "UTF8_OBD":
+          if (valueArg instanceof QuotedString) {
+            int stringLen = ((QuotedString) valueArg).value.getBytes(Charsets.UTF_8).length;
+            bb = newByteBuf(stringLen + 2, true);
+            PositionedByteRange br = new SimplePositionedMutableByteRange(bb.array(), 0, stringLen + 2);
+            if (encodingType.endsWith("_OBD")) {
+              org.apache.hadoop.hbase.util.OrderedBytes.encodeString(br,
+                  ((QuotedString)valueArg).value, Order.DESCENDING);
+              this.sortOrderAscending = false;
+            } else {
+              org.apache.hadoop.hbase.util.OrderedBytes.encodeString(br,
+                        ((QuotedString)valueArg).value, Order.ASCENDING);
+            }
+          }
+          break;
         case "UTF8":
-          // let visitSchemaPath() handle this.
+        // let visitSchemaPath() handle this.
           return e.getInput().accept(this, valueArg);
         }
 
@@ -348,15 +366,15 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
       // For TIME_EPOCH_BE/BIGINT_BE encoding, the operators that we push-down are =, <>, <, <=, >, >=
       switch (functionName) {
       case "equal":
-      rowKeyPrefixFilter = new PrefixFilter(ByteBuffer.allocate(4).putInt(val).array());
-      rowKeyPrefixStartRow = ByteBuffer.allocate(4).putInt(val).array();
-      rowKeyPrefixStopRow = ByteBuffer.allocate(4).putInt(val + 1).array();
-      return true;
-    case "greater_than_or_equal_to":
-      rowKeyPrefixStartRow = ByteBuffer.allocate(4).putInt(val).array();
+        rowKeyPrefixFilter = new PrefixFilter(ByteBuffer.allocate(4).putInt(val).array());
+        rowKeyPrefixStartRow = ByteBuffer.allocate(4).putInt(val).array();
+        rowKeyPrefixStopRow = ByteBuffer.allocate(4).putInt(val + 1).array();
+        return true;
+      case "greater_than_or_equal_to":
+        rowKeyPrefixStartRow = ByteBuffer.allocate(4).putInt(val).array();
         return true;
       case "greater_than":
-      rowKeyPrefixStartRow = ByteBuffer.allocate(4).putInt(val + 1).array();
+        rowKeyPrefixStartRow = ByteBuffer.allocate(4).putInt(val + 1).array();
         return true;
       case "less_than_or_equal_to":
         rowKeyPrefixStopRow = ByteBuffer.allocate(4).putInt(val + 1).array();
@@ -463,12 +481,12 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
       }
 
       return false;
+    }
+
+    return false;
   }
 
-  return false;
-}
-
-@Override
+  @Override
   public Boolean visitUnknown(LogicalExpression e, LogicalExpression valueArg) throws RuntimeException {
     return false;
   }

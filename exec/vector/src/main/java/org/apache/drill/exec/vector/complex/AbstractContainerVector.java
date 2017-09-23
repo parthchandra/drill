@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -88,7 +88,7 @@ public abstract class AbstractContainerVector implements ValueVector {
       @Nullable
       @Override
       public String apply(MaterializedField field) {
-        return Preconditions.checkNotNull(field).getName();
+        return Preconditions.checkNotNull(field).getLastName();
       }
     }));
   }
@@ -96,9 +96,9 @@ public abstract class AbstractContainerVector implements ValueVector {
   /**
    * Clears out all underlying child vectors.
    */
-  @Override
+ @Override
   public void close() {
-    for (ValueVector vector : this) {
+    for (ValueVector vector:(Iterable<ValueVector>)this) {
       vector.close();
     }
   }
@@ -112,14 +112,14 @@ public abstract class AbstractContainerVector implements ValueVector {
   }
 
   MajorType getLastPathType() {
-    if ((this.getField().getType().getMinorType() == MinorType.LIST &&
+    if((this.getField().getType().getMinorType() == MinorType.LIST  &&
         this.getField().getType().getMode() == DataMode.REPEATED)) {  // Use Repeated scalar type instead of Required List.
       VectorWithOrdinal vord = getChildVectorWithOrdinal(null);
       ValueVector v = vord.vector;
-      if (!(v instanceof AbstractContainerVector)) {
+      if (! (v instanceof  AbstractContainerVector)) {
         return v.getField().getType();
       }
-    } else if (this.getField().getType().getMinorType() == MinorType.MAP &&
+    } else if (this.getField().getType().getMinorType() == MinorType.MAP  &&
         this.getField().getType().getMode() == DataMode.REPEATED) {  // Use Required Map
       return this.getField().getType().toBuilder().setMode(DataMode.REQUIRED).build();
     }

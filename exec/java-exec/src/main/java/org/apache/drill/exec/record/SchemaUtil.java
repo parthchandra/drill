@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -53,7 +53,7 @@ public class SchemaUtil {
 
     for (BatchSchema s : schemas) {
       for (MaterializedField field : s) {
-        SchemaPath path = SchemaPath.getSimplePath(field.getName());
+        SchemaPath path = SchemaPath.getSimplePath(field.getPath());
         Set<MinorType> currentTypes = typeSetMap.get(path);
         if (currentTypes == null) {
           currentTypes = Sets.newHashSet();
@@ -64,7 +64,9 @@ public class SchemaUtil {
           throw new RuntimeException("Schema change not currently supported for schemas with complex types");
         }
         if (newType == MinorType.UNION) {
-          currentTypes.addAll(field.getType().getSubTypeList());
+          for (MinorType subType : field.getType().getSubTypeList()) {
+            currentTypes.add(subType);
+          }
         } else {
           currentTypes.add(newType);
         }
@@ -80,11 +82,10 @@ public class SchemaUtil {
         for (MinorType t : types) {
           builder.addSubType(t);
         }
-        MaterializedField field = MaterializedField.create(path.getLastSegment().getNameSegment().getPath(), builder.build());
+        MaterializedField field = MaterializedField.create(path.getAsUnescapedPath(), builder.build());
         fields.add(field);
       } else {
-        MaterializedField field = MaterializedField.create(path.getLastSegment().getNameSegment().getPath(),
-                                                            Types.optional(types.iterator().next()));
+        MaterializedField field = MaterializedField.create(path.getAsUnescapedPath(), Types.optional(types.iterator().next()));
         fields.add(field);
       }
     }
@@ -161,12 +162,12 @@ public class SchemaUtil {
       if (w.isHyper()) {
         isHyper = true;
         final ValueVector[] vvs = w.getValueVectors();
-        vectorMap.put(vvs[0].getField().getName(), vvs);
+        vectorMap.put(vvs[0].getField().getPath(), vvs);
       } else {
         assert !isHyper;
         @SuppressWarnings("resource")
         final ValueVector v = w.getValueVector();
-        vectorMap.put(v.getField().getName(), v);
+        vectorMap.put(v.getField().getPath(), v);
       }
     }
 
@@ -174,7 +175,7 @@ public class SchemaUtil {
 
     for (MaterializedField field : toSchema) {
       if (isHyper) {
-        final ValueVector[] vvs = (ValueVector[]) vectorMap.remove(field.getName());
+        final ValueVector[] vvs = (ValueVector[]) vectorMap.remove(field.getPath());
         final ValueVector[] vvsOut;
         if (vvs == null) {
           vvsOut = new ValueVector[1];
@@ -188,7 +189,7 @@ public class SchemaUtil {
         c.add(vvsOut);
       } else {
         @SuppressWarnings("resource")
-        final ValueVector v = (ValueVector) vectorMap.remove(field.getName());
+        final ValueVector v = (ValueVector) vectorMap.remove(field.getPath());
         c.add(coerceVector(v, c, field, recordCount, allocator));
       }
     }

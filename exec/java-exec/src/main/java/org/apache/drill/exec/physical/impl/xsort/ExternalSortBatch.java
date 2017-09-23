@@ -678,7 +678,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
       for (BatchGroup group : batchGroupList) {
         vectors[i++] = group.getValueAccessorById(
             field.getValueClass(),
-            group.getValueVectorId(SchemaPath.getSimplePath(field.getName())).getFieldIds())
+            group.getValueVectorId(SchemaPath.getSimplePath(field.getPath())).getFieldIds())
             .getValueVector();
       }
       cont.add(vectors);

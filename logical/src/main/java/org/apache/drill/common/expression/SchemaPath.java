@@ -71,6 +71,9 @@ public class SchemaPath extends LogicalExpressionBase {
   public SchemaPath(String simpleName, ExpressionPosition pos) {
     super(pos);
     this.rootSegment = new NameSegment(simpleName);
+    if (simpleName.contains(".")) {
+      throw new IllegalStateException("This is deprecated and only supports simpe paths.");
+    }
   }
 
 
@@ -226,13 +229,25 @@ public class SchemaPath extends LogicalExpressionBase {
     return ExpressionStringBuilder.toString(this);
   }
 
-  /**
-   * Returns path string of {@code rootSegment}
-   *
-   * @return path string of {@code rootSegment}
-   */
-  public String getRootSegmentPath() {
-    return rootSegment.getPath();
+  public String getAsUnescapedPath() {
+    StringBuilder sb = new StringBuilder();
+    PathSegment seg = getRootSegment();
+    if (seg.isArray()) {
+      throw new IllegalStateException("Drill doesn't currently support top level arrays");
+    }
+    sb.append(seg.getNameSegment().getPath());
+
+    while ( (seg = seg.getChild()) != null) {
+      if (seg.isNamed()) {
+        sb.append('.');
+        sb.append(seg.getNameSegment().getPath());
+      } else {
+        sb.append('[');
+        sb.append(seg.getArraySegment().getIndex());
+        sb.append(']');
+      }
+    }
+    return sb.toString();
   }
 
   /**
@@ -290,4 +305,5 @@ public class SchemaPath extends LogicalExpressionBase {
     }
 
   }
+
 }

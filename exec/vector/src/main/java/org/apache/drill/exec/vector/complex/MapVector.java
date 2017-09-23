@@ -105,7 +105,7 @@ public class MapVector extends AbstractMapVector {
 
   @Override
   public void setInitialCapacity(int numRecords) {
-    for (final ValueVector v : this) {
+    for (final ValueVector v : (Iterable<ValueVector>) this) {
       v.setInitialCapacity(numRecords);
     }
   }
@@ -116,7 +116,7 @@ public class MapVector extends AbstractMapVector {
       return 0;
     }
     long buffer = 0;
-    for (final ValueVector v : this) {
+    for (final ValueVector v : (Iterable<ValueVector>)this) {
       buffer += v.getBufferSize();
     }
 
@@ -130,7 +130,7 @@ public class MapVector extends AbstractMapVector {
     }
 
     long bufferSize = 0;
-    for (final ValueVector v : this) {
+    for (final ValueVector v : (Iterable<ValueVector>) this) {
       bufferSize += v.getBufferSizeFor(valueCount);
     }
 
@@ -147,7 +147,7 @@ public class MapVector extends AbstractMapVector {
 
   @Override
   public TransferPair getTransferPair(BufferAllocator allocator) {
-    return new MapTransferPair(this, getField().getName(), allocator);
+    return new MapTransferPair(this, getField().getPath(), allocator);
   }
 
   @Override
@@ -268,11 +268,11 @@ public class MapVector extends AbstractMapVector {
     for (final SerializedField child : fields) {
       final MaterializedField fieldDef = MaterializedField.create(child);
 
-      ValueVector vector = getChild(fieldDef.getName());
+      ValueVector vector = getChild(fieldDef.getLastName());
       if (vector == null) {
         // if we arrive here, we didn't have a matching vector.
         vector = BasicTypeHelper.getNewVector(fieldDef, allocator);
-        putChild(fieldDef.getName(), vector);
+        putChild(fieldDef.getLastName(), vector);
       }
       if (child.getValueCount() == 0) {
         vector.clear();

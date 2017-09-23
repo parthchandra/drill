@@ -515,7 +515,7 @@ public class HashJoinBatch extends AbstractRecordBatch<HashJoinPOP> implements R
           outputType = inputType;
         }
 
-        final ValueVector v = container.addOrGet(MaterializedField.create(vv.getField().getName(), outputType));
+        final ValueVector v = container.addOrGet(MaterializedField.create(vv.getField().getPath(), outputType));
         if (v instanceof AbstractContainerVector) {
           vv.getValueVector().makeTransferPair(v);
           v.clear();

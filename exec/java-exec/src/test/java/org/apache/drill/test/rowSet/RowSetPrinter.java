@@ -73,7 +73,7 @@ public class RowSetPrinter {
       if (i > 0) {
         out.print(", ");
       }
-      out.print(schema.column(i).getName());
+      out.print(schema.column(i).getLastName());
     }
     out.println();
   }

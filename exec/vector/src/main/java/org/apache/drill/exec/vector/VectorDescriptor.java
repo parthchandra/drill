@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -49,7 +49,7 @@ public class VectorDescriptor {
   }
 
   public String getName() {
-    return field.getName();
+    return field.getLastName();
   }
 
   public Collection<MaterializedField> getChildren() {
@@ -57,7 +57,7 @@ public class VectorDescriptor {
   }
 
   public boolean hasName() {
-    return !DEFAULT_NAME.equals(getName());
+    return getName() != DEFAULT_NAME;
   }
 
   public VectorDescriptor withName(final String name) {

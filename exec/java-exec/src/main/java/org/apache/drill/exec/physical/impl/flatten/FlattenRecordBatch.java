@@ -253,7 +253,8 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
   }
 
   private FieldReference getRef(NamedExpression e) {
-    return e.getRef();
+    final FieldReference ref = e.getRef();
+    return ref;
   }
 
   /**
@@ -332,7 +333,8 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
 
     ClassifierResult result = new ClassifierResult();
 
-    for (NamedExpression namedExpression : exprs) {
+    for (int i = 0; i < exprs.size(); i++) {
+      final NamedExpression namedExpression = exprs.get(i);
       result.clear();
 
       String outputName = getRef(namedExpression).getRootSegment().getPath();
@@ -406,11 +408,10 @@ public class FlattenRecordBatch extends AbstractSingleRecordBatch<FlattenPOP> {
 
     List<NamedExpression> exprs = Lists.newArrayList();
     for (MaterializedField field : incoming.getSchema()) {
-      String fieldName = field.getName();
-      if (fieldName.equals(popConfig.getColumn().getRootSegmentPath())) {
+      if (field.getPath().equals(popConfig.getColumn().getAsUnescapedPath())) {
         continue;
       }
-      exprs.add(new NamedExpression(SchemaPath.getSimplePath(fieldName), new FieldReference(fieldName)));
+      exprs.add(new NamedExpression(SchemaPath.getSimplePath(field.getPath()), new FieldReference(field.getPath())));
     }
     return exprs;
   }
