@@ -39,18 +39,11 @@ public class RexSeparator {
   final private List<LogicalExpression> relatedPaths;
   final private RelNode inputRel;
   final private RexBuilder builder;
-  final private boolean enableORPartialPush;
 
   public RexSeparator(List<LogicalExpression> relatedPaths, RelNode inputRel, RexBuilder builder) {
-    this(relatedPaths, inputRel, builder, true);
-  }
-
-  public RexSeparator(List<LogicalExpression> relatedPaths, RelNode inputRel,
-                      RexBuilder builder, boolean enableORPartialPush) {
     this.relatedPaths = relatedPaths;
     this.inputRel = inputRel;
     this.builder = builder;
-    this.enableORPartialPush = enableORPartialPush;
   }
 
   public RexNode getSeparatedCondition(RexNode expr) {
@@ -75,7 +68,7 @@ public class RexSeparator {
       }
     }
 
-    ConditionSeparator separator = new ConditionSeparator(markMap, builder, this.enableORPartialPush);
+    ConditionSeparator separator = new ConditionSeparator(markMap, builder);
     separator.analyze(expr);
     return separator.getFinalCondition();
   }
@@ -85,9 +78,8 @@ public class RexSeparator {
     final private Map<RexNode, LogicalExpression> markMap;
     private boolean inAcceptedPath;
 
-    public ConditionSeparator(Map<RexNode, LogicalExpression> markMap,
-                              RexBuilder builder, boolean enableORPartialPush) {
-      super(new BitSet(), builder, enableORPartialPush);
+    public ConditionSeparator(Map<RexNode, LogicalExpression> markMap, RexBuilder builder) {
+      super(new BitSet(), builder);
       this.markMap = markMap;
       inAcceptedPath = false;
     }
