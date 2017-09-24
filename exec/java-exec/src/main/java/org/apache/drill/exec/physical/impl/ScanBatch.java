@@ -171,6 +171,91 @@ public class ScanBatch implements CloseableRecordBatch {
     }
   }
 
+  /**
+   * This method is to perform scan specific actions when the scan needs to clean/reset readers and return NONE status
+   * @return NONE
+   */
+  private IterOutcome cleanAndReturnNone() {
+    if(isRepeatableScan) {
+      readers = readerList.iterator();
+      return IterOutcome.NONE;
+    }
+    else {
+      releaseAssets(); // All data has been read. Release resource.
+      done = true;
+      return IterOutcome.NONE;
+    }
+  }
+
+  /**
+   * When receive zero record from current reader, update reader accordingly,
+   * and return the decision whether the iteration should continue
+   * @return whether we could continue iteration
+   * @throws Exception
+   */
+  private boolean shouldContinueAfterNoRecords() throws Exception {
+    logger.trace("scan got 0 record.");
+    if(isRepeatableScan) {
+      if (!currentReader.hasNext()) {
+        currentReader = null;
+        readers = readerList.iterator();
+        return false;
+      }
+      return true;
+    }
+    else {// Regular scan
+      currentReader.close();
+      currentReader = null;
+      return true;// In regular case, we always continue the iteration, if no more reader, we will break out at the head of loop
+    }
+  }
+
+  private IterOutcome internalNext() throws Exception {
+    while (true) {
+      if (currentReader == null && !getNextReaderIfHas()) {
+        logger.trace("currentReader is null");
+        return cleanAndReturnNone();
+      }
+      injector.injectChecked(context.getExecutionControls(), "next-allocate", OutOfMemoryException.class);
+      currentReader.allocate(mutator.fieldVectorMap());
+
+      recordCount = currentReader.next();
+      logger.trace("currentReader.next return recordCount={}", recordCount);
+      Preconditions.checkArgument(recordCount >= 0, "recordCount from RecordReader.next() should not be negative");
+      boolean isNewSchema = mutator.isNewSchema();
+      populateImplicitVectorsAndSetCount();
+      oContext.getStats().batchReceived(0, recordCount, isNewSchema);
+
+      boolean toContinueIter = true;
+      if (recordCount == 0) {
+        // If we got 0 record, we may need to clean and exit, but we may need to return a new schema in below code block,
+        // so we use toContinueIter to mark the decision whether we should continue the iteration
+        toContinueIter = shouldContinueAfterNoRecords();
+      }
+
+      if (isNewSchema) {
+        // Even when recordCount = 0, we should return return OK_NEW_SCHEMA if current reader presents a new schema.
+        // This could happen when data sources have a non-trivial schema with 0 row.
+        container.buildSchema(SelectionVectorMode.NONE);
+        schema = container.getSchema();
+        return IterOutcome.OK_NEW_SCHEMA;
+      }
+
+      // Handle case of same schema.
+      if (recordCount == 0) {
+        if (toContinueIter) {
+          continue; // Skip to next loop iteration if reader returns 0 row and has same schema.
+        } else {
+          // Return NONE if recordCount ==0 && !isNewSchema
+          return IterOutcome.NONE;
+        }
+      } else {
+        // return OK if recordCount > 0 && ! isNewSchema
+        return IterOutcome.OK;
+      }
+    }
+  }
+
   @Override
   public IterOutcome next() {
     if (done) {
@@ -178,52 +263,8 @@ public class ScanBatch implements CloseableRecordBatch {
     }
     oContext.getStats().startProcessing();
     try {
-      while (true) {
-        if (currentReader == null && !getNextReaderIfHas()) {
-          if (isRepeatableScan) {
-            // for repeatable readers, reset the iterator to the beginning of the list of readers since subsequent
-            // scans should start at the first reader
-            // TODO: should return ITERATION_NONE, to indicate it's the end of one iteration for repeated scan.
-            readers = readerList.iterator();
-            return IterOutcome.NONE;
-          }
-
-          releaseAssets(); // All data has been read. Release resource.
-          done = true;
-          return IterOutcome.NONE;
-        }
-        injector.injectChecked(context.getExecutionControls(), "next-allocate", OutOfMemoryException.class);
-        currentReader.allocate(mutator.fieldVectorMap());
-
-        recordCount = currentReader.next();
-        Preconditions.checkArgument(recordCount >= 0, "recordCount from RecordReader.next() should not be negative");
-        boolean isNewSchema = mutator.isNewSchema();
-        populateImplicitVectorsAndSetCount();
-        oContext.getStats().batchReceived(0, recordCount, isNewSchema);
-
-        if (recordCount == 0) {
-          currentReader.close();
-          currentReader = null; // indicate currentReader is complete,
-                                // and fetch next reader in next loop iterator if required.
-        }
-
-        if (isNewSchema) {
-          // Even when recordCount = 0, we should return return OK_NEW_SCHEMA if current reader presents a new schema.
-          // This could happen when data sources have a non-trivial schema with 0 row.
-          container.buildSchema(SelectionVectorMode.NONE);
-          schema = container.getSchema();
-          return IterOutcome.OK_NEW_SCHEMA;
-        }
-
-        // Handle case of same schema.
-        if (recordCount == 0) {
-            continue; // Skip to next loop iteration if reader returns 0 row and has same schema.
-        } else {
-          // return OK if recordCount > 0 && ! isNewSchema
-          return IterOutcome.OK;
-        }
-      }
-    } catch (OutOfMemoryException ex) {
+      return internalNext();
+    }  catch (OutOfMemoryException ex) {
       clearFieldVectorMap();
       throw UserException.memoryError(ex).build(logger);
     } catch (ExecutionSetupException e) {
@@ -496,7 +537,11 @@ public class ScanBatch implements CloseableRecordBatch {
   public void close() throws Exception {
     container.clear();
     mutator.clear();
-    if (currentReader != null) {
+    if (isRepeatableScan && readerList != null) {
+      for (RecordReader r : readerList) {
+        r.close();
+      }
+    } else if (currentReader != null) {
       currentReader.close();
     }
   }

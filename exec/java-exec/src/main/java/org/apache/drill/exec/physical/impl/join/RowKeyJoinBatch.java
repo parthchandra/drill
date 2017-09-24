@@ -151,6 +151,7 @@ public class RowKeyJoinBatch extends AbstractRecordBatch<RowKeyJoinPOP> implemen
         while((rightUpstream == IterOutcome.OK || rightUpstream == IterOutcome.OK_NEW_SCHEMA) &&
             right.getRecordCount() == 0) {
           rightUpstream = next(right);
+          logger.trace("rowkeyjoin loop when recordCount == 0. rightUpstream {}", rightUpstream);
         }
 
         if (!hasRowKeyBatch && right.getRecordCount() > 0) {
