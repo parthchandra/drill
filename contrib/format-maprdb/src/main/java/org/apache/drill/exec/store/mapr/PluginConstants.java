@@ -54,6 +54,9 @@ public class PluginConstants {
   public static final String JSON_TABLE_SCAN_SIZE_MB = "format-maprdb.json.scanSizeMB";
   public static final int JSON_TABLE_SCAN_SIZE_MB_DEFAULT = 128;
 
+  public static final String JSON_TABLE_USE_NUM_REGIONS_FOR_DISTRIBUTION_PLANNING = "format-maprdb.json.useNumRegionsForDistribution";
+  public static final boolean JSON_TABLE_USE_NUM_REGIONS_FOR_DISTRIBUTION_PLANNING_DEFAULT = false;
+
   public static final String JSON_TABLE_BLOCK_SIZE = "format-maprdb.json.pluginCost.blockSize";
   public static final int JSON_TABLE_BLOCK_SIZE_DEFAULT = 8192;
 

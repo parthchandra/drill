@@ -26,6 +26,7 @@ import org.apache.drill.PlanTestBase;
 import org.apache.drill.exec.expr.fn.impl.DateUtility;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
+import org.apache.drill.common.config.DrillConfig;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
@@ -33,6 +34,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runners.MethodSorters;
+import java.util.Properties;
 
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @Category(ClusterTest.class)
@@ -67,6 +69,14 @@ public class IndexPlanTest extends BaseJsonTest {
 
   @BeforeClass
   public static void setupTableIndexes() throws Exception {
+
+    Properties overrideProps = new Properties();
+    overrideProps.setProperty("format-maprdb.json.useNumRegionsForDistribution", "true");
+    updateTestCluster(1, DrillConfig.create(overrideProps));
+
+    MaprDBTestsSuite.setupTests();
+    MaprDBTestsSuite.createPluginAndGetConf(getDrillbitContext());
+
     System.out.print("setupTableIndexes begins");
     Admin admin = MaprDBTestsSuite.getAdmin();
     if (admin != null) {
@@ -421,7 +431,6 @@ public class IndexPlanTest extends BaseJsonTest {
     return;
   }
 
-  @Ignore ("Needs MD-2620 fix")
   @Test
   public void TestNonCoveringRangePartition_1() throws Exception {
 
@@ -639,8 +648,6 @@ public class IndexPlanTest extends BaseJsonTest {
         .baselineColumns("fname").baselineValues("vSAEsyFN")
         .go();
 
-    // @Ignore ("Needs MD-2620 fix").
-    /*
     test(sliceTargetSmall);
     try {
       PlanTestBase.testPlanMatchingPatterns(query2,
@@ -651,7 +658,6 @@ public class IndexPlanTest extends BaseJsonTest {
     } finally {
       test(sliceTargetDefault);
     }
-    */
   }
 
   @Test  // 2 table join, each table has local predicate on top-level column
@@ -908,7 +914,6 @@ public class IndexPlanTest extends BaseJsonTest {
         .go();
   }
 
-  @Ignore ("Needs MD-2620 fix")
   @Test
   public void orderByLimitNonCoveringPlan() throws Exception {
     String query = "SELECT t.name.lname as lname FROM hbase.`index_test_primary` as t " +

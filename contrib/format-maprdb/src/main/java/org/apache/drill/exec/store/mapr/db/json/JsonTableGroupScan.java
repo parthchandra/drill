@@ -521,6 +521,16 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   @Override
   public boolean isDistributed() {
+    // getMaxParallelizationWidth gets information about all regions to scan and is expensive.
+    // This option is meant to be used only for unit tests.
+    boolean useNumRegions = storagePlugin.getContext().getConfig().getBoolean(PluginConstants.JSON_TABLE_USE_NUM_REGIONS_FOR_DISTRIBUTION_PLANNING);
+    if (useNumRegions) {
+      return getMaxParallelizationWidth() > 1 ? true: false;
+    }
+
+    // This function gets called multiple times during planning. To avoid performance
+    // bottleneck, estimate degree of parallelization using stats instead of actually getting information
+    // about all regions.
     double rowCount, rowSize;
     double scanRangeSize = storagePlugin.getContext().getConfig().getInt(PluginConstants.JSON_TABLE_SCAN_SIZE_MB) * 1024 * 1024;
 
