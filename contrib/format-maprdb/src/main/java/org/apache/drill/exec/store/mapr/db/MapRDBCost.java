@@ -27,24 +27,38 @@ public class MapRDBCost implements PluginCost {
 
   private int JSON_AVG_COLUMN_SIZE;
   private int JSON_TABLE_BLOCK_SIZE;  // bytes per block
+  private int JSON_BLOCK_SEQ_READ_COST;
+  private int JSON_BLOCK_RANDOM_READ_COST;
+  private int JSON_HDD_BLOCK_SEQ_READ_COST;
+  private int JSON_HDD_BLOCK_RANDOM_READ_COST;
   private int JSON_SSD_BLOCK_SEQ_READ_COST;
   private int JSON_SSD_BLOCK_RANDOM_READ_COST;
 
-  public MapRDBCost(DrillConfig config) {
+  public MapRDBCost(DrillConfig config, String mediaType) {
     JSON_AVG_COLUMN_SIZE = setConfigValue(config, PluginConstants.JSON_TABLE_AVERGE_COLUMN_SIZE,
-        PluginConstants.JSON_TABLE_AVERGE_COLUMN_SIZE_DEFAULT);
+        PluginConstants.JSON_TABLE_AVERGE_COLUMN_SIZE_DEFAULT, PluginConstants.alwaysValid);
     JSON_TABLE_BLOCK_SIZE = setConfigValue(config, PluginConstants.JSON_TABLE_BLOCK_SIZE,
-        PluginConstants.JSON_TABLE_BLOCK_SIZE_DEFAULT);
+        PluginConstants.JSON_TABLE_BLOCK_SIZE_DEFAULT, PluginConstants.alwaysValid);
     JSON_SSD_BLOCK_SEQ_READ_COST = setConfigValue(config, PluginConstants.JSON_TABLE_SSD_BLOCK_SEQ_READ_COST,
-        PluginConstants.JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT);
+        PluginConstants.JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT, PluginConstants.isNonNegative);
     JSON_SSD_BLOCK_RANDOM_READ_COST = setConfigValue(config, PluginConstants.JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST,
-        PluginConstants.JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT);
+        PluginConstants.JSON_TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT, new greaterThanEquals(JSON_SSD_BLOCK_SEQ_READ_COST));
+    JSON_HDD_BLOCK_SEQ_READ_COST = setConfigValue(config, PluginConstants.JSON_TABLE_HDD_BLOCK_SEQ_READ_COST,
+            PluginConstants.JSON_TABLE_HDD_BLOCK_SEQ_READ_COST_DEFAULT, PluginConstants.isNonNegative);
+    JSON_HDD_BLOCK_RANDOM_READ_COST = setConfigValue(config, PluginConstants.JSON_TABLE_HDD_BLOCK_RANDOM_READ_COST,
+            PluginConstants.JSON_TABLE_HDD_BLOCK_RANDOM_READ_COST_DEFAULT, new greaterThanEquals(JSON_HDD_BLOCK_SEQ_READ_COST));
+    JSON_BLOCK_SEQ_READ_COST = mediaType.equals(PluginConstants.SSD) ? JSON_SSD_BLOCK_SEQ_READ_COST :
+                                    JSON_HDD_BLOCK_SEQ_READ_COST;
+    JSON_BLOCK_RANDOM_READ_COST = mediaType.equals(PluginConstants.SSD) ? JSON_SSD_BLOCK_RANDOM_READ_COST :
+                                    JSON_HDD_BLOCK_RANDOM_READ_COST;
   }
 
-  private int setConfigValue(DrillConfig config, String configPath, int defaultValue) {
+  private int setConfigValue(DrillConfig config, String configPath,
+                             int defaultValue, CheckValid check) {
     int configValue;
     try {
       configValue = config.getInt(configPath);
+      if (!check.isValid(configValue)) { configValue = defaultValue; }
     } catch (Exception ex) {
       // Use defaults, if config values not present or any other issue
       configValue = defaultValue;
@@ -73,7 +87,7 @@ public class MapRDBCost implements PluginCost {
   @Override
   public int getSequentialBlockReadCost(GroupScan scan) {
     if (scan instanceof JsonTableGroupScan) {
-      return JSON_SSD_BLOCK_SEQ_READ_COST;
+      return JSON_BLOCK_SEQ_READ_COST;
     } else {
       return PluginConstants.TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT;
     }
@@ -82,7 +96,7 @@ public class MapRDBCost implements PluginCost {
   @Override
   public int getRandomBlockReadCost(GroupScan scan) {
     if (scan instanceof JsonTableGroupScan) {
-      return JSON_SSD_BLOCK_RANDOM_READ_COST;
+      return JSON_BLOCK_RANDOM_READ_COST;
     } else {
       return PluginConstants.TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT;
     }

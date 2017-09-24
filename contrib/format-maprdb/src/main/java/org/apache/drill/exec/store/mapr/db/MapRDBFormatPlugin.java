@@ -53,6 +53,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   private final Connection connection;
   private final MapRDBTableCache jsonTableCache;
   private final int scanRangeSizeMB;
+  private final String mediaType;
   private final MapRDBCost pluginCostModel;
 
   public MapRDBFormatPlugin(String name, DrillbitContext context, Configuration fsConf,
@@ -68,8 +69,15 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
       logger.warn("Invalid scan size {} for MapR-DB tables, using default", scanRangeSizeMBConfig);
       scanRangeSizeMBConfig = PluginConstants.JSON_TABLE_SCAN_SIZE_MB_DEFAULT;
     }
+    String mediaTypeConfig = context.getConfig().getString(PluginConstants.JSON_TABLE_MEDIA_TYPE);
+    if (!(mediaTypeConfig.equals(PluginConstants.SSD) ||
+        mediaTypeConfig.equals(PluginConstants.HDD))) {
+      logger.warn("Invalid media Type {} for MapR-DB JSON tables, using default 'SSD'", mediaTypeConfig);
+      mediaTypeConfig = PluginConstants.JSON_TABLE_MEDIA_TYPE_DEFAULT;
+    }
+    mediaType = mediaTypeConfig;
     scanRangeSizeMB = scanRangeSizeMBConfig;
-    pluginCostModel = new MapRDBCost(context.getConfig());
+    pluginCostModel = new MapRDBCost(context.getConfig(), mediaType);
   }
 
   @Override

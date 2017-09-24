@@ -18,14 +18,35 @@
 package org.apache.drill.exec.store.mapr;
 
 import static org.ojai.DocumentConstants.ID_KEY;
-
 import org.apache.drill.common.expression.SchemaPath;
-
 import com.mapr.db.DBConstants;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
+import org.apache.drill.exec.planner.cost.PluginCost.CheckValid;
 
 public class PluginConstants {
+  static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PluginConstants.class);
 
+  public final static CheckValid alwaysValid = new CheckValid<Integer>() {
+    @Override
+    public boolean isValid(Integer parameter) {
+      return true;
+    }
+  };
+
+  public final static CheckValid isNonNegative = new CheckValid<Integer>() {
+    @Override
+    public boolean isValid(Integer paramValue) {
+      if (paramValue > 0 && paramValue <= Integer.MAX_VALUE) {
+        return true;
+      } else {
+        logger.warn("Setting default value as the supplied parameter value is less than/equals to 0");
+        return false;
+      }
+    }
+  };
+
+  public static final String SSD = "SSD";
+  public static final String HDD = "HDD";
   public static final SchemaPath ID_SCHEMA_PATH = SchemaPath.getSimplePath(ID_KEY);
 
   public static final SchemaPath DOCUMENT_SCHEMA_PATH = SchemaPath.getSimplePath(DBConstants.DOCUMENT_FIELD);
@@ -35,6 +56,9 @@ public class PluginConstants {
 
   public static final String JSON_TABLE_BLOCK_SIZE = "format-maprdb.json.pluginCost.blockSize";
   public static final int JSON_TABLE_BLOCK_SIZE_DEFAULT = 8192;
+
+  public static final String JSON_TABLE_MEDIA_TYPE = "format-maprdb.json.mediaType";
+  public static final String JSON_TABLE_MEDIA_TYPE_DEFAULT = SSD;
 
   // TODO: Currently, DrillCostBase has a byte read cost, but not a block read cost. The block
   // read cost is dependent on block size and the type of the storage, so it makes more sense to
@@ -53,4 +77,9 @@ public class PluginConstants {
   public static final int TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT = 32 * DrillCostBase.BASE_CPU_COST;
   public static final int TABLE_SSD_BLOCK_RANDOM_READ_COST_DEFAULT = TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT;
   public static final int TABLE_AVERGE_COLUMN_SIZE_DEFAULT = 10;
+  public static final String JSON_TABLE_HDD_BLOCK_SEQ_READ_COST = "format-maprdb.json.pluginCost.hddBlockSequentialReadCost";
+  public static final int JSON_TABLE_HDD_BLOCK_SEQ_READ_COST_DEFAULT = 6 * JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT;
+
+  public static final String JSON_TABLE_HDD_BLOCK_RANDOM_READ_COST = "format-maprdb.json.pluginCost.hddBlockRandomReadCost";
+  public static final int JSON_TABLE_HDD_BLOCK_RANDOM_READ_COST_DEFAULT = 1000 * JSON_TABLE_HDD_BLOCK_SEQ_READ_COST_DEFAULT;
 }
