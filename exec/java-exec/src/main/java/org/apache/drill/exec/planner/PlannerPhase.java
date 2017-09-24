@@ -18,7 +18,6 @@
 package org.apache.drill.exec.planner;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSet.Builder;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import org.apache.calcite.plan.RelOptRule;
@@ -41,6 +40,7 @@ import org.apache.calcite.tools.RuleSet;
 import org.apache.calcite.tools.RuleSets;
 import org.apache.drill.exec.ops.OptimizerRulesContext;
 import org.apache.drill.exec.planner.index.DbScanToIndexScanPrule;
+import org.apache.drill.exec.planner.index.PlainDbScanToIndexScanPrule;
 import org.apache.drill.exec.planner.logical.DrillAggregateRule;
 import org.apache.drill.exec.planner.logical.DrillFilterAggregateTransposeRule;
 import org.apache.drill.exec.planner.logical.DrillFilterJoinRules;
@@ -411,7 +411,9 @@ public enum PlannerPhase {
             DbScanToIndexScanPrule.PROJECT_FILTER_PROJECT_SCAN,
             DbScanToIndexScanPrule.SORT_PROJECT_FILTER_SCAN,
             DbScanToIndexScanPrule.FILTER_PROJECT_SCAN,
-            DbScanToIndexScanPrule.FILTER_SCAN
+            DbScanToIndexScanPrule.FILTER_SCAN,
+            PlainDbScanToIndexScanPrule.SORT_PROJECT_SCAN,
+            PlainDbScanToIndexScanPrule.SORT_SCAN
         )
         .build();
     return RuleSets.ofList(indexRules);

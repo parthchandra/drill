@@ -311,49 +311,6 @@ public class DbScanToIndexScanPrule extends Prule {
     return groupScan.getSecondaryIndexCollection(scan);
   }
 
-  /**
-   * generate logical expressions for sort rexNodes in SortRel
-   * @param indexContext
-   */
-  private void updateSortExpression(IndexPlanCallContext indexContext) {
-    if(indexContext.sort == null) {
-      return;
-    }
-
-    DrillParseContext parserContext =
-        new DrillParseContext(PrelUtil.getPlannerSettings(indexContext.call.rel(0).getCluster()));
-
-    indexContext.sortExprs = Lists.newArrayList();
-    for (RelFieldCollation collation : indexContext.sort.getCollation().getFieldCollations()) {
-      int idx = collation.getFieldIndex();
-      DrillProjectRel oneProject;
-      if (indexContext.upperProject != null && indexContext.lowerProject != null) {
-        LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.lowerProject, indexContext.scan,
-            indexContext.upperProject.getProjects().get(idx));
-        indexContext.sortExprs.add(expr);
-      }
-      else {//one project is null now
-        oneProject = (indexContext.upperProject != null)? indexContext.upperProject : indexContext.lowerProject;
-        if(oneProject != null) {
-          LogicalExpression expr = RexToExpression.toDrill(parserContext, null, indexContext.scan,
-              oneProject.getProjects().get(idx));
-          indexContext.sortExprs.add(expr);
-        }
-        else {//two projects are null
-          SchemaPath path;
-          RelDataTypeField f = indexContext.scan.getRowType().getFieldList().get(idx);
-          String pathSeg = f.getName().replaceAll("`", "");
-          final String[] segs = pathSeg.split("\\.");
-          path = SchemaPath.getCompoundPath(segs);
-          indexContext.sortExprs.add(path);
-        }
-      }
-    }
-    logger.debug("index_plan_info: required sort expressions {}", indexContext.sortExprs);
-  }
-  /**
-   *
-   */
   private void processWithIndexSelection(
       IndexPlanCallContext indexContext,
       PlannerSettings settings,
@@ -428,7 +385,7 @@ public class DbScanToIndexScanPrule extends Prule {
     List<IndexGroup> intersectIndexes = Lists.newArrayList();
 
     //update sort expressions in context
-    updateSortExpression(indexContext);
+    IndexPlanUtils.updateSortExpression(indexContext);
 
     IndexSelector selector = new IndexSelector(indexCondition,
         remainderCondition,
@@ -445,7 +402,7 @@ public class DbScanToIndexScanPrule extends Prule {
           continue;
         }
         FunctionalIndexInfo functionInfo = indexDesc.getFunctionalInfo();
-        selector.addIndex(indexDesc, isCoveringIndex(indexContext, functionInfo),
+        selector.addIndex(indexDesc, IndexPlanUtils.isCoveringIndex(indexContext, functionInfo),
             indexContext.lowerProject != null ? indexContext.lowerProject.getRowType().getFieldCount() :
                 scan.getRowType().getFieldCount());
       }
@@ -578,105 +535,6 @@ public class DbScanToIndexScanPrule extends Prule {
         logger.warn("Exception while trying to generate non-covering index access plan", e);
       }
     }
-  }
-
-  /**
-   * For a particular table scan for table T1 and an index on that table, find out if it is a covering index
-   * @return
-   */
-  private boolean isCoveringIndex(IndexPlanCallContext indexContext, FunctionalIndexInfo functionInfo) {
-    if(functionInfo.hasFunctional()) {
-      //need info from full query
-      return queryCoveredByIndex(indexContext, functionInfo);
-    }
-    DbGroupScan groupScan = (DbGroupScan) indexContext.scan.getGroupScan();
-    List<LogicalExpression> tableCols = Lists.newArrayList();
-    tableCols.addAll(groupScan.getColumns());
-    return functionInfo.getIndexDesc().isCoveringIndex(tableCols);
-  }
-
-  //this check queryCoveredByIndex is needed only when there is a function based index field.
-  //If there is no function based index field, we don't need to worry whether there could be
-  //expressions not covered by the index existing somewhere out of the visible scope of this rule(project-filter-scan).
-
-  /**
-   * For the given index with functional field, e.g. cast(a.b as INT), use the knowledge of the whole query(cached in optimizerContext from previous convert process)
-   * to check if there are expressions other than indexed function cast(a.b as INT) has field a.b and a.b is not in the index
-   * @param functionInfo
-   * @return false if the query could not be covered by the index (should not create covering index plan)
-   */
-  boolean queryCoveredByIndex(IndexPlanCallContext indexContext,
-                              FunctionalIndexInfo functionInfo) {
-    //for indexed functions, if relevant schemapaths are included in index(in indexed fields or non-indexed fields),
-    // check covering based on the local information we have:
-    //   if references to schema paths in functional indexes disappear beyond capProject
-
-    if (indexContext.upperProject == null) {
-      if( !isFullQuery(indexContext)) {
-        return false;
-      }
-    }
-
-    DrillParseContext parserContext =
-        new DrillParseContext(PrelUtil.getPlannerSettings(indexContext.call.rel(0).getCluster()));
-
-    Set<LogicalExpression> exprs = Sets.newHashSet();
-    if (indexContext.upperProject != null) {
-      if (indexContext.lowerProject == null) {
-        for (RexNode rex : indexContext.upperProject.getProjects()) {
-          LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
-          exprs.add(expr);
-        }
-      } else {
-        //we have underneath project, so we have to do more to convert expressions
-        for (RexNode rex : indexContext.upperProject.getProjects()) {
-          LogicalExpression expr = RexToExpression.toDrill(parserContext, indexContext.lowerProject, indexContext.scan, rex);
-          exprs.add(expr);
-        }
-      }
-    }
-    else {//capProject == null
-      if (indexContext.lowerProject != null) {
-        for (RexNode rex : indexContext.lowerProject.getProjects()) {
-          LogicalExpression expr = DrillOptiq.toDrill(parserContext, indexContext.scan, rex);
-          exprs.add(expr);
-        }
-      }
-    }
-
-    Map<LogicalExpression, Set<SchemaPath>> exprPathMap = functionInfo.getPathsInFunctionExpr();
-    PathInExpr exprSearch = new PathInExpr(exprPathMap);
-
-    for(LogicalExpression expr: exprs) {
-      if(expr.accept(exprSearch, null) == false) {
-        return false;
-      }
-    }
-    //if we come to here, paths in indexed function expressions are covered in capProject.
-    //now we check other paths.
-
-    //check the leftout paths (appear in capProject other than functional index expression) are covered by other index fields or not
-    List<LogicalExpression> leftPaths = Lists.newArrayList(exprSearch.getRemainderPaths());
-
-    indexContext.leftOutPathsInFunctions = exprSearch.getRemainderPathsInFunctions();
-    return functionInfo.getIndexDesc().isCoveringIndex(leftPaths);
-  }
-
-  private boolean isFullQuery(IndexPlanCallContext indexContext) {
-    RelNode rootInCall = indexContext.call.rel(0);
-    //check if the tip of the operator stack we have is also the top of the whole query, if yes, return true
-    if (indexContext.call.getPlanner().getRoot() instanceof RelSubset) {
-      final RelSubset rootSet = (RelSubset) indexContext.call.getPlanner().getRoot();
-      if (rootSet.getRelList().contains(rootInCall)) {
-        return true;
-      }
-    } else {
-      if (indexContext.call.getPlanner().getRoot().equals(rootInCall)) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
 }

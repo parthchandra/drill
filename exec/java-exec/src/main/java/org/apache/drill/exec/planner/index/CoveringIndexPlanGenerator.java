@@ -97,76 +97,6 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         origScan, newRowType, builder, functionInfo);
   }
 
-  /**
-   *A RexNode forest with three RexNodes for expressions "cast(a.q as int) * 2, b+c, concat(a.q, " world")"
-   * on Scan RowType('a', 'b', 'c') will be like this:
-   *
-   *          (0)Call:"*"                                       Call:"concat"
-   *           /         \                                    /           \
-   *    (1)Call:CAST     2            Call:"+"        (5)Call:ITEM     ' world'
-   *      /        \                   /     \          /   \
-   * (2)Call:ITEM  TYPE:INT       (3)$1    (4)$2       $0    'q'
-   *   /      \
-   *  $0     'q'
-   *
-   * So for above expressions, when visiting the RexNode trees using PathInExpr, we could mark indexed expressions in the trees,
-   * as shown in the diagram above are the node (1),
-   * then collect the schema paths in the indexed expression but found out of the indexed expression -- node (5),
-   * and other regular schema paths (3) (4)
-   *
-   * @param parseContext
-   * @param project
-   * @param scan
-   * @param toRewriteRex  the RexNode to be converted if it contain a functional index expression.
-   * @param newRowType
-   * @param functionInfo
-   * @return
-   */
-  private RexNode rewriteFunctionalRex(DrillParseContext parseContext,
-                                       DrillProjectRelBase project,
-                                       RelNode scan,
-                                       RexNode toRewriteRex,
-                                       RelDataType newRowType,
-                                       FunctionalIndexInfo functionInfo) {
-    if (!functionInfo.hasFunctional()) {
-      return toRewriteRex;
-    }
-    RexToExpression.RexToDrillExt rexToDrill = new RexToExpression.RexToDrillExt(parseContext, project, scan);
-    LogicalExpression expr = toRewriteRex.accept(rexToDrill);
-
-    final Map<LogicalExpression, Set<SchemaPath>> exprPathMap = functionInfo.getPathsInFunctionExpr();
-    PathInExpr exprSearch = new PathInExpr(exprPathMap);
-    expr.accept(exprSearch, null);
-    Set<LogicalExpression> remainderPaths = exprSearch.getRemainderPaths();
-
-    //now build the rex->logical expression map for SimpleRexRemap
-    //left out schema paths
-    Map<LogicalExpression, Set<RexNode>> exprToRex = rexToDrill.getMapExprToRex();
-    final Map<RexNode, LogicalExpression> mapRexExpr = Maps.newHashMap();
-    for (LogicalExpression leftExpr: remainderPaths) {
-      if (exprToRex.containsKey(leftExpr)) {
-        Set<RexNode> rexs = exprToRex.get(leftExpr);
-        for (RexNode rex: rexs) {
-          mapRexExpr.put(rex, leftExpr);
-        }
-      }
-    }
-
-    //functional expressions e.g. cast(a.b as int)
-    for (LogicalExpression functionExpr: functionInfo.getExprMap().keySet()) {
-      if (exprToRex.containsKey(functionExpr)) {
-        Set<RexNode> rexs = exprToRex.get(functionExpr);
-        for (RexNode rex: rexs) {
-          mapRexExpr.put(rex, functionExpr);
-        }
-      }
-
-    }
-
-    SimpleRexRemap remap = new SimpleRexRemap(origScan, newRowType, builder);
-    remap.setExpressionMap(functionInfo.getExprMap());
-    return remap.rewriteWithMap(toRewriteRex, mapRexExpr);
-  }
 
   @Override
   public RelNode convertChild(final RelNode filter, final RelNode input) throws InvalidRelException {
@@ -232,7 +162,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
         List<RexNode> newProjects = Lists.newArrayList();
         DrillParseContext parseContxt = new DrillParseContext(PrelUtil.getPlannerSettings(newProject.getCluster()));
         for(RexNode projectRex: newProject.getProjects()) {
-          RexNode newRex = rewriteFunctionalRex(parseContxt, null, origScan, projectRex, indexScanPrel.getRowType(), functionInfo);
+          RexNode newRex = IndexPlanUtils.rewriteFunctionalRex(indexContext, parseContxt, null, origScan, projectRex, indexScanPrel.getRowType(), functionInfo);
           newProjects.add(newRex);
         }
 

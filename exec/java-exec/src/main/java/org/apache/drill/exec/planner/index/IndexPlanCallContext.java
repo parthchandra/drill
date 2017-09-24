@@ -68,4 +68,16 @@ public class IndexPlanCallContext {
     this.indexHint = ((DbGroupScan)this.scan.getGroupScan()).getIndexHint();
   }
 
+  IndexPlanCallContext(RelOptRuleCall call,
+                       DrillSortRel sort,
+                       DrillProjectRel project,
+                       DrillScanRel scan) {
+    this.call = call;
+    this.sort = sort;
+    this.upperProject = null;
+    this.filter = null;
+    this.lowerProject = project;
+    this.scan = scan;
+    this.indexHint = ((DbGroupScan)this.scan.getGroupScan()).getIndexHint();
+  }
 }

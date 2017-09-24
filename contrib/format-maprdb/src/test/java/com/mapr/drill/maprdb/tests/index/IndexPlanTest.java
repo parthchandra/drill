@@ -23,6 +23,9 @@ import com.mapr.drill.maprdb.tests.json.BaseJsonTest;
 import com.mapr.tests.annotations.ClusterTest;
 
 import org.apache.drill.PlanTestBase;
+import org.apache.drill.exec.expr.fn.impl.DateUtility;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.FixMethodOrder;
@@ -85,7 +88,7 @@ public class IndexPlanTest extends BaseJsonTest {
             "i_state_city", "address.state,address.city", "name.fname,name.lname",//mainly for composite key test
             "i_age", "personal.age", "",
             "i_income", "personal.income", "",
-            "i_lic", "driverlicense", "",
+            "i_lic", "driverlicense", "reverseid",
             "i_cast_int_ssn", "$CAST(id.ssn@INT)", "contact.phone",
             "i_cast_vchar_lic", "$CAST(driverlicense@STRING)","contact.email",
             "i_state_age_phone", "address.state,personal.age,contact.phone", "name.fname",
@@ -1054,5 +1057,81 @@ public class IndexPlanTest extends BaseJsonTest {
         new String[]{"indexName="}
     );
 
+  }
+
+  @Test
+  public void testNoFilterOrderByCoveringPlan() throws Exception {
+    String query = "SELECT t.`id`.`ssn` AS `ssn`, t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        "order by t.id.ssn limit 2";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"indexName=i_ssn"},
+        new String[]{"Sort", "TopN", "RowKeyJoin"}
+    );
+    testBuilder()
+        .ordered()
+        .sqlQuery(query)
+        .baselineColumns("ssn", "phone").baselineValues("100000000", "6500008069")
+        .baselineColumns("ssn", "phone").baselineValues("100000001", "6500001411")
+        .build()
+        .run();
+  }
+
+  @Test
+  public void testNoFilterOrderByCast() throws Exception {
+    String query = "SELECT CAST(t.id.ssn as INT) AS `ssn`, t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        "order by CAST(t.id.ssn as INT) limit 2";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"indexName=i_cast_int_ssn"},
+        new String[]{"TopN", "Sort", "RowKeyJoin"}
+    );
+    testBuilder()
+        .ordered()
+        .sqlQuery(query)
+        .baselineColumns("ssn", "phone").baselineValues(100000000, "6500008069")
+        .baselineColumns("ssn", "phone").baselineValues(100000001, "6500001411")
+        .build()
+        .run();
+  }
+
+  @Test
+  public void testNoFilterOrderByHashIndex() throws Exception {
+    String query = "SELECT cast(t.activity.irs.firstlogin as timestamp) AS `firstlogin`, t.id.ssn as ssn FROM hbase.`index_test_primary` as t " +
+        "order by cast(t.activity.irs.firstlogin as timestamp) limit 2";
+    test(defaultHavingIndexPlan);
+    //no collation for hash index so Sort or TopN must have been preserved
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"(Sort|TopN)"},
+        new String[]{}
+    );
+    DateTime date = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss")
+        .parseDateTime("2010-01-21 00:12:24");
+
+    testBuilder()
+        .ordered()
+        .sqlQuery(query)
+        .baselineColumns("firstlogin", "ssn").baselineValues(date, "100006852")
+        .baselineColumns("firstlogin", "ssn").baselineValues(date, "100005844")
+        .build()
+        .run();
+  }
+
+  @Test
+  public void testNoFilterOrderBySimpleField() throws Exception {
+    String query = "SELECT t.reverseid as rid, t.driverlicense as lic FROM hbase.`index_test_primary` as t " +
+        "order by t.driverlicense limit 2";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"indexName=i_lic"},
+        new String[]{"Sort", "TopN"}
+    );
+    testBuilder()
+        .ordered()
+        .sqlQuery(query)
+        .baselineColumns("rid", "lic").baselineValues("4539", 100000000L)
+        .baselineColumns("rid", "lic").baselineValues("943", 100000001L)
+        .build()
+        .run();
   }
 }

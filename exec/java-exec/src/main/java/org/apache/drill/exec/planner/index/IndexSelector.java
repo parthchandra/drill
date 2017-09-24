@@ -77,6 +77,22 @@ public class IndexSelector  {
     this.indexPropList = Lists.newArrayList();
   }
 
+  /**
+   * This constructor is to build selector for no index condition case (no filter)
+   * @param indexContext
+   */
+  public IndexSelector(IndexPlanCallContext indexContext) {
+    this.indexCondition = null;
+    this.otherRemainderCondition = null;
+    this.indexContext = indexContext;
+    this.totalRows = Statistics.ROWCOUNT_UNKNOWN;
+    this.stats = ((DbGroupScan) (indexContext.scan).getGroupScan()).getStatistics();
+    this.rexBuilder = indexContext.scan.getCluster().getRexBuilder();
+    this.builder = null;
+    this.primaryTableScan = indexContext.scan;
+    this.indexPropList = Lists.newArrayList();
+  }
+
   public void addIndex(IndexDescriptor indexDesc, boolean isCovering, int numProjectedFields) {
     IndexProperties indexProps = new IndexProperties(indexDesc, isCovering, otherRemainderCondition, rexBuilder,
         numProjectedFields, totalRows, primaryTableScan);
@@ -360,6 +376,23 @@ public class IndexSelector  {
         break;
       }
     }
+  }
+
+  /**
+   * we assume all the indexes added in indexPropList are all applicable (and covering).
+   * For now this function is used and tested only in IndexScanWithSortOnlyPrule
+   */
+  public IndexProperties getBestIndexNoFilter() {
+    RelOptPlanner planner = indexContext.call.getPlanner();
+    List<IndexGroup> candidateIndexes = Lists.newArrayList();
+
+    for (IndexProperties p : indexPropList) {
+        IndexGroup index = new IndexGroup();
+        index.addIndexProp(p);
+        candidateIndexes.add(index);
+    }
+    Collections.sort(candidateIndexes, new IndexComparator(planner, builder));
+    return indexPropList.iterator().next();
   }
 
   public static class IndexComparator implements Comparator<IndexGroup> {
