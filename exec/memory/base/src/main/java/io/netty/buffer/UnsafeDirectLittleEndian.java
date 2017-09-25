@@ -74,18 +74,18 @@ public final class UnsafeDirectLittleEndian extends WrappedByteBuf {
     this.memoryAddress = buf.memoryAddress();
   }
 
-    private long addr(int index) {
-        return memoryAddress + index;
-    }
+  private long addr(int index) {
+      return memoryAddress + index;
+  }
 
-    @Override
-    public long getLong(int index) {
-//        wrapped.checkIndex(index, 8);
+  @Override
+  public long getLong(int index) {
+    //wrapped.checkIndex(index, 8);
     return PlatformDependent.getLong(addr(index));
-    }
+  }
 
-    @Override
-    public float getFloat(int index) {
+  @Override
+  public float getFloat(int index) {
         return Float.intBitsToFloat(getInt(index));
     }
 
