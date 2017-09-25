@@ -113,6 +113,8 @@ public abstract class PlainDbScanToIndexScanPrule extends Prule {
       return;
     }
 
+    IndexPlanUtils.updateSortExpression(indexContext);
+
     IndexSelector selector = new IndexSelector(indexContext);
 
     for (IndexDescriptor indexDesc : indexCollection) {
@@ -128,15 +130,15 @@ public abstract class PlainDbScanToIndexScanPrule extends Prule {
 
     IndexSelector.IndexProperties idxProp = selector.getBestIndexNoFilter();
 
-    try {
-      //generate a covering plan
-      CoveringPlanNoFilterGenerator planGen = new CoveringPlanNoFilterGenerator(indexContext, idxProp.getIndexDesc().getFunctionalInfo(), settings);
-      planGen.go();
+    if (idxProp != null) {
+      try {
+        //generate a covering plan
+        CoveringPlanNoFilterGenerator planGen = new CoveringPlanNoFilterGenerator(indexContext, idxProp.getIndexDesc().getFunctionalInfo(), settings);
+        planGen.go();
+      } catch (Exception e) {
+        logger.warn("Exception while trying to generate covering-no-filter index plan", e);
+      }
     }
-    catch (Exception e) {
-      logger.warn("Exception while trying to generate covering-no-filter index plan", e);
-    }
-
     indexPlanTimer.stop();
     logger.debug("Index Planning took {} ms", indexPlanTimer.elapsed(TimeUnit.MILLISECONDS));
   }

@@ -1134,4 +1134,16 @@ public class IndexPlanTest extends BaseJsonTest {
         .build()
         .run();
   }
+
+  @Test //negative case for no filter plan
+  public void testNoFilterOrderByNoIndexMatch() throws Exception {
+    String query = "SELECT t.`id`.`ssn` AS `ssn`, t.contact.phone as phone FROM hbase.`index_test_primary` as t " +
+        "order by t.name.fname limit 2";
+    test(defaultHavingIndexPlan);
+    PlanTestBase.testPlanMatchingPatterns(query,
+        new String[] {"(Sort|TopN)"},
+        new String[]{"indexName="}
+    );
+  }
+
 }

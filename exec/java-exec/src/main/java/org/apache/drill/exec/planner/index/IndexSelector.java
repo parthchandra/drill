@@ -169,7 +169,7 @@ public class IndexSelector  {
     if (indexContext.lowerProject != null) {
       inputCollation =
           IndexPlanUtils.buildCollationProject(indexContext.lowerProject.getProjects(), null,
-              indexScanPrel, functionInfo,indexContext);
+              indexContext.scan, functionInfo,indexContext);
     }
 
     if (indexContext.upperProject != null) {
@@ -383,16 +383,21 @@ public class IndexSelector  {
    * For now this function is used and tested only in IndexScanWithSortOnlyPrule
    */
   public IndexProperties getBestIndexNoFilter() {
+    if (indexPropList.size() == 0) {
+      return null;
+    }
+
     RelOptPlanner planner = indexContext.call.getPlanner();
     List<IndexGroup> candidateIndexes = Lists.newArrayList();
 
     for (IndexProperties p : indexPropList) {
+      p.setSatisfiesCollation(buildAndCheckCollation(p));
         IndexGroup index = new IndexGroup();
         index.addIndexProp(p);
         candidateIndexes.add(index);
     }
     Collections.sort(candidateIndexes, new IndexComparator(planner, builder));
-    return indexPropList.iterator().next();
+    return candidateIndexes.get(0).getIndexProps().get(0);
   }
 
   public static class IndexComparator implements Comparator<IndexGroup> {
@@ -713,6 +718,10 @@ public class IndexSelector  {
 
     public boolean satisfiesCollation() {
       return satisfiesCollation;
+    }
+
+    public void setSatisfiesCollation(boolean satisfiesCollation) {
+      this.satisfiesCollation = satisfiesCollation;
     }
 
     public RelOptCost getSelfCost(RelOptPlanner planner) {
