@@ -84,7 +84,9 @@ public abstract class BasicServer<T extends EnumLite, SC extends ServerConnectio
 
             final ChannelPipeline pipe = ch.pipeline();
             // Make sure that the SSL handler is the first handler in the pipeline so everything is encrypted
-            setupSSL(pipe);
+            if (isSslEnabled()) {
+              setupSSL(pipe);
+            }
 
             pipe.addLast(RpcConstants.PROTOCOL_DECODER, getDecoder(connection.getAllocator(), getOutOfMemoryHandler()));
             pipe.addLast(RpcConstants.MESSAGE_DECODER, new RpcDecoder("s-" + rpcConfig.getName()));
@@ -112,7 +114,7 @@ public abstract class BasicServer<T extends EnumLite, SC extends ServerConnectio
   // Adds a SSL handler if enabled. Required only for client and server communications, so
   // a real implementation is only available for UserServer
   protected void setupSSL(ChannelPipeline pipe) {
-    // Do nothing
+    throw new UnsupportedOperationException("SSL is implemented only by the User Server.");
   }
 
   protected boolean isSslEnabled() {

@@ -80,11 +80,7 @@ class UserConnectionConfig extends AbstractConnectionConfig {
         ? null
         : new InboundImpersonationManager();
 
-    if (config.getBoolean(ExecConstants.USER_SSL_ENABLED)) {
-      sslEnabled = true;
-    } else {
-      sslEnabled = false;
-    }
+    sslEnabled = config.getBoolean(ExecConstants.USER_SSL_ENABLED);
 
     if(isSSLEnabled() && isAuthEnabled() && isEncryptionEnabled()){
       logger.warn("The server is configured to use both SSL and SASL encryption (only one should be configured).");

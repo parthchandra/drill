@@ -70,8 +70,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
   private final Parser<HR> handshakeParser;
 
   private final IdlePingHandler pingHandler;
-  private final ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener =
-      new ConnectionMultiListener.SSLHandshakeListener();
+  private ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener = null;
 
   public BasicClient(RpcConfig rpcMapping, ByteBufAllocator alloc, EventLoopGroup eventLoopGroup, T handshakeType,
                      Class<HR> responseClass, Parser<HR> handshakeParser) {
@@ -104,7 +103,9 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
             final ChannelPipeline pipe = ch.pipeline();
             // Make sure that the SSL handler is the first handler in the pipeline so everything is encrypted
-            setupSSL(pipe, sslHandshakeListener);
+            if (isSslEnabled()) {
+              setupSSL(pipe, sslHandshakeListener);
+            }
 
             pipe.addLast(RpcConstants.PROTOCOL_DECODER, getDecoder(connection.getAllocator()));
             pipe.addLast(RpcConstants.MESSAGE_DECODER, new RpcDecoder("c-" + rpcConfig.getName()));
@@ -128,7 +129,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
   // Adds a SSL handler if enabled. Required only for client and server communications, so
   // a real implementation is only available for UserClient
   protected void setupSSL(ChannelPipeline pipe, ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener) {
-    // Do nothing
+    throw new UnsupportedOperationException("SSL is implemented only by the User Client.");
   }
 
   protected boolean isSslEnabled() {
@@ -223,6 +224,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
         ConnectionMultiListener.newBuilder(connectionListener, handshakeValue, this);
     if (isSslEnabled()) {
       cml = builder.enableHandshake().enableSSL().build();
+      sslHandshakeListener = new ConnectionMultiListener.SSLHandshakeListener();
       sslHandshakeListener.setParent(cml);
     } else {
       cml = builder.enableHandshake().enablePlain().build();

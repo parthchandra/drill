@@ -23,10 +23,13 @@ import io.netty.handler.ssl.SslProvider;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import java.util.Properties;
 
@@ -35,7 +38,6 @@ public class SSLConfigClient extends SSLConfig {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfigClient.class);
 
   Properties properties;
-  private final SSLFactory.Mode mode; // Let's reuse Hadoop's SSLFactory.Mode to distinguish client/server
   private final boolean userSslEnabled;
   private final String trustStoreType;
   private final String trustStorePath;
@@ -51,7 +53,6 @@ public class SSLConfigClient extends SSLConfig {
 
   public SSLConfigClient(Properties properties) throws DrillException {
     this.properties = properties;
-    this.mode = SSLFactory.Mode.CLIENT;
     userSslEnabled = getBooleanProperty(DrillProperties.ENABLE_TLS);
     trustStoreType = getStringProperty(DrillProperties.TRUSTSTORE_TYPE, "JKS");
     trustStorePath = getStringProperty(DrillProperties.TRUSTSTORE_PATH, "");
@@ -98,7 +99,7 @@ public class SSLConfigClient extends SSLConfig {
   }
 
   @Override
-  public SslContext initSslContext() throws DrillException {
+  public SslContext initNettySslContext() throws DrillException {
     final SslContext sslCtx;
 
     if (!userSslEnabled) {
@@ -127,7 +128,7 @@ public class SSLConfigClient extends SSLConfig {
   }
 
   @Override
-  public SSLContext initSSLContext() throws DrillException {
+  public SSLContext initJDKSSLContext() throws DrillException {
     final SSLContext sslCtx;
 
     if (!userSslEnabled) {
@@ -152,6 +153,28 @@ public class SSLConfigClient extends SSLConfig {
     return sslCtx;
   }
 
+  @Override
+  public SSLEngine createSSLEngine(BufferAllocator allocator, String peerHost, int peerPort) {
+    SSLEngine engine = super.createSSLEngine(allocator, peerHost, peerPort);
+
+    if (!this.disableHostVerification()) {
+      SSLParameters sslParameters = engine.getSSLParameters();
+      // only available since Java 7
+      sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
+      engine.setSSLParameters(sslParameters);
+    }
+
+    engine.setUseClientMode(true);
+
+    try {
+      engine.setEnableSessionCreation(true);
+    } catch (Exception e) {
+      // Openssl implementation may throw this.
+      logger.debug("Session creation not enabled. Exception: {}", e.getMessage());
+    }
+
+    return engine;
+  }
 
   @Override
   public boolean isUserSslEnabled() {
@@ -225,7 +248,7 @@ public class SSLConfigClient extends SSLConfig {
 
   @Override
   public SSLFactory.Mode getMode() {
-    return mode;
+    return SSLFactory.Mode.CLIENT;
   }
 
   @Override

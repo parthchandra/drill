@@ -20,7 +20,6 @@ package org.apache.drill.exec.ssl;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
-import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.hadoop.security.ssl.SSLFactory;
@@ -32,7 +31,6 @@ import javax.net.ssl.TrustManagerFactory;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.security.KeyStore;
-import java.text.MessageFormat;
 
 public abstract class SSLConfig {
 
@@ -60,15 +58,20 @@ public abstract class SSLConfig {
   public static final String HADOOP_SSL_TRUSTSTORE_PASSWORD_TPL_KEY = "ssl.{0}.truststore.password";
   public static final String HADOOP_SSL_TRUSTSTORE_TYPE_TPL_KEY = "ssl.{0}.truststore.type";
 
-  public SSLConfig()
-      throws DrillException {
+  public SSLConfig() {
   }
 
   public abstract void validateKeyStore() throws DrillException;
 
-  public abstract SslContext initSslContext() throws DrillException;
+  // We need to use different SSLContext objects depending on what the user has chosen
+  // For most uses we will use the Netty SslContext class. This allows us to use either
+  // the JDK implementation or the OpenSSL implementation. However if the user wants to
+  // use the system trust store, then the only way to access it is via the JDK's
+  // SSLContext class. (See the createSSLEngine method below).
 
-  public abstract SSLContext initSSLContext() throws DrillException;
+  public abstract SslContext initNettySslContext() throws DrillException;
+
+  public abstract SSLContext initJDKSSLContext() throws DrillException;
 
   public abstract boolean isUserSslEnabled();
 
@@ -191,10 +194,10 @@ public abstract class SSLConfig {
 
   public void initContext() throws DrillException {
     if ((isWindows || isMacOs) && useSystemTrustStore()) {
-      initSSLContext();
-      logger.debug("Initialized Windows SSL context using JDK.");
+      initJDKSSLContext();
+      logger.debug("Initialized Windows/MacOs SSL context using JDK.");
     } else {
-      initSslContext();
+      initNettySslContext();
       logger.debug("Initialized SSL context.");
     }
     return;
@@ -205,18 +208,18 @@ public abstract class SSLConfig {
     if ((isWindows || isMacOs) && useSystemTrustStore()) {
       if (peerHost != null) {
         engine = jdkSSlContext.createSSLEngine(peerHost, peerPort);
-        logger.debug("Initializing Windows SSLEngine with hostname verification.");
+        logger.debug("Initializing Windows/MacOs SSLEngine with hostname.");
       } else {
         engine = jdkSSlContext.createSSLEngine();
-        logger.debug("Initializing Windows SSLEngine with no hostname verification.");
+        logger.debug("Initializing Windows/MacOs SSLEngine with no hostname.");
       }
     } else {
       if (peerHost != null) {
         engine = nettySslContext.newEngine(allocator.getAsByteBufAllocator(), peerHost, peerPort);
-        logger.debug("Initializing SSLEngine with hostname verification.");
+        logger.debug("Initializing SSLEngine with hostname.");
       } else {
         engine = nettySslContext.newEngine(allocator.getAsByteBufAllocator());
-        logger.debug("Initializing SSLEngine with no hostname verification.");
+        logger.debug("Initializing SSLEngine with no hostname.");
       }
     }
     return engine;

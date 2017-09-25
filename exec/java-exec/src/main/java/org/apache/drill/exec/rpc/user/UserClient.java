@@ -142,37 +142,19 @@ public class UserClient
 
   @Override protected void setupSSL(ChannelPipeline pipe,
       ConnectionMultiListener.SSLHandshakeListener sslHandshakeListener) {
-    if (sslConfig.isUserSslEnabled()) {
 
-      String peerHost = endpoint.getAddress();
-      int peerPort = endpoint.getUserPort();
-      SSLEngine sslEngine = sslConfig.createSSLEngine(allocator, peerHost, peerPort);
+    String peerHost = endpoint.getAddress();
+    int peerPort = endpoint.getUserPort();
+    SSLEngine sslEngine = sslConfig.createSSLEngine(allocator, peerHost, peerPort);
 
-      if (!sslConfig.disableHostVerification()) {
-        SSLParameters sslParameters = sslEngine.getSSLParameters();
-        // only available since Java 7
-        sslParameters.setEndpointIdentificationAlgorithm("HTTPS");
-        sslEngine.setSSLParameters(sslParameters);
-      }
+    // Add SSL handler into pipeline
+    SslHandler sslHandler = new SslHandler(sslEngine);
+    sslHandler.setHandshakeTimeoutMillis(sslConfig.getHandshakeTimeout());
 
-      sslEngine.setUseClientMode(true);
-
-      try {
-        sslEngine.setEnableSessionCreation(true);
-      } catch (Exception e) {
-        // Openssl implementation may throw this.
-        logger.debug("Session creation not enabled. Exception: {}", e.getMessage());
-      }
-
-      // Add SSL handler into pipeline
-      SslHandler sslHandler = new SslHandler(sslEngine);
-      sslHandler.setHandshakeTimeoutMillis(sslConfig.getHandshakeTimeout());
-
-      // Add a listener for SSL Handshake complete. The Drill client handshake will be enabled only
-      // after this is done.
-      sslHandler.handshakeFuture().addListener(sslHandshakeListener);
-      pipe.addFirst(RpcConstants.SSL_HANDLER, sslHandler);
-    }
+    // Add a listener for SSL Handshake complete. The Drill client handshake will be enabled only
+    // after this is done.
+    sslHandler.handshakeFuture().addListener(sslHandshakeListener);
+    pipe.addFirst(RpcConstants.SSL_HANDLER, sslHandler);
     logger.debug(sslConfig.toString());
   }
 

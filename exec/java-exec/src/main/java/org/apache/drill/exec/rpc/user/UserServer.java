@@ -78,8 +78,6 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UserServer.class);
   private static final String SERVER_NAME = "Apache Drill Server";
 
-  private final BootStrapContext bootStrapContext;
-  private final BufferAllocator allocator;
   private final UserConnectionConfig config;
   private final SSLConfig sslConfig;
   private Channel sslChannel;
@@ -90,13 +88,11 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
     super(UserRpcConfig.getMapping(context.getConfig(), context.getExecutor()),
         allocator.getAsByteBufAllocator(),
         eventLoopGroup);
-    this.bootStrapContext = context;
-    this.allocator = allocator;
     this.config = new UserConnectionConfig(allocator, context, new UserServerRequestHandler(worker));
     this.sslChannel = null;
     try {
       this.sslConfig = new SSLConfigBuilder()
-          .config(bootStrapContext.getConfig())
+          .config(context.getConfig())
           .mode(SSLFactory.Mode.SERVER)
           .initializeSSLContext(true)
           .validateKeyStore(true)
@@ -112,27 +108,15 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
 
   @Override
   protected void setupSSL(ChannelPipeline pipe) {
-    if (sslConfig.isUserSslEnabled()) {
 
-      SSLEngine sslEngine = sslConfig.createSSLEngine(allocator, null, 0);
-      sslEngine.setUseClientMode(false);
-
-      // No need for client side authentication (HTTPS like behaviour)
-      sslEngine.setNeedClientAuth(false);
-
-      try {
-        sslEngine.setEnableSessionCreation(true);
-      } catch (Exception e) {
-        // Openssl implementation may throw this.
-        logger.debug("Session creation not enabled. Exception: {}", e.getMessage());
-      }
-
-      // Add SSL handler into pipeline
-      pipe.addFirst(RpcConstants.SSL_HANDLER, new SslHandler(sslEngine));
-      logger.debug("SSL communication between client and server is enabled.");
-    }
+    SSLEngine sslEngine = sslConfig.createSSLEngine(config.getAllocator(), null, 0);
+    // Add SSL handler into pipeline
+    pipe.addFirst(RpcConstants.SSL_HANDLER, new SslHandler(sslEngine));
+    logger.debug("SSL communication between client and server is enabled.");
     logger.debug(sslConfig.toString());
+
   }
+
   @Override
   protected boolean isSslEnabled() {
     return sslConfig.isUserSslEnabled();
@@ -141,7 +125,6 @@ public class UserServer extends BasicServer<RpcType, BitToUserConnection> {
   @Override
   public void setSslChannel(Channel c) {
     sslChannel = c;
-    return;
   }
 
   @Override

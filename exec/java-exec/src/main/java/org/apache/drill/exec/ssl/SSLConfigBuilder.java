@@ -53,11 +53,11 @@ public class SSLConfigBuilder {
     } else {
       sslConfig = new SSLConfigClient(properties);
     }
-    if(initializeSSLContext){
-      sslConfig.initContext();
-    }
     if(validateKeyStore){
       sslConfig.validateKeyStore();
+    }
+    if(initializeSSLContext){
+      sslConfig.initContext();
     }
     return sslConfig;
   }

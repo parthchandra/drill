@@ -24,11 +24,13 @@ import io.netty.handler.ssl.SslProvider;
 import org.apache.drill.common.config.DrillConfig;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.ssl.SSLFactory;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLEngine;
 import javax.net.ssl.TrustManagerFactory;
 import java.text.MessageFormat;
 
@@ -38,7 +40,6 @@ public class SSLConfigServer extends SSLConfig {
 
   private final DrillConfig config;
   private final Configuration hadoopConfig;
-  private final SSLFactory.Mode mode; // Let's reuse Hadoop's SSLFactory.Mode to distinguish client/server
   private final boolean userSslEnabled;
   private final boolean httpsEnabled;
   private final String keyStoreType;
@@ -53,7 +54,7 @@ public class SSLConfigServer extends SSLConfig {
 
   public SSLConfigServer(DrillConfig config, Configuration hadoopConfig) throws DrillException {
     this.config = config;
-    this.mode = SSLFactory.Mode.SERVER;
+    SSLFactory.Mode mode = SSLFactory.Mode.SERVER;
     httpsEnabled =
         config.hasPath(ExecConstants.HTTP_ENABLE_SSL) && config.getBoolean(ExecConstants.HTTP_ENABLE_SSL);
     // For testing we will mock up a hadoop configuration, however for regular use, we find the actual hadoop config.
@@ -65,7 +66,7 @@ public class SSLConfigServer extends SSLConfig {
         this.hadoopConfig = hadoopConfig;
       }
       String hadoopSSLConfigFile =
-          this.hadoopConfig.get(resolveHadoopPropertyName(HADOOP_SSL_CONF_TPL_KEY, mode));
+          this.hadoopConfig.get(resolveHadoopPropertyName(HADOOP_SSL_CONF_TPL_KEY, getMode()));
       logger.debug("Using Hadoop configuration for SSL");
       logger.debug("Hadoop SSL configuration file: {}", hadoopSSLConfigFile);
       this.hadoopConfig.addResource(hadoopSSLConfigFile);
@@ -112,7 +113,7 @@ public class SSLConfigServer extends SSLConfig {
   }
 
   @Override
-  public SslContext initSslContext() throws DrillException {
+  public SslContext initNettySslContext() throws DrillException {
     final SslContext sslCtx;
 
     if (!userSslEnabled) {
@@ -146,7 +147,7 @@ public class SSLConfigServer extends SSLConfig {
   }
 
   @Override
-  public SSLContext initSSLContext() throws DrillException {
+  public SSLContext initJDKSSLContext() throws DrillException {
     final SSLContext sslCtx;
 
     if (!userSslEnabled) {
@@ -174,6 +175,25 @@ public class SSLConfigServer extends SSLConfig {
     }
     this.jdkSSlContext = sslCtx;
     return sslCtx;
+  }
+
+  @Override
+  public SSLEngine createSSLEngine(BufferAllocator allocator, String peerHost, int peerPort) {
+    SSLEngine engine = super.createSSLEngine(allocator, peerHost, peerPort);
+
+    engine.setUseClientMode(false);
+
+    // No need for client side authentication (HTTPS like behaviour)
+    engine.setNeedClientAuth(false);
+
+    try {
+      engine.setEnableSessionCreation(true);
+    } catch (Exception e) {
+      // Openssl implementation may throw this.
+      logger.debug("Session creation not enabled. Exception: {}", e.getMessage());
+    }
+
+    return engine;
   }
 
   private String getConfigParam(String name, String hadoopName) {
@@ -286,7 +306,7 @@ public class SSLConfigServer extends SSLConfig {
 
   @Override
   public SSLFactory.Mode getMode() {
-    return mode;
+    return SSLFactory.Mode.SERVER;
   }
 
   @Override
