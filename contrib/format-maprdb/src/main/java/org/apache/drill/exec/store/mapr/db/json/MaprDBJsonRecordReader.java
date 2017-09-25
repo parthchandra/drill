@@ -79,7 +79,10 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
   private QueryCondition condition;
 
   /**
-   * A set of projected FieldPaths that are pushed into MapR-DB Scanner
+   * A set of projected FieldPaths that are pushed into MapR-DB Scanner.
+   * This set is a superset of the fields returned by {@link #getColumns()} when
+   * projection pass-through is in effect. In such cases, {@link #getColumns()}
+   * returns only those fields which are required by Drill to run its operators.
    */
   private FieldPath[] scannedFields;
 
@@ -220,6 +223,10 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
       }
     }
     return transformed;
+  }
+
+  protected FieldPath[] getScannedFields() {
+    return scannedFields;
   }
 
   protected boolean getIdOnly() {

@@ -45,6 +45,7 @@ import com.mapr.db.ojai.DBDocumentReaderBase;
 
 import org.ojai.Document;
 import org.ojai.DocumentStream;
+import org.ojai.FieldPath;
 
 
 public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
@@ -63,14 +64,11 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
   public void readToInitSchema() {
     DBDocumentReaderBase reader = null;
     vectorWriter.setPosition(0);
-    DocumentStream dstream = null;
 
-    try {
-      dstream = table.find();
+    try (DocumentStream dstream = table.find()) {
       reader = (DBDocumentReaderBase) dstream.iterator().next().asReader();
       documentWriter.writeDBDocument(vectorWriter, reader);
-    }
-    catch(UserException e) {
+    } catch(UserException e) {
       throw UserException.unsupportedError(e)
           .addContext(String.format("Table: %s, document id: '%s'",
               getTable().getPath(),
@@ -85,9 +83,6 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
       }
     }
     finally {
-      if (dstream != null) {
-        dstream.close();
-      }
       vectorWriter.setPosition(0);
     }
   }
@@ -113,12 +108,13 @@ public class RestrictedJsonRecordReader extends MaprDBJsonRecordReader {
     Table table = super.formatPlugin.getJsonTableCache().getTable(subScanSpec.getTableName(), subScanSpec.getUserName());
     int idx = 0;
     String [] projections = null;
+    FieldPath[] scannedFields = this.getScannedFields();
 
     // only populate projections for non-star query (for star, null is interpreted as all fields)
-    if (!this.isStarQuery()) {
-      projections = new String[this.getColumns().size()];
-      for (SchemaPath path : this.getColumns()) {
-        projections[idx] = FieldPathHelper.schemaPath2FieldPath(path).asPathString();
+    if (!this.isStarQuery() && scannedFields != null && scannedFields.length > 0) {
+      projections = new String[scannedFields.length];
+      for (FieldPath path : scannedFields) {
+        projections[idx] = path.asPathString();
         ++idx;
       }
     }
