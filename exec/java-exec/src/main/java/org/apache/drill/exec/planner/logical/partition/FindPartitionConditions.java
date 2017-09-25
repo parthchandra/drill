@@ -195,8 +195,16 @@ public class FindPartitionConditions extends RexVisitorImpl<Void> {
          * For all other operators we clear the children if one of the
          * children is a no push.
          */
-        assert currentOp.getOp().getKind() == SqlKind.AND;
-        newFilter = currentOp.getChildren().get(0);
+        if (currentOp.getOp().getKind() == SqlKind.AND) {
+          newFilter = currentOp.getChildren().get(0);
+          for(OpState opState : opStack) {
+            if (opState.getOp().getKind() == SqlKind.NOT) {
+              //AND under NOT should not get pushed
+              newFilter = null;
+            }
+          }
+
+        }
       } else {
         newFilter = builder.makeCall(currentOp.getOp(), currentOp.getChildren());
       }
