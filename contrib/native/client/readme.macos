@@ -44,7 +44,7 @@ Install Prerequisites
 2.2) Install zookeeper
   $> brew install zookeeper
 
-2.3) Install or  Cyrus SASL 
+2.3) Install or build Cyrus SASL 
    To Install (need macports, brew did not work for me)
        port install cyrus-sasl2
 

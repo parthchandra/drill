@@ -173,7 +173,8 @@ typedef enum{
 #define USERPROP_USESSL   "enableTLS"
 #define USERPROP_TLSPROTOCOL "TLSProtocol" //TLS version
 #define USERPROP_CERTFILEPATH "certFilePath" // pem file path and name
-#define USERPROP_CERTPASSWORD "certPassword" // Password for certificate file
+// TODO: support truststore protected by password. 
+// #define USERPROP_CERTPASSWORD "certPassword" // Password for certificate file. 
 #define USERPROP_DISABLE_HOSTVERIFICATION "disableHostVerification"
 #define USERPROP_DISABLE_CERTVERIFICATION "disableCertVerification"
 #define USERPROP_USESYSTEMTRUSTSTORE "useSystemTrustStore" //Windows only, use the system trust store

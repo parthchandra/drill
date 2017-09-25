@@ -84,7 +84,7 @@ OR
     ln -svf libboost_filesystem.a libboost_filesystem-mt.a
     ln -svf libboost_date_time.a libboost_date_time-mt.a
 
-5) Install or  Cyrus SASL 
+5) Install or  build Cyrus SASL 
    To Install 
        yum install cyrus-sasl-devel
        yum install cyrus-sasl-gssapi
