@@ -62,6 +62,9 @@ public class MapRDBTableCache {
       RemovalListener<MapRDBTableCache.Key, Table> removalListener = new RemovalListener<MapRDBTableCache.Key, Table>() {
         public void onRemoval(RemovalNotification<MapRDBTableCache.Key, Table> removal) {
           Table table = removal.getValue();
+          MapRDBTableCache.Key key = removal.getKey();
+          logger.debug("time {} closing the table {} index {}", System.nanoTime(),
+              key.path == null ? "null" : key.path, key.indexDesc == null ? "null" : key.indexDesc.getIndexName());
           table.close(); // close the table
         }
       };
@@ -77,6 +80,8 @@ public class MapRDBTableCache {
         public Table load(final MapRDBTableCache.Key key) throws Exception {
           // getTable is already calling tableCache.get in correct user UGI context, so should be fine here.
           // key.Left is Path. key.Right is indexDesc.
+          logger.debug("time {} opening the table for {} index {}", System.nanoTime(),
+              key.path == null ? "null" : key.path, key.indexDesc == null ? "null" : key.indexDesc.getIndexName());
           return (key.indexDesc == null) ? MapRDBImpl.getTable(key.path) : MapRDBImpl.getIndexTable(key.indexDesc);
         }
       });
@@ -108,6 +113,8 @@ public class MapRDBTableCache {
           }
 
           if (tableCachingEnabled) {
+            logger.debug("time {} get the table handle {} index {}", System.nanoTime(), tablePath == null ? "null" : tablePath,
+                indexDesc == null ? "null" : indexDesc.getIndexName());
             return tableCache.get(new MapRDBTableCache.Key(tablePath, indexDesc));
           } else {
             return indexDesc == null ? MapRDBImpl.getTable(tablePath) : MapRDBImpl.getIndexTable(indexDesc);
