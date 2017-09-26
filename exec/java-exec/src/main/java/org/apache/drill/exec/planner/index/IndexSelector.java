@@ -35,6 +35,7 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.planner.common.DrillJoinRelBase;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
 import org.apache.drill.exec.planner.cost.PluginCost;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -697,7 +698,7 @@ public class IndexSelector  {
 
     public RexNode getLeadingColumnsFilter() {
       if (leadingFilters.size() > 0) {
-        RexNode leadingColumnsFilter = RexUtil.composeConjunction(rexBuilder, leadingFilters, false);
+        RexNode leadingColumnsFilter = DrillRelOptUtil.composeConjunction(rexBuilder, leadingFilters, false);
         return leadingColumnsFilter;
       }
       return null;
@@ -708,7 +709,7 @@ public class IndexSelector  {
         List<RexNode> operands = Lists.newArrayList();
         operands.add(indexColumnsRemainderFilter);
         operands.add(otherColumnsRemainderFilter);
-        RexNode totalRemainder = RexUtil.composeConjunction(rexBuilder, operands, false);
+        RexNode totalRemainder = DrillRelOptUtil.composeConjunction(rexBuilder, operands, false);
         return totalRemainder;
       } else if (indexColumnsRemainderFilter != null) {
         return indexColumnsRemainderFilter;
@@ -758,7 +759,7 @@ public class IndexSelector  {
       for (IndexProperties indexProps : index.getIndexProps()) {
         remFilterList.add(indexProps.getTotalRemainderFilter());
       }
-      remFilters = RexUtil.composeConjunction(scanRel.getCluster().getRexBuilder(), remFilterList, false);
+      remFilters = DrillRelOptUtil.composeConjunction(scanRel.getCluster().getRexBuilder(), remFilterList, false);
 
       for (IndexProperties indexProps : index.getIndexProps()) {
         totalRows = indexProps.getTotalRows();

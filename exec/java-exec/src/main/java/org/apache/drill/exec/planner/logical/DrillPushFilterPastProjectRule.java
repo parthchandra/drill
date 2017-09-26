@@ -65,7 +65,7 @@ public class DrillPushFilterPastProjectRule extends RelOptRule {
       }
     }
 
-    final RexNode qualifedPred =RexUtil.composeConjunction(filterRel.getCluster().getRexBuilder(), qualifiedPredList, true);
+    final RexNode qualifedPred =DrillRelOptUtil.composeConjunction(filterRel.getCluster().getRexBuilder(), qualifiedPredList, true);
 
     if (qualifedPred == null) {
       return;
@@ -83,7 +83,7 @@ public class DrillPushFilterPastProjectRule extends RelOptRule {
             projRel.getNamedProjects(),
             false);
 
-    final RexNode unqualifiedPred = RexUtil.composeConjunction(filterRel.getCluster().getRexBuilder(), unqualifiedPredList, true);
+    final RexNode unqualifiedPred = DrillRelOptUtil.composeConjunction(filterRel.getCluster().getRexBuilder(), unqualifiedPredList, true);
 
     if (unqualifiedPred == null) {
       call.transformTo(newProjRel);

@@ -18,22 +18,35 @@
 package org.apache.drill.exec.planner.common;
 
 import java.util.AbstractList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Project;
-import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rel.rules.ProjectRemoveRule;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
+import org.apache.calcite.rex.RexCorrelVariable;
+import org.apache.calcite.rex.RexDynamicParam;
+import org.apache.calcite.rex.RexFieldAccess;
 import org.apache.calcite.rex.RexInputRef;
+import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexLocalRef;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.rex.RexOver;
+import org.apache.calcite.rex.RexRangeRef;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.rex.RexVisitor;
 import org.apache.calcite.rex.RexVisitorImpl;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlValidatorUtil;
 import org.apache.calcite.util.Pair;
@@ -223,4 +236,211 @@ public abstract class DrillRelOptUtil {
     }
   }
 
+  /**
+   * Converts a collection of expressions into an AND.
+   * If there are zero expressions, returns TRUE.
+   * If there is one expression, returns just that expression.
+   * Removes expressions that always evaluate to TRUE.
+   * Returns null only if {@code nullOnEmpty} and expression is TRUE.
+   * @deprecated Will be superseded by {@link RexUtil} methods post migration to latest Calcite version
+   */
+  @Deprecated
+  public static RexNode composeConjunction(RexBuilder rexBuilder,
+                                           Iterable<? extends RexNode> nodes, boolean nullOnEmpty) {
+    ImmutableList<RexNode> list = flattenAnd(nodes);
+    switch (list.size()) {
+      case 0:
+        return nullOnEmpty
+            ? null
+            : rexBuilder.makeLiteral(true);
+      case 1:
+        return list.get(0);
+      default:
+        return rexBuilder.makeCall(SqlStdOperatorTable.AND, list);
+    }
+  }
+
+  /**
+   * Flattens a list of AND nodes.
+   * <p>Treats null nodes as literal TRUE (i.e. ignores them).
+   * @param nodes
+   * @return
+   * @deprecated Will be superseded by {@link RexUtil} methods post migration to latest Calcite version
+   */
+  /** Flattens a list of AND nodes.
+   *
+   * <p>Treats null nodes as literal TRUE (i.e. ignores them). */
+  @Deprecated
+  public static ImmutableList<RexNode> flattenAnd(
+      Iterable<? extends RexNode> nodes) {
+    boolean flatten = flattenIsValid(nodes);
+    if (nodes instanceof Collection && ((Collection) nodes).isEmpty()) {
+      // Optimize common case
+      return ImmutableList.of();
+    }
+    final ImmutableList.Builder<RexNode> builder = ImmutableList.builder();
+    final Set<String> digests = Sets.newHashSet(); // to eliminate duplicates
+    for (RexNode node : nodes) {
+      if (node != null && (!flatten || digests.add(node.toString()))) {
+        addAnd(builder, node);
+      }
+    }
+    return builder.build();
+  }
+
+  @Deprecated
+  private static void addAnd(ImmutableList.Builder<RexNode> builder,
+                             RexNode node) {
+    switch (node.getKind()) {
+      case AND:
+        for (RexNode operand : ((RexCall) node).getOperands()) {
+          addAnd(builder, operand);
+        }
+        return;
+      default:
+        if (!node.isAlwaysTrue()) {
+          builder.add(node);
+        }
+    }
+  }
+
+  /**
+   * Converts a collection of expressions into an OR.
+   * If there are zero expressions, returns FALSE.
+   * If there is one expression, returns just that expression.
+   * Removes expressions that always evaluate to FALSE.
+   * Flattens expressions that are ORs.
+   * @deprecated Will be superseded by {@link RexUtil} methods post migration to latest Calcite version
+   */
+  @Deprecated
+  public static RexNode composeDisjunction(RexBuilder rexBuilder,
+                                           Iterable<? extends RexNode> nodes, boolean nullOnEmpty) {
+    ImmutableList<RexNode> list = flattenOr(nodes);
+    switch (list.size()) {
+      case 0:
+        return nullOnEmpty
+            ? null
+            : rexBuilder.makeLiteral(false);
+      case 1:
+        return list.get(0);
+      default:
+        return rexBuilder.makeCall(SqlStdOperatorTable.OR, list);
+    }
+  }
+
+  /**
+   * Flattens a list of OR nodes.
+   * <p>Treats null nodes as literal TRUE (i.e. ignores them).
+   * @param nodes
+   * @return
+   * @deprecated Will be superseded by {@link RexUtil} methods post migration to latest Calcite version
+   */
+  @Deprecated
+  public static ImmutableList<RexNode> flattenOr(
+      Iterable<? extends RexNode> nodes) {
+    boolean flatten = flattenIsValid(nodes);
+    if (nodes instanceof Collection && ((Collection) nodes).isEmpty()) {
+      // Optimize common case
+      return ImmutableList.of();
+    }
+    final ImmutableList.Builder<RexNode> builder = ImmutableList.builder();
+    final Set<String> digests = Sets.newHashSet(); // to eliminate duplicates
+    for (RexNode node : nodes) {
+      if (node != null && (!flatten || digests.add(node.toString()))) {
+        addOr(builder, node);
+      }
+    }
+    return builder.build();
+  }
+
+  @Deprecated
+  private static void addOr(ImmutableList.Builder<RexNode> builder,
+                            RexNode node) {
+    switch (node.getKind()) {
+      case OR:
+        for (RexNode operand : ((RexCall) node).getOperands()) {
+          addOr(builder, operand);
+        }
+        return;
+      default:
+        if (!node.isAlwaysFalse()) {
+          builder.add(node);
+        }
+    }
+  }
+
+  @Deprecated
+  private static boolean flattenIsValid(Iterable<? extends RexNode> nodes) {
+    FlattenValidityRexVisitor visitor = new FlattenValidityRexVisitor();
+    for (RexNode node : nodes) {
+      node.accept(visitor);
+    }
+    return visitor.isFlattenValid();
+  }
+
+  private static class FlattenValidityRexVisitor extends RexVisitorImpl<RexNode> {
+
+    protected boolean isFlattenValid = true;
+
+    public FlattenValidityRexVisitor() {
+      super(true);
+    }
+
+    public boolean isFlattenValid() {
+      return isFlattenValid;
+    }
+
+    @Override
+    public RexNode visitInputRef(RexInputRef inputRef) {
+      return inputRef;
+    }
+
+    @Override
+    public RexNode visitLocalRef(RexLocalRef localRef) {
+      return localRef;
+    }
+
+    @Override
+    public RexNode visitLiteral(RexLiteral literal) {
+      if (literal.getTypeName() == SqlTypeName.TIME
+          || literal.getTypeName() == SqlTypeName.TIMESTAMP) {
+        isFlattenValid = false;
+      }
+      return literal;
+    }
+
+    @Override
+    public RexNode visitOver(RexOver over) {
+      return over;
+    }
+
+    @Override
+    public RexNode visitCorrelVariable(RexCorrelVariable correlVariable) {
+      return correlVariable;
+    }
+
+    @Override
+    public RexNode visitCall(RexCall call) {
+
+      for (RexNode operand : call.operands) {
+        operand.accept(this);
+      }
+      return call;
+    }
+
+    @Override
+    public RexNode visitDynamicParam(RexDynamicParam dynamicParam) {
+      return dynamicParam;
+    }
+
+    @Override
+    public RexNode visitRangeRef(RexRangeRef rangeRef) {
+      return rangeRef;
+    }
+
+    @Override
+    public RexNode visitFieldAccess(RexFieldAccess fieldAccess) {
+      return fieldAccess;
+    }
+  }
 }

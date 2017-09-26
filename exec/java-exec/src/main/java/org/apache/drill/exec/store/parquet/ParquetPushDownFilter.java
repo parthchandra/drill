@@ -132,7 +132,7 @@ public abstract class ParquetPushDownFilter extends StoragePluginOptimizerRule {
       }
     }
 
-    final RexNode qualifedPred = RexUtil.composeConjunction(filter.getCluster().getRexBuilder(), qualifiedPredList, true);
+    final RexNode qualifedPred = DrillRelOptUtil.composeConjunction(filter.getCluster().getRexBuilder(), qualifiedPredList, true);
 
     if (qualifedPred == null) {
       return;

@@ -35,6 +35,7 @@ import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 import org.apache.drill.exec.planner.logical.DrillMergeProjectRule;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.physical.FilterPrel;
@@ -116,7 +117,7 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       List<RexNode> conditions = new ArrayList<RexNode>();
       conditions.add(indexCondition);
       conditions.add(remainderCondition);
-      coveringCondition = RexUtil.composeConjunction(indexScanPrel.getCluster().getRexBuilder(), conditions, true);
+      coveringCondition = DrillRelOptUtil.composeConjunction(indexScanPrel.getCluster().getRexBuilder(), conditions, true);
     }
     RexNode newIndexCondition =
         rewriteFunctionalCondition(coveringCondition, indexScanPrel.getRowType(), functionInfo);

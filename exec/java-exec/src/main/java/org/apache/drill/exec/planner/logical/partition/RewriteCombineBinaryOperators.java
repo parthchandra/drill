@@ -36,6 +36,7 @@ import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.rex.RexVisitorImpl;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -85,14 +86,14 @@ import java.util.List;
       for (RexNode child : call.getOperands()) {
         conjuncts.addAll(RelOptUtil.conjunctions(child.accept(this)));
       }
-      return RexUtil.composeConjunction(builder, conjuncts, true);
+      return DrillRelOptUtil.composeConjunction(builder, conjuncts, true);
     }
     if (kind == SqlKind.OR) {
       List<RexNode> disjuncts = Lists.newArrayList();
       for (RexNode child : call.getOperands()) {
         disjuncts.addAll(RelOptUtil.disjunctions(child.accept(this)));
       }
-      return RexUtil.composeDisjunction(builder, disjuncts, true);
+      return DrillRelOptUtil.composeDisjunction(builder, disjuncts, true);
     }
     return builder.makeCall(type, op, visitChildren(call));
   }

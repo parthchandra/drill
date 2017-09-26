@@ -37,6 +37,7 @@ import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.util.trace.CalciteTrace;
 
 import com.google.common.collect.Lists;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 
 /**
  * Rule that converts a {@link org.apache.calcite.rel.logical.LogicalJoin} to a {@link DrillJoinRel}, which is implemented by Drill "join" operation.
@@ -118,6 +119,6 @@ public class DrillJoinRule extends RelOptRule {
            builder.makeInputRef(rightTypes.get(rightKeyOrdinal).getType(), rightKeyOrdinal + numLeftFields)
       ));
     }
-    return RexUtil.composeConjunction(builder, equijoinList, false);
+    return DrillRelOptUtil.composeConjunction(builder, equijoinList, false);
   }
 }

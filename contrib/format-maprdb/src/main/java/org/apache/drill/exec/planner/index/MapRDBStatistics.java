@@ -38,6 +38,7 @@ import org.apache.drill.common.expression.ExpressionStringBuilder;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
@@ -547,13 +548,13 @@ public class MapRDBStatistics implements Statistics {
       for(RexNode pred : RelOptUtil.conjunctions(condition)) {
         conditions.add(convertToStatsCondition(pred, index, context, scanRel, typesToProcess));
       }
-      return RexUtil.composeConjunction(builder, conditions, false);
+      return DrillRelOptUtil.composeConjunction(builder, conditions, false);
     } else if (condition.getKind() == SqlKind.OR) {
       final List<RexNode> conditions = Lists.newArrayList();
       for(RexNode pred : RelOptUtil.disjunctions(condition)) {
         conditions.add(convertToStatsCondition(pred, index, context, scanRel, typesToProcess));
       }
-      return RexUtil.composeDisjunction(builder, conditions, false);
+      return DrillRelOptUtil.composeDisjunction(builder, conditions, false);
     } else if (condition instanceof RexCall) {
       // LIKE operator - convert to a RANGE predicate, if possible
       if (typesToProcess.contains(SqlKind.LIKE)

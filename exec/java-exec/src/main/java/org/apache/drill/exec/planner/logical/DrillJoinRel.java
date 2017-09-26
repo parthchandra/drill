@@ -37,6 +37,7 @@ import org.apache.drill.common.logical.data.JoinCondition;
 import org.apache.drill.common.logical.data.LogicalOperator;
 import org.apache.drill.common.logical.data.Project;
 import org.apache.drill.exec.planner.common.DrillJoinRelBase;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 import org.apache.drill.exec.planner.common.JoinControl;
 import org.apache.drill.exec.planner.torel.ConversionContext;
 
@@ -156,7 +157,7 @@ public class DrillJoinRel extends DrillJoinRelBase implements DrillRel {
                 )
                 );
     }
-    RexNode rexCondition = RexUtil.composeConjunction(context.getRexBuilder(), joinConditions, false);
+    RexNode rexCondition = DrillRelOptUtil.composeConjunction(context.getRexBuilder(), joinConditions, false);
     DrillJoinRel joinRel = new DrillJoinRel(context.getCluster(), context.getLogicalTraits(), left, right, rexCondition, join.getJoinType());
 
     return joinRel;

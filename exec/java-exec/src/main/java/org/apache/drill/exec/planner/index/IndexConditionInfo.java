@@ -29,6 +29,7 @@ import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.util.Pair;
 import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
 import org.apache.drill.exec.planner.logical.partition.RewriteCombineBinaryOperators;
 
@@ -253,7 +254,7 @@ public class IndexConditionInfo {
         RexUtil.removeAll(conjuncts, indexConjunction);
       }
 
-      RexNode remainderCondition = RexUtil.composeConjunction(builder, conjuncts, false);
+      RexNode remainderCondition = DrillRelOptUtil.composeConjunction(builder, conjuncts, false);
 
       indexCondition = indexCondition.accept(reverseVisitor);
 

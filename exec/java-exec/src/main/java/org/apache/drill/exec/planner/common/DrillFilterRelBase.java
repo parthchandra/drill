@@ -89,7 +89,7 @@ public abstract class DrillFilterRelBase extends Filter implements DrillRelNode 
     double compNum = mq.getRowCount(child);
 
     for (int i = 0; i< numConjuncts; i++) {
-      RexNode conjFilter = RexUtil.composeConjunction(this.getCluster().getRexBuilder(), conjunctions.subList(0, i + 1), false);
+      RexNode conjFilter = DrillRelOptUtil.composeConjunction(this.getCluster().getRexBuilder(), conjunctions.subList(0, i + 1), false);
       compNum += Filter.estimateFilteredRows(child, conjFilter);
     }
 
