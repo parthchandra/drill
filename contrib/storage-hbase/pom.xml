@@ -20,7 +20,7 @@
   <parent>
     <artifactId>drill-contrib-parent</artifactId>
     <groupId>org.apache.drill.contrib</groupId>
-    <version>1.11.0-sidev-SNAPSHOT</version>
+    <version>1.11.0-mapr</version>
   </parent>
 
   <artifactId>drill-storage-hbase</artifactId>

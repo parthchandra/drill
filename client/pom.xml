@@ -19,7 +19,7 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>org.apache.drill</groupId>
-  <version>1.11.0-sidev-SNAPSHOT</version>
+  <version>1.11.0-mapr</version>
   <artifactId>drill-client</artifactId>
   <packaging>jar</packaging>
 
