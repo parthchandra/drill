@@ -18,6 +18,7 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
+#include <strstream>
 
 #include "drill/drillConfig.hpp"
 #include "drill/drillError.hpp"
@@ -59,6 +60,7 @@ connectionStatus_t ConnectionEndpoint::getDrillbitEndpoint(){
         }
         if(isZookeeperConnection()){
             if((ret=getDrillbitEndpointFromZk())!=CONN_SUCCESS){
+                DRILL_LOG(LOG_INFO) << "Failed to get endpoint from zk" << std::endl;
                 return ret;
             }
         }else if(!this->isDirectConnection()){
@@ -73,39 +75,36 @@ connectionStatus_t ConnectionEndpoint::getDrillbitEndpoint(){
 }
 
 void ConnectionEndpoint::parseConnectString(){
-    boost::regex connStrExpr("(.*)=(.*):([0-9]+)(?:/(.+))?");
+    boost::regex connStrExpr("(.*)=(((.*):([0-9]+),?)+)(/.+)?");
     boost::cmatch matched;
 
     if(boost::regex_match(m_connectString.c_str(), matched, connStrExpr)){
         m_protocol.assign(matched[1].first, matched[1].second);
-        std::string host, port;
-        host.assign(matched[2].first, matched[2].second);
-        port.assign(matched[3].first, matched[3].second);
         if(isDirectConnection()){
-            // if the connection is to a zookeeper, 
+            m_host.assign(matched[4].first, matched[4].second);
+            m_port.assign(matched[5].first, matched[5].second);
+        }else {
+            // if the connection is to a zookeeper,
             // we will get the host and the port only after connecting to the Zookeeper
-            m_host=host;
-            m_port=port;
+            m_host = "";
+            m_port = "";
         }
-        m_hostPortStr=host+std::string(":")+port;
-        std::string pathToDrill;
-        if(matched.size()==5){
-            pathToDrill.assign(matched[4].first, matched[4].second);
-            if(!pathToDrill.empty()){
-                m_pathToDrill=std::string("/")+pathToDrill;
-            }
+        m_hostPortStr.assign(matched[2].first, matched[2].second);
+        if(matched[6].matched) {
+            m_pathToDrill.assign(matched[6].first, matched[6].second);
         }
-        DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) 
-                << "Conn str: "<< m_connectString 
-                << ";  protocol: " << m_protocol 
-                << ";  host: " << host 
-                << "; port: " << port 
-                << ";  path to drill: " << m_pathToDrill 
-                << std::endl;)
+        std::ostrstream debugstr;
+        debugstr
+            << "Conn str: "<< m_connectString
+            << ";  protocol: " << m_protocol
+            << ";  host: " << m_host
+            << ";  port: " << m_port
+            << ";  path to drill: " << m_pathToDrill
+            << std::endl;
+        DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << debugstr; )
     } else {
         DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << "Invalid connect string. Regexp did not match" << std::endl;)
     }
-
     return;
 }
 
@@ -145,6 +144,7 @@ connectionStatus_t ConnectionEndpoint::handleError(connectionStatus_t status, st
     DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
     if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
     m_pError=pErr;
+    DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Error getting drillbit endpoint:" << pErr->msg << std::endl;)
     return status;
 }
 
@@ -340,6 +340,7 @@ connectionStatus_t Channel::handleError(connectionStatus_t status, std::string m
     DrillClientError* pErr = new DrillClientError(status, DrillClientError::CONN_ERROR_START+status, msg);
     if(m_pError!=NULL){ delete m_pError; m_pError=NULL;}
     m_pError=pErr;
+    DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Error connecting:" << pErr->msg << std::endl;)
     return status;
 }
 
@@ -362,11 +363,12 @@ connectionStatus_t Channel::connectInternal() {
         if (ec) {
             return handleError(CONN_FAILURE, getMessage(ERR_CONN_FAILURE, host, port, ec.message().c_str()));
         }
-    } catch (std::exception e) {
+    } catch (boost::system::system_error e) {
         // Handle case when the hostname cannot be resolved. "resolve" is hard-coded in boost asio resolver.resolve
-        if (!strcmp(e.what(), "resolve")) {
+        if (!strncmp(e.what(), "resolve", 7)) {
             return handleError(CONN_HOSTNAME_RESOLUTION_ERROR, getMessage(ERR_CONN_EXCEPT, e.what()));
         }
+    } catch (std::exception e) {
         return handleError(CONN_FAILURE, getMessage(ERR_CONN_EXCEPT, e.what()));
     }
 
@@ -382,7 +384,7 @@ connectionStatus_t Channel::connectInternal() {
 
     std::string useSystemTrustStore;
     m_pContext->getUserProperties()->getProp(USERPROP_USESYSTEMTRUSTSTORE, useSystemTrustStore);
-
+    DRILL_LOG(LOG_TRACE) << "Connected" << std::endl;
     return this->protocolHandshake(useSystemTrustStore=="true");
 
 }
