@@ -371,11 +371,11 @@ public class IndexPlanUtils {
   }
   /**
    * Build collation property for project, the one closer to the Scan
-   * @param projectRexs
-   * @param project, the project between projectRexs and input, it could be null if no such intermediate project(lower project)
-   * @param input
-   * @param indexInfo
-   * @param context
+   * @param projectRexs the expressions to project
+   * @param project the project between projectRexs and input, it could be null if no such intermediate project(lower project)
+   * @param input  the input RelNode to the project, usually it is the scan operator.
+   * @param indexInfo the index for which we are building index plan
+   * @param context the context of this index planning process
    * @return the output RelCollation
    */
   public static RelCollation buildCollationProject(List<RexNode> projectRexs,
@@ -383,15 +383,25 @@ public class IndexPlanUtils {
                                                    RelNode input,
                                                    FunctionalIndexInfo indexInfo,
                                                    IndexPlanCallContext context) {
+    Map<LogicalExpression, Integer> projectExprs = getProjectExprs(projectRexs, project, input);
+    return buildCollationForExpressions(projectExprs, indexInfo.getIndexDesc(), context);
+  }
 
-    final List<LogicalExpression> sortExpressions = context.sortExprs;
-    //if leading fields of index are here, add them to RelCollation
-    List<RelFieldCollation> newFields = Lists.newArrayList();
+  /**
+   * Build the collation property for index scan
+   * @param indexDesc the index for which we are building index plan
+   * @param context the context of this index planning process
+   * @return the output RelCollation for the scan on index
+   */
+  public static RelCollation buildCollationCoveringIndexScan(IndexDescriptor indexDesc,
+      IndexPlanCallContext context) {
+    Map<LogicalExpression, Integer> rowTypeExprs = getExprsFromRowType(context.scan.getRowType());
+    return buildCollationForExpressions(rowTypeExprs, indexDesc, context);
+  }
 
-    if (sortExpressions == null) {
-      return RelCollations.of(newFields);
-    }
-
+  public static Map<LogicalExpression, Integer> getProjectExprs(List<RexNode> projectRexs,
+                                                                DrillProjectRel project,
+                                                                RelNode input) {
     Map<LogicalExpression, Integer> projectExprs = Maps.newLinkedHashMap();
     DrillParseContext parserContext = new DrillParseContext(PrelUtil.getPlannerSettings(input.getCluster()));
     int idx=0;
@@ -401,21 +411,53 @@ public class IndexPlanUtils {
       projectExprs.put(expr, idx);
       idx++;
     }
+    return projectExprs;
+  }
 
-    //go through indexed fields to build collation
+  public static Map<LogicalExpression, Integer> getExprsFromRowType( RelDataType indexScanRowType) {
+
+    Map<LogicalExpression, Integer> rowTypeExprs = Maps.newLinkedHashMap();
+    int idx = 0;
+    for (RelDataTypeField field : indexScanRowType.getFieldList()) {
+      rowTypeExprs.put(FieldReference.getWithQuotedRef(field.getName()), idx++);
+    }
+    return rowTypeExprs;
+  }
+
+  /**
+   * Given index, compute the collations for a list of projected expressions(from Scan's rowType or Project's )
+   * in the context
+   * @param projectExprs the output expression list of a RelNode
+   * @param indexDesc  the index for which we are building index plan
+   * @param context  the context of this index planning process
+   * @return the collation provided by index that will be exposed by the expression list
+   */
+  public static RelCollation buildCollationForExpressions(Map<LogicalExpression, Integer> projectExprs,
+                                                        IndexDescriptor indexDesc,
+                                                        IndexPlanCallContext context) {
+
+    assert projectExprs != null;
+    final List<LogicalExpression> sortExpressions = context.sortExprs;
+    // if leading fields of index are here, add them to RelCollation
+    List<RelFieldCollation> newFields = Lists.newArrayList();
+    if (sortExpressions == null) {
+      return RelCollations.of(newFields);
+    }
+
+    // go through indexed fields to build collation
     // break out of the loop when found first indexed field [not projected && not _only_ in equality condition of filter]
     // or the leading field is not projected
-    List<LogicalExpression> indexedCols = indexInfo.getIndexDesc().getIndexColumns();
+    List<LogicalExpression> indexedCols = indexDesc.getIndexColumns();
     for (int idxFieldCount=0; idxFieldCount<indexedCols.size(); ++idxFieldCount) {
       LogicalExpression expr = indexedCols.get(idxFieldCount);
 
       if (!projectExprs.containsKey(expr)) {
-        //leading indexed field is not projected
-        //but it is only-in-equality field, -- we continue to next indexed field, but we don't generate collation for this field
+        // leading indexed field is not projected
+        // but it is only-in-equality field, -- we continue to next indexed field, but we don't generate collation for this field
         if(exprOnlyInEquality(expr, context)) {
           continue;
         }
-        //else no more collation is needed to be generated, since we now have one leading field which is not in equality condition
+        // else no more collation is needed to be generated, since we now have one leading field which is not in equality condition
         break;
       }
 
@@ -427,7 +469,7 @@ public class IndexPlanUtils {
         continue;
       }
 
-      RelCollation idxCollation = indexInfo.getIndexDesc().getCollation();
+      RelCollation idxCollation = indexDesc.getCollation();
       RelFieldCollation.Direction dir = (idxCollation == null)?
           null : idxCollation.getFieldCollations().get(idxFieldCount).direction;
       if ( dir == null) {
@@ -443,50 +485,6 @@ public class IndexPlanUtils {
   // TODO: proper implementation
   public static boolean pathOnlyInIndexedFunction(SchemaPath path) {
     return true;
-  }
-
-  /**
-   * Build the collation property for the index scan
-   * @param indexDesc
-   * @param indexScanRowType
-   * @return the output RelCollation
-   */
-  public static RelCollation buildCollationCoveringIndexScan(IndexDescriptor indexDesc,
-      RelDataType indexScanRowType) {
-
-    final List<RelDataTypeField> indexFields = indexScanRowType.getFieldList();
-
-    // The collationMap has SchemaPath as key.  This works fine for top level JSON fields.  For
-    // nested JSON fields e.g a.b.c, the Project above the Scan will create an ITEM expr to produce
-    // the field, so the RelCollation property has to be build separately for that Project.
-    final Map<LogicalExpression, RelFieldCollation> collationMap = indexDesc.getCollationMap();
-
-    assert collationMap != null : "Invalid collation map for index";
-
-    List<RelFieldCollation> fieldCollations = Lists.newArrayList();
-    Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newTreeMap();
-
-    for (int i = 0; i < indexScanRowType.getFieldCount(); i++) {
-      RelDataTypeField f1 = indexFields.get(i);
-      FieldReference ref = FieldReference.getWithQuotedRef(f1.getName());
-      RelFieldCollation origCollation = collationMap.get(ref);
-      if (origCollation != null) {
-        RelFieldCollation fc = new RelFieldCollation(i, //origCollation.getFieldIndex(),
-            origCollation.direction, origCollation.nullDirection);
-        rsScanCollationMap.put(origCollation.getFieldIndex(), fc);
-        //fieldCollations.add(fc);
-      }
-    }
-    //should sort by the order of these fields in indexDesc
-    for (Map.Entry<Integer, RelFieldCollation> entry : rsScanCollationMap.entrySet()) {
-      RelFieldCollation fc = entry.getValue();
-      if (fc != null) {
-        fieldCollations.add(fc);
-      }
-    }
-
-    final RelCollation collation = RelCollations.of(fieldCollations);
-    return collation;
   }
 
   public static RelCollation buildCollationNonCoveringIndexScan(IndexDescriptor indexDesc,
@@ -521,7 +519,7 @@ public class IndexPlanUtils {
       }
     }
 
-    //should sort by the order of these fields in indexDesc
+    // should sort by the order of these fields in indexDesc
     for (Map.Entry<Integer, RelFieldCollation> entry : rsScanCollationMap.entrySet()) {
       RelFieldCollation fc = entry.getValue();
       if (fc != null) {
@@ -559,7 +557,7 @@ public class IndexPlanUtils {
     // Create the collation traits for index scan based on the index columns under the
     // condition that the index actually has collation property (e.g hash indexes don't)
     if (indexDesc.getCollation() != null) {
-      RelCollation collationTrait = buildCollationCoveringIndexScan(indexDesc, newRowType);
+      RelCollation collationTrait = buildCollationCoveringIndexScan(indexDesc, indexContext);
       indexScanTraitSet = indexScanTraitSet.plus(collationTrait);
     }
 
@@ -590,11 +588,11 @@ public class IndexPlanUtils {
         continue;
       }
 
-      //if this path only in indexed function, we are safe to replace it
+      // if this path only in indexed function, we are safe to replace it
       if(pathOnlyInIndexedFunction(paths.get(i))) {
         newPaths.set(i, newPath);
       }
-      else {//we should not replace this column, instead we add a new "$N" field.
+      else {// we should not replace this column, instead we add a new "$N" field.
         newPaths.add(newPath);
       }
     }
@@ -644,8 +642,8 @@ public class IndexPlanUtils {
     expr.accept(exprSearch, null);
     Set<LogicalExpression> remainderPaths = exprSearch.getRemainderPaths();
 
-    //now build the rex->logical expression map for SimpleRexRemap
-    //left out schema paths
+    // now build the rex->logical expression map for SimpleRexRemap
+    // left out schema paths
     Map<LogicalExpression, Set<RexNode>> exprToRex = rexToDrill.getMapExprToRex();
     final Map<RexNode, LogicalExpression> mapRexExpr = Maps.newHashMap();
     for (LogicalExpression leftExpr: remainderPaths) {
@@ -657,7 +655,7 @@ public class IndexPlanUtils {
       }
     }
 
-    //functional expressions e.g. cast(a.b as int)
+    // functional expressions e.g. cast(a.b as int)
     for (LogicalExpression functionExpr: functionInfo.getExprMap().keySet()) {
       if (exprToRex.containsKey(functionExpr)) {
         Set<RexNode> rexs = exprToRex.get(functionExpr);
