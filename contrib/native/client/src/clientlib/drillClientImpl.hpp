@@ -401,8 +401,11 @@ class DrillClientImpl : public DrillClientImplBase{
     };
 
         ~DrillClientImpl(){
-            //Free any record batches or buffers remaining
             //Cancel any pending requests
+            m_heartbeatTimer.cancel();
+            m_deadlineTimer.cancel();
+            m_io_service.stop();
+            //Free any record batches or buffers remaining
             //Clear and destroy DrillClientQueryResults vector?
             if(this->m_pWork!=NULL){
                 delete this->m_pWork;
@@ -412,19 +415,19 @@ class DrillClientImpl : public DrillClientImplBase{
                 delete this->m_saslAuthenticator;
                 this->m_saslAuthenticator = NULL;
             }
-            if(this->m_pChannel!=NULL){
-                m_pChannel->close();
-                delete this->m_pChannel;
-                this->m_pChannel = NULL;
-            }
-            if(this->m_pChannelContext!=NULL){
-                delete this->m_pChannelContext;
-                this->m_pChannelContext = NULL;
+            {
+                boost::lock_guard<boost::mutex> lock(m_channelMutex);
+                if (this->m_pChannel != NULL) {
+                    m_pChannel->close();
+                    delete this->m_pChannel;
+                    this->m_pChannel = NULL;
+                }
+                if (this->m_pChannelContext != NULL) {
+                    delete this->m_pChannelContext;
+                    this->m_pChannelContext = NULL;
+                }
             }
 
-            m_heartbeatTimer.cancel();
-            m_deadlineTimer.cancel();
-            m_io_service.stop();
             if(m_rbuf!=NULL){
                 Utils::freeBuffer(m_rbuf, MAX_SOCK_RD_BUFSIZE); m_rbuf=NULL;
             }
@@ -613,8 +616,12 @@ class DrillClientImpl : public DrillClientImplBase{
         boost::asio::io_service m_io_service;
         // the work object prevent io_service running out of work
         boost::asio::io_service::work * m_pWork;
+
+        // Mutex to protect channel
+        boost::mutex m_channelMutex;
         Channel* m_pChannel;
         ChannelContext_t* m_pChannelContext;
+
         boost::asio::deadline_timer m_deadlineTimer; // to timeout async queries that never return
         boost::asio::deadline_timer m_heartbeatTimer; // to send heartbeat messages
 

@@ -213,7 +213,15 @@ void DrillClientImpl::doWriteToSocket(const char* dataPtr, size_t bytesToWrite,
     // Write all the bytes to socket. In case of error when all bytes are not successfully written
     // proper errorCode will be set.
     while(1) {
-        size_t bytesWritten = m_pChannel->getSocketStream().writeSome(boost::asio::buffer(dataPtr, bytesToWrite), errorCode);
+        size_t bytesWritten;
+        {
+            boost::lock_guard<boost::mutex> lock(m_channelMutex);
+            if(m_pChannel==NULL){
+                return;
+            }
+            bytesWritten = m_pChannel->getSocketStream().writeSome(boost::asio::buffer(dataPtr, bytesToWrite),
+                                                                          errorCode);
+        }
 
         if(errorCode && boost::asio::error::interrupted != errorCode){
             break;
@@ -334,16 +342,22 @@ connectionStatus_t DrillClientImpl::recvHandshake(){
         DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Started new handshake wait timer with "
                 << DrillClientConfig::getHandshakeTimeout() << " seconds." << std::endl;)
     }
-    
-    m_pChannel->getSocketStream().asyncRead(
-            boost::asio::buffer(m_rbuf, LEN_PREFIX_BUFLEN),
-            boost::bind(
-                &DrillClientImpl::handleHandshake,
-                this,
-                m_rbuf,
-                boost::asio::placeholders::error,
-                boost::asio::placeholders::bytes_transferred)
-            );
+
+    {
+        boost::lock_guard<boost::mutex> lock(m_channelMutex);
+        if (m_pChannel == NULL) {
+            return CONN_NOSOCKET;
+        }
+        m_pChannel->getSocketStream().asyncRead(
+                boost::asio::buffer(m_rbuf, LEN_PREFIX_BUFLEN),
+                boost::bind(
+                        &DrillClientImpl::handleHandshake,
+                        this,
+                        m_rbuf,
+                        boost::asio::placeholders::error,
+                        boost::asio::placeholders::bytes_transferred)
+        );
+    }
     DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << "DrillClientImpl::recvHandshake: async read waiting for server handshake response.\n";)
     m_io_service.run();
     if(m_rbuf!=NULL){
@@ -382,8 +396,15 @@ void DrillClientImpl::doReadFromSocket(ByteBuf_t inBuf, size_t bytesToRead,
     // Read all the bytes. In case when all the bytes were not read the proper
     // errorCode will be set.
     while(1){
-        size_t dataBytesRead = m_pChannel->getSocketStream().readSome(boost::asio::buffer(inBuf, bytesToRead),
+        size_t dataBytesRead;
+        {
+            boost::lock_guard<boost::mutex> lock(m_channelMutex);
+            if(m_pChannel==NULL){
+                return;
+            }
+            dataBytesRead = m_pChannel->getSocketStream().readSome(boost::asio::buffer(inBuf, bytesToRead),
                                            errorCode);
+        }
         // Check if errorCode is EINTR then just retry otherwise break from loop
         if(errorCode && boost::asio::error::interrupted != errorCode){
             break;
@@ -482,7 +503,10 @@ void DrillClientImpl::handleHShakeReadTimeout(const boost::system::error_code & 
                                               << "Deadline timer expired; ERR_CONN_HSHAKETIMOUT.\n";)
             handleConnError(CONN_HANDSHAKE_TIMEOUT, getMessage(ERR_CONN_HSHAKETIMOUT));
             m_io_service.stop();
-            m_pChannel->close();
+            {
+                boost::lock_guard<boost::mutex> lock(m_channelMutex);
+                if(m_pChannel != NULL) m_pChannel->close();
+            }
         }
     }
     return;
@@ -990,15 +1014,21 @@ void DrillClientImpl::getNextResult(){
 
     startHeartbeatTimer();
 
-    m_pChannel->getSocketStream().asyncRead(
-            boost::asio::buffer(readBuf, LEN_PREFIX_BUFLEN),
-            boost::bind(
-                &DrillClientImpl::handleRead,
-                this,
-                readBuf,
-                boost::asio::placeholders::error,
-                boost::asio::placeholders::bytes_transferred)
-            );
+    {
+        boost::lock_guard<boost::mutex> lock(m_channelMutex);
+        if (m_pChannel == NULL) {
+            return;
+        }
+        m_pChannel->getSocketStream().asyncRead(
+                boost::asio::buffer(readBuf, LEN_PREFIX_BUFLEN),
+                boost::bind(
+                        &DrillClientImpl::handleRead,
+                        this,
+                        readBuf,
+                        boost::asio::placeholders::error,
+                        boost::asio::placeholders::bytes_transferred)
+        );
+    }
     DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << "DrillClientImpl::getNextResult: async_read from the server\n";)
 }
 
@@ -1899,9 +1929,16 @@ void DrillClientImpl::handleReadTimeout(const boost::system::error_code & err){
             // defined. To be really sure, we need to close the socket. Closing the socket is a bit
             // drastic and we will defer that till a later release.
 #ifdef WIN32_SHUTDOWN_ON_TIMEOUT
+            {
+                boost::lock_guard<boost::mutex> lock(m_channelMutex);
+                if(m_pChannel != NULL) m_pChannel->close();
+            }
             m_pChannel->close();
 #else // NOT WIN32_SHUTDOWN_ON_TIMEOUT
-            m_pChannel->getInnerSocket().cancel();
+            {
+                boost::lock_guard<boost::mutex> lock(m_channelMutex);
+                if(m_pChannel != NULL) m_pChannel->getInnerSocket().cancel();
+            }
 #endif // WIN32_SHUTDOWN_ON_TIMEOUT
         }
     }
@@ -2243,7 +2280,15 @@ void DrillClientImpl::sendCancel(const exec::shared::QueryId* pQueryId){
 }
 
 void DrillClientImpl::shutdownSocket(){
-    m_pChannel->close();
+    m_pendingRequests=0;
+    m_heartbeatTimer.cancel();
+    m_deadlineTimer.cancel();
+    {
+        boost::lock_guard<boost::mutex> lock(m_channelMutex);
+        if (m_pChannel != NULL) {
+            m_pChannel->close();
+        }
+    }
     m_io_service.stop();
     m_bIsConnected=false;
 
