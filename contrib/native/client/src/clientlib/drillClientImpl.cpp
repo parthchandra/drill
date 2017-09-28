@@ -19,15 +19,12 @@
 
 #include "drill/common.hpp"
 #include <queue>
-#include <string>
 #include <boost/algorithm/string.hpp>
 #include <boost/asio.hpp>
 #include <boost/assign.hpp>
 #include <boost/bind.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
-#include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <boost/functional/factory.hpp>
-#include <boost/lexical_cast.hpp>
 #include <boost/thread.hpp>
 
 #include "drill/drillClient.hpp"
@@ -35,16 +32,9 @@
 #include "drill/recordBatch.hpp"
 #include "drill/userProperties.hpp"
 #include "drillClientImpl.hpp"
-#include "collectionsImpl.hpp"
 #include "errmsgs.hpp"
 #include "logger.hpp"
-#include "metadata.hpp"
-#include "rpcMessage.hpp"
-#include "utils.hpp"
-#include "GeneralRPC.pb.h"
-#include "UserBitShared.pb.h"
 #include "zookeeperClient.hpp"
-#include "saslAuthenticatorImpl.hpp"
 
 namespace Drill{
 namespace { // anonymous namespace
@@ -69,7 +59,7 @@ struct ToRpcType: public std::unary_function<google::protobuf::int32, exec::user
 } // anonymous
 
 connectionStatus_t DrillClientImpl::connect(const char* connStr, DrillUserProperties* props){
-    if (this->m_bIsConnected || (this->m_pChannelContext!=NULL && this->m_pChannel!=NULL)) {
+    if (this->m_bIsConnected) {
         if(!std::strcmp(connStr, m_connectStr.c_str())){
             // trying to connect to a different address is not allowed if already connected
             return handleConnError(CONN_ALREADYCONNECTED, getMessage(ERR_CONN_ALREADYCONN));
@@ -96,11 +86,12 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr, DrillUserProper
         return ret;
     }
     props->setProperty(USERPROP_SERVICE_HOST, m_pChannel->getEndpoint()->getHost());
+    m_bIsConnected = true;
     return ret;
 }
 
 connectionStatus_t DrillClientImpl::connect(const char* host, const char* port, DrillUserProperties* props){
-    if (this->m_bIsConnected || (this->m_pChannelContext!=NULL && this->m_pChannel!=NULL)) {
+    if (this->m_bIsConnected) {
         std::string connStr = std::string(host)+":"+std::string(port);
         if(!std::strcmp(connStr.c_str(), m_connectStr.c_str())){
             // trying to connect to a different address is not allowed if already connected
@@ -129,6 +120,7 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port, 
         return ret;
     }
     props->setProperty(USERPROP_SERVICE_HOST, m_pChannel->getEndpoint()->getHost());
+    m_bIsConnected = true;
     return ret;
 }
 
