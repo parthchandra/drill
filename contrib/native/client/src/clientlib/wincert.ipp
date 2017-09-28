@@ -37,7 +37,7 @@
 #define MY_ENCODING_TYPE  (PKCS_7_ASN_ENCODING | X509_ASN_ENCODING)
 
 inline
-int loadSystemTrustStore(const SSL *ssl) {
+int loadSystemTrustStore(const SSL *ssl, std::string& msg) {
     HCERTSTORE hStore;
     PCCERT_CONTEXT pContext = NULL;
     X509 *x509;
@@ -47,6 +47,7 @@ int loadSystemTrustStore(const SSL *ssl) {
 		"ROOT",
 		"SPC"
 	};
+	int certCount=0;
      
     SSL_CTX * ctx = SSL_get_SSL_CTX(ssl);
     X509_STORE *store = SSL_CTX_get_cert_store(ctx);
@@ -54,8 +55,10 @@ int loadSystemTrustStore(const SSL *ssl) {
 	for(int i=0; i<4; i++){
     hStore = CertOpenSystemStore(NULL, stores[i]);
 
-    if (!hStore)
-        return 1;
+    if (!hStore){
+        msg.append("Failed to load store: ").append(stores[i]).append("\n");
+        continue;
+    }
 
     while (pContext = CertEnumCertificatesInStore(hStore, pContext)) {
         //uncomment the line below if you want to see the certificates as pop ups
@@ -70,19 +73,23 @@ int loadSystemTrustStore(const SSL *ssl) {
             //    std::cout << "Added certificate " << x509->name << " from " << stores[i] << std::endl;
 
             X509_free(x509);
+            certCount++;
         }
     }
 
     CertFreeCertificateContext(pContext);
     CertCloseStore(hStore, 0);
 	}
+	if(certCount==0){
+	    msg.append("No certificates found.");
+	    return -1;
+	}
     return 0;
-
 }
 
 #else // notwindows
 inline
-int loadSystemTrustStore(const SSL *ssl) {
+int loadSystemTrustStore(const SSL *ssl, std::string& msg) {
     return 0;
 }
 

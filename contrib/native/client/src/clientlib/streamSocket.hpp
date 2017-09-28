@@ -150,7 +150,9 @@ class SslSocket:
             sslTCPSocket_t(ioService, sslContext) {
             }
 
-        ~SslSocket(){};
+        ~SslSocket(){
+            this->lowest_layer().close();
+        };
 
         sslTCPSocket_t& getSocketStream(){ return *this;}
 
@@ -177,9 +179,10 @@ class SslSocket:
         // throws: boost::system::system_error
         void protocolHandshake(bool useSystemConfig){
             if(useSystemConfig){
-                if (loadSystemTrustStore(this->native_handle())) {
+                std::string msg = "Failed to load system trust store.";
+                if (loadSystemTrustStore(this->native_handle(), msg)) {
                     boost::system::error_code ec(EPROTO, boost::system::system_category());
-                    boost::asio::detail::throw_error(ec, "Failed to load system trust store");
+                    boost::asio::detail::throw_error(ec, msg.c_str());
                 }
             }
             this->handshake(boost::asio::ssl::stream<boost::asio::ip::tcp::socket>::client);

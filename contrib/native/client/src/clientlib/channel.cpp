@@ -18,8 +18,6 @@
 
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
-#include <strstream>
-
 #include "drill/drillConfig.hpp"
 #include "drill/drillError.hpp"
 #include "drill/userProperties.hpp"
@@ -93,15 +91,13 @@ void ConnectionEndpoint::parseConnectString(){
         if(matched[6].matched) {
             m_pathToDrill.assign(matched[6].first, matched[6].second);
         }
-        std::ostrstream debugstr;
-        debugstr
-            << "Conn str: "<< m_connectString
-            << ";  protocol: " << m_protocol
-            << ";  host: " << m_host
-            << ";  port: " << m_port
-            << ";  path to drill: " << m_pathToDrill
-            << std::endl;
-        DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << debugstr; )
+        DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG)
+                             << "Conn str: "<< m_connectString
+                             << ";  protocol: " << m_protocol
+                             << ";  host: " << m_host
+                             << ";  port: " << m_port
+                             << ";  path to drill: " << m_pathToDrill
+                             << std::endl;)
     } else {
         DRILL_MT_LOG(DRILL_LOG(LOG_DEBUG) << "Invalid connect string. Regexp did not match" << std::endl;)
     }
@@ -135,8 +131,12 @@ connectionStatus_t ConnectionEndpoint::getDrillbitEndpointFromZk(){
         m_host=boost::lexical_cast<std::string>(endpoint.address());
         m_port=boost::lexical_cast<std::string>(endpoint.user_port());
     }
-    DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Choosing drillbit <" << (drillbits.size() - 1)  << ">. Selected " << endpoint.DebugString() << std::endl;)
-        zook.close();
+    if(err){
+        return handleError(CONN_ZOOKEEPER_ERROR, getMessage(ERR_CONN_ZOOKEEPER, zook.getError().c_str()));
+    }
+    DRILL_MT_LOG(DRILL_LOG(LOG_TRACE) << "Choosing drillbit <" << (drillbits.size() - 1)
+                                      << ">. Selected " << endpoint.DebugString() << std::endl;)
+    zook.close();
     return CONN_SUCCESS;
 }
 
@@ -431,12 +431,6 @@ connectionStatus_t SSLStreamChannel::init(ChannelContext_t* pContext){
         std::string hostPortStr = m_pEndpoint->getHost() + ":" + m_pEndpoint->getPort();
         ((SSLChannelContext_t *) pContext)->getSslContext().set_verify_callback(
                 boost::asio::ssl::rfc2818_verification(hostPortStr.c_str()));
-    }
-
-    std::string disableCertificateVerification;
-    props->getProp(USERPROP_DISABLE_CERTVERIFICATION, disableCertificateVerification);
-    if (disableCertificateVerification == "true") {
-        ((SSLChannelContext_t *) pContext)->getSslContext().set_verify_mode(boost::asio::ssl::context::verify_none);
     }
 
     m_pSocket=new SslSocket(m_ioService, ((SSLChannelContext_t*)pContext)->getSslContext() );

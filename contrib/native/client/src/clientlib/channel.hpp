@@ -43,7 +43,6 @@ class UserProperties;
 
         private:
             void parseConnectString();
-            connectionStatus_t validateConnectionString();
             bool isDirectConnection();
             bool isZookeeperConnection();
             connectionStatus_t getDrillbitEndpointFromZk();
@@ -131,7 +130,7 @@ class UserProperties;
             virtual ~Channel();
             virtual connectionStatus_t init(ChannelContext_t* context)=0;
             connectionStatus_t connect();
-            connectionStatus_t protocolClose();
+            bool isConnected(){ return m_state == CHANNEL_CONNECTED;}
             template <typename SettableSocketOption> void setOption(SettableSocketOption& option);
             DrillClientError* getError(){ return m_pError;}
             void close(){ 
