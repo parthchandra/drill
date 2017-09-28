@@ -265,11 +265,16 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     boolean filterPushed = (scanSpec.getSerializedFilter() != null);
     double avgRowSize = stats.getAvgRowSize(null, null, true);
     double totalRowCount = stats.getRowCount(null, null);
+    logger.debug("index_plan_info: GroupScan {} with stats {}: rowCount={}, condition={}, totalRowCount={}, fullTableRowCount={}",
+        System.identityHashCode(this), System.identityHashCode(stats), rowCount,
+        scanSpec.getCondition()==null?"null":scanSpec.getCondition(),
+        totalRowCount, fullTableRowCount);
     // If UNKNOWN, or DB stats sync issues(manifests as 0 rows) use defaults.
     if (rowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
       rowCount = (scanSpec.getSerializedFilter() != null ? .5 : 1) * fullTableRowCount;
     }
     if (totalRowCount == ROWCOUNT_UNKNOWN || totalRowCount == 0) {
+      logger.debug("did not get valid totalRowCount, will take this: {}", fullTableRowCount);
       totalRowCount = fullTableRowCount;
     }
     if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
@@ -294,7 +299,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     }
 
     logger.debug("JsonGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, diskCost:{}",
-        this, rowCount, avgRowSize, numBlocks, totalBlocks, diskCost);
+        this.getOperatorId(), rowCount, avgRowSize, numBlocks, totalBlocks, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 
@@ -335,8 +340,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     double numBlocks = Math.ceil(((avgRowSize * rowsFromDisk)/pluginCostModel.getBlockSize(this)));
     numBlocks = Math.min(totalBlocks, numBlocks);
     double diskCost = numBlocks * pluginCostModel.getSequentialBlockReadCost(this);
-    logger.debug("JsonIndexGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, diskCost:{}",
-        this, rowCount, avgRowSize, numBlocks, totalBlocks, diskCost);
+    logger.debug("index_plan_info: JsonIndexGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, rowsFromDisk {}, diskCost:{}",
+        System.identityHashCode(this), rowCount, avgRowSize, numBlocks, totalBlocks, rowsFromDisk, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 

@@ -104,7 +104,11 @@ public class ScanPrel extends AbstractRelNode implements DrillScanPrel {
   @Override
   public double estimateRowCount(RelMetadataQuery mq) {
     final PlannerSettings settings = PrelUtil.getPlannerSettings(getCluster());
-    return this.groupScan.getScanStats(settings).getRecordCount();
+
+    double rowCount = this.groupScan.getScanStats(settings).getRecordCount();
+    logger.debug("index_plan_info: #{}.estimateRowCount get rowCount {} from  groupscan {}",
+        this.getId(), rowCount, System.identityHashCode(groupScan));
+    return rowCount;
   }
 
   @Override

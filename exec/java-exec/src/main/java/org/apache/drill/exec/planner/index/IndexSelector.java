@@ -249,7 +249,8 @@ public class IndexSelector  {
     PlannerSettings settings = PrelUtil.getPlannerSettings(planner);
     List<IndexGroup> candidateIndexes = Lists.newArrayList();
 
-    logger.info("index_plan_info: Analyzing indexes for prefix matches");
+    logger.info("index_plan_info: Analyzing {} indexes for prefix matches: {}",
+        indexPropList.size(), indexPropList);
     // analysis phase
     for (IndexProperties p : indexPropList) {
       analyzePrefixMatches(p);
@@ -613,7 +614,7 @@ public class IndexSelector  {
       this.satisfiesCollation = satisfiesCollation;
       leadingPrefixMap = prefixMap;
 
-      logger.debug("index_plan_info: Index {}: leading prefix map: {}, whether satisfies collation: {}, index columns remainder condition: {}",
+      logger.info("index_plan_info: Index {}: leading prefix map: {}, satisfies collation: {}, remainder condition: {}",
           indexDescriptor.getIndexName(), leadingPrefixMap, satisfiesCollation, indexColumnsRemainderFilter);
 
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
@@ -639,7 +640,7 @@ public class IndexSelector  {
         double sel = 1.0;
         if (filterRows != Statistics.ROWCOUNT_UNKNOWN) {
           sel = filterRows/totalRows;
-          logger.debug("index_plan_info: Filter: {}, filterRows = {}, totalRows = {}, selectivity = {}",
+          logger.info("index_plan_info: Filter: {}, filterRows = {}, totalRows = {}, selectivity = {}",
               filter, filterRows, totalRows, sel);
         } else {
           sel = RelMdUtil.guessSelectivity(filter);

@@ -384,7 +384,7 @@ public class DbScanToIndexScanPrule extends Prule {
     List<IndexGroup> nonCoveringIndexes = Lists.newArrayList();
     List<IndexGroup> intersectIndexes = Lists.newArrayList();
 
-    //update sort expressions in context
+    //update sort expressions in context, it is needed for computing collation, so do it before IndexSelector
     IndexPlanUtils.updateSortExpression(indexContext);
 
     IndexSelector selector = new IndexSelector(indexCondition,
@@ -395,6 +395,7 @@ public class DbScanToIndexScanPrule extends Prule {
         totalRows);
 
     for (IndexDescriptor indexDesc : collection) {
+      logger.info("index_plan_info indexDescriptor: {}", indexDesc.toString());
       // check if any of the indexed fields of the index are present in the filter condition
       if (IndexPlanUtils.conditionIndexed(indexableExprMarker, indexDesc) != IndexPlanUtils.ConditionIndexed.NONE) {
         if (isValidIndexHint && !indexContext.indexHint.equals(indexDesc.getIndexName())) {

@@ -144,7 +144,7 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
     // for biasing towards non-covering plans.
     diskCost *= stats.getRowKeyJoinBackIOFactor();
     logger.debug("RestrictedJsonGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, diskCost:{}",
-        this, rowCount, avgRowSize, numBlocks, totalBlocksPrimary, diskCost);
+        System.identityHashCode(this), rowCount, avgRowSize, numBlocks, totalBlocksPrimary, diskCost);
     return new ScanStats(GroupScanProperty.NO_EXACT_ROW_COUNT, rowCount, 1, diskCost);
   }
 

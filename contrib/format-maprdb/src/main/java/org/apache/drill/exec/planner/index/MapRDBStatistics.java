@@ -271,6 +271,8 @@ public class MapRDBStatistics implements Statistics {
       if (statsCache.get(conditionAsStr) == null) {
         IndexCollection indexes = ((DbGroupScan)scan).getSecondaryIndexCollection(scanRel);
         populateStats(condition, indexes, scanRel, context);
+        logger.info("index_plan_info: initialize: scanRel #{} and groupScan {} got fulltable {}, statsCache: {}",
+            scanRel.getId(), System.identityHashCode(scan), fullTableScanPayload, statsCache);
         return true;
       }
     }
