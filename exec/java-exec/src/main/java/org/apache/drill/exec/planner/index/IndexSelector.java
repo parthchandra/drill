@@ -17,7 +17,6 @@
  */
 package org.apache.drill.exec.planner.index;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -116,27 +115,7 @@ public class IndexSelector  {
 
     if (indexCols.size() > 0) {
       if (initCondition != null) { // check filter condition
-        boolean prefix = true;
-        int i=0;
-        while (prefix && i < indexCols.size()) {
-          LogicalExpression p = indexCols.get(i++);
-          List<LogicalExpression> prefixCol = ImmutableList.of(p);
-          IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
-          if(info != null && info.hasIndexCol) {
-            // the col had a match with one of the conditions; save the information about
-            // indexcol --> condition mapping
-            leadingPrefixMap.put(p, info.indexCondition);
-            initCondition = info.remainderCondition;
-            if (initCondition.isAlwaysTrue()) {
-              // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
-              // we don't need to keep track of it for rest of the index selection
-              initCondition = null;
-              break;
-            }
-          } else {
-            prefix = false;
-          }
-        }
+        initCondition = IndexPlanUtils.getLeadingPrefixMap(leadingPrefixMap, indexCols, builder, indexCondition);
       }
       if (requiredCollation()) {
         satisfiesCollation = buildAndCheckCollation(indexProps);
@@ -620,16 +599,7 @@ public class IndexSelector  {
 
       // iterate over the columns in the index descriptor and lookup from the leadingPrefixMap
       // the corresponding conditions
-      if (leadingPrefixMap.size() > 0) {
-        for (LogicalExpression p : indexDescriptor.getIndexColumns()) {
-          RexNode n;
-          if ((n = leadingPrefixMap.get(p)) != null) {
-            leadingFilters.add(n);
-          } else {
-            break; // break since the prefix property will not be preserved
-          }
-        }
-      }
+      leadingFilters = IndexPlanUtils.getLeadingFilters(leadingPrefixMap, indexDescriptor.getIndexColumns());
 
       // compute the estimated row count by calling the statistics APIs
       // NOTE: the calls to stats.getRowCount() below supply the primary table scan
@@ -661,8 +631,7 @@ public class IndexSelector  {
       }
 
       // get the average row size based on the leading column filter
-      avgRowSize = stats.getAvgRowSize(leadingFilters.size() > 0 ? leadingFilters.get(0) : null,
-          idxIdentifier, primaryTableScan, false);
+      avgRowSize = stats.getAvgRowSize(idxIdentifier, false);
       if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN) {
         avgRowSize = numProjectedFields * Statistics.AVG_COLUMN_SIZE;
         if (stats.isStatsAvailable()) {
@@ -697,25 +666,11 @@ public class IndexSelector  {
     }
 
     public RexNode getLeadingColumnsFilter() {
-      if (leadingFilters.size() > 0) {
-        RexNode leadingColumnsFilter = DrillRelOptUtil.composeConjunction(rexBuilder, leadingFilters, false);
-        return leadingColumnsFilter;
-      }
-      return null;
+      return IndexPlanUtils.getLeadingColumnsFilter(leadingFilters, rexBuilder);
     }
 
     public RexNode getTotalRemainderFilter() {
-      if (indexColumnsRemainderFilter != null && otherColumnsRemainderFilter != null) {
-        List<RexNode> operands = Lists.newArrayList();
-        operands.add(indexColumnsRemainderFilter);
-        operands.add(otherColumnsRemainderFilter);
-        RexNode totalRemainder = DrillRelOptUtil.composeConjunction(rexBuilder, operands, false);
-        return totalRemainder;
-      } else if (indexColumnsRemainderFilter != null) {
-        return indexColumnsRemainderFilter;
-      } else {
-        return otherColumnsRemainderFilter;
-      }
+      return IndexPlanUtils.getTotalRemainderFilter(indexColumnsRemainderFilter, otherColumnsRemainderFilter, rexBuilder);
     }
 
     public boolean satisfiesCollation() {

@@ -17,7 +17,9 @@
  */
 package org.apache.drill.exec.store.mapr.db.json;
 
+import static org.apache.drill.exec.planner.index.Statistics.ROWCOUNT_HUGE;
 import static org.apache.drill.exec.planner.index.Statistics.ROWCOUNT_UNKNOWN;
+import static org.apache.drill.exec.planner.index.Statistics.AVG_ROWSIZE_UNKNOWN;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -50,6 +52,7 @@ import org.apache.drill.exec.planner.cost.PluginCost;
 
 import org.apache.drill.exec.planner.physical.PartitionFunction;
 import org.apache.drill.exec.planner.logical.DrillScanRel;
+import org.apache.drill.exec.planner.physical.PrelUtil;
 import org.apache.drill.exec.store.StoragePluginRegistry;
 import org.apache.drill.exec.store.dfs.FileSystemConfig;
 import org.apache.drill.exec.store.dfs.FileSystemPlugin;
@@ -265,8 +268,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     final int numColumns = (columns == null || columns.isEmpty()) ? STAR_COLS : columns.size();
     // index will be NULL for FTS
     double rowCount = stats.getRowCount(scanSpec.getCondition(), null);
-    boolean filterPushed = (scanSpec.getSerializedFilter() != null);
-    double avgRowSize = stats.getAvgRowSize(null, null, true);
+    // rowcount based on _id predicate. If NO _id predicate present in condition, then the
+    // rowcount should be same as totalRowCount. Equality b/w the two rowcounts should not be
+    // construed as NO _id predicate since stats are approximate.
+    double leadingRowCount = stats.getLeadingRowCount(scanSpec.getCondition(), null);
+    double avgRowSize = stats.getAvgRowSize(null, true);
     double totalRowCount = stats.getRowCount(null, null);
     logger.debug("index_plan_info: GroupScan {} with stats {}: rowCount={}, condition={}, totalRowCount={}, fullTableRowCount={}",
         System.identityHashCode(this), System.identityHashCode(stats), rowCount,
@@ -280,11 +286,13 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       logger.debug("did not get valid totalRowCount, will take this: {}", fullTableRowCount);
       totalRowCount = fullTableRowCount;
     }
-    if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
+    if (avgRowSize == AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
     }
-    double rowsFromDisk = totalRowCount;
-    //TODO: Add case where QueryCondition is on _id field which would result in pruning
+    if (leadingRowCount == ROWCOUNT_UNKNOWN || leadingRowCount == 0) {
+      leadingRowCount = totalRowCount;
+    }
+    double rowsFromDisk = leadingRowCount;
     double totalBlocks = Math.ceil((avgRowSize * totalRowCount)/pluginCostModel.getBlockSize(this));
     double numBlocks = Math.ceil((avgRowSize * rowsFromDisk)/pluginCostModel.getBlockSize(this));
     numBlocks = Math.min(totalBlocks, numBlocks);
@@ -296,9 +304,9 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
      * e.g. forcedRowCountMap<NULL, 1000>
      */
     if (forcedRowCountMap.get(null) != null && //Forced full table rowcount and it is HUGE
-        forcedRowCountMap.get(null) == Statistics.ROWCOUNT_HUGE ) {
-      rowCount = Statistics.ROWCOUNT_HUGE;
-      diskCost = Statistics.ROWCOUNT_HUGE;
+        forcedRowCountMap.get(null) == ROWCOUNT_HUGE ) {
+      rowCount = ROWCOUNT_HUGE;
+      diskCost = ROWCOUNT_HUGE;
     }
 
     logger.debug("JsonGroupScan:{} rowCount:{}, avgRowSize:{}, blocks:{}, totalBlocks:{}, diskCost:{}",
@@ -325,15 +333,20 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     String idxIdentifier = stats.buildUniqueIndexIdentifier(scanSpec.getIndexDesc().getPrimaryTablePath(),
         scanSpec.getIndexDesc().getIndexName());
     double rowCount = stats.getRowCount(scanSpec.getCondition(), idxIdentifier);
-    double avgRowSize = stats.getAvgRowSize(scanSpec.getCondition(), idxIdentifier, false);
+    // rowcount based on index leading columns predicate.
+    double leadingRowCount = stats.getLeadingRowCount(scanSpec.getCondition(), idxIdentifier);
+    double avgRowSize = stats.getAvgRowSize(idxIdentifier, false);
     // If UNKNOWN, use defaults
     if (rowCount == ROWCOUNT_UNKNOWN || rowCount == 0) {
-      rowCount = (filterPushed ? 0.0005f : 0.001f) * fullTableRowCount / scanSpec.getIndexDesc().getIndexedFields().size() ;
+      rowCount = (filterPushed ? 0.0005f : 0.001f) * fullTableRowCount / scanSpec.getIndexDesc().getIndexedFields().size();
     }
-    if (avgRowSize == Statistics.AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
+    if (leadingRowCount == ROWCOUNT_UNKNOWN || leadingRowCount == 0) {
+      leadingRowCount = rowCount;
+    }
+    if (avgRowSize == AVG_ROWSIZE_UNKNOWN || avgRowSize == 0) {
       avgRowSize = avgColumnSize * numColumns;
     }
-    double rowsFromDisk = rowCount;
+    double rowsFromDisk = leadingRowCount;
     if (!filterPushed) {
       // both start and stop rows are empty, indicating this is a full scan so
       // use the total rows for calculating disk i/o
@@ -414,35 +427,68 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   }
 
   /**
+   * Get the estimated average rowsize. DO NOT call this API directly.
+   * Call the stats API instead which modifies the counts based on preference options.
+   * @param index, to use for generating the estimate
+   * @return row count post filtering
+   */
+  public MapRDBStatisticsPayload getAverageRowSizeStats(IndexDescriptor index) {
+    IndexDesc indexDesc = null;
+    double avgRowSize = AVG_ROWSIZE_UNKNOWN;
+
+    if (index != null) {
+      indexDesc = (IndexDesc)((MapRDBIndexDescriptor)index).getOriginalDesc();
+    }
+    // If no index is specified, get it from the primary table
+    if(indexDesc == null && scanSpec.isSecondaryIndex()) {
+      throw new UnsupportedOperationException("getAverageRowSizeStats should be invoked on primary table");
+    }
+
+    // Get the index table or primary table and use the DB API to get the estimated number of rows. For size estimates,
+    // we assume that all the columns would be read from the disk.
+    final Table table = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), indexDesc, getUserName());
+
+    if (table != null) {
+      final MetaTable metaTable = table.getMetaTable();
+      if (metaTable != null) {
+        avgRowSize = metaTable.getAverageRowSize();
+      }
+    }
+    logger.debug("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
+        "avgRowSize: {}, estimatedSize {}", this, (indexDesc == null ? "null" : indexDesc.getIndexName()),
+        (indexDesc == null ? "null" : indexDesc.getIndexInfo()), avgRowSize);
+    return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, ROWCOUNT_UNKNOWN, avgRowSize);
+  }
+
+  /**
    * Get the estimated statistics after applying the {@link RexNode} condition. DO NOT call this API directly.
    * Call the stats API instead which modifies the counts based on preference options.
    * @param condition, filter to apply
    * @param index, to use for generating the estimate
    * @return row count post filtering
    */
-  public MapRDBStatisticsPayload getEstimatedStats(QueryCondition condition, IndexDescriptor index, DrillScanRel scanRel) {
+  public MapRDBStatisticsPayload getFirstKeyEstimatedStats(QueryCondition condition, IndexDescriptor index, DrillScanRel scanRel) {
     IndexDesc indexDesc = null;
     if (index != null) {
       indexDesc = (IndexDesc)((MapRDBIndexDescriptor)index).getOriginalDesc();
     }
-    return getEstimatedRowCountInternal(condition, indexDesc, scanRel);
-
+    return getFirstKeyEstimatedStatsInternal(condition, indexDesc, scanRel);
   }
 
   /**
-   * Get the estimated row count after applying the {@link QueryCondition} condition
+   * Get the estimated statistics after applying the {@link QueryCondition} condition
    * @param condition, filter to apply
    * @param index, to use for generating the estimate
-   * @return row count post filtering
+   * @return {@link MapRDBStatisticsPayload} statistics
    */
-  private MapRDBStatisticsPayload getEstimatedRowCountInternal(QueryCondition condition, IndexDesc index, DrillScanRel scanRel) {
+  private MapRDBStatisticsPayload getFirstKeyEstimatedStatsInternal(QueryCondition condition, IndexDesc index, DrillScanRel scanRel) {
     // double totalRows = getRowCount(null, scanPrel);
 
     // If no index is specified, get it from the primary table
     if(index == null && scanSpec.isSecondaryIndex()) {
       // If stats not cached get it from the table.
       //table = MapRDB.getTable(scanSpec.getPrimaryTablePath());
-      throw new UnsupportedOperationException("getEstimatedRowCount should be invoked on primary table");
+      throw new UnsupportedOperationException("getFirstKeyEstimatedStats should be invoked on primary table");
     }
 
     // Get the index table or primary table and use the DB API to get the estimated number of rows. For size estimates,
@@ -450,31 +496,50 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     final Table table = this.formatPlugin.getJsonTableCache().getTable(scanSpec.getTableName(), index, getUserName());
 
     if (table != null) {
-      final MetaTable metaTable = table.getMetaTable();
-      final com.mapr.db.scan.ScanStats stats = (condition == null)
-          ? metaTable.getScanStats() : metaTable.getScanStats(condition);
       // Factor reflecting confidence in the DB estimates. If a table has few tablets, the tablet-level stats
-      // might be off. The decay factor will reduce estimates when one tablet represents a significant percentage
+      // might be off. The decay scalingFactor will reduce estimates when one tablet represents a significant percentage
       // of the entire table.
-      double factor = 1.0;
-      // Use the factor only when a condition filters out rows from the table. If no condition is present, all rows
-      // should be selected. So the factor should not reduce the returned rows
-      if (condition != null) {
-        factor = Math.min(1.0, 1.0 / Math.sqrt(100.0 / metaTable.getScanStats().getPartitionCount()));
+      double scalingFactor = 1.0;
+      boolean isFullScan = false;
+      final MetaTable metaTable = table.getMetaTable();
+      com.mapr.db.scan.ScanStats stats = (condition == null)
+          ? metaTable.getScanStats() : metaTable.getScanStats(condition);
+      if (index == null && condition != null) {
+        // Given table condition might not be on leading column. Check if the rowcount matches full table rows.
+        // In that case no leading key present or does not prune enough. Treat it like so.
+        com.mapr.db.scan.ScanStats noConditionPTabStats = metaTable.getScanStats();
+        if (stats.getEstimatedNumRows() == noConditionPTabStats.getEstimatedNumRows()) {
+          isFullScan = true;
+        }
       }
-      logger.info("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
-              "condition: {} rowCount: {}, avgRowSize: {}, estimatedSize: {}, partitionCount: {}",
+      // Use the scalingFactor only when a condition filters out rows from the table. If no condition is present, all rows
+      // should be selected. So the scalingFactor should not reduce the returned rows
+      if (condition != null && !isFullScan) {
+        double forcedScalingFactor = PrelUtil.getSettings(scanRel.getCluster()).getIndexStatsRowCountScalingFactor();
+        // Accuracy is defined as 1 - Error where Error = # Boundary Tablets (2) / # Total Matching Tablets.
+        // For 2 or less matching tablets, the error is assumed to be 50%. The Sqrt gives the decaying scalingFactor
+        double accuracy = stats.getPartitionCount() > 2 ? 1.0 - (2.0/stats.getPartitionCount()) : 0.5;
+        scalingFactor = Math.min(1.0, 1.0 / Math.sqrt(1.0 / accuracy));
+        if (forcedScalingFactor < 1.0
+            && metaTable.getScanStats().getPartitionCount() < PluginConstants.JSON_TABLE_NUM_TABLETS_PER_INDEX_DEFAULT) {
+          // User forced confidence scalingFactor for small tables (assumed as less than 32 tablets (~512 MB))
+          scalingFactor = forcedScalingFactor;
+        }
+      }
+      logger.debug("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
+              "condition: {} rowCount: {}, avgRowSize: {}, estimatedSize {}, partitionCount {}, totalPartitionCount {}, " +
+          "scalingFactor {}",
           this, (index == null ? "null" : index.getIndexName()), (index == null ? "null" : index.getIndexInfo()),
           (condition == null ? "null" : condition.toString()), stats.getEstimatedNumRows(),
-          (stats.getEstimatedNumRows() == 0 ? 0 : stats.getEstimatedSize()/stats.getEstimatedNumRows()), stats.getEstimatedSize(),
-          stats.getPartitionCount());
-      return new MapRDBStatisticsPayload(factor * stats.getEstimatedNumRows(),
+          (stats.getEstimatedNumRows() == 0 ? 0 : stats.getEstimatedSize()/stats.getEstimatedNumRows()),
+          stats.getEstimatedSize(), stats.getPartitionCount(), metaTable.getScanStats().getPartitionCount(), scalingFactor);
+      return new MapRDBStatisticsPayload(scalingFactor * stats.getEstimatedNumRows(), scalingFactor * stats.getEstimatedNumRows(),
           ((stats.getEstimatedNumRows() == 0 ? 0 : (double)stats.getEstimatedSize()/stats.getEstimatedNumRows())));
     } else {
-      logger.info("index_plan_info: getEstimatedRowCount: {} indexName: {}, indexInfo: {}, " +
+      logger.debug("index_plan_info: getEstimatedRowCount: {} indexName: {}, indexInfo: {}, " +
               "condition: {} rowCount: UNKNOWN, avgRowSize: UNKNOWN", this, (index == null ? "null" : index.getIndexName()),
           (index == null ? "null" : index.getIndexInfo()), (condition == null ? "null" : condition.toString()));
-      return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, Statistics.AVG_ROWSIZE_UNKNOWN);
+      return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, ROWCOUNT_UNKNOWN, AVG_ROWSIZE_UNKNOWN);
     }
   }
 
@@ -520,7 +585,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     }
     // Stats might NOT have the full rows (e.g. table is newly populated and DB stats APIs return it after
     // 15 mins). Use the table rows as populated using the (expensive but accurate) Hbase API if needed.
-    if (condition == null && (rowcount == 0 || rowcount == Statistics.ROWCOUNT_UNKNOWN)) {
+    if (condition == null && (rowcount == 0 || rowcount == ROWCOUNT_UNKNOWN)) {
       rowcount = fullTableRowCount;
       logger.debug("getRowCount: Stats not available yet! Use Admin APIs full table rowcount {}",
           fullTableRowCount);
@@ -546,10 +611,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
     if (scanSpec.getIndexDesc() != null) {
       String idxIdentifier = stats.buildUniqueIndexIdentifier(scanSpec.getIndexDesc().getPrimaryTablePath(), scanSpec.getIndexName());
       rowCount = stats.getRowCount(scanSpec.getCondition(), idxIdentifier);
-      rowSize = stats.getAvgRowSize(scanSpec.getCondition(), idxIdentifier, false);
+      rowSize = stats.getAvgRowSize(idxIdentifier, false);
     } else {
       rowCount = stats.getRowCount(scanSpec.getCondition(), null);
-      rowSize = stats.getAvgRowSize(scanSpec.getCondition(), null, false);
+      rowSize = stats.getAvgRowSize(null, false);
     }
 
     return (long)(rowCount * rowSize)/scanRangeSize > 1 ? true : false;

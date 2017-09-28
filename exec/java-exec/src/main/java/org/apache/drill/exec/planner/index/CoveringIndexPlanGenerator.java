@@ -107,18 +107,13 @@ public class CoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
       return null;
     }
 
-    RexNode coveringCondition = indexCondition;
+    RexNode coveringCondition;
     ScanPrel indexScanPrel =
         IndexPlanUtils.buildCoveringIndexScan(origScan, indexGroupScan, indexContext, indexDesc);
 
     // If remainder condition, then combine the index and remainder conditions. This is a covering plan so we can
     // pushed the entire condition into the index.
-    if (remainderCondition != null && !remainderCondition.isAlwaysTrue()) {
-      List<RexNode> conditions = new ArrayList<RexNode>();
-      conditions.add(indexCondition);
-      conditions.add(remainderCondition);
-      coveringCondition = DrillRelOptUtil.composeConjunction(indexScanPrel.getCluster().getRexBuilder(), conditions, true);
-    }
+    coveringCondition = IndexPlanUtils.getTotalFilter(indexCondition, remainderCondition, indexScanPrel.getCluster().getRexBuilder());
     RexNode newIndexCondition =
         rewriteFunctionalCondition(coveringCondition, indexScanPrel.getRowType(), functionInfo);
 

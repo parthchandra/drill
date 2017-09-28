@@ -18,10 +18,12 @@
 
 package org.apache.drill.exec.planner.index;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -33,6 +35,8 @@ import org.apache.calcite.rel.RelCollationTraitDef;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.LogicalExpression;
@@ -41,6 +45,7 @@ import org.apache.drill.exec.physical.base.DbGroupScan;
 import org.apache.drill.exec.physical.base.GroupScan;
 import org.apache.drill.exec.physical.base.IndexGroupScan;
 import org.apache.drill.exec.planner.common.DrillProjectRelBase;
+import org.apache.drill.exec.planner.common.DrillRelOptUtil;
 import org.apache.drill.exec.planner.fragment.DistributionAffinity;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
@@ -676,4 +681,80 @@ public class IndexPlanUtils {
     return remap.rewriteWithMap(toRewriteRex, mapRexExpr);
   }
 
+  public static RexNode getLeadingPrefixMap(Map<LogicalExpression, RexNode> leadingPrefixMap,
+                                  List<LogicalExpression> indexCols,
+                                  IndexConditionInfo.Builder builder, RexNode condition) {
+    boolean prefix = true;
+    int i=0;
+
+    RexNode initCondition = condition.isAlwaysTrue() ? null : condition;
+    while (prefix && i < indexCols.size()) {
+      LogicalExpression p = indexCols.get(i++);
+      List<LogicalExpression> prefixCol = ImmutableList.of(p);
+      IndexConditionInfo info = builder.indexConditionRelatedToFields(prefixCol, initCondition);
+      if(info != null && info.hasIndexCol) {
+        // the col had a match with one of the conditions; save the information about
+        // indexcol --> condition mapping
+        leadingPrefixMap.put(p, info.indexCondition);
+        initCondition = info.remainderCondition;
+        if (initCondition.isAlwaysTrue()) {
+          // all filter conditions are accounted for, so if the remainder is TRUE, set it to NULL because
+          // we don't need to keep track of it for rest of the index selection
+          initCondition = null;
+          break;
+        }
+      } else {
+        prefix = false;
+      }
+    }
+    return initCondition;
+  }
+
+  public static List<RexNode> getLeadingFilters (Map<LogicalExpression, RexNode> leadingPrefixMap, List<LogicalExpression> indexCols) {
+    List<RexNode> leadingFilters = Lists.newArrayList();
+    if (leadingPrefixMap.size() > 0) {
+      for (LogicalExpression p : indexCols) {
+        RexNode n;
+        if ((n = leadingPrefixMap.get(p)) != null) {
+          leadingFilters.add(n);
+        } else {
+          break; // break since the prefix property will not be preserved
+        }
+      }
+    }
+    return leadingFilters;
+  }
+
+  public static RexNode getLeadingColumnsFilter(List<RexNode> leadingFilters, RexBuilder rexBuilder) {
+    if (leadingFilters.size() > 0) {
+      RexNode leadingColumnsFilter = DrillRelOptUtil.composeConjunction(rexBuilder, leadingFilters, false);
+      return leadingColumnsFilter;
+    }
+    return null;
+  }
+
+  public static RexNode getTotalRemainderFilter(RexNode indexColsRemFilter, RexNode incColsRemFilter, RexBuilder rexBuilder) {
+    if (indexColsRemFilter != null && incColsRemFilter != null) {
+      List<RexNode> operands = Lists.newArrayList();
+      operands.add(indexColsRemFilter);
+      operands.add(incColsRemFilter);
+      RexNode totalRemainder = DrillRelOptUtil.composeConjunction(rexBuilder, operands, false);
+      return totalRemainder;
+    } else if (indexColsRemFilter != null) {
+      return indexColsRemFilter;
+    } else {
+      return incColsRemFilter;
+    }
+  }
+
+  public static RexNode getTotalFilter(RexNode leadColsFilter, RexNode totRemColsFilter, RexBuilder rexBuilder) {
+    RexNode condition = leadColsFilter;
+    if (leadColsFilter != null && totRemColsFilter != null && !totRemColsFilter.isAlwaysTrue()) {
+      List<RexNode> conditions = new ArrayList<RexNode>();
+      conditions.add(leadColsFilter);
+      conditions.add(totRemColsFilter);
+      return DrillRelOptUtil.composeConjunction(rexBuilder, conditions, true);
+    }
+    return condition;
+  }
 }

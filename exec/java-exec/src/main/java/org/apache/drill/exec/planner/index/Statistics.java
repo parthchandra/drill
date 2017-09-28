@@ -43,16 +43,24 @@ public interface Statistics {
    *  @param condition - Filter specified as a {@link RexNode}
    *  @param tabIdxName - The index name generated using {@code buildUniqueIndexIdentifier}
    *  @param scanRel - The current scan rel
+   *  @return the rowcount for the filter
    */
   double getRowCount(RexNode condition, String tabIdxName, RelNode scanRel);
 
-  /** Returns the average row size for the specified filter condition
+  /** Returns the leading rowcount for the specified filter condition
+   *  Leading rowcount means rowcount for filter condition only on leading index columns.
    *  @param condition - Filter specified as a {@link RexNode}
    *  @param tabIdxName - The index name generated using {@code buildUniqueIndexIdentifier}
    *  @param scanRel - The current scan rel
-   *  @param isIndexScan - Whether the current rel is an index scan (false for primary table)
+   *  @return the leading rowcount
    */
-  double getAvgRowSize(RexNode condition, String tabIdxName, DrillScanRel scanRel, boolean isIndexScan);
+  double getLeadingRowCount(RexNode condition, String tabIdxName, RelNode scanRel);
+
+  /** Returns the average row size for the specified filter condition
+   * @param tabIdxName - The index name generated using {@code buildUniqueIndexIdentifier}
+   * @param isIndexScan - Whether the current rel is an index scan (false for primary table)
+   */
+  double getAvgRowSize(String tabIdxName, boolean isIndexScan);
 
   boolean initialize(RexNode condition, DrillScanRel scanRel, IndexPlanCallContext context);
 }

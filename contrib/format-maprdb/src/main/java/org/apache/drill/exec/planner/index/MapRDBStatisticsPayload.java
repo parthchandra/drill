@@ -20,11 +20,12 @@ package org.apache.drill.exec.planner.index;
 public class MapRDBStatisticsPayload implements StatisticsPayload {
 
   double rowCount;
-
+  double leadingRowCount;
   double avgRowSize;
 
-  public MapRDBStatisticsPayload(double rowCount, double avgRowSize) {
+  public MapRDBStatisticsPayload(double rowCount, double leadingRowCount, double avgRowSize) {
     this.rowCount = rowCount;
+    this.leadingRowCount = leadingRowCount;
     this.avgRowSize = avgRowSize;
   }
 
@@ -32,6 +33,7 @@ public class MapRDBStatisticsPayload implements StatisticsPayload {
   public String toString() {
     return "MapRDBStatisticsPayload{" +
         "rowCount=" + rowCount +
+        ", leadingRowCount=" + leadingRowCount +
         ", avgRowSize=" + avgRowSize +
         '}';
   }
@@ -39,6 +41,11 @@ public class MapRDBStatisticsPayload implements StatisticsPayload {
   @Override
   public double getRowCount() {
     return rowCount;
+  }
+
+  @Override
+  public double getLeadingRowCount() {
+    return  leadingRowCount;
   }
 
   @Override

@@ -124,6 +124,7 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       new OptionDefinition(PlannerSettings.INDEX_COVERING_SELECTIVITY_THRESHOLD),
       new OptionDefinition(PlannerSettings.INDEX_NONCOVERING_SELECTIVITY_THRESHOLD),
       new OptionDefinition(PlannerSettings.INDEX_ROWKEYJOIN_COST_FACTOR),
+      new OptionDefinition(PlannerSettings.INDEX_STATS_ROWCOUNT_SCALING_FACTOR),
       // TODO: Deprecate the following 2 (also in PlannerSettings.java)
       new OptionDefinition(PlannerSettings.INDEX_PREFER_INTERSECT_PLANS),
       new OptionDefinition(PlannerSettings.INDEX_MAX_INDEXES_TO_INTERSECT),

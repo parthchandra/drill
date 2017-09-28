@@ -19,5 +19,6 @@ package org.apache.drill.exec.planner.index;
 
 public interface StatisticsPayload {
   double getRowCount();
+  double getLeadingRowCount();
   double getAvgRowSize();
 }

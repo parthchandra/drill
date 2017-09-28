@@ -51,13 +51,6 @@ public class IndexConditionInfo {
     this.hasIndexCol = hasIndexCol;
   }
 
-  public static Comparator<IndexDescriptor> indexFieldsDescComparator = new Comparator<IndexDescriptor>() {
-    @Override
-    public int compare(IndexDescriptor o1, IndexDescriptor o2) {
-      return - (o1.getIndexColumns().size() - o2.getIndexColumns().size());
-    }
-  };
-
   public static Builder newBuilder(RexNode condition,
                                    Iterable<IndexDescriptor> indexes,
                                    RexBuilder builder,
@@ -126,7 +119,7 @@ public class IndexConditionInfo {
      * that are relevant to this.indexes. The conditions are separated on LEADING index columns.
      * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
      */
-    public Map<IndexDescriptor, IndexConditionInfo> getLeadingKeyIndexConditionMap() {
+    public Map<IndexDescriptor, IndexConditionInfo> getFirstKeyIndexConditionMap() {
 
       Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = Maps.newLinkedHashMap();
 
@@ -184,47 +177,44 @@ public class IndexConditionInfo {
     /**
      * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
      * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
+     * that are relevant to the indexList. The conditions are separated based on index columns.
+     * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
+     */
+    public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap(List<IndexDescriptor> indexList) {
+      return getIndexConditionMapInternal(indexList);
+    }
+
+    /**
+     * Get a map of Index=>IndexConditionInfo, each IndexConditionInfo has the separated condition and remainder condition.
+     * The map is ordered, so the last IndexDescriptor will have the final remainderCondition after separating conditions
      * that are relevant to this.indexes. The conditions are separated based on index columns.
      * @return Map containing index{@link IndexDescriptor} and condition {@link IndexConditionInfo} pairs
      */
     public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap() {
-
-      //sort indexes by indexed fields number in desc order
-      List<IndexDescriptor> sortedIndex = Lists.newArrayList(indexes);
-      Collections.sort(sortedIndex, indexFieldsDescComparator);
-
-      return indexConditionMapFromSortedIndexes(sortedIndex);
+      return getIndexConditionMapInternal(Lists.newArrayList(indexes));
     }
 
-    public Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMap(List<IndexDescriptor> indexList) {
+    private Map<IndexDescriptor, IndexConditionInfo> getIndexConditionMapInternal(List<IndexDescriptor> indexes) {
 
-      //sort indexes by indexed fields number in desc order
-      List<IndexDescriptor> sortedIndex = Lists.newArrayList(indexList);
-      Collections.sort(sortedIndex, indexFieldsDescComparator);
-
-      return indexConditionMapFromSortedIndexes(sortedIndex);
-    }
-
-    private Map<IndexDescriptor, IndexConditionInfo> indexConditionMapFromSortedIndexes(List<IndexDescriptor> sortedIndex) {
       Map<IndexDescriptor, IndexConditionInfo> indexInfoMap = Maps.newLinkedHashMap();
       RexNode initCondition = condition;
-      for(IndexDescriptor index : sortedIndex) {
+      for (IndexDescriptor index : indexes) {
         if(initCondition.isAlwaysTrue()) {
           break;
         }
         if(!isConditionPrefix(index, initCondition)) {
           continue;
         }
-
         IndexConditionInfo info = indexConditionRelatedToFields(index.getIndexColumns(), initCondition);
         if(info == null || info.hasIndexCol == false) {
           continue;
         }
-        indexInfoMap.put(index, info);
         initCondition = info.remainderCondition;
+        indexInfoMap.put(index, info);
       }
       return indexInfoMap;
     }
+
     /**
      * Given a list of Index Expressions(usually indexed fields/functions from one or a set of indexes),
      * separate a filter condition into

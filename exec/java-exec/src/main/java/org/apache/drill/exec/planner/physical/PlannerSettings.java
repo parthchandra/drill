@@ -102,6 +102,8 @@ public class PlannerSettings implements Context{
   // TODO: Deprecate the following 2 (also in SystemOptionManager.java)
   public static final BooleanValidator INDEX_PREFER_INTERSECT_PLANS = new BooleanValidator("planner.index.prefer_intersect_plans");
   public static final RangeLongValidator INDEX_MAX_INDEXES_TO_INTERSECT = new RangeLongValidator("planner.index.max_indexes_to_intersect", 2, 100);
+  public static final RangeDoubleValidator INDEX_STATS_ROWCOUNT_SCALING_FACTOR =
+      new RangeDoubleValidator("planner.index.statistics_rowcount_scaling_factor", 0.0, 1.0);
   // ------------------------------------------- Index planning related options END ----------------------------------------------------------------
   public static final OptionValidator IDENTIFIER_MAX_LENGTH =
       new RangeLongValidator("planner.identifier_max_length", 128 /* A minimum length is needed because option names are identifiers themselves */,
@@ -380,7 +382,13 @@ public class PlannerSettings implements Context{
     return options.getOption(INDEX_PREFER_INTERSECT_PLANS);
   }
 
-  public long getMaxIndexesToIntersect() { return options.getOption(INDEX_MAX_INDEXES_TO_INTERSECT); }
+  public long getMaxIndexesToIntersect() {
+    return options.getOption(INDEX_MAX_INDEXES_TO_INTERSECT);
+  }
+
+  public double getIndexStatsRowCountScalingFactor() {
+    return options.getOption(INDEX_STATS_ROWCOUNT_SCALING_FACTOR);
+  }
 
   @Override
   public <T> T unwrap(Class<T> clazz) {

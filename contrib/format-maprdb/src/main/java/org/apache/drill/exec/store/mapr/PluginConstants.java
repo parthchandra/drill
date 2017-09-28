@@ -51,6 +51,8 @@ public class PluginConstants {
 
   public static final SchemaPath DOCUMENT_SCHEMA_PATH = SchemaPath.getSimplePath(DBConstants.DOCUMENT_FIELD);
 
+  public static final int JSON_TABLE_NUM_TABLETS_PER_INDEX_DEFAULT = 32;
+
   public static final String JSON_TABLE_SCAN_SIZE_MB = "format-maprdb.json.scanSizeMB";
   public static final int JSON_TABLE_SCAN_SIZE_MB_DEFAULT = 128;
 
