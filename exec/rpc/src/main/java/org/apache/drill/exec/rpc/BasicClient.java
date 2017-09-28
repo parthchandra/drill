@@ -21,7 +21,6 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -34,12 +33,10 @@ import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 
-import java.net.SocketAddress;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.GeneralRPCProtos.RpcMode;
-import org.apache.drill.exec.rpc.RpcConnectionHandler.FailureType;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Internal.EnumLite;
@@ -117,7 +114,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
             }
 
             pipe.addLast(RpcConstants.MESSAGE_HANDLER, new InboundHandler(connection));
-            pipe.addLast(RpcConstants.EXCEPTION_HANDLER, new RpcExceptionHandler<CC>(connection));
+            pipe.addLast(RpcConstants.EXCEPTION_HANDLER, new RpcExceptionHandler<>(connection));
           }
         }); //
 
@@ -138,11 +135,11 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   // Save the SslChannel after the SSL handshake so it can be closed later
   public void setSslChannel(Channel c) {
-    return;
+
   }
 
   protected void closeSSL() {
-    return;
+
   }
 
   @Override
@@ -169,7 +166,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
       }
     };
 
-    public IdlePingHandler(long idleWaitInMillis) {
+    IdlePingHandler(long idleWaitInMillis) {
       super(0, idleWaitInMillis, 0, TimeUnit.MILLISECONDS);
     }
 
@@ -204,8 +201,8 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
     return super.send(connection, rpcType, protobufBody, clazz, dataBodies);
   }
 
-  public <SEND extends MessageLite, RECEIVE extends MessageLite> void send(
-      RpcOutcomeListener<RECEIVE> listener, SEND protobufBody, boolean allowInEventLoop,
+  public <SEND extends MessageLite, RECEIVE extends MessageLite>
+  void send(RpcOutcomeListener<RECEIVE> listener, SEND protobufBody, boolean allowInEventLoop,
       ByteBuf... dataBodies) {
     super.send(listener, connection, handshakeType, protobufBody, (Class<RECEIVE>) responseClass,
         allowInEventLoop, dataBodies);
@@ -219,15 +216,15 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   protected void connectAsClient(RpcConnectionHandler<CC> connectionListener, HS handshakeValue,
                                  String host, int port) {
-    ConnectionMultiListener cml;
-    ConnectionMultiListener.Builder builder =
+    ConnectionMultiListener<T, CC, HS, HR, BasicClient<T, CC, HS, HR>> cml;
+    ConnectionMultiListener.Builder<T, CC, HS, HR, BasicClient<T, CC, HS, HR> > builder =
         ConnectionMultiListener.newBuilder(connectionListener, handshakeValue, this);
     if (isSslEnabled()) {
-      cml = builder.enableHandshake().enableSSL().build();
+      cml = builder.enableSSL().build();
       sslHandshakeListener = new ConnectionMultiListener.SSLHandshakeListener();
       sslHandshakeListener.setParent(cml);
     } else {
-      cml = builder.enableHandshake().enablePlain().build();
+      cml = builder.build();
     }
     b.connect(host, port).addListener(cml.connectionHandler);
   }
@@ -236,7 +233,7 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
     private final CC connection;
 
-    public ClientHandshakeHandler(CC connection) {
+    ClientHandshakeHandler(CC connection) {
       super(BasicClient.this.handshakeType, BasicClient.this.handshakeParser);
       Preconditions.checkNotNull(connection);
       this.connection = connection;

@@ -76,7 +76,7 @@ public class TestSSLConfig {
       fail();
       //Expected
     } catch (Exception e) {
-      assertTrue(e instanceof DrillException);
+
     }
   }
 
@@ -143,15 +143,21 @@ public class TestSSLConfig {
         .format(HADOOP_SSL_CONF_TPL_KEY, SSLFactory.Mode.SERVER.toString().toLowerCase());
     hadoopConfig.set(hadoopSSLFileProp, "ssl-server-invalid.xml");
     ConfigBuilder config = new ConfigBuilder();
+    config.put(ExecConstants.USER_SSL_ENABLED, true);
     config.put(ExecConstants.SSL_USE_HADOOP_CONF, true);
-    SSLConfig sslv = new SSLConfigBuilder()
-        .config(config.build())
-        .mode(SSLFactory.Mode.SERVER)
-        .initializeSSLContext(false)
-        .validateKeyStore(true)
-        .hadoopConfig(hadoopConfig)
-        .build();
-    assertEquals("FAIL", sslv.getKeyStorePassword());
+    SSLConfig sslv;
+    try {
+      sslv = new SSLConfigBuilder()
+          .config(config.build())
+          .mode(SSLFactory.Mode.SERVER)
+          .initializeSSLContext(false)
+          .validateKeyStore(true)
+          .hadoopConfig(hadoopConfig)
+          .build();
+      fail();
+    } catch (Exception e) {
+      assertTrue(e instanceof DrillException);
+    }
   }
 
 }

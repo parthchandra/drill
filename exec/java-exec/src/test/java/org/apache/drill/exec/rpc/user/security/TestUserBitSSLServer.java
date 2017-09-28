@@ -123,4 +123,21 @@ public class TestUserBitSSLServer extends BaseTestQuery {
     assertEquals(failureCaught, true);
   }
 
+  @Test
+  // Should pass because the keystore password will be used.
+  public void testNoKeyPassword() throws Exception {
+    DrillConfig testConfig = new DrillConfig(DrillConfig.create(sslConfig)
+        .withValue(ExecConstants.SSL_KEY_PASSWORD, ConfigValueFactory.fromAnyRef("")),
+        false);
+
+    // Start an SSL enabled cluster
+    boolean failureCaught = false;
+    try {
+      updateTestCluster(1, testConfig, initProps);
+    } catch (Exception e) {
+      failureCaught = true;
+    }
+    assertEquals(failureCaught, false);
+  }
+
 }

@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.rpc;
 
+import com.google.protobuf.Internal.EnumLite;
 import com.google.protobuf.MessageLite;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -40,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  *             in the case of SSL, wait for a SSL handshake completion and then send an application handshake.
  */
 
-public class ConnectionMultiListener<CC extends ClientConnection, HS extends MessageLite, HR extends MessageLite, BC extends BasicClient> {
+public class ConnectionMultiListener<T extends EnumLite, CC extends ClientConnection, HS extends MessageLite, HR extends MessageLite, BC extends BasicClient<T, CC, HS, HR>> {
 
   private static final Logger logger = org.slf4j.LoggerFactory.getLogger(ConnectionMultiListener.class);
 
@@ -58,23 +59,24 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
     this.parent = basicClient;
   }
 
-  @SuppressWarnings("unchecked")
-  public static <CC extends ClientConnection, HS extends MessageLite, BC extends BasicClient> Builder
+  public static <T extends EnumLite, CC extends ClientConnection, HS extends MessageLite, HR extends MessageLite, BC extends BasicClient<T, CC, HS, HR>>
+  Builder<T, CC, HS, HR, BC>
   newBuilder(RpcConnectionHandler<CC> connectionListener, HS handshakeValue,
       BC basicClient) {
-    return new Builder(connectionListener, handshakeValue, basicClient);
+    return new Builder<>(connectionListener, handshakeValue, basicClient);
   }
 
-  public ConnectionHandler connectionHandler = null;
-  public HandshakeSendHandler handshakeSendHandler = null;
-  public SSLConnectionHandler sslConnectionHandler = null;
+  ConnectionHandler connectionHandler = null;
+  private HandshakeSendHandler handshakeSendHandler = null;
+  private SSLConnectionHandler sslConnectionHandler = null;
 
   /**
    * Manages connection establishment outcomes.
    */
   private class ConnectionHandler implements GenericFutureListener<ChannelFuture> {
 
-    @Override public void operationComplete(ChannelFuture future) throws Exception {
+    @Override
+    public void operationComplete(ChannelFuture future) throws Exception {
       boolean isInterrupted = false;
 
       // We want to wait for at least 120 secs when interrupts occur. Establishing a connection fails/succeeds quickly,
@@ -127,7 +129,8 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
   }
 
   private class SSLConnectionHandler implements GenericFutureListener<Future<Channel>> {
-    @Override public void operationComplete(Future<Channel> future) throws Exception {
+    @Override
+    public void operationComplete(Future<Channel> future) throws Exception {
       // send the handshake
       parent.send(handshakeSendHandler, handshakeValue, true);
     }
@@ -138,17 +141,19 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
    */
   private class HandshakeSendHandler implements RpcOutcomeListener<HR> {
 
-    @Override public void failed(RpcException ex) {
+    @Override
+    public void failed(RpcException ex) {
       logger.debug("Failure while initiating handshake", ex);
       connectionListener.connectionFailed(RpcConnectionHandler.FailureType.HANDSHAKE_COMMUNICATION, ex);
     }
 
-    @Override public void success(HR value, ByteBuf buffer) {
+    @Override
+    public void success(HR value, ByteBuf buffer) {
       // logger.debug("Handshake received. {}", value);
       try {
         parent.validateHandshake(value);
         parent.finalizeConnection(value, parent.connection);
-        connectionListener.connectionSucceeded((CC) parent.connection);
+        connectionListener.connectionSucceeded(parent.connection);
         // logger.debug("Handshake completed succesfully.");
       } catch (Exception ex) {
         logger.debug("Failure while validating handshake", ex);
@@ -156,7 +161,8 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
       }
     }
 
-    @Override public void interrupted(final InterruptedException ex) {
+    @Override
+    public void interrupted(final InterruptedException ex) {
       logger.warn("Interrupted while waiting for handshake response", ex);
       connectionListener.connectionFailed(RpcConnectionHandler.FailureType.HANDSHAKE_COMMUNICATION, ex);
     }
@@ -170,14 +176,15 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
    */
   public static class SSLHandshakeListener implements GenericFutureListener<Future<Channel>> {
     ConnectionMultiListener parent;
-    public SSLHandshakeListener() {
+    SSLHandshakeListener() {
     }
 
     public void setParent(ConnectionMultiListener cml){
       this.parent = cml;
     }
 
-    @Override public void operationComplete(Future<Channel> future) throws Exception {
+    @Override
+    public void operationComplete(Future<Channel> future) throws Exception {
       if(parent != null){
         if(future.isSuccess()) {
           Channel c = future.get();
@@ -189,48 +196,36 @@ public class ConnectionMultiListener<CC extends ClientConnection, HS extends Mes
       } else {
         throw new RpcException("RPC Setup error. SSL handshake complete handler is not set up.");
       }
-      return;
     }
   }
 
 
-  public static class Builder<CC extends ClientConnection, HS extends MessageLite, HR extends MessageLite, BC extends BasicClient> {
+  public static class Builder<T extends EnumLite, CC extends ClientConnection, HS extends MessageLite, HR extends MessageLite, BC extends BasicClient<T, CC, HS, HR> > {
 
-    private RpcConnectionHandler<CC> connectionListener;
-    private HS handshakeValue;
-    private BC basicClient;
-    private ConnectionMultiListener cml;
+    private final RpcConnectionHandler<CC> connectionListener;
+    private final HS handshakeValue;
+    private final BC basicClient;
+    boolean enableSSL = false;
+
+    private ConnectionMultiListener<T, CC, HS, HR, BC> cml;
 
     private Builder(RpcConnectionHandler<CC> connectionListener, HS handshakeValue, BC basicClient) {
       this.connectionListener = connectionListener;
       this.handshakeValue = handshakeValue;
       this.basicClient = basicClient;
-      this.cml = new ConnectionMultiListener(connectionListener, handshakeValue, basicClient);
     }
 
-    public Builder enableSSL() {
-      cml.connectionHandler = cml.new ConnectionHandler();
-      cml.sslConnectionHandler = cml.new SSLConnectionHandler();
+    Builder<T, CC, HS, HR, BC> enableSSL() {
+      enableSSL = true;
       return this;
     }
 
-    public Builder enablePlain() {
+    public ConnectionMultiListener<T, CC, HS, HR, BC> build() {
+      this.cml = new ConnectionMultiListener<>(connectionListener, handshakeValue, basicClient);
       cml.connectionHandler = cml.new ConnectionHandler();
-      return this;
-    }
-
-    public Builder enableHandshake() {
       cml.handshakeSendHandler = cml.new HandshakeSendHandler();
-      return this;
-    }
-
-    public ConnectionMultiListener build() {
-      //always enable handshake
-      if (cml.handshakeSendHandler == null) {
-        enableHandshake();
-      }
-      if (cml.connectionHandler == null && cml.sslConnectionHandler == null) {
-        enablePlain();
+      if(enableSSL) {
+        cml.sslConnectionHandler = cml.new SSLConnectionHandler();
       }
       return cml;
     }
