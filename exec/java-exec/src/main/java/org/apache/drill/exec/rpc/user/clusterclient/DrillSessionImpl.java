@@ -17,8 +17,10 @@
  */
 package org.apache.drill.exec.rpc.user.clusterclient;
 
+import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
@@ -35,14 +37,14 @@ import org.apache.drill.exec.rpc.DrillRpcFuture;
 import org.apache.drill.exec.rpc.user.QueryDataBatch;
 import org.apache.drill.exec.rpc.user.UserResultsListener;
 
-import java.util.concurrent.ConcurrentMap;
+import java.util.Set;
 
 public class DrillSessionImpl implements DrillSession {
-//  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillSessionImpl.class);
+  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(DrillSessionImpl.class);
 
   private final SessionHandle sessionHandle;
   private final DrillConnectionImpl connection;
-  private final ConcurrentMap<QueryId, QueryId> queries = Maps.newConcurrentMap();
+  private final Set<QueryId> queries = Sets.newConcurrentHashSet();
 
   DrillSessionImpl(DrillConnectionImpl connection, SessionHandle sessionHandle) {
     this.connection = connection;
@@ -56,6 +58,8 @@ public class DrillSessionImpl implements DrillSession {
 
   @Override
   public void executeStatement(final String sql, final UserResultsListener resultsListener) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(sql), "sql should not be null or blank");
+    Preconditions.checkArgument(resultsListener != null, "resultsListener can not be null");
     connection.send(connection.getResultHandler()
             .getWrappedListener(wrapUserResultListener(resultsListener)),
         RpcType.RUN_QUERY_WITH_SESSION,
@@ -75,32 +79,55 @@ public class DrillSessionImpl implements DrillSession {
 
       @Override
       public void queryIdArrived(QueryId queryId) {
+        Preconditions.checkNotNull(queryId);
         this.queryId = queryId;
-        queries.putIfAbsent(queryId, queryId);
+        String wasAdded = queries.add(queryId) ?  "was" : "was not";
+        logger.debug("query {} {} added to known queries", queryId, wasAdded);
         resultsListener.queryIdArrived(queryId);
       }
 
       @Override
       public void submissionFailed(UserException ex) {
-        queries.remove(queryId);
+        // It is possible that queryId was not yet assigned, see SubmissionListener.failed()
+        String wasRemoved = (queryId != null) && queries.remove(queryId) ? "was" : "was not";
+        logger.debug("query {} {} removed from known queries", queryId, wasRemoved, ex);
         resultsListener.submissionFailed(ex);
       }
 
       @Override
       public void dataArrived(QueryDataBatch result, ConnectionThrottle throttle) {
-        resultsListener.dataArrived(result, throttle);
+        logger.debug("data arrived for query {}", queryId);
+        // TODO: replace queryId == null check with Preconditions.checkNotNull(queryId);
+        if (queryId == null || queries.contains(queryId)) {
+          resultsListener.dataArrived(result, throttle);
+        }
       }
 
       @Override
       public void queryCompleted(QueryState state) {
-        queries.remove(queryId);
-        resultsListener.queryCompleted(state);
+        // TODO: replace queryId == null check with Preconditions.checkNotNull(queryId);
+        boolean notify = queryId == null || queries.remove(queryId);
+        logger.debug("query {} was completed with state {}, listener {} {} be notified", queryId, state, resultsListener,
+            notify ? "will" : "will not");
+        if (notify) {
+          resultsListener.queryCompleted(state);
+        }
       }
     };
   }
 
   @Override
   public DrillRpcFuture<Ack> cancelQuery(final QueryId queryId) {
+    return cancelQuery(queryId, false);
+  }
+
+  private DrillRpcFuture<Ack> cancelQuery(final QueryId queryId, boolean notifyWhenCompleted) {
+    Preconditions.checkArgument(queryId != null, "queryId can not be null");
+    logger.debug("cancelling query {}", queryId);
+    if (!notifyWhenCompleted && !queries.remove(queryId) || notifyWhenCompleted && !queries.contains(queryId)) {
+      logger.warn("Trying to cancel unknown query {}, query already completed or cancelled?", queryId);
+    }
+    // TODO: do not send cancellation request for unknown queries to the server
     return connection.send(RpcType.CANCEL_QUERY_WITH_SESSION,
         CancelQueryWithSessionHandle.newBuilder()
             .setSessionHandle(sessionHandle)
@@ -119,7 +146,7 @@ public class DrillSessionImpl implements DrillSession {
             new Predicate<QueryId>() {
               @Override
               public boolean apply(final QueryId input) {
-                return queries.containsKey(input);
+                return queries.contains(input);
               }
             },
             UserException.connectionError()
