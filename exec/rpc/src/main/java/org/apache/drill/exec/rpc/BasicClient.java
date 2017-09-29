@@ -138,10 +138,6 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   }
 
-  protected void closeSSL() {
-
-  }
-
   @Override
   protected CC initRemoteConnection(SocketChannel channel){
     local=channel.localAddress();
@@ -255,10 +251,6 @@ public abstract class BasicClient<T extends EnumLite, CC extends ClientConnectio
 
   public void close() {
     logger.debug("Closing client");
-
-    if(isSslEnabled()) {
-      closeSSL();
-    }
 
     if (connection != null) {
       connection.close();

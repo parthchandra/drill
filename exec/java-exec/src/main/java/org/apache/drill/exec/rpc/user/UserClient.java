@@ -28,11 +28,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.net.ssl.SSLEngine;
-import javax.net.ssl.SSLParameters;
 import javax.security.sasl.SaslClient;
 import javax.security.sasl.SaslException;
 
-import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.ssl.SslHandler;
 import org.apache.drill.common.KerberosUtil;
@@ -118,7 +116,6 @@ public class UserClient
   private volatile List<String> serverAuthMechanisms = null;
   private volatile boolean authComplete = true;
   private SSLConfig sslConfig;
-  private Channel sslChannel;
   private DrillbitEndpoint endpoint;
 
   public UserClient(String clientName, DrillConfig config, Properties properties, boolean supportComplexTypes,
@@ -130,7 +127,6 @@ public class UserClient
     this.clientName = clientName;
     this.allocator = allocator;
     this.supportComplexTypes = supportComplexTypes;
-    this.sslChannel = null;
     try {
       this.sslConfig = new SSLConfigBuilder().properties(properties).mode(SSLFactory.Mode.CLIENT)
           .initializeSSLContext(true).validateKeyStore(false).build();
@@ -160,17 +156,6 @@ public class UserClient
 
   @Override protected boolean isSslEnabled() {
     return sslConfig.isUserSslEnabled();
-  }
-
-  @Override public void setSslChannel(Channel c) {
-    sslChannel = c;
-    return;
-  }
-
-  @Override protected void closeSSL() {
-    if (isSslEnabled() && sslChannel != null) {
-      sslChannel.close();
-    }
   }
 
   public RpcEndpointInfos getServerInfos() {
