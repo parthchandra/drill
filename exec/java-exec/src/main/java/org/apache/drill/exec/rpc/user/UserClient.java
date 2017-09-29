@@ -131,7 +131,7 @@ public class UserClient
       this.sslConfig = new SSLConfigBuilder().properties(properties).mode(SSLFactory.Mode.CLIENT)
           .initializeSSLContext(true).validateKeyStore(false).build();
     } catch (DrillException e) {
-      throw new NonTransientRpcException(e.getMessage());
+      throw new InvalidConnectionInfoException(e.getMessage());
     }
 
   }
@@ -200,7 +200,7 @@ public class UserClient
         String msg = new StringBuilder().append(
             "Connecting to the server timed out. This is sometimes due to a mismatch in the SSL configuration between client and server. [ Exception: ")
             .append(e.getMessage()).append("]").toString();
-        throw new InvalidConnectionInfoException(msg);
+        throw new NonTransientRpcException(msg);
       }
     } else {
       connect(hsBuilder.build(), endpoint).checkedGet();
