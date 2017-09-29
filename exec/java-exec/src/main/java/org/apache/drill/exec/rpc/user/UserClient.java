@@ -147,7 +147,7 @@ public class UserClient extends BasicClient<RpcType, UserClient.UserToBitConnect
         .setSupportTimeout(true)
         .setCredentials(credentials)
         .setClientInfos(UserRpcUtils.getRpcEndpointInfos(clientName))
-        .setSaslSupport(SaslSupport.SASL_AUTH)
+        .setSaslSupport(SaslSupport.SASL_PRIVACY)
         .setProperties(properties.serializeForServer())
         .setEnableMultiplex(properties.containsKey(DrillProperties.MULTIPLEX) &&
             Boolean.parseBoolean(properties.getProperty(DrillProperties.MULTIPLEX)));
