@@ -20,8 +20,7 @@
 #ifndef STREAMSOCKET_HPP
 #define STREAMSOCKET_HPP
 
-#include "drill/common.hpp"
-#include "env.h"
+#include "logger.hpp"
 #include "wincert.ipp"
 
 #include <boost/asio.hpp>
@@ -179,8 +178,12 @@ class SslSocket:
         // throws: boost::system::system_error
         void protocolHandshake(bool useSystemConfig){
             if(useSystemConfig){
-                std::string msg = "Failed to load system trust store.";
-                if (loadSystemTrustStore(this->native_handle(), msg)) {
+                std::string msg = "";
+                int ret = loadSystemTrustStore(this->native_handle(), msg);
+                if(!msg.empty()){
+                    DRILL_LOG(LOG_WARNING) << msg.c_str() << std::endl;
+                }
+                if(ret){
                     boost::system::error_code ec(EPROTO, boost::system::system_category());
                     boost::asio::detail::throw_error(ec, msg.c_str());
                 }
