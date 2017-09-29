@@ -66,8 +66,8 @@ public class ZKSecureACLProvider implements ACLProvider {
 
     public List<ACL> getAclForPath(String path) {
         logger.trace("getAclForPath " + path);
-        if(path.equals(drillClusterPath)) {
-            logger.trace("getAclForPath drillClusterPath " + drillClusterPath);
+        if(path.startsWith(drillClusterPath)) {
+            logger.trace("getAclForPath drillClusterPath " + path);
             return DRILL_CLUSTER_ACL;
         }
         return DEFAULT_ACL;
