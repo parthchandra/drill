@@ -41,6 +41,8 @@ import org.ojai.types.OTime;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.mapr.db.util.SqlHelper;
+
 import org.ojai.types.OTimestamp;
 
 class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpression, RuntimeException> {
@@ -110,7 +112,7 @@ class CompareFunctionsProcessor extends AbstractExprVisitor<Boolean, LogicalExpr
     }
 
     if (valueArg instanceof QuotedString) {
-      this.value = KeyValueBuilder.initFrom(((QuotedString) valueArg).value);
+      this.value = SqlHelper.decodeStringAsValue(((QuotedString) valueArg).value);
       this.path = path;
       return true;
     }
