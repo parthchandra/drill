@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*/
 
 #include <fstream>
 #include <iostream>
@@ -24,58 +24,59 @@
 #include <boost/algorithm/string/join.hpp>
 #include "drill/drillc.hpp"
 
-int nOptions=25;
+int nOptions = 25;
 
 struct Option{
     char name[32];
     char desc[128];
     bool required;
-}qsOptions[]= {
-    {"plan", "Plan files separated by semicolons", false},
-    {"query", "Query strings, separated by semicolons", false},
-    {"type", "Query type [physical|logical|sql|server]", true},
-    {"connectStr", "Connect string", true},
-    {"schema", "Default schema", false},
-    {"api", "API type [sync|async|meta]", true},
-    {"logLevel", "Logging level [trace|debug|info|warn|error|fatal]", false},
-    {"testCancel", "Cancel the query after the first record batch.", false},
-    {"syncSend", "Send query only after previous result is received", false},
-    {"hshakeTimeout", "Handshake timeout (second).", false},
-    {"queryTimeout", "Query timeout (second).", false},
-    {"heartbeatFrequency", "Heartbeat frequency (second). Disabled if set to 0.", false},
-    {"user", "Username", false},
-    {"password", "Password", false},
-    {"saslPluginPath", "Path to where SASL plugins are installed", false},
-    {"service_host", "Service host for Kerberos", false},
-    {"service_name", "Service name for Kerberos", false},
-    {"auth", "Authentication mechanism to use", false},
-    {"sasl_encrypt", "Negotiate for encrypted connection", false},
-    {"enableSSL", "Enable SSL", false},
-    {"TLSProtocol", "TLS protocol version", false},
-    {"certFilePath", "Path to SSL certificate file", false},
-    {"disableHostnameVerification", "disable host name verification", false},
-    {"disableCertVerification", "disable certificate verification", false},
-	{"useSystemTrustStore", "[Windows only]. Use the system truststore.", false }
+}qsOptions[] = {
+        { "plan", "Plan files separated by semicolons", false },
+        { "query", "Query strings, separated by semicolons", false },
+        { "type", "Query type [physical|logical|sql|server]", true },
+        { "connectStr", "Connect string", true },
+        { "schema", "Default schema", false },
+        { "api", "API type [sync|async|meta]", true },
+        { "logLevel", "Logging level [trace|debug|info|warn|error|fatal]", false },
+        { "testCancel", "Cancel the query after the first record batch.", false },
+        { "syncSend", "Send query only after previous result is received", false },
+        { "hshakeTimeout", "Handshake timeout (second).", false },
+        { "queryTimeout", "Query timeout (second).", false },
+        { "heartbeatFrequency", "Heartbeat frequency (second). Disabled if set to 0.", false },
+        { "user", "Username", false },
+        { "password", "Password", false },
+        { "saslPluginPath", "Path to where SASL plugins are installed", false },
+        { "service_host", "Service host for Kerberos", false },
+        { "service_name", "Service name for Kerberos", false },
+        { "auth", "Authentication mechanism to use", false },
+        { "sasl_encrypt", "Negotiate for encrypted connection", false },
+        { "enableSSL", "Enable SSL", false },
+        { "TLSProtocol", "TLS protocol version", false },
+        { "certFilePath", "Path to SSL certificate file", false },
+        { "disableHostnameVerification", "disable host name verification", false },
+        { "disableCertVerification", "disable certificate verification", false },
+        { "useSystemTrustStore", "[Windows only]. Use the system truststore.", false }
 
 };
 
 std::map<std::string, std::string> qsOptionValues;
 
-bool bTestCancel=false;
-bool bSyncSend=false;
+bool bTestCancel = false;
+bool bSyncSend = false;
 
 
 Drill::status_t SchemaListener(void* ctx, Drill::FieldDefPtr fields, Drill::DrillClientError* err){
-    if(!err){
-        std::cout<< "SCHEMA CHANGE DETECTED:" << std::endl;
-        for(size_t i=0; i<fields->size(); i++){
-            std::string name= fields->at(i)->getName();
+    if (!err){
+        std::cout << "SCHEMA CHANGE DETECTED:" << std::endl;
+        for (size_t i = 0; i < fields->size(); i++){
+            std::string name = fields->at(i)->getName();
             std::cout << name << "\t";
         }
         std::cout << std::endl;
-        return Drill::QRY_SUCCESS ;
-    }else{
-        std::cerr<< "ERROR: " << err->msg << std::endl;
+        return Drill::QRY_SUCCESS;
+    }
+    else{
+        std::cerr << "ERROR: " << err->msg << std::endl;
         return Drill::QRY_FAILURE;
     }
 }
@@ -86,30 +87,38 @@ Drill::status_t QueryResultsListener(void* ctx, Drill::RecordBatch* b, Drill::Dr
     // (received an record batch and err is NULL)
     // or
     // (received query state message passed by `err` and b is NULL)
+    std::cout << "QueryResultsListener..." << std::endl;
     boost::lock_guard<boost::mutex> listenerLock(listenerMutex);
-    if(!err){
-        if(b!=NULL){
+    if (!err){
+        std::cout << "QueryResultsListener...!err..." << std::endl;
+        if (b != NULL){
+            std::cout << "QueryResultsListener...!err...b != NULL..." << std::endl;
             b->print(std::cout, 0); // print all rows
             std::cout << "DATA RECEIVED ..." << std::endl;
             delete b; // we're done with this batch, we can delete it
-            if(bTestCancel){
+            if (bTestCancel){
                 return Drill::QRY_FAILURE;
-            }else{
-                return Drill::QRY_SUCCESS ;
             }
-        }else{
+            else{
+                return Drill::QRY_SUCCESS;
+            }
+        }
+        else{
+            std::cout << "QueryResultsListener...!err...DONE..." << std::endl;
             std::cout << "Query Complete." << std::endl;
             return Drill::QRY_SUCCESS;
-		}
-    }else{
-        assert(b==NULL);
-        switch(err->status) {
+        }
+    }
+    else{
+        std::cout << "QueryResultsListener...err..." << std::endl;
+        assert(b == NULL);
+        switch (err->status) {
             case Drill::QRY_COMPLETED:
             case Drill::QRY_CANCELED:
-                std::cerr<< "INFO: " << err->msg << std::endl;
+                std::cerr << "INFO: " << err->msg << std::endl;
                 return Drill::QRY_SUCCESS;
             default:
-                std::cerr<< "ERROR: " << err->msg << std::endl;
+                std::cerr << "ERROR: " << err->msg << std::endl;
                 return Drill::QRY_FAILURE;
         }
     }
@@ -164,47 +173,47 @@ void print(const Drill::FieldMetadata* pFieldMetadata, void* buf, size_t sz){
 }
 
 void printUsage(){
-    std::cerr<<"Usage: querySubmitter ";
-    for(int j=0; j<nOptions ;j++){
-        std::cerr<< " "<< qsOptions[j].name <<"="  << "[" <<qsOptions[j].desc <<"]" ;
+    std::cerr << "Usage: querySubmitter ";
+    for (int j = 0; j < nOptions; j++){
+        std::cerr << " " << qsOptions[j].name << "=" << "[" << qsOptions[j].desc << "]";
     }
-    std::cerr<<std::endl;
+    std::cerr << std::endl;
 }
 
 int parseArgs(int argc, char* argv[]){
-    bool error=false;
-    for(int i=1; i<argc; i++){
-        char*a =argv[i];
-        char* o=strtok(a, "=");
-        char*v=strtok(NULL, "");
+    bool error = false;
+    for (int i = 1; i < argc; i++){
+        char*a = argv[i];
+        char* o = strtok(a, "=");
+        char*v = strtok(NULL, "");
 
-        bool found=false;
-        for(int j=0; j<nOptions ;j++){
-            if(!strcmp(qsOptions[j].name, o)){
-                found=true; break;
+        bool found = false;
+        for (int j = 0; j < nOptions; j++){
+            if (!strcmp(qsOptions[j].name, o)){
+                found = true; break;
             }
         }
-        if(!found){
-            std::cerr<< "Unknown option:"<< o <<". Ignoring" << std::endl;
+        if (!found){
+            std::cerr << "Unknown option:" << o << ". Ignoring" << std::endl;
             continue;
         }
 
-        if(v==NULL){
-            std::cerr<< ""<< qsOptions[i].name << " [" <<qsOptions[i].desc <<"] " << "requires a parameter."  << std::endl;
-            error=true;
+        if (v == NULL){
+            std::cerr << "" << qsOptions[i].name << " [" << qsOptions[i].desc << "] " << "requires a parameter." << std::endl;
+            error = true;
         }
-        qsOptionValues[o]=v;
+        qsOptionValues[o] = v;
     }
 
-    for(int j=0; j<nOptions ;j++){
-        if(qsOptions[j].required ){
-            if(qsOptionValues.find(qsOptions[j].name) == qsOptionValues.end()){
-                std::cerr<< ""<< qsOptions[j].name << " [" <<qsOptions[j].desc <<"] " << "is required." << std::endl;
-                error=true;
+    for (int j = 0; j < nOptions; j++){
+        if (qsOptions[j].required){
+            if (qsOptionValues.find(qsOptions[j].name) == qsOptionValues.end()){
+                std::cerr << "" << qsOptions[j].name << " [" << qsOptions[j].desc << "] " << "is required." << std::endl;
+                error = true;
             }
         }
     }
-    if(error){
+    if (error){
         printUsage();
         exit(1);
     }
@@ -213,11 +222,11 @@ int parseArgs(int argc, char* argv[]){
 
 void parseUrl(std::string& url, std::string& protocol, std::string& host, std::string& port){
     char u[1024];
-    strcpy(u,url.c_str());
-    char* z=strtok(u, "=");
-    char* h=strtok(NULL, ":");
-    char* p=strtok(NULL, ":");
-    protocol=z; host=h; port=p;
+    strcpy(u, url.c_str());
+    char* z = strtok(u, "=");
+    char* h = strtok(NULL, ":");
+    char* p = strtok(NULL, ":");
+    protocol = z; host = h; port = p;
 }
 
 std::vector<std::string> &splitString(const std::string& s, char delim, std::vector<std::string>& elems){
@@ -233,7 +242,7 @@ int readPlans(const std::string& planList, std::vector<std::string>& plans){
     std::vector<std::string> planFiles;
     std::vector<std::string>::iterator iter;
     splitString(planList, ';', planFiles);
-    for(iter = planFiles.begin(); iter != planFiles.end(); iter++) {
+    for (iter = planFiles.begin(); iter != planFiles.end(); iter++) {
         std::ifstream f((*iter).c_str());
         std::string plan((std::istreambuf_iterator<char>(f)), (std::istreambuf_iterator<char>()));
         std::cout << "plan:" << plan << std::endl;
@@ -248,41 +257,83 @@ int readQueries(const std::string& queryList, std::vector<std::string>& queries)
 }
 
 bool validate(const std::string& type, const std::string& query, const std::string& plan){
-	if (type != "sync" || type != "async") {
-		return true;
-	}
-    if(query.empty() && plan.empty()){
-        std::cerr<< "Either query or plan must be specified"<<std::endl;
-        return false;    }
-        if(type=="physical" || type == "logical" ){
-            if(plan.empty()){
-                std::cerr<< "A logical or physical  plan must be specified"<<std::endl;
-                return false;
-            }
-        }else
-            if(type=="sql"){
-                if(query.empty()){
-                    std::cerr<< "A drill SQL query must be specified"<<std::endl;
-                    return false;
-                }
-            }else{
-                std::cerr<< "Unknown query type: "<< type << std::endl;
-                return false;
-            }
+    if (type != "sync" || type != "async") {
         return true;
+    }
+    if (query.empty() && plan.empty()){
+        std::cerr << "Either query or plan must be specified" << std::endl;
+        return false;
+    }
+    if (type == "physical" || type == "logical"){
+        if (plan.empty()){
+            std::cerr << "A logical or physical  plan must be specified" << std::endl;
+            return false;
+        }
+    }
+    else
+    if (type == "sql"){
+        if (query.empty()){
+            std::cerr << "A drill SQL query must be specified" << std::endl;
+            return false;
+        }
+    }
+    else{
+        std::cerr << "Unknown query type: " << type << std::endl;
+        return false;
+    }
+    return true;
 }
 
 Drill::logLevel_t getLogLevel(const char *s){
-    if(s!=NULL){
-        if(!strcmp(s, "trace")) return Drill::LOG_TRACE;
-        if(!strcmp(s, "debug")) return Drill::LOG_DEBUG;
-        if(!strcmp(s, "info")) return Drill::LOG_INFO;
-        if(!strcmp(s, "warn")) return Drill::LOG_WARNING;
-        if(!strcmp(s, "error")) return Drill::LOG_ERROR;
-        if(!strcmp(s, "fatal")) return Drill::LOG_FATAL;
+    if (s != NULL){
+        if (!strcmp(s, "trace")) return Drill::LOG_TRACE;
+        if (!strcmp(s, "debug")) return Drill::LOG_DEBUG;
+        if (!strcmp(s, "info")) return Drill::LOG_INFO;
+        if (!strcmp(s, "warn")) return Drill::LOG_WARNING;
+        if (!strcmp(s, "error")) return Drill::LOG_ERROR;
+        if (!strcmp(s, "fatal")) return Drill::LOG_FATAL;
     }
     return Drill::LOG_ERROR;
 }
+
+
+// =================================================================================================
+// Segmentation Fault repro...
+// =================================================================================================
+Drill::status_t QRListener(void* ctx, Drill::RecordBatch* in_rb, Drill::DrillClientError* in_err)
+{
+    std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000001: QRListener ++++++++++++++ ENTER ++++++++++++++" << std::endl;
+    if (NULL != in_err)
+    {
+        std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000001: QRListener: Error not null." << std::endl;
+    }
+    else if ((NULL == in_rb) && (NULL == in_err))
+    {
+        std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000001: QRListener: Error null and RB null." << std::endl;
+    }
+    else
+    {
+        std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000001: QRListener: RB not null and error null." << std::endl;
+        delete in_rb;
+    }
+    return Drill::QRY_FAILURE;
+}
+
+void ExecuteDRQry(
+        const std::string& in_qry,
+        Drill::DrillClient& in_client,
+        Drill::QueryHandle_t& in_qryHandle)
+{
+    std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000001: ExecuteDRQry ++++++++++++++ ENTER ++++++++++++++" << std::endl;
+    in_client.submitQuery(
+            Drill::SQL,
+            in_qry,
+            QRListener,
+            NULL,
+            &(in_qryHandle));
+}
+
+// =================================================================================================
 
 int main(int argc, char* argv[]) {
     try {
@@ -291,57 +342,60 @@ int main(int argc, char* argv[]) {
 
         std::vector<std::string*> queries;
 
-        std::string connectStr=qsOptionValues["connectStr"];
-        std::string schema=qsOptionValues["schema"];
-        std::string queryList=qsOptionValues["query"];
-        std::string planList=qsOptionValues["plan"];
-        std::string api=qsOptionValues["api"];
-        std::string type_str=qsOptionValues["type"];
-        std::string logLevel=qsOptionValues["logLevel"];
-        std::string testCancel=qsOptionValues["testCancel"];
-        std::string syncSend=qsOptionValues["syncSend"];
-        std::string hshakeTimeout=qsOptionValues["hshakeTimeout"];
-        std::string queryTimeout=qsOptionValues["queryTimeout"];
-        std::string heartbeatFrequency=qsOptionValues["heartbeatFrequency"];
-        std::string user=qsOptionValues["user"];
-        std::string password=qsOptionValues["password"];
-        std::string saslPluginPath=qsOptionValues["saslPluginPath"];
-        std::string sasl_encrypt=qsOptionValues["sasl_encrypt"];
-        std::string serviceHost=qsOptionValues["service_host"];
-        std::string serviceName=qsOptionValues["service_name"];
-        std::string auth=qsOptionValues["auth"];
-        std::string enableSSL=qsOptionValues["enableSSL"];
-        std::string tlsProtocol=qsOptionValues["TLSProtocol"];
-        std::string certFilePath=qsOptionValues["certFilePath"];
-        std::string disableHostnameVerification=qsOptionValues["disableHostnameVerification"];
-        std::string disableCertVerification=qsOptionValues["disableCertVerification"];
-		std::string useSystemTrustStore = qsOptionValues["useSystemTrustStore"];
+        std::string connectStr = qsOptionValues["connectStr"];
+        std::string schema = qsOptionValues["schema"];
+        std::string queryList = qsOptionValues["query"];
+        std::string planList = qsOptionValues["plan"];
+        std::string api = qsOptionValues["api"];
+        std::string type_str = qsOptionValues["type"];
+        std::string logLevel = qsOptionValues["logLevel"];
+        std::string testCancel = qsOptionValues["testCancel"];
+        std::string syncSend = qsOptionValues["syncSend"];
+        std::string hshakeTimeout = qsOptionValues["hshakeTimeout"];
+        std::string queryTimeout = qsOptionValues["queryTimeout"];
+        std::string heartbeatFrequency = qsOptionValues["heartbeatFrequency"];
+        std::string user = qsOptionValues["user"];
+        std::string password = qsOptionValues["password"];
+        std::string saslPluginPath = qsOptionValues["saslPluginPath"];
+        std::string sasl_encrypt = qsOptionValues["sasl_encrypt"];
+        std::string serviceHost = qsOptionValues["service_host"];
+        std::string serviceName = qsOptionValues["service_name"];
+        std::string auth = qsOptionValues["auth"];
+        std::string enableSSL = qsOptionValues["enableSSL"];
+        std::string tlsProtocol = qsOptionValues["TLSProtocol"];
+        std::string certFilePath = qsOptionValues["certFilePath"];
+        std::string disableHostnameVerification = qsOptionValues["disableHostnameVerification"];
+        std::string disableCertVerification = qsOptionValues["disableCertVerification"];
+        std::string useSystemTrustStore = qsOptionValues["useSystemTrustStore"];
 
         Drill::QueryType type;
 
-        if(!validate(type_str, queryList, planList)){
+        if (!validate(type_str, queryList, planList)){
             exit(1);
         }
 
-        Drill::logLevel_t l=getLogLevel(logLevel.c_str());
+        Drill::logLevel_t l = getLogLevel(logLevel.c_str());
 
         std::vector<std::string> queryInputs;
-        if(type_str=="sql" ){
+        if (type_str == "sql"){
             readQueries(queryList, queryInputs);
-            type=Drill::SQL;
-        }else if(type_str=="physical" ){
+            type = Drill::SQL;
+        }
+        else if (type_str == "physical"){
             readPlans(planList, queryInputs);
-            type=Drill::PHYSICAL;
-        }else if(type_str == "logical"){
+            type = Drill::PHYSICAL;
+        }
+        else if (type_str == "logical"){
             readPlans(planList, queryInputs);
-            type=Drill::LOGICAL;
-        }else{
+            type = Drill::LOGICAL;
+        }
+        else{
             readQueries(queryList, queryInputs);
-            type=Drill::SQL;
+            type = Drill::SQL;
         }
 
-        bTestCancel = !strcmp(testCancel.c_str(), "true")?true:false;
-        bSyncSend = !strcmp(syncSend.c_str(), "true")?true:false;
+        bTestCancel = !strcmp(testCancel.c_str(), "true") ? true : false;
+        bSyncSend = !strcmp(syncSend.c_str(), "true") ? true : false;
 
         std::vector<std::string>::iterator queryInpIter;
 
@@ -352,30 +406,31 @@ int main(int argc, char* argv[]) {
         std::vector<Drill::QueryHandle_t>::iterator queryHandleIter;
 
         Drill::DrillClient client;
+
 #if defined _WIN32 || defined _WIN64
         TCHAR tempPath[MAX_PATH];
         GetTempPath(MAX_PATH, tempPath);
-		char logpathPrefix[MAX_PATH + 128];
-		strcpy(logpathPrefix,tempPath);
-		strcat(logpathPrefix, "\\drillclient");
+        char logpathPrefix[MAX_PATH + 128];
+        strcpy(logpathPrefix, tempPath);
+        strcat(logpathPrefix, "\\drillclient");
 #else
-		const char* logpathPrefix = "/var/log/drill/drillclient";
+        const char* logpathPrefix = "/var/log/drill/drillclient";
 #endif
-		// To log to file
+        // To log to file
         Drill::DrillClient::initLogging(logpathPrefix, l);
         // To log to stderr
         //Drill::DrillClient::initLogging(NULL, l);
 
-        int nQueries=queryInputs.size();
-        Drill::DrillClientConfig::setBufferLimit(nQueries*2*1024*1024); // 2MB per query. The size of a record batch may vary, but is unlikely to exceed the 256 MB which is the default. 
+        int nQueries = queryInputs.size();
+        Drill::DrillClientConfig::setBufferLimit(nQueries * 2 * 1024 * 1024); // 2MB per query. The size of a record batch may vary, but is unlikely to exceed the 256 MB which is the default.
 
-        if(!hshakeTimeout.empty()){
+        if (!hshakeTimeout.empty()){
             Drill::DrillClientConfig::setHandshakeTimeout(atoi(hshakeTimeout.c_str()));
         }
         if (!queryTimeout.empty()){
             Drill::DrillClientConfig::setQueryTimeout(atoi(queryTimeout.c_str()));
         }
-        if(!heartbeatFrequency.empty()) {
+        if (!heartbeatFrequency.empty()) {
             Drill::DrillClientConfig::setHeartbeatFrequency(atoi(heartbeatFrequency.c_str()));
         }
         if (!saslPluginPath.empty()){
@@ -383,192 +438,317 @@ int main(int argc, char* argv[]) {
         }
 
         Drill::DrillUserProperties props;
-        if(schema.length()>0){
+        if (schema.length() > 0){
             props.setProperty(USERPROP_SCHEMA, schema);
         }
-        if(user.length()>0){
+        if (user.length() > 0){
             props.setProperty(USERPROP_USERNAME, user);
         }
-        if(password.length()>0){
+        if (password.length() > 0){
             props.setProperty(USERPROP_PASSWORD, password);
         }
-        if(sasl_encrypt.length()>0){
+        if (sasl_encrypt.length() > 0){
             props.setProperty(USERPROP_SASL_ENCRYPT, sasl_encrypt);
         }
-        if(serviceHost.length()>0){
+        if (serviceHost.length() > 0){
             props.setProperty(USERPROP_SERVICE_HOST, serviceHost);
         }
-        if(serviceName.length()>0){
+        if (serviceName.length() > 0){
             props.setProperty(USERPROP_SERVICE_NAME, serviceName);
         }
-        if(auth.length()>0){
+        if (auth.length() > 0){
             props.setProperty(USERPROP_AUTH_MECHANISM, auth);
         }
-        if(enableSSL.length()>0){
+        if (enableSSL.length() > 0){
             props.setProperty(USERPROP_USESSL, enableSSL);
-			if (enableSSL == "true" && certFilePath.length() <= 0 && useSystemTrustStore.length() <= 0){
-                std::cerr<< "SSL is enabled but no certificate or truststore provided. " << std::endl;
+            if (enableSSL == "true" && certFilePath.length() <= 0 && useSystemTrustStore.length() <= 0){
+                std::cerr << "SSL is enabled but no certificate or truststore provided. " << std::endl;
                 return -1;
             }
             props.setProperty(USERPROP_TLSPROTOCOL, tlsProtocol);
             props.setProperty(USERPROP_CERTFILEPATH, certFilePath);
             props.setProperty(USERPROP_DISABLE_HOSTVERIFICATION, disableHostnameVerification);
             props.setProperty(USERPROP_DISABLE_CERTVERIFICATION, disableCertVerification);
-			if (useSystemTrustStore.length() > 0){
-				props.setProperty(USERPROP_USESYSTEMTRUSTSTORE, useSystemTrustStore);
-			}
+            if (useSystemTrustStore.length() > 0){
+                props.setProperty(USERPROP_USESYSTEMTRUSTSTORE, useSystemTrustStore);
+            }
         }
 
-        if(client.connect(connectStr.c_str(), &props)!=Drill::CONN_SUCCESS){
-            std::cerr<< "Failed to connect with error: "<< client.getError() << " (Using:"<<connectStr<<")"<<std::endl;
+        if (client.connect(connectStr.c_str(), &props) != Drill::CONN_SUCCESS){
+            std::cerr << "Failed to connect with error: " << client.getError() << " (Using:" << connectStr << ")" << std::endl;
             return -1;
         }
-        std::cout<< "Connected!\n" << std::endl;
-        if(api=="meta") {
-        	Drill::Metadata* metadata = client.getMetadata();
-        	if (metadata) {
-        		std::cout << "Connector:" << std::endl;
-        		std::cout << "\tname:" << metadata->getConnectorName() << std::endl;
-        		std::cout << "\tversion:" << metadata->getConnectorVersion() << std::endl;
-        		std::cout << std::endl;
-        		std::cout << "Server:" << std::endl;
-        		std::cout << "\tname:" << metadata->getServerName() << std::endl;
-        		std::cout << "\tversion:" << metadata->getServerVersion() << std::endl;
-        		std::cout << std::endl;
-        		std::cout << "Metadata:" << std::endl;
-        		std::cout << "\tall tables are selectable: " << metadata->areAllTableSelectable() << std::endl;
-        		std::cout << "\tcatalog separator: " << metadata->getCatalogSeparator() << std::endl;
-        		std::cout << "\tcatalog term: " << metadata->getCatalogTerm() << std::endl;
-        		std::cout << "\tCOLLATE support: " << metadata->getCollateSupport() << std::endl;
-        		std::cout << "\tcorrelation names: " << metadata->getCorrelationNames() << std::endl;
-        		std::cout << "\tdate time functions: " << boost::algorithm::join(metadata->getDateTimeFunctions(), ", ") << std::endl;
-        		std::cout << "\tdate time literals support: " << metadata->getDateTimeLiteralsSupport() << std::endl;
-        		std::cout << "\tGROUP BY support: " << metadata->getGroupBySupport() << std::endl;
-        		std::cout << "\tidentifier case: " << metadata->getIdentifierCase() << std::endl;
-        		std::cout << "\tidentifier quote string: " << metadata->getIdentifierQuoteString() << std::endl;
-        		std::cout << "\tmax binary literal length: " << metadata->getMaxBinaryLiteralLength() << std::endl;
-        		std::cout << "\tmax catalog name length: " << metadata->getMaxCatalogNameLength() << std::endl;
-        		std::cout << "\tmax char literal length: " << metadata->getMaxCharLiteralLength() << std::endl;
-        		std::cout << "\tmax column name length: " << metadata->getMaxColumnNameLength() << std::endl;
-        		std::cout << "\tmax columns in GROUP BY: " << metadata->getMaxColumnsInGroupBy() << std::endl;
-        		std::cout << "\tmax columns in ORDER BY: " << metadata->getMaxColumnsInOrderBy() << std::endl;
-        		std::cout << "\tmax columns in SELECT: " << metadata->getMaxColumnsInSelect() << std::endl;
-        		std::cout << "\tmax cursor name length: " << metadata->getMaxCursorNameLength() << std::endl;
-        		std::cout << "\tmax logical lob size: " << metadata->getMaxLogicalLobSize() << std::endl;
-        		std::cout << "\tmax row size: " << metadata->getMaxRowSize() << std::endl;
-        		std::cout << "\tmax schema name length: " << metadata->getMaxSchemaNameLength() << std::endl;
-        		std::cout << "\tmax statement length: " << metadata->getMaxStatementLength() << std::endl;
-        		std::cout << "\tmax statements: " << metadata->getMaxStatements() << std::endl;
-        		std::cout << "\tmax table name length: " << metadata->getMaxTableNameLength() << std::endl;
-        		std::cout << "\tmax tables in SELECT: " << metadata->getMaxTablesInSelect() << std::endl;
-        		std::cout << "\tmax user name length: " << metadata->getMaxUserNameLength() << std::endl;
-        		std::cout << "\tNULL collation: " << metadata->getNullCollation() << std::endl;
-        		std::cout << "\tnumeric functions: " << boost::algorithm::join(metadata->getNumericFunctions(), ", ") << std::endl;
-        		std::cout << "\tOUTER JOIN support: " << metadata->getOuterJoinSupport() << std::endl;
-        		std::cout << "\tquoted identifier case: " << metadata->getQuotedIdentifierCase() << std::endl;
-        		std::cout << "\tSQL keywords: " << boost::algorithm::join(metadata->getSQLKeywords(), ",") << std::endl;
-        		std::cout << "\tschema term: " << metadata->getSchemaTerm() << std::endl;
-        		std::cout << "\tsearch escape string: " << metadata->getSearchEscapeString() << std::endl;
-        		std::cout << "\tspecial characters: " << metadata->getSpecialCharacters() << std::endl;
-        		std::cout << "\tstring functions: " << boost::algorithm::join(metadata->getStringFunctions(), ",") << std::endl;
-        		std::cout << "\tsub query support: " << metadata->getSubQuerySupport() << std::endl;
-        		std::cout << "\tsystem functions: " << boost::algorithm::join(metadata->getSystemFunctions(), ",") << std::endl;
-        		std::cout << "\ttable term: " << metadata->getTableTerm() << std::endl;
-        		std::cout << "\tUNION support: " << metadata->getUnionSupport() << std::endl;
-        		std::cout << "\tBLOB included in max row size: " << metadata->isBlobIncludedInMaxRowSize() << std::endl;
-        		std::cout << "\tcatalog at start: " << metadata->isCatalogAtStart() << std::endl;
-        		std::cout << "\tcolumn aliasing supported: " << metadata->isColumnAliasingSupported() << std::endl;
-        		std::cout << "\tLIKE escape clause supported: " << metadata->isLikeEscapeClauseSupported() << std::endl;
-        		std::cout << "\tNULL plus non NULL equals to NULL: " << metadata->isNullPlusNonNullNull() << std::endl;
-        		std::cout << "\tread-only: " << metadata->isReadOnly() << std::endl;
-        		std::cout << "\tSELECT FOR UPDATE supported: " << metadata->isSelectForUpdateSupported() << std::endl;
-        		std::cout << "\ttransaction supported: " << metadata->isTransactionSupported() << std::endl;
-        		std::cout << "\tunrelated columns in ORDER BY supported: " << metadata->isUnrelatedColumnsInOrderBySupported() << std::endl;
+        std::cout << "Connected!\n" << std::endl;
+        if (api == "meta") {
+            Drill::Metadata* metadata = client.getMetadata();
+            if (metadata) {
+                std::cout << "Connector:" << std::endl;
+                std::cout << "\tname:" << metadata->getConnectorName() << std::endl;
+                std::cout << "\tversion:" << metadata->getConnectorVersion() << std::endl;
+                std::cout << std::endl;
+                std::cout << "Server:" << std::endl;
+                std::cout << "\tname:" << metadata->getServerName() << std::endl;
+                std::cout << "\tversion:" << metadata->getServerVersion() << std::endl;
+                std::cout << std::endl;
+                std::cout << "Metadata:" << std::endl;
+                std::cout << "\tall tables are selectable: " << metadata->areAllTableSelectable() << std::endl;
+                std::cout << "\tcatalog separator: " << metadata->getCatalogSeparator() << std::endl;
+                std::cout << "\tcatalog term: " << metadata->getCatalogTerm() << std::endl;
+                std::cout << "\tCOLLATE support: " << metadata->getCollateSupport() << std::endl;
+                std::cout << "\tcorrelation names: " << metadata->getCorrelationNames() << std::endl;
+                std::cout << "\tdate time functions: " << boost::algorithm::join(metadata->getDateTimeFunctions(), ", ") << std::endl;
+                std::cout << "\tdate time literals support: " << metadata->getDateTimeLiteralsSupport() << std::endl;
+                std::cout << "\tGROUP BY support: " << metadata->getGroupBySupport() << std::endl;
+                std::cout << "\tidentifier case: " << metadata->getIdentifierCase() << std::endl;
+                std::cout << "\tidentifier quote string: " << metadata->getIdentifierQuoteString() << std::endl;
+                std::cout << "\tmax binary literal length: " << metadata->getMaxBinaryLiteralLength() << std::endl;
+                std::cout << "\tmax catalog name length: " << metadata->getMaxCatalogNameLength() << std::endl;
+                std::cout << "\tmax char literal length: " << metadata->getMaxCharLiteralLength() << std::endl;
+                std::cout << "\tmax column name length: " << metadata->getMaxColumnNameLength() << std::endl;
+                std::cout << "\tmax columns in GROUP BY: " << metadata->getMaxColumnsInGroupBy() << std::endl;
+                std::cout << "\tmax columns in ORDER BY: " << metadata->getMaxColumnsInOrderBy() << std::endl;
+                std::cout << "\tmax columns in SELECT: " << metadata->getMaxColumnsInSelect() << std::endl;
+                std::cout << "\tmax cursor name length: " << metadata->getMaxCursorNameLength() << std::endl;
+                std::cout << "\tmax logical lob size: " << metadata->getMaxLogicalLobSize() << std::endl;
+                std::cout << "\tmax row size: " << metadata->getMaxRowSize() << std::endl;
+                std::cout << "\tmax schema name length: " << metadata->getMaxSchemaNameLength() << std::endl;
+                std::cout << "\tmax statement length: " << metadata->getMaxStatementLength() << std::endl;
+                std::cout << "\tmax statements: " << metadata->getMaxStatements() << std::endl;
+                std::cout << "\tmax table name length: " << metadata->getMaxTableNameLength() << std::endl;
+                std::cout << "\tmax tables in SELECT: " << metadata->getMaxTablesInSelect() << std::endl;
+                std::cout << "\tmax user name length: " << metadata->getMaxUserNameLength() << std::endl;
+                std::cout << "\tNULL collation: " << metadata->getNullCollation() << std::endl;
+                std::cout << "\tnumeric functions: " << boost::algorithm::join(metadata->getNumericFunctions(), ", ") << std::endl;
+                std::cout << "\tOUTER JOIN support: " << metadata->getOuterJoinSupport() << std::endl;
+                std::cout << "\tquoted identifier case: " << metadata->getQuotedIdentifierCase() << std::endl;
+                std::cout << "\tSQL keywords: " << boost::algorithm::join(metadata->getSQLKeywords(), ",") << std::endl;
+                std::cout << "\tschema term: " << metadata->getSchemaTerm() << std::endl;
+                std::cout << "\tsearch escape string: " << metadata->getSearchEscapeString() << std::endl;
+                std::cout << "\tspecial characters: " << metadata->getSpecialCharacters() << std::endl;
+                std::cout << "\tstring functions: " << boost::algorithm::join(metadata->getStringFunctions(), ",") << std::endl;
+                std::cout << "\tsub query support: " << metadata->getSubQuerySupport() << std::endl;
+                std::cout << "\tsystem functions: " << boost::algorithm::join(metadata->getSystemFunctions(), ",") << std::endl;
+                std::cout << "\ttable term: " << metadata->getTableTerm() << std::endl;
+                std::cout << "\tUNION support: " << metadata->getUnionSupport() << std::endl;
+                std::cout << "\tBLOB included in max row size: " << metadata->isBlobIncludedInMaxRowSize() << std::endl;
+                std::cout << "\tcatalog at start: " << metadata->isCatalogAtStart() << std::endl;
+                std::cout << "\tcolumn aliasing supported: " << metadata->isColumnAliasingSupported() << std::endl;
+                std::cout << "\tLIKE escape clause supported: " << metadata->isLikeEscapeClauseSupported() << std::endl;
+                std::cout << "\tNULL plus non NULL equals to NULL: " << metadata->isNullPlusNonNullNull() << std::endl;
+                std::cout << "\tread-only: " << metadata->isReadOnly() << std::endl;
+                std::cout << "\tSELECT FOR UPDATE supported: " << metadata->isSelectForUpdateSupported() << std::endl;
+                std::cout << "\ttransaction supported: " << metadata->isTransactionSupported() << std::endl;
+                std::cout << "\tunrelated columns in ORDER BY supported: " << metadata->isUnrelatedColumnsInOrderBySupported() << std::endl;
 
-        		client.freeMetadata(&metadata);
-        	} else {
-        		std::cerr << "Cannot get metadata:" << client.getError() << std::endl;
-        	}
-        } else if(api=="sync"){
-            Drill::DrillClientError* err=NULL;
+                client.freeMetadata(&metadata);
+            }
+            else {
+                std::cerr << "Cannot get metadata:" << client.getError() << std::endl;
+            }
+        }
+        else if (api == "debug")
+        {
+            std::cout << "==============================================================" << std::endl;
+            std::cout << "| API Segmentation Fault Repro Case... " << std::endl;
+            std::cout << "==============================================================" << std::endl;
+
+            // Kill the initial client...
+            std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000000: Killing initial connection..." << std::endl;
+            client.close();
+
+            // Counter.
+            int runCount = 0;
+
+            // Get the input query.
+            std::string iptQuery;
+            for (queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++)
+            {
+                iptQuery = *queryInpIter;
+            }
+
+            // Run until failure...
+            while (true)
+            {
+                std::cout << std::endl;
+                std::cout << "=================================================" << std::endl;
+                runCount += 1;
+                std::cout << "RUN COUNT: " << runCount << std::endl;
+                std::cout << "=================================================" << std::endl;
+                std::cout << std::endl;
+                std::cout << "RunTest +++++ Establishing connection" << std::endl;
+                Drill::DrillClient dc;
+                if (dc.connect(connectStr.c_str(), &props) != Drill::CONN_SUCCESS){
+                    std::cerr << "Failed to connect with error: " << dc.getError() << " (Using:" << connectStr << ")" << std::endl;
+                    return -1;
+                }
+
+                // At this point we have the client and a successful connection has been established.
+                // Get Server metadata.
+                std::cout << "RunTest +++++ Getting metadata..." << std::endl;
+                Drill::Metadata* metadata = dc.getMetadata();
+
+                // Identify the server.
+                std::cout << "RunTest +++++ Retrieving metadata info..." << std::endl;
+                std::string serverName = metadata->getServerName();
+                uint32_t major = metadata->getServerMajorVersion();
+                uint32_t minor = metadata->getServerMinorVersion();
+                uint32_t patch = metadata->getServerPatchVersion();
+
+                // Execute a simple query.
+                std::cout << "RunTest +++++ Execute simple query..." << std::endl;
+                Drill::QueryHandle_t qHandle = NULL;
+                ExecuteDRQry(iptQuery, dc, qHandle);
+
+                std::cout << "RunTest +++++ Wait a rand time (100 to 155)..." << std::endl;
+                boost::this_thread::sleep(boost::posix_time::milliseconds(rand() % 55 + 100));
+
+                std::cout << "RunTest +++++ Cancel query..." << std::endl;
+                if (NULL != qHandle)
+                {
+                    std::cout << "RunTest +++++ Cancel query...Not Null..." << std::endl;
+                    dc.cancelQuery(qHandle);
+                }
+
+                std::cout << "RunTest +++++  Free Query Resources..." << std::endl;
+                if (NULL != qHandle)
+                {
+                    std::cout << "RunTest +++++ Free Query Resources...Not Null..." << std::endl;
+                    dc.freeQueryResources(&qHandle);
+                }
+                qHandle = NULL;
+
+                std::cout << "RunTest +++++ Free Metadata..." << std::endl;
+                if (NULL != metadata)
+                {
+                    std::cout << "RunTest +++++ Free Metadata...Not Null..." << std::endl;
+                    dc.freeMetadata(&metadata);
+                    metadata = NULL;
+                }
+
+                std::cout << "RunTest +++++ Close client..." << std::endl;
+                dc.close();
+            }
+            return 0;
+        }
+        else if (api == "sync"){
+            Drill::DrillClientError* err = NULL;
             Drill::status_t ret;
-            int nQueries=0;
-            for(queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++) {
+            int nQueries = 0;
+            for (queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++) {
                 Drill::RecordIterator* pRecIter = client.submitQuery(type, *queryInpIter, err);
-                if(pRecIter!=NULL){
+                if (pRecIter != NULL){
                     recordIterators.push_back(pRecIter);
                     nQueries++;
                 }
             }
-            Drill::DrillClientConfig::setBufferLimit(nQueries*2*1024*1024); // 2MB per query. Allows us to hold at least two record batches.
-            size_t row=0;
-            for(recordIterIter = recordIterators.begin(); recordIterIter != recordIterators.end(); recordIterIter++) {
+            Drill::DrillClientConfig::setBufferLimit(nQueries * 2 * 1024 * 1024); // 2MB per query. Allows us to hold at least two record batches.
+            size_t row = 0;
+            for (recordIterIter = recordIterators.begin(); recordIterIter != recordIterators.end(); recordIterIter++) {
                 // get fields.
-                row=0;
-                Drill::RecordIterator* pRecIter=*recordIterIter;
-                Drill::FieldDefPtr fields= pRecIter->getColDefs();
-                while((ret=pRecIter->next()), (ret==Drill::QRY_SUCCESS || ret==Drill::QRY_SUCCESS_WITH_INFO) && !pRecIter->hasError()){
+                row = 0;
+                Drill::RecordIterator* pRecIter = *recordIterIter;
+                Drill::FieldDefPtr fields = pRecIter->getColDefs();
+                while ((ret = pRecIter->next()), (ret == Drill::QRY_SUCCESS || ret == Drill::QRY_SUCCESS_WITH_INFO) && !pRecIter->hasError()){
                     fields = pRecIter->getColDefs();
                     row++;
-                    if( (ret==Drill::QRY_SUCCESS_WITH_INFO  && pRecIter->hasSchemaChanged() )|| ( row%100==1)){
-                        for(size_t i=0; i<fields->size(); i++){
-                            std::string name= fields->at(i)->getName();
+                    if ((ret == Drill::QRY_SUCCESS_WITH_INFO  && pRecIter->hasSchemaChanged()) || (row % 100 == 1)){
+                        for (size_t i = 0; i < fields->size(); i++){
+                            std::string name = fields->at(i)->getName();
                             printf("%s\t", name.c_str());
                         }
                         printf("\n");
                     }
                     printf("ROW: %ld\t", row);
-                    for(size_t i=0; i<fields->size(); i++){
+                    for (size_t i = 0; i < fields->size(); i++){
                         void* pBuf; size_t sz;
                         pRecIter->getCol(i, &pBuf, &sz);
                         print(fields->at(i), pBuf, sz);
                     }
                     printf("\n");
-                    if(bTestCancel && row%100==1){
+                    if (bTestCancel && row % 100 == 1){
                         pRecIter->cancel();
                         printf("Application cancelled the query.\n");
                     }
                 }
-                if(ret!=Drill::QRY_NO_MORE_DATA && ret!=Drill::QRY_CANCEL){
-                    std::cerr<< pRecIter->getError() << std::endl;
+                if (ret != Drill::QRY_NO_MORE_DATA && ret != Drill::QRY_CANCEL){
+                    std::cerr << pRecIter->getError() << std::endl;
                 }
                 client.freeQueryIterator(&pRecIter);
             }
             client.waitForResults();
-        }else{
-            if(bSyncSend){
-                for(queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++) {
-                    Drill::QueryHandle_t qryHandle;
-                    client.submitQuery(type, *queryInpIter, QueryResultsListener, NULL, &qryHandle);
-                    client.registerSchemaChangeListener(&qryHandle, SchemaListener);
-                    
-                     if(bTestCancel) {
-                        // Send cancellation request after 5seconds
-                        boost::this_thread::sleep(boost::posix_time::milliseconds(1000));
-                        std::cout<< "\n Cancelling query: " << *queryInpIter << "\n" << std::endl;
-                        client.cancelQuery(qryHandle);
-                    } else {
-                        client.waitForResults();
+        }
+        else
+        {
+            // Kill the initial client...
+            std::cout << ">>>>>>>>>>>>>> ASFRC 0x0000000000: Killing initial connection..." << std::endl;
+            client.close();
+
+            // Counter.
+            int runCount = 0;
+
+            // Run until failure...
+            while (true)
+            {
+                std::cout << std::endl;
+                std::cout << "=================================================" << std::endl;
+                runCount += 1;
+                std::cout << "RUN COUNT: " << runCount << std::endl;
+                std::cout << "=================================================" << std::endl;
+                std::cout << std::endl;
+
+                Drill::DrillClient dc;
+                if (dc.connect(connectStr.c_str(), &props) != Drill::CONN_SUCCESS)
+                {
+                    std::cerr << "Failed to connect with error: " << dc.getError() << " (Using:" << connectStr << ")" << std::endl;
+                    return -1;
+                }
+
+                if (bSyncSend)
+                {
+                    for (queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++)
+                    {
+                        Drill::QueryHandle_t qryHandle;
+                        dc.submitQuery(type, *queryInpIter, QueryResultsListener, NULL, &qryHandle);
+                        dc.registerSchemaChangeListener(&qryHandle, SchemaListener);
+
+                        if (bTestCancel)
+                        {
+                            // Send cancellation request after 5seconds
+                            boost::this_thread::sleep(boost::posix_time::milliseconds(rand() % 150 + 50));
+                            std::cout << "\n Cancelling query: " << *queryInpIter << "\n" << std::endl;
+                            dc.cancelQuery(qryHandle);
+                        }
+                        else
+                        {
+                            dc.waitForResults();
+                        }
+
+                        dc.freeQueryResources(&qryHandle);
                     }
-
-                    client.freeQueryResources(&qryHandle);
                 }
-
-            }else{
-                for(queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++) {
-                    Drill::QueryHandle_t qryHandle;
-                    client.submitQuery(type, *queryInpIter, QueryResultsListener, NULL, &qryHandle);
-                    client.registerSchemaChangeListener(&qryHandle, SchemaListener);
-                    queryHandles.push_back(qryHandle);
+                else
+                {
+                    for (queryInpIter = queryInputs.begin(); queryInpIter != queryInputs.end(); queryInpIter++)
+                    {
+                        Drill::QueryHandle_t qryHandle;
+                        dc.submitQuery(type, *queryInpIter, QueryResultsListener, NULL, &qryHandle);
+                        dc.registerSchemaChangeListener(&qryHandle, SchemaListener);
+                        queryHandles.push_back(qryHandle);
+                    }
+                    dc.waitForResults();
+                    for (queryHandleIter = queryHandles.begin(); queryHandleIter != queryHandles.end(); queryHandleIter++)
+                    {
+                        dc.freeQueryResources(&*queryHandleIter);
+                    }
                 }
-                client.waitForResults();
-                for(queryHandleIter = queryHandles.begin(); queryHandleIter != queryHandles.end(); queryHandleIter++) {
-                    client.freeQueryResources(&*queryHandleIter);
-                }
+                dc.close();
             }
+
+
         }
         client.close();
-    } catch (std::exception& e) {
+    }
+    catch (std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
 
