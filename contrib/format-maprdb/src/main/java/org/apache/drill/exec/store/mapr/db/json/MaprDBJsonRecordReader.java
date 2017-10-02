@@ -149,6 +149,12 @@ public class MaprDBJsonRecordReader extends AbstractRecordReader {
     allTextMode = formatPlugin.getConfig().isAllTextMode();
     ignoreSchemaChange = formatPlugin.getConfig().isIgnoreSchemaChange();
     disablePushdown = !formatPlugin.getConfig().isEnablePushdown();
+
+    if (condition != null) {
+      logger.debug("Created record reader with query condition {}", condition.toString());
+    } else {
+      logger.debug("Created record reader with query condition NULL");
+    }
   }
 
   @Override
