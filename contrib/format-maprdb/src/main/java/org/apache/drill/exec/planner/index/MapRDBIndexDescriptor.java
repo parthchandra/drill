@@ -117,36 +117,33 @@ public class MapRDBIndexDescriptor extends DrillIndexDescriptor {
     Set<SchemaPath> schemaPathSet = Sets.newHashSet();
 
     public List<LogicalExpression> parseExpressions(Collection<LogicalExpression> expressions) {
-      List<LogicalExpression> decodedCols = Lists.newArrayList();
-      for(LogicalExpression expr : expressions) {
-        LogicalExpression decoded = expr.accept(this, null);
+      List<LogicalExpression> allCols = Lists.newArrayList();
+      Collection<SchemaPath> decoded;
 
-        //encoded multiple path will return null
-        if(decoded != null) {
-          decodedCols.add(decoded);
+      for(LogicalExpression expr : expressions) {
+        LogicalExpression nonDecoded = expr.accept(this, null);
+        if(nonDecoded != null) {
+          allCols.add(nonDecoded);
         }
       }
 
-      decodedCols.addAll(schemaPathSet);
-      return decodedCols;
+      if (schemaPathSet.size() > 0) {
+        decoded = EncodedSchemaPathSet.decode(schemaPathSet);
+        allCols.addAll(decoded);
+      }
+      return allCols;
     }
 
     @Override
     public LogicalExpression visitSchemaPath(SchemaPath path, Void value) {
-      List<SchemaPath> paths = Lists.newArrayList();
-      paths.add(path);
-      Collection<SchemaPath> decoded = EncodedSchemaPathSet.decode(paths);
-
-      if ( decoded.size() == 1) {
-        return decoded.iterator().next();
+      if (EncodedSchemaPathSet.isEncodedSchemaPath(path)) {
+        // if decoded size is not one, incoming path is encoded path thus there is no cast or other function applied on it,
+        // since users won't pass in encoded fields, so it is safe to return null,
+        schemaPathSet.add(path);
+        return null;
+      } else {
+        return path;
       }
-      else {
-        schemaPathSet.addAll(decoded);
-      }
-
-      // if decoded size is not one, incoming path is encoded path thus there is no cast or other function applied on it,
-      // since users won't pass in encoded fields, so it is safe to return null,
-      return null;
     }
 
   }
