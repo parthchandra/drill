@@ -20,7 +20,6 @@ package org.apache.drill.exec.store.mapr.db.json;
 import org.apache.drill.common.expression.BooleanOperator;
 import org.apache.drill.common.expression.FunctionCall;
 import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.expression.visitors.AbstractExprVisitor;
 import org.apache.drill.exec.store.hbase.DrillHBaseConstants;
 import org.ojai.Value;
@@ -179,67 +178,67 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
   private JsonScanSpec createJsonScanSpec(FunctionCall call,
       CompareFunctionsProcessor processor) {
     String functionName = processor.getFunctionName();
-    SchemaPath field = processor.getPath();
+    String fieldPath = processor.getPath().asPathString(false);
     Value fieldValue = processor.getValue();
 
     QueryCondition cond = null;
     switch (functionName) {
     case "equal":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getRootSegmentPath(), Op.EQUAL, fieldValue);
+      setIsCondition(cond, fieldPath, Op.EQUAL, fieldValue);
       break;
 
     case "not_equal":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getRootSegmentPath(), Op.NOT_EQUAL, fieldValue);
+      setIsCondition(cond, fieldPath, Op.NOT_EQUAL, fieldValue);
       break;
 
     case "less_than":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getRootSegmentPath(), Op.LESS, fieldValue);
+      setIsCondition(cond, fieldPath, Op.LESS, fieldValue);
       break;
 
     case "less_than_or_equal_to":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getRootSegmentPath(), Op.LESS_OR_EQUAL, fieldValue);
+      setIsCondition(cond, fieldPath, Op.LESS_OR_EQUAL, fieldValue);
       break;
 
     case "greater_than":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getRootSegmentPath(), Op.GREATER, fieldValue);
+      setIsCondition(cond, fieldPath, Op.GREATER, fieldValue);
       break;
 
     case "greater_than_or_equal_to":
       cond = MapRDBImpl.newCondition();
-      setIsCondition(cond, field.getRootSegmentPath(), Op.GREATER_OR_EQUAL, fieldValue);
+      setIsCondition(cond, fieldPath, Op.GREATER_OR_EQUAL, fieldValue);
       break;
 
     case "isnull":
-      cond = MapRDBImpl.newCondition().notExists(field.getRootSegmentPath());
+      cond = MapRDBImpl.newCondition().notExists(fieldPath);
       break;
 
     case "isnotnull":
-      cond = MapRDBImpl.newCondition().exists(field.getRootSegmentPath());
+      cond = MapRDBImpl.newCondition().exists(fieldPath);
       break;
 
     case "istrue":
-      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.EQUAL, true);
+      cond = MapRDBImpl.newCondition().is(fieldPath, Op.EQUAL, true);
       break;
 
     case "isnotfalse":
-      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.NOT_EQUAL, false);
+      cond = MapRDBImpl.newCondition().is(fieldPath, Op.NOT_EQUAL, false);
       break;
 
     case "isfalse":
-      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.EQUAL, false);
+      cond = MapRDBImpl.newCondition().is(fieldPath, Op.EQUAL, false);
       break;
 
     case "isnottrue":
-      cond = MapRDBImpl.newCondition().is(field.getRootSegmentPath(), Op.NOT_EQUAL, true);
+      cond = MapRDBImpl.newCondition().is(fieldPath, Op.NOT_EQUAL, true);
       break;
 
     case "like":
-      cond = MapRDBImpl.newCondition().like(field.getRootSegmentPath(), fieldValue.getString());
+      cond = MapRDBImpl.newCondition().like(fieldPath, fieldValue.getString());
       break;
 
     default:
