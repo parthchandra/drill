@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -112,9 +112,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
 
   public AbstractGroupScan getGroupScan(String userName, FileSelection selection,
       List<SchemaPath> columns, IndexDesc indexDesc) throws IOException {
-    List<String> files = selection.getFiles();
-    assert (files.size() == 1);
-    String tableName = files.get(0);
+    String tableName = getTableName(selection);
     TableBasicAttrs attrs = getMaprFS().getTableBasicAttrs(new Path(tableName));
 
     if (attrs.getIsJson()) {
@@ -153,4 +151,18 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   public MapRDBCost getPluginCostModel() {
     return pluginCostModel;
   }
+
+  /**
+   * Allows to get a table name from FileSelection object
+   *
+   * @param selection File selection object
+   * @return string table name
+   */
+  @JsonIgnore
+  public String getTableName(FileSelection selection) {
+    List<String> files = selection.getFiles();
+    assert (files.size() == 1);
+    return files.get(0);
+  }
+
 }
