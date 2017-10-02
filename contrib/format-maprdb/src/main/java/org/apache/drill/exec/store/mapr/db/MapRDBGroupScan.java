@@ -175,7 +175,7 @@ public abstract class MapRDBGroupScan extends AbstractDbGroupScan {
       hostIndexQueue.add(i);
     }
 
-    Set<Entry<TabletFragmentInfo, String>> regionsToAssignSet = Sets.newHashSet(regionsToScan.entrySet());
+    Set<Entry<TabletFragmentInfo, String>> regionsToAssignSet = Sets.newLinkedHashSet(regionsToScan.entrySet());
 
     /*
      * First, we assign regions which are hosted on region servers running on drillbit endpoints
