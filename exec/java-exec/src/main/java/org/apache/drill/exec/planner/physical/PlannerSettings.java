@@ -155,8 +155,8 @@ public class PlannerSettings implements Context{
   // for testing purpose
   public static final String FORCE_2PHASE_AGGR_KEY = "planner.force_2phase_aggr";
   public static final BooleanValidator FORCE_2PHASE_AGGR = new BooleanValidator(FORCE_2PHASE_AGGR_KEY);
-  public static final BooleanValidator DISABLE_SCAN_STATS = new BooleanValidator("planner.disable_scan_statistics", true);
-  public static final BooleanValidator ENABLE_SCAN_STATS = new BooleanValidator("planner.enable_scan_statistics", true);
+  public static final BooleanValidator DISABLE_SCAN_STATS = new BooleanValidator("planner.disable_scan_statistics");
+  public static final BooleanValidator ENABLE_SCAN_STATS = new BooleanValidator("planner.enable_scan_statistics");
 
   public OptionManager options = null;
   public FunctionImplementationRegistry functionImplementationRegistry = null;

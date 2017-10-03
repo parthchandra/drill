@@ -27,6 +27,7 @@ import org.apache.drill.exec.rpc.user.clusterclient.zkbased.ZKBasedConnectionPoo
 import org.apache.drill.exec.rpc.user.clusterclient.zkbased.ZKBasedEndpointProvider;
 import org.apache.drill.test.QuerySummaryFuture;
 import org.apache.drill.test.SummaryOnlyQueryEventListener;
+import org.apache.drill.exec.ZookeeperHelper;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -42,6 +43,7 @@ import static org.junit.Assert.fail;
 @Ignore
 public class TestDrillClusterClient extends DrillSystemTestBase {
 //  private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestDrillClusterClient.class);
+  final ZookeeperHelper zkHelper = new ZookeeperHelper();
 
   @Test
   public void zkPool() throws Exception {
@@ -50,9 +52,9 @@ public class TestDrillClusterClient extends DrillSystemTestBase {
     try {
       pool = ClusterClientBuilders.newZKBasedPool()
           .setZKEndpointProviderBuilder(ZKBasedEndpointProvider.newBuilder()
-              .withConnectionString(getConfig().getString(ExecConstants.ZK_CONNECTION))
-              .withClusterId(getConfig().getString(ExecConstants.SERVICE_NAME))
-              .withZKRoot(getConfig().getString(ExecConstants.ZK_ROOT)))
+              .withConnectionString(zkHelper.getConfig().getString(ExecConstants.ZK_CONNECTION))
+              .withClusterId(zkHelper.getConfig().getString(ExecConstants.SERVICE_NAME))
+              .withZKRoot(zkHelper.getConfig().getString(ExecConstants.ZK_ROOT)))
           .build();
       createSessionAndTryQuery(pool);
       createSessionAndTryQuery(pool);
@@ -76,9 +78,9 @@ public class TestDrillClusterClient extends DrillSystemTestBase {
     try {
       pool = ClusterClientBuilders.newZKBasedPool()
           .setZKEndpointProviderBuilder(ZKBasedEndpointProvider.newBuilder()
-              .withConnectionString(getConfig().getString(ExecConstants.ZK_CONNECTION))
-              .withClusterId(getConfig().getString(ExecConstants.SERVICE_NAME))
-              .withZKRoot(getConfig().getString(ExecConstants.ZK_ROOT)))
+              .withConnectionString(zkHelper.getConfig().getString(ExecConstants.ZK_CONNECTION))
+              .withClusterId(zkHelper.getConfig().getString(ExecConstants.SERVICE_NAME))
+              .withZKRoot(zkHelper.getConfig().getString(ExecConstants.ZK_ROOT)))
           // .setConnectionProperties(null) username, password
           .build();
 
