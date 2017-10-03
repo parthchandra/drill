@@ -113,6 +113,21 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       new OptionDefinition(PlannerSettings.QUOTING_IDENTIFIERS),
       new OptionDefinition(PlannerSettings.JOIN_OPTIMIZATION),
       new OptionDefinition(PlannerSettings.FORCE_2PHASE_AGGR), // for testing
+      // ------------------------------------------- Index planning related options BEGIN --------------------------------------------------------------
+      new OptionDefinition(PlannerSettings.USE_SIMPLE_OPTIMIZER),
+      new OptionDefinition(PlannerSettings.INDEX_PLANNING),
+      new OptionDefinition(PlannerSettings.ENABLE_STATS),
+      new OptionDefinition(PlannerSettings.DISABLE_FULL_TABLE_SCAN),
+      new OptionDefinition(PlannerSettings.INDEX_MAX_CHOSEN_INDEXES_PER_TABLE),
+      new OptionDefinition(PlannerSettings.INDEX_FORCE_SORT_NONCOVERING),
+      new OptionDefinition(PlannerSettings.INDEX_USE_HASHJOIN_NONCOVERING),
+      new OptionDefinition(PlannerSettings.INDEX_COVERING_SELECTIVITY_THRESHOLD),
+      new OptionDefinition(PlannerSettings.INDEX_NONCOVERING_SELECTIVITY_THRESHOLD),
+      new OptionDefinition(PlannerSettings.INDEX_ROWKEYJOIN_COST_FACTOR),
+      // TODO: Deprecate the following 2 (also in PlannerSettings.java)
+      new OptionDefinition(PlannerSettings.INDEX_PREFER_INTERSECT_PLANS),
+      new OptionDefinition(PlannerSettings.INDEX_MAX_INDEXES_TO_INTERSECT),
+      // ------------------------------------------- Index planning related options END   --------------------------------------------------------------
       new OptionDefinition(ExecConstants.HASHAGG_NUM_PARTITIONS_VALIDATOR),
       new OptionDefinition(ExecConstants.HASHAGG_MAX_MEMORY_VALIDATOR),
       new OptionDefinition(ExecConstants.HASHAGG_MIN_BATCHES_PER_PARTITION_VALIDATOR), // for tuning
@@ -163,6 +178,7 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       new OptionDefinition(ExecConstants.MIN_HASH_TABLE_SIZE),
       new OptionDefinition(ExecConstants.MAX_HASH_TABLE_SIZE),
       new OptionDefinition(ExecConstants.EARLY_LIMIT0_OPT),
+      new OptionDefinition(ExecConstants.LATE_LIMIT0_OPT),
       new OptionDefinition(ExecConstants.ENABLE_MEMORY_ESTIMATION),
       new OptionDefinition(ExecConstants.MAX_QUERY_MEMORY_PER_NODE),
       new OptionDefinition(ExecConstants.MIN_MEMORY_PER_BUFFERED_OP),

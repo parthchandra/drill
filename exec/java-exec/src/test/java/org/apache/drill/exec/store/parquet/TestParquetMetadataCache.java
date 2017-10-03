@@ -32,6 +32,7 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.Ignore;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -683,6 +684,7 @@ public class TestParquetMetadataCache extends PlanTestBase {
     }
   }
 
+  @Ignore("Until DRILL-4264 changes are merged in")
   @Test // DRILL-4264
   public void testMetadataCacheFieldWithDots() throws Exception {
     final String tableWithDots = "dfs_test.tmp.`complex_table`";

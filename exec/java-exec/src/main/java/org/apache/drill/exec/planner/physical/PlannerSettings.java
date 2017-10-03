@@ -99,7 +99,7 @@ public class PlannerSettings implements Context{
       new RangeDoubleValidator("planner.index.noncovering_selectivity_threshold", 0.0, 1.0);
   public static final RangeDoubleValidator INDEX_ROWKEYJOIN_COST_FACTOR =
       new RangeDoubleValidator("planner.index.rowkeyjoin_cost_factor", 0, Double.MAX_VALUE);
-  // TODO: Deprecate
+  // TODO: Deprecate the following 2 (also in SystemOptionManager.java)
   public static final BooleanValidator INDEX_PREFER_INTERSECT_PLANS = new BooleanValidator("planner.index.prefer_intersect_plans");
   public static final RangeLongValidator INDEX_MAX_INDEXES_TO_INTERSECT = new RangeLongValidator("planner.index.max_indexes_to_intersect", 2, 100);
   // ------------------------------------------- Index planning related options END ----------------------------------------------------------------
