@@ -389,8 +389,9 @@ public class HashJoinBatch extends AbstractBinaryRecordBatch<HashJoinPOP> implem
         // For every record in the build batch , hash the key columns
         for (int i = 0; i < currentRecordCount; i++) {
           int hashCode = hashTable.getHashCode(i);
+          HashTable.PutStatus putResult;
           try {
-            hashTable.put(i, htIndex, hashCode);
+            putResult = hashTable.put(i, htIndex, hashCode);
           } catch (RetryAfterSpillException RE) { throw new OutOfMemoryException("HT put");} // Hash Join can not retry yet
                         /* Use the global index returned by the hash table, to store
                          * the current record index and batch index. This will be used

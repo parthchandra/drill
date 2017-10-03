@@ -79,7 +79,6 @@ public interface HashTable {
   public void setMaxVarcharSize(int size);
 
   public boolean outputKeys(int batchIdx, VectorContainer outContainer, int outStartIndex, int numRecords, int numExpectedRecords);
-  public void addNewKeyBatch();
 
   public Pair<VectorContainer, Integer> nextBatch();
 

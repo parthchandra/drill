@@ -73,7 +73,6 @@ import com.google.common.collect.Sets;
 public class SystemOptionManager extends BaseOptionManager implements OptionManager, AutoCloseable {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SystemOptionManager.class);
 
-    /********
   private CaseInsensitiveMap<OptionValidator> VALIDATORS;
   public void populateValidators() {
     final OptionValidator[] validators = new OptionValidator[]{
@@ -119,6 +118,7 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.HASHAGG_NUM_PARTITIONS_VALIDATOR,
       ExecConstants.HASHAGG_MAX_MEMORY_VALIDATOR,
       ExecConstants.HASHAGG_MIN_BATCHES_PER_PARTITION_VALIDATOR, // for tuning
+      ExecConstants.HASHAGG_USE_MEMORY_PREDICTION_VALIDATOR, // for testing
       ExecConstants.HASHAGG_FALLBACK_ENABLED_VALIDATOR, // for enable/disable unbounded HashAgg
       PlannerSettings.INDEX_PLANNING,
       PlannerSettings.INDEX_FORCE_SORT_NONCOVERING,
@@ -217,11 +217,11 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       ExecConstants.ENABLE_ITERATOR_VALIDATOR,
       ExecConstants.ENABLE_VECTOR_VALIDATOR,
       ExecConstants.QUERY_ROWKEYJOIN_BATCHSIZE
-    *******/
+
   /**
    * Creates all the OptionDefinitions to be registered with the {@link SystemOptionManager}.
    * @return A map
-   */
+   *
   public static CaseInsensitiveMap<OptionDefinition> createDefaultOptionDefinitions() {
     final OptionDefinition[] definitions = new OptionDefinition[]{
       new OptionDefinition(PlannerSettings.CONSTANT_FOLDING),
@@ -350,7 +350,7 @@ public class SystemOptionManager extends BaseOptionManager implements OptionMana
       new OptionDefinition(ExecConstants.PERSISTENT_TABLE_UMASK_VALIDATOR),
       new OptionDefinition(ExecConstants.CPU_LOAD_AVERAGE),
       new OptionDefinition(ExecConstants.ENABLE_VECTOR_VALIDATOR),
-      new OptionDefinition(ExecConstants.ENABLE_ITERATOR_VALIDATOR)
+      new OptionDefinition(ExecConstants.ENABLE_ITERATOR_VALIDATOR)  ****/
     };
     final Map<String, OptionValidator> tmp = new HashMap<>();
     for (final OptionValidator validator : validators) {

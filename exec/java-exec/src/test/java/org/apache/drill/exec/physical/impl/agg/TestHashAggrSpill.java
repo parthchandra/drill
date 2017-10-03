@@ -65,7 +65,8 @@ public class TestHashAggrSpill extends BaseTestQuery {
         long opCycle = hag0.getMetric(HashAggTemplate.Metric.SPILL_CYCLE.ordinal());
         assertEquals(spillCycle, opCycle);
         long op_spilled_partitions = hag0.getMetric(HashAggTemplate.Metric.SPILLED_PARTITIONS.ordinal());
-        assertTrue( op_spilled_partitions >= fromSpilledPartitions && op_spilled_partitions <= toSpilledPartitions );
+        String msg = "Spilled partitions: " + op_spilled_partitions + " . ";
+        assertTrue( msg, op_spilled_partitions >= fromSpilledPartitions && op_spilled_partitions <= toSpilledPartitions );
         /* assertEquals(3, ops.size());
         for ( int i = 0; i < ops.size(); i++ ) {
             ProfileParser.OperatorProfile hag = ops.get(i);
@@ -123,7 +124,7 @@ public class TestHashAggrSpill extends BaseTestQuery {
     @Test
     public void testSimpleHashAggrSpill() throws Exception {
         testSpill(68_000_000, 16, 2, 2, false, true, null,
-          1_200_000, 1,2, 3
+          1_200_000, 1,1, 3
           );
     }
     /**

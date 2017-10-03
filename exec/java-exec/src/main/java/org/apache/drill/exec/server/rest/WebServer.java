@@ -71,6 +71,7 @@ import javax.servlet.DispatcherType;
 import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionEvent;
 import javax.servlet.http.HttpSessionListener;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.net.BindException;
 import java.security.KeyPair;
@@ -100,7 +101,7 @@ public class WebServer implements AutoCloseable {
 
   private final WorkManager workManager;
 
-  private final Server embeddedJetty;
+  private Server embeddedJetty;
 
   private final BootStrapContext context;
 
@@ -329,7 +330,7 @@ public class WebServer implements AutoCloseable {
    * @return Initialized {@link ServerConnector} for HTTPS connectios.
    * @throws Exception
    */
-  private ServerConnector createHttpsConnector() throws Exception {
+  private ServerConnector createHttpsConnector(int port) throws Exception {
     logger.info("Setting up HTTPS connector for web server");
 
     final SslContextFactory sslContextFactory = new SslContextFactory();
@@ -406,7 +407,7 @@ public class WebServer implements AutoCloseable {
     final ServerConnector sslConnector = new ServerConnector(embeddedJetty,
         new SslConnectionFactory(sslContextFactory, HttpVersion.HTTP_1_1.asString()),
         new HttpConnectionFactory(httpsConfig));
-    sslConnector.setPort(config.getInt(ExecConstants.HTTP_PORT));
+    sslConnector.setPort(port);
 
     return sslConnector;
   }
@@ -416,11 +417,11 @@ public class WebServer implements AutoCloseable {
    * @return Initialized {@link ServerConnector} instance for HTTP connections.
    * @throws Exception
    */
-  private ServerConnector createHttpConnector() throws Exception {
+  private ServerConnector createHttpConnector(int port) throws Exception {
     logger.info("Setting up HTTP connector for web server");
     final HttpConfiguration httpConfig = new HttpConfiguration();
     final ServerConnector httpConnector = new ServerConnector(embeddedJetty, new HttpConnectionFactory(httpConfig));
-    httpConnector.setPort(config.getInt(ExecConstants.HTTP_PORT));
+    httpConnector.setPort(port);
 
     return httpConnector;
   }
