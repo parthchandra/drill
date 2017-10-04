@@ -31,6 +31,8 @@ import org.apache.drill.exec.server.options.TypeValidators.RangeDoubleValidator;
 import org.apache.drill.exec.server.options.TypeValidators.RangeLongValidator;
 import org.apache.drill.exec.server.options.TypeValidators.StringValidator;
 import org.apache.drill.exec.server.options.TypeValidators.MaxWidthValidator;
+import org.apache.drill.exec.server.options.TypeValidators.AdminUsersValidator;
+import org.apache.drill.exec.server.options.TypeValidators.AdminUserGroupsValidator;
 import org.apache.drill.exec.testing.ExecutionControls;
 
 public interface ExecConstants {
@@ -463,13 +465,14 @@ public interface ExecConstants {
    * such as changing system options.
    */
   String ADMIN_USERS_KEY = "security.admin.users";
-  StringValidator ADMIN_USERS_VALIDATOR = new StringValidator(ADMIN_USERS_KEY);
+  AdminUsersValidator ADMIN_USERS_VALIDATOR = new AdminUsersValidator(ADMIN_USERS_KEY);
 
   /**
    * Option whose value is a comma separated list of admin usergroups.
    */
   String ADMIN_USER_GROUPS_KEY = "security.admin.user_groups";
-  StringValidator ADMIN_USER_GROUPS_VALIDATOR = new StringValidator(ADMIN_USER_GROUPS_KEY);
+  AdminUserGroupsValidator ADMIN_USER_GROUPS_VALIDATOR = new AdminUserGroupsValidator(ADMIN_USER_GROUPS_KEY);
+
   /**
    * Option whose value is a string representing list of inbound impersonation policies.
    *
