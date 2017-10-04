@@ -73,9 +73,8 @@ connectionStatus_t DrillClientImpl::connect(const char* connStr, DrillUserProper
         CHANNEL_TYPE_SOCKET;
 
     connectionStatus_t ret = CONN_SUCCESS;
-    m_pChannelContext = ChannelContextFactory::getChannelContext(type, props);
-    m_pChannel= ChannelFactory::getChannel(type, m_io_service, connStr);
-    ret=m_pChannel->init(m_pChannelContext);
+    m_pChannel= ChannelFactory::getChannel(type, m_io_service, connStr, props);
+    ret=m_pChannel->init();
     if(ret!=CONN_SUCCESS){
         handleConnError(m_pChannel->getError());
         return ret;
@@ -106,10 +105,8 @@ connectionStatus_t DrillClientImpl::connect(const char* host, const char* port, 
         CHANNEL_TYPE_SOCKET;
 
     connectionStatus_t ret = CONN_SUCCESS;
-    m_pChannelContext = ChannelContextFactory::getChannelContext(type, props);
-    m_pChannel= ChannelFactory::getChannel(type, m_io_service, host, port);
-    m_pChannel->init(m_pChannelContext);
-    ret=m_pChannel->init(m_pChannelContext);
+    m_pChannel= ChannelFactory::getChannel(type, m_io_service, host, port, props);
+    ret=m_pChannel->init();
     if(ret!=CONN_SUCCESS){
         handleConnError(m_pChannel->getError());
         return ret;

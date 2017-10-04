@@ -165,6 +165,10 @@ typedef enum{
     RET_FAILURE=1
 } ret_t;
 
+// Connect string protocol types
+#define PROTOCOL_TYPE_ZK     "zk"
+#define PROTOCOL_TYPE_DIRECT "drillbit"
+#define PROTOCOL_TYPE_DIRECT_2 "local"
 
 // User Property Names
 #define USERPROP_USERNAME "userName"

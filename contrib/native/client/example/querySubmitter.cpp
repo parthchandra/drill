@@ -55,7 +55,7 @@ struct Option{
     {"certFilePath", "Path to SSL certificate file", false},
     {"disableHostnameVerification", "disable host name verification", false},
     {"disableCertVerification", "disable certificate verification", false},
-	{"useSystemTrustStore", "[Windows only]. Use the system truststore.", false }
+    {"useSystemTrustStore", "[Windows only]. Use the system truststore.", false }
 
 };
 
@@ -315,7 +315,7 @@ int main(int argc, char* argv[]) {
         std::string certFilePath=qsOptionValues["certFilePath"];
         std::string disableHostnameVerification=qsOptionValues["disableHostnameVerification"];
         std::string disableCertVerification=qsOptionValues["disableCertVerification"];
-		std::string useSystemTrustStore = qsOptionValues["useSystemTrustStore"];
+        std::string useSystemTrustStore = qsOptionValues["useSystemTrustStore"];
 
         Drill::QueryType type;
 
@@ -574,3 +574,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
