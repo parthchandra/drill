@@ -150,7 +150,7 @@ public abstract class SSLConfig {
               .append("Exception while initializing the truststore: [")
               .append(e.getMessage())
               .append("]. ")
-              .toString());
+              .toString(), e);
     }
     return tmf;
   }

@@ -181,10 +181,14 @@ public class UserClient
   public void connect(final DrillbitEndpoint endpoint, final DrillProperties properties,
       final UserCredentials credentials) throws RpcException {
     final UserToBitHandshake.Builder hsBuilder =
-        UserToBitHandshake.newBuilder().setRpcVersion(UserRpcConfig.RPC_VERSION).setSupportListening(true)
-            .setSupportComplexTypes(supportComplexTypes).setSupportTimeout(true).setCredentials(credentials)
+        UserToBitHandshake.newBuilder()
+            .setRpcVersion(UserRpcConfig.RPC_VERSION)
+            .setSupportListening(true)
+            .setSupportComplexTypes(supportComplexTypes)
+            .setSupportTimeout(true).setCredentials(credentials)
             .setClientInfos(UserRpcUtils.getRpcEndpointInfos(clientName))
-            .setSaslSupport(SaslSupport.SASL_PRIVACY).setProperties(properties.serializeForServer());
+            .setSaslSupport(SaslSupport.SASL_PRIVACY)
+            .setProperties(properties.serializeForServer());
 
     // Only used for testing purpose
     if (properties.containsKey(DrillProperties.TEST_SASL_LEVEL)) {

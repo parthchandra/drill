@@ -210,8 +210,7 @@ public class SSLConfigServer extends SSLConfig {
 
   private String getHadoopConfigParam(String name) {
     Preconditions.checkArgument(this.hadoopConfig != null);
-    String value = "";
-    value = hadoopConfig.get(name, "");
+    String value = hadoopConfig.get(name, "");
     value = value.trim();
     return value;
   }
