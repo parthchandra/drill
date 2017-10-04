@@ -25,15 +25,21 @@ import org.apache.drill.exec.planner.physical.AbstractRangePartitionFunction;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
 import org.apache.drill.exec.vector.ValueVector;
+import org.ojai.store.QueryCondition;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.mapr.db.Table;
+import com.mapr.db.impl.ConditionImpl;
 import com.mapr.db.impl.IdCodec;
-import com.mapr.db.impl.TabletInfoImpl;
+import com.mapr.db.impl.ConditionNode.RowkeyRange;
 import com.mapr.db.scan.ScanRange;
+import com.mapr.fs.jni.MapRConstants;
+import com.mapr.org.apache.hadoop.hbase.util.Bytes;
 
 @JsonTypeName("jsontable-range-partition-function")
 public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunction {
@@ -46,22 +52,35 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   @JsonProperty("tableName")
   protected String tableName;
 
-  @JsonProperty("subScan")
-  protected MapRDBSubScan subScan = null;
-
   @JsonIgnore
   protected ValueVector partitionKeyVector = null;
 
-  @JsonIgnore
-  protected Table table = null;
+  // List of start keys of the scan ranges for the table.
+  @JsonProperty
+  protected List<byte[]> startKeys = null;
 
+  // List of stop keys of the scan ranges for the table.
+  @JsonProperty
+  protected List<byte[]> stopKeys = null;
+
+  // Whether the start/stop keys have been initialized
   @JsonIgnore
-  List<ScanRange> scanRanges = null;
+  protected boolean isInitialized = false;
 
   @JsonCreator
   public JsonTableRangePartitionFunction(
       @JsonProperty("refList") List<FieldReference> refList,
-      @JsonProperty("tableName") String tableName) {
+      @JsonProperty("tableName") String tableName,
+      @JsonProperty("startKeys") List<byte[]> startKeys,
+      @JsonProperty("stopKeys") List<byte[]> stopKeys) {
+    this.refList = refList;
+    this.tableName = tableName;
+    this.startKeys = startKeys;
+    this.stopKeys = stopKeys;
+  }
+
+  public JsonTableRangePartitionFunction(List<FieldReference> refList,
+      String tableName) {
     this.refList = refList;
     this.tableName = tableName;
   }
@@ -83,16 +102,7 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 
     partitionKeyVector = v.getValueVector();
 
-    assert subScan != null : "subScan has not yet been initialized";
-
-    // initialize the table handle from the table cache
-    table = subScan.getFormatPlugin().getJsonTableCache().getTable(tableName, subScan.getUserName());
-
-    // Set the condition to null such that all scan ranges are retrieved for the primary table.
-    // The reason is the row keys could typically belong to any one of the tablets of the table, so
-    // there is no use trying to get only limited set of scan ranges (note that applying a non-null
-    // condition to getScanRanges() also has a cost associated with it).
-    scanRanges = table.getMetaTable().getScanRanges();
+    Preconditions.checkArgument(partitionKeyVector != null, "Found null partitionKeVector.") ;
   }
 
   @Override
@@ -119,42 +129,94 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 
   @Override
   public int eval(int index, int numPartitions) {
-	  assert partitionKeyVector != null;
 
 	  String key = partitionKeyVector.getAccessor().getObject(index).toString();
 	  byte[] encodedKey = IdCodec.encodeAsBytes(key);
 
-    // Assign a default partition id of 0 for the case where the row key was not found
-    // in any of the tablets; this could happen if the primary table row was deleted and we
-    // have stale information. Such discrepancy will be handled by the join operator itself but
-    // from a range partition function viewpoint, it should just put it in a default bucket.
-    int tabletId = 0;
-    TabletInfoImpl tablet = null;
+    int tabletId = -1;
 
-    // TODO: currently this is doing a linear search through the tablet ranges; For N rows and M tablets,
-    // this will be an O(NxM) operation. This search should ideally be delegated to MapR-DB once an
-    // appropriate API is available to optimize this
-    for (int i = 0; i < scanRanges.size(); i++) {
-      tablet = (TabletInfoImpl) (scanRanges.get(i));
-      if (tablet.containsRow(encodedKey)) {
-         tabletId = i;
-         break;
+    // Do a 'range' binary search through the list of start-stop keys to find nearest range.  Assumption is
+    // that the list of start keys is ordered (this is ensured by MetaTable.getScanRanges())
+    // TODO: This search should ideally be delegated to MapR-DB once an appropriate API is available
+    // to optimize this
+    int low = 0, high = startKeys.size() - 1;
+    while (low <= high) {
+      int mid = low + (high-low)/2;
+
+      byte[] start = startKeys.get(mid);
+      byte[] stop  = stopKeys.get(mid);
+
+      // Check if key is present in the mid interval of [start, stop].
+      // Account for empty byte array start/stop
+      if ( (Bytes.compareTo(encodedKey, start) >= 0 ||
+             Bytes.equals(start, MapRConstants.EMPTY_BYTE_ARRAY)
+           ) &&
+           (Bytes.compareTo(encodedKey, stop) < 0 ||
+             Bytes.equals(stop, MapRConstants.EMPTY_BYTE_ARRAY)
+           )
+         ) {
+        tabletId = mid;
+        break;
+      }
+
+      if (Bytes.compareTo(encodedKey, start) >= 0) {
+        // key is greater, ignore left side
+        low = mid + 1;
+      } else {
+        // key is smaller, ignore right side
+        high = mid - 1;
       }
     }
 
-    logger.debug("Key = {}, tablet id = {}", key, tabletId);
+    if (tabletId < 0) {
+      tabletId = 0;
+      logger.warn("Key {} was not found in any of the start-stop ranges. Using default tabletId {}", key, tabletId);
+    }
 
-    // for debugging only
-    // if (tablet != null) {
-    //   logger.debug("Tablet range: {}", tablet.getRowKeyRange().toString());
-    // }
+    int partitionId = tabletId % numPartitions;
 
-    return tabletId % numPartitions;
+    logger.trace("Key = {}, tablet id = {}, partition id = {}", key, tabletId, partitionId);
+
+    return partitionId;
   }
 
+
   @Override
-  public void setSubScan(SubScan subScan) {
-    this.subScan = (MapRDBSubScan) subScan;
+  public void initialize(SubScan subScan) {
+
+    if (isInitialized) {
+      return;
+    }
+
+    MapRDBSubScan dbSubScan = (MapRDBSubScan) subScan;
+
+    // get the table handle from the table cache
+    Table table = dbSubScan.getFormatPlugin().getJsonTableCache().getTable(tableName, dbSubScan.getUserName());
+
+    // Set the condition to null such that all scan ranges are retrieved for the primary table.
+    // The reason is the row keys could typically belong to any one of the tablets of the table, so
+    // there is no use trying to get only limited set of scan ranges.
+    List<ScanRange> ranges = table.getMetaTable().getScanRanges();
+    this.startKeys = Lists.newArrayList();
+    this.stopKeys = Lists.newArrayList();
+
+    logger.debug("Num scan ranges for table {} = {}", table.getName(), ranges.size());
+
+    for (ScanRange r : ranges) {
+      QueryCondition condition = r.getCondition();
+      List<RowkeyRange> rowkeyRanges =  ((ConditionImpl)condition).getRowkeyRanges();
+      byte[] start = rowkeyRanges.get(0).getStartRow();
+      byte[] stop  = rowkeyRanges.get(rowkeyRanges.size() - 1).getStopRow();
+
+      startKeys.add(start);
+      stopKeys.add(stop);
+    }
+
+    // check validity; only need to check one of the lists since they are populated together
+    Preconditions.checkArgument(startKeys.size() > 0, "Found empty list of start/stopKeys.");
+
+    isInitialized = true;
+
   }
 
 }

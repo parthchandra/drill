@@ -36,7 +36,7 @@ public abstract class AbstractRangePartitionFunction  implements PartitionFuncti
 
   public abstract int eval(int index, int numPartitions);
 
-  public abstract void setSubScan(SubScan subScan);
+  public abstract void initialize(SubScan subScan);
 
   @JsonIgnore
   @Override

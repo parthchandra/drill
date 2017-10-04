@@ -58,10 +58,6 @@ public class RangePartitionSender extends AbstractSender{
     return partitionFunction;
   }
 
-  public void setSubScan(SubScan subScan) {
-    partitionFunction.setSubScan(subScan);
-  }
-
   @Override
   public <T, X, E extends Throwable> T accept(PhysicalVisitor<T, X, E> physicalVisitor, X value) throws E {
     return physicalVisitor.visitRangePartitionSender(this, value);

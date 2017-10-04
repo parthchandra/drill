@@ -56,9 +56,9 @@ public interface PartitionFunction  {
   FieldReference getPartitionFieldRef();
 
   /**
-   * Sets up a SubScan that may be needed for the partition function's internal use
+   * Initialization for the partition function.  Currently uses a SubScan for initialization.
    * @param subScan
    */
-  void setSubScan(SubScan subScan);
+  void initialize(SubScan subScan);
 
 }
