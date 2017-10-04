@@ -489,7 +489,11 @@ public class IndexPlanUtils {
 
   public static RelCollation buildCollationNonCoveringIndexScan(IndexDescriptor indexDesc,
       RelDataType indexScanRowType,
-      RelDataType restrictedScanRowType) {
+      RelDataType restrictedScanRowType, IndexPlanCallContext context) {
+
+    if (context.sortExprs == null) {
+      return RelCollations.of(RelCollations.EMPTY.getFieldCollations());
+    }
 
     final List<RelDataTypeField> indexFields = indexScanRowType.getFieldList();
     final List<RelDataTypeField> rsFields = restrictedScanRowType.getFieldList();
@@ -498,6 +502,7 @@ public class IndexPlanUtils {
     assert collationMap != null : "Invalid collation map for index";
 
     List<RelFieldCollation> fieldCollations = Lists.newArrayList();
+
     Map<Integer, RelFieldCollation> rsScanCollationMap = Maps.newTreeMap();
 
     // for each index field that is projected from the indexScan, find the corresponding

@@ -183,7 +183,7 @@ public class NonCoveringIndexPlanGenerator extends AbstractIndexPlanGenerator {
     RelCollation collation = null;
     if (indexDesc.getCollation() != null &&
          !settings.isIndexForceSortNonCovering()) {
-      collation = IndexPlanUtils.buildCollationNonCoveringIndexScan(indexDesc, indexScanRowType, dbscanRowType);
+      collation = IndexPlanUtils.buildCollationNonCoveringIndexScan(indexDesc, indexScanRowType, dbscanRowType, indexContext);
       if (restrictedScanTraitSet.contains(RelCollationTraitDef.INSTANCE)) { // replace existing trait
         restrictedScanTraitSet = restrictedScanTraitSet.plus(partition).replace(collation);
       } else {  // add new one
