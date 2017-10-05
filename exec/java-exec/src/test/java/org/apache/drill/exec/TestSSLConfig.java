@@ -76,7 +76,7 @@ public class TestSSLConfig {
       fail();
       //Expected
     } catch (Exception e) {
-
+      assertTrue(e instanceof DrillException);
     }
   }
 

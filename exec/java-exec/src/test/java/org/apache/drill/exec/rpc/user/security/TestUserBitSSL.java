@@ -26,6 +26,7 @@ import org.apache.drill.common.config.DrillProperties;
 import org.apache.drill.exec.ExecConstants;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -201,6 +202,7 @@ public class TestUserBitSSL extends BaseTestQuery {
     test("SELECT * FROM cp.`region.json`");
   }
 
+  @Ignore
   @Test
   public void testClientConfigHostnameVerification() {
     String password = "test_password";
@@ -225,7 +227,6 @@ public class TestUserBitSSL extends BaseTestQuery {
       // Store away the truststore.
       try (FileOutputStream fos1 = new FileOutputStream(tempFile1);) {
         ts.store(fos1, password.toCharArray());
-        fos1.close();
       } catch (Exception e) {
         fail(e.getMessage());
       }
@@ -240,7 +241,6 @@ public class TestUserBitSSL extends BaseTestQuery {
       // Store away the keystore.
       try (FileOutputStream fos2 = new FileOutputStream(tempFile2);) {
         ts.store(fos2, password.toCharArray());
-        fos2.close();
       } catch (Exception e) {
         fail(e.getMessage());
       }
