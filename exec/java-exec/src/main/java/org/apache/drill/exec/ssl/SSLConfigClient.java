@@ -37,7 +37,7 @@ public class SSLConfigClient extends SSLConfig {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(SSLConfigClient.class);
 
-  Properties properties;
+  private final Properties properties;
   private final boolean userSslEnabled;
   private final String trustStoreType;
   private final String trustStorePath;

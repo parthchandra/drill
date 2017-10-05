@@ -223,9 +223,12 @@ public class TestUserBitSSL extends BaseTestQuery {
       ts.load(null, password.toCharArray());
       ts.setCertificateEntry("drillTest", certificate.cert());
       // Store away the truststore.
-      FileOutputStream fos1 = new FileOutputStream(tempFile1);
-      ts.store(fos1, password.toCharArray());
-      fos1.close();
+      try (FileOutputStream fos1 = new FileOutputStream(tempFile1);) {
+        ts.store(fos1, password.toCharArray());
+        fos1.close();
+      } catch (Exception e) {
+        fail(e.getMessage());
+      }
 
       tempFile2 = File.createTempFile(keyStoreFileName, ".ks");
       tempFile2.deleteOnExit();
@@ -235,9 +238,12 @@ public class TestUserBitSSL extends BaseTestQuery {
       ts.load(null, password.toCharArray());
       ts.setKeyEntry("drillTest", certificate.key(), password.toCharArray(), new java.security.cert.Certificate[]{certificate.cert()});
       // Store away the keystore.
-      FileOutputStream fos2 = new FileOutputStream(tempFile2);
-      ts.store(fos2, password.toCharArray());
-      fos2.close();
+      try (FileOutputStream fos2 = new FileOutputStream(tempFile2);) {
+        ts.store(fos2, password.toCharArray());
+        fos2.close();
+      } catch (Exception e) {
+        fail(e.getMessage());
+      }
 
       final Properties connectionProps = new Properties();
       connectionProps.setProperty(DrillProperties.ENABLE_TLS, "true");
