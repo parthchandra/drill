@@ -175,6 +175,25 @@ public class HashJoinBatch extends AbstractBinaryRecordBatch<HashJoinPOP> implem
   }
 
   @Override
+  protected boolean prefetchFirstBatchFromBothSides() {
+    if (super.prefetchFirstBatchFromBothSides() == false) {
+      return false;
+    }
+
+    /* It is fine to early exit when one of the stream is NONE for INNER join.
+     * INNER join doesn't produce any data if one of the stream is NONE.
+     * However, this is not true for non INNER join's.
+     */
+    if (this.joinType == JoinRelType.INNER &&
+        (leftUpstream == IterOutcome.NONE || rightUpstream == IterOutcome.NONE)) {
+      state = BatchState.DONE;
+      return false;
+    }
+
+    return true;
+  }
+
+  @Override
   protected void buildSchema() throws SchemaChangeException {
     if (! prefetchFirstBatchFromBothSides()) {
       return;

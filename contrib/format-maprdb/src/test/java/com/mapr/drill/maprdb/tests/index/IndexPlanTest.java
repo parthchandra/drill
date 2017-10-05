@@ -1193,4 +1193,23 @@ public class IndexPlanTest extends BaseJsonTest {
     );
   }
 
+// Enable this testcase once MD-2848 is fixed.
+//  @Test
+//  public void IntersectPlanWithOneSideNoRows() throws Exception {
+//    try {
+//      String query = "SELECT t.`name`.`lname` AS `lname` FROM hbase.`index_test_primary` as t " +
+//              " where t.personal.age = 53 AND t.personal.income=111145";
+//      test(defaultHavingIndexPlan);
+//      test(preferIntersectPlans + ";" + disableFTS);
+//      PlanTestBase.testPlanMatchingPatterns(query,
+//              new String[]{"RowKeyJoin(.*[\n\r])+.*RestrictedJsonTableGroupScan(.*[\n\r])+.*HashJoin(.*[\n\r])+.*JsonTableGroupScan.*indexName=(i_age|i_income)(.*[\n\r])+.*JsonTableGroupScan.*indexName=(i_age|i_income)"},
+//              new String[]{}
+//      );
+//
+//      testNoResult(query);
+//
+//    } finally {
+//      test(defaultIntersectPlans + ";" + enableFTS);
+//    }
+//  }
 }
