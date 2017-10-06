@@ -654,11 +654,11 @@ public class TestEarlyLimit0Optimization extends BaseTestQuery {
 
   @Test
   public void substring() throws Exception {
-    substringTest("SELECT SUBSTRING(full_name, 1, 5) AS s FROM " + viewName, 25);
+    substringTest("SELECT SUBSTRING(full_name, 1, 5) AS s FROM " + viewName, Types.MAX_VARCHAR_LENGTH);
   }
 
   @Test
   public void substr() throws Exception {
-    substringTest("SELECT SUBSTR(full_name, 1, 5) AS s FROM " + viewName, 25);
+    substringTest("SELECT SUBSTR(full_name, 1, 5) AS s FROM " + viewName, Types.MAX_VARCHAR_LENGTH);
   }
 }
