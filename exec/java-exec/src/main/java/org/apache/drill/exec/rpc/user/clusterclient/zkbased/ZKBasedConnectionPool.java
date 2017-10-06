@@ -84,7 +84,7 @@ public class ZKBasedConnectionPool extends AbstractDrillClusterClient implements
       connection = connections.get(endpoint, new Callable<DrillConnectionImpl>() {
         @Override
         public DrillConnectionImpl call() throws Exception {
-          final DrillConnectionImpl newConnection = newPhysicalConnection(endpoint);
+          final DrillConnectionImpl newConnection = newPhysicalConnection(endpoint, info);
           newConnection.connect(endpoint, connectionProperties, getUserCredentials(connectionProperties));
           return newConnection;
         }

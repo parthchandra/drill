@@ -26,6 +26,7 @@ import org.apache.drill.exec.proto.GeneralRPCProtos.Ack;
 import org.apache.drill.exec.proto.UserProtos.NewSessionRequest;
 import org.apache.drill.exec.proto.UserProtos.RpcType;
 import org.apache.drill.exec.proto.UserProtos.SessionHandle;
+import org.apache.drill.exec.rpc.NonTransientRpcException;
 import org.apache.drill.exec.rpc.RpcException;
 import org.apache.drill.exec.rpc.user.QueryResultHandler;
 import org.apache.drill.exec.rpc.user.UserClient;
@@ -41,9 +42,10 @@ public class DrillConnectionImpl extends UserClient implements DrillConnection {
 
   private final ConcurrentMap<SessionHandle, DrillSessionImpl> sessions = Maps.newConcurrentMap();
 
-  DrillConnectionImpl(AbstractDrillClusterClient clusterClient, DrillbitEndpoint endpoint) {
-    super(clusterClient.clientName, clusterClient.config, clusterClient.supportComplexTypes,
-        clusterClient.allocator, clusterClient.eventLoopGroup, clusterClient.executor);
+  DrillConnectionImpl(AbstractDrillClusterClient clusterClient, DrillbitEndpoint endpoint, Properties props)
+      throws NonTransientRpcException {
+    super(clusterClient.clientName, clusterClient.config, props, clusterClient.supportComplexTypes,
+        clusterClient.allocator, clusterClient.eventLoopGroup, clusterClient.executor, endpoint);
     this.clusterClient = clusterClient;
     this.endpoint = endpoint;
   }

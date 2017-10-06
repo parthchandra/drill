@@ -28,8 +28,10 @@ import org.apache.drill.exec.memory.RootAllocatorFactory;
 import org.apache.drill.exec.proto.CoordinationProtos.DrillbitEndpoint;
 import org.apache.drill.exec.proto.UserBitShared.UserCredentials;
 import org.apache.drill.exec.rpc.NamedThreadFactory;
+import org.apache.drill.exec.rpc.NonTransientRpcException;
 import org.apache.drill.exec.rpc.TransportCheck;
 
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -99,8 +101,9 @@ public abstract class AbstractDrillClusterClient implements DrillClusterClient {
         .build();
   }
 
-  protected final DrillConnectionImpl newPhysicalConnection(final DrillbitEndpoint endpoint) {
-    return new DrillConnectionImpl(this, endpoint);
+  protected final DrillConnectionImpl newPhysicalConnection(final DrillbitEndpoint endpoint,
+      final Properties props) throws NonTransientRpcException {
+    return new DrillConnectionImpl(this, endpoint, props);
   }
 
   /**
