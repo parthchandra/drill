@@ -21,6 +21,7 @@ import com.google.common.collect.Lists;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
+import org.apache.drill.common.types.Types;
 import org.apache.drill.common.util.FileUtils;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
 import org.junit.Ignore;
@@ -29,6 +30,7 @@ import org.junit.Test;
 import java.util.List;
 
 public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
+
   @Test
   public void testConcatWithMoreThanTwoArgs() throws Exception {
     final String query = "select concat(r_name, r_name, r_name, 'f') as col \n" +
@@ -38,6 +40,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
     TypeProtos.MajorType majorType = TypeProtos.MajorType.newBuilder()
             .setMinorType(TypeProtos.MinorType.VARCHAR)
             .setMode(TypeProtos.DataMode.REQUIRED)
+            .setPrecision(Types.MAX_VARCHAR_LENGTH)
             .build();
     expectedSchema.add(Pair.of(SchemaPath.getSimplePath("col"), majorType));
 
@@ -91,6 +94,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
     TypeProtos.MajorType majorType = TypeProtos.MajorType.newBuilder()
         .setMinorType(TypeProtos.MinorType.VARCHAR)
         .setMode(TypeProtos.DataMode.REQUIRED)
+        .setPrecision(Types.MAX_VARCHAR_LENGTH)
         .build();
     expectedSchema.add(Pair.of(SchemaPath.getSimplePath("col"), majorType));
 
@@ -123,6 +127,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
     TypeProtos.MajorType majorType = TypeProtos.MajorType.newBuilder()
             .setMinorType(TypeProtos.MinorType.VARCHAR)
             .setMode(TypeProtos.DataMode.REQUIRED)
+            .setPrecision(Types.MAX_VARCHAR_LENGTH)
             .build();
     expectedSchema.add(Pair.of(SchemaPath.getSimplePath("col"), majorType));
 
@@ -155,6 +160,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
     TypeProtos.MajorType majorType = TypeProtos.MajorType.newBuilder()
         .setMinorType(TypeProtos.MinorType.VARCHAR)
         .setMode(TypeProtos.DataMode.REQUIRED)
+        .setPrecision(Types.MAX_VARCHAR_LENGTH)
         .build();
     expectedSchema.add(Pair.of(SchemaPath.getSimplePath("col"), majorType));
 
@@ -187,6 +193,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
     TypeProtos.MajorType majorType = TypeProtos.MajorType.newBuilder()
         .setMinorType(TypeProtos.MinorType.VARCHAR)
         .setMode(TypeProtos.DataMode.REQUIRED)
+        .setPrecision(Types.MAX_VARCHAR_LENGTH)
         .build();
     expectedSchema.add(Pair.of(SchemaPath.getSimplePath("col"), majorType));
 
@@ -500,6 +507,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
     final TypeProtos.MajorType majorType2 = TypeProtos.MajorType.newBuilder()
         .setMinorType(TypeProtos.MinorType.VARCHAR)
         .setMode(TypeProtos.DataMode.OPTIONAL)
+        .setPrecision(Types.MAX_VARCHAR_LENGTH)
         .build();
 
     final TypeProtos.MajorType majorType3 = TypeProtos.MajorType.newBuilder()
@@ -734,7 +742,7 @@ public class TestFunctionsWithTypeExpoQueries extends BaseTestQuery {
         .sqlQuery(query)
         .ordered()
         .baselineColumns("col")
-        .baselineValues(36l)
+        .baselineValues(36L)
         .build()
         .run();
   }

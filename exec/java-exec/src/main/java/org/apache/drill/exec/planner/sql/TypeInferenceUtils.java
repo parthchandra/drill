@@ -688,10 +688,7 @@ public class TypeInferenceUtils {
         opBinding = convertDecimalLiteralToDouble(opBinding);
       }
 
-      return createCalciteTypeWithNullability(
-          opBinding.getTypeFactory(),
-          opBinding.getOperandType(0).getSqlTypeName(),
-          true);
+      return opBinding.getTypeFactory().createTypeWithNullability(opBinding.getOperandType(0), true);
     }
   }
 
