@@ -113,6 +113,10 @@ public abstract class PlainDbScanToIndexScanPrule extends Prule {
       return;
     }
 
+    if (settings.isStatisticsEnabled()) {
+      groupScan.getStatistics().initialize(null, indexContext.scan, indexContext);
+    }
+
     IndexPlanUtils.updateSortExpression(indexContext);
 
     IndexSelector selector = new IndexSelector(indexContext);

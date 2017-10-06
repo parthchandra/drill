@@ -19,9 +19,9 @@ package org.apache.drill.exec.planner.index;
 
 public class MapRDBStatisticsPayload implements StatisticsPayload {
 
-  final double rowCount;
+  double rowCount;
 
-  final double avgRowSize;
+  double avgRowSize;
 
   public MapRDBStatisticsPayload(double rowCount, double avgRowSize) {
     this.rowCount = rowCount;

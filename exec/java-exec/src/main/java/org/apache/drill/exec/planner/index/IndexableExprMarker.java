@@ -173,6 +173,10 @@ public class IndexableExprMarker extends RexVisitorImpl<Boolean> {
 
   @Override
   public Boolean visitCall(RexCall call) {
+    if (call.getKind() == SqlKind.NOT) {
+      // Conditions under NOT are not indexable
+      return false;
+    }
     if (operandsAreIndexable(call)) {
       for (RexNode operand : call.operands) {
         directCompareOp = true;

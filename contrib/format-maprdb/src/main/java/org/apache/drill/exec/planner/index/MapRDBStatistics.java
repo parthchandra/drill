@@ -279,11 +279,25 @@ public class MapRDBStatistics implements Statistics {
     return false;
   }
 
+  private void populateStatsForNoFilter(JsonTableGroupScan jTabGrpScan, IndexCollection indexes, DrillScanRel scanRel,
+                                   IndexPlanCallContext context) {
+    for (IndexDescriptor idx: indexes) {
+      StatisticsPayload idxPayload = jTabGrpScan.getEstimatedStats(null, idx, scanRel);
+
+      RelDataType newRowType;
+      FunctionalIndexInfo functionInfo = idx.getFunctionalInfo();
+      if (functionInfo.hasFunctional()) {
+        newRowType = FunctionalIndexHelper.rewriteFunctionalRowType(scanRel, context, functionInfo);
+      } else {
+        newRowType = scanRel.getRowType();
+      }
+      addToCache(null, idx, context, idxPayload, jTabGrpScan, scanRel, newRowType);
+    }
+  }
+
   private void populateStats(RexNode condition, IndexCollection indexes, DrillScanRel scanRel,
                                IndexPlanCallContext context) {
     JsonTableGroupScan jTabGrpScan;
-    Map<IndexDescriptor, IndexConditionInfo> leadingKeyIdxConditionMap;
-    Map<IndexDescriptor, IndexConditionInfo> idxConditionMap;
 
     IndexCollection keyRepIndexes = rowKeyRepIndexes(indexes);
     if (scanRel.getGroupScan() instanceof JsonTableGroupScan) {
@@ -292,6 +306,13 @@ public class MapRDBStatistics implements Statistics {
       logger.debug("Statistics: populateStats exit early - not an instance of JsonTableGroupScan!");
       return;
     }
+    if (condition == null) {
+      populateStatsForNoFilter(jTabGrpScan, indexes, scanRel, context);
+      return;
+    }
+
+    Map<IndexDescriptor, IndexConditionInfo> leadingKeyIdxConditionMap;
+    Map<IndexDescriptor, IndexConditionInfo> idxConditionMap;
 
     RexBuilder builder = scanRel.getCluster().getRexBuilder();
     PlannerSettings settings = PrelUtil.getSettings(scanRel.getCluster());
@@ -415,13 +436,25 @@ public class MapRDBStatistics implements Statistics {
         if (payloadMap != null) {
           if (payloadMap.get(buildUniqueIndexIdentifier(idx)) == null) {
             payloadMap.put(buildUniqueIndexIdentifier(idx), payload);
+
+            // rowCount for the same condition should be the same on primary table or index, let us sync them to the smallest
+            double minimalRowCount = payload.getRowCount();
+            for (StatisticsPayload existing : payloadMap.values()) {
+              if (existing.getRowCount() < minimalRowCount) {
+                minimalRowCount = existing.getRowCount();
+              }
+            }
+            for (StatisticsPayload existing : payloadMap.values()) {
+              if (existing instanceof MapRDBStatisticsPayload) {
+                ((MapRDBStatisticsPayload)existing).rowCount = minimalRowCount;
+              }
+            }
           } else {
             logger.debug("Statistics: Filter row count already exists for filter: {}. Skip!", conditionAsStr);
           }
         } else {
           logger.debug("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
         }
-
       }
     } else if (condition == null) {
       Map<String, StatisticsPayload> payloadMap = new HashMap<>();
