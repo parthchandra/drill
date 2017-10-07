@@ -216,7 +216,8 @@ public class SystemOptionManager extends BaseOptionManager implements AutoClosea
       new OptionDefinition(ExecConstants.PERSISTENT_TABLE_UMASK_VALIDATOR),
       new OptionDefinition(ExecConstants.CPU_LOAD_AVERAGE),
       new OptionDefinition(ExecConstants.ENABLE_VECTOR_VALIDATOR),
-      new OptionDefinition(ExecConstants.ENABLE_ITERATOR_VALIDATOR)
+      new OptionDefinition(ExecConstants.ENABLE_ITERATOR_VALIDATOR),
+      new OptionDefinition(ExecConstants.QUERY_ROWKEYJOIN_BATCHSIZE)
     };
 
     final CaseInsensitiveMap<OptionDefinition> map = CaseInsensitiveMap.newHashMap();
