@@ -30,6 +30,9 @@ import org.apache.drill.exec.record.RecordBatch;
 
 public interface Partitioner {
 
+  // Always keep the recordCount as (2^x) - 1 to better utilize the memory allocation in ValueVectors
+  static final int DEFAULT_RECORD_BATCH_SIZE = (1 << 10) - 1;
+
   public abstract void setup(FragmentContext context,
                           RecordBatch incoming,
                           HashPartitionSender popConfig,

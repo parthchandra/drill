@@ -54,9 +54,6 @@ import com.google.common.collect.Lists;
 public abstract class PartitionerTemplate implements Partitioner {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(PartitionerTemplate.class);
 
-  // Always keep the recordCount as (2^x) - 1 to better utilize the memory allocation in ValueVectors
-  private static final int DEFAULT_RECORD_BATCH_SIZE = (1 << 10) - 1;
-
   private SelectionVector2 sv2;
   private SelectionVector4 sv4;
   private RecordBatch incoming;
@@ -65,7 +62,7 @@ public abstract class PartitionerTemplate implements Partitioner {
   private int end;
   private List<OutgoingRecordBatch> outgoingBatches = Lists.newArrayList();
 
-  private int outgoingRecordBatchSize = DEFAULT_RECORD_BATCH_SIZE;
+  private int outgoingRecordBatchSize = Partitioner.DEFAULT_RECORD_BATCH_SIZE;
 
   @Override
   public List<? extends PartitionOutgoingBatch> getOutgoingBatches() {
@@ -92,6 +89,7 @@ public abstract class PartitionerTemplate implements Partitioner {
     this.stats = stats;
     this.start = start;
     this.end = end;
+    this.outgoingRecordBatchSize = popConfig.getOutgoingBatchSize();
     doSetup(context, incoming, null);
 
     // Half the outgoing record batch size if the number of senders exceeds 1000 to reduce the total amount of memory

@@ -38,7 +38,8 @@ public class RangePartitionSenderCreator implements RootCreator<RangePartitionSe
     Preconditions.checkArgument(children.size() == 1);
     RangePartitionRecordBatch rangep = new RangePartitionRecordBatch(config, children.iterator().next(), context);
     HashPartitionSender hpc = new HashPartitionSender(config.getOppositeMajorFragmentId(), config,
-        config.getPartitionFunction().getPartitionFieldRef(), config.getDestinations());
+        config.getPartitionFunction().getPartitionFieldRef(), config.getDestinations(),
+        RangePartitionSender.RANGE_PARTITION_OUTGOING_BATCH_SIZE);
     return new PartitionSenderRootExec(context, rangep, hpc);
   }
 
