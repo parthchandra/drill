@@ -54,6 +54,9 @@ public class PluginConstants {
   public static final String JSON_TABLE_SCAN_SIZE_MB = "format-maprdb.json.scanSizeMB";
   public static final int JSON_TABLE_SCAN_SIZE_MB_DEFAULT = 128;
 
+  public static final String JSON_TABLE_RESTRICTED_SCAN_SIZE_MB = "format-maprdb.json.restrictedScanSizeMB";
+  public static final int JSON_TABLE_RESTRICTED_SCAN_SIZE_MB_DEFAULT = 4096;
+
   public static final String JSON_TABLE_USE_NUM_REGIONS_FOR_DISTRIBUTION_PLANNING = "format-maprdb.json.useNumRegionsForDistribution";
   public static final boolean JSON_TABLE_USE_NUM_REGIONS_FOR_DISTRIBUTION_PLANNING_DEFAULT = false;
 
@@ -63,9 +66,6 @@ public class PluginConstants {
   public static final String JSON_TABLE_MEDIA_TYPE = "format-maprdb.json.mediaType";
   public static final String JSON_TABLE_MEDIA_TYPE_DEFAULT = SSD;
 
-  // TODO: Currently, DrillCostBase has a byte read cost, but not a block read cost. The block
-  // read cost is dependent on block size and the type of the storage, so it makes more sense to
-  // define one here. However, the appropriate factor needs to be decided.
   public static final String JSON_TABLE_SSD_BLOCK_SEQ_READ_COST = "format-maprdb.json.pluginCost.ssdBlockSequentialReadCost";
   public static final int JSON_TABLE_SSD_BLOCK_SEQ_READ_COST_DEFAULT = 32 * DrillCostBase.BASE_CPU_COST * JSON_TABLE_BLOCK_SIZE_DEFAULT;
 

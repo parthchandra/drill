@@ -189,7 +189,10 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
     // Set the condition to null such that all scan ranges are retrieved for the primary table.
     // The reason is the row keys could typically belong to any one of the tablets of the table, so
     // there is no use trying to get only limited set of scan ranges.
-    List<ScanRange> ranges = table.getMetaTable().getScanRanges();
+    // NOTE: here we use the restrictedScanRangeSizeMB because the range partitioning should be parallelized
+    // based on the number of scan ranges on the RestrictedJsonTableGroupScan.
+    List<ScanRange> ranges = table.getMetaTable().getScanRanges(plugin.getRestrictedScanRangeSizeMB());
+
     this.startKeys = Lists.newArrayList();
     this.stopKeys = Lists.newArrayList();
 

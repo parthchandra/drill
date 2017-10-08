@@ -55,6 +55,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
   private final int scanRangeSizeMB;
   private final String mediaType;
   private final MapRDBCost pluginCostModel;
+  private final int restrictedScanRangeSizeMB;
 
   public MapRDBFormatPlugin(String name, DrillbitContext context, Configuration fsConf,
       StoragePluginConfig storageConfig, MapRDBFormatPluginConfig formatConfig) throws IOException {
@@ -69,6 +70,13 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
       logger.warn("Invalid scan size {} for MapR-DB tables, using default", scanRangeSizeMBConfig);
       scanRangeSizeMBConfig = PluginConstants.JSON_TABLE_SCAN_SIZE_MB_DEFAULT;
     }
+
+    int restrictedScanRangeSizeMBConfig = context.getConfig().getInt(PluginConstants.JSON_TABLE_RESTRICTED_SCAN_SIZE_MB);
+    if (restrictedScanRangeSizeMBConfig < 32 || restrictedScanRangeSizeMBConfig > 8192) {
+      logger.warn("Invalid restricted scan size {} for MapR-DB tables, using default", restrictedScanRangeSizeMBConfig);
+      restrictedScanRangeSizeMBConfig = PluginConstants.JSON_TABLE_RESTRICTED_SCAN_SIZE_MB_DEFAULT;
+    }
+
     String mediaTypeConfig = context.getConfig().getString(PluginConstants.JSON_TABLE_MEDIA_TYPE);
     if (!(mediaTypeConfig.equals(PluginConstants.SSD) ||
         mediaTypeConfig.equals(PluginConstants.HDD))) {
@@ -77,6 +85,7 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
     }
     mediaType = mediaTypeConfig;
     scanRangeSizeMB = scanRangeSizeMBConfig;
+    restrictedScanRangeSizeMB = restrictedScanRangeSizeMBConfig;
     pluginCostModel = new MapRDBCost(context.getConfig(), mediaType);
   }
 
@@ -135,6 +144,10 @@ public class MapRDBFormatPlugin extends TableFormatPlugin {
 
   public int getScanRangeSizeMB() {
     return scanRangeSizeMB;
+  }
+
+  public int getRestrictedScanRangeSizeMB() {
+    return restrictedScanRangeSizeMB;
   }
 
   public MapRDBCost getPluginCostModel() {

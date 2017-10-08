@@ -18,6 +18,7 @@
 package org.apache.drill.exec.store.mapr.db.json;
 
 import java.util.List;
+import java.util.NavigableMap;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -68,6 +69,10 @@ public class RestrictedJsonTableGroupScan extends JsonTableGroupScan {
         spec.getTableName(),
         getRegionsToScan().get(tfi), spec.getSerializedFilter(), getUserName());
     return subScanSpec;
+  }
+
+  protected NavigableMap<TabletFragmentInfo, String> getRegionsToScan() {
+    return getRegionsToScan(formatPlugin.getRestrictedScanRangeSizeMB());
   }
 
   @Override

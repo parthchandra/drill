@@ -190,6 +190,10 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   }
 
   protected NavigableMap<TabletFragmentInfo, String> getRegionsToScan() {
+    return getRegionsToScan(formatPlugin.getScanRangeSizeMB());
+  }
+
+  protected NavigableMap<TabletFragmentInfo, String> getRegionsToScan(int scanRangeSizeMB) {
     // If regionsToScan already computed, just return.
     if (doNotAccessRegionsToScan == null) {
       final Table t = this.formatPlugin.getJsonTableCache().getTable(
@@ -198,8 +202,8 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
       QueryCondition scanSpecCondition = scanSpec.getCondition();
       List<ScanRange> scanRanges = (scanSpecCondition == null)
-          ? metaTable.getScanRanges(formatPlugin.getScanRangeSizeMB())
-          : metaTable.getScanRanges(scanSpecCondition, formatPlugin.getScanRangeSizeMB());
+          ? metaTable.getScanRanges(scanRangeSizeMB)
+          : metaTable.getScanRanges(scanSpecCondition, scanRangeSizeMB);
 
       // set the start-row of the scanspec as the start-row of the first scan range
       ScanRange firstRange = scanRanges.get(0);
@@ -248,7 +252,6 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
 
   @Override
   public ScanStats getScanStats() {
-    //TODO: look at stats for this.
     if (isIndexScan()) {
       return indexScanStats();
     }
