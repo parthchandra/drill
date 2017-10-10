@@ -23,8 +23,10 @@ import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
+import org.apache.drill.common.expression.CastExpression;
 import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.exec.planner.logical.DrillOptiq;
 import org.apache.drill.exec.planner.logical.DrillParseContext;
 import org.apache.drill.exec.planner.logical.partition.FindPartitionConditions;
@@ -61,6 +63,13 @@ public class RexSeparator {
           //case sensitive comparison
           if (! ((SchemaPath)relevantExpr).getAsUnescapedPath().equals(
               ((SchemaPath)relatedPaths.get(idxFound)).getAsUnescapedPath()) ) {
+            continue;
+          }
+        }
+        else if (relevantExpr instanceof CastExpression) {
+          final CastExpression castExprInFilter = (CastExpression) relevantExpr;
+          if (castExprInFilter.getMajorType().getMinorType() == TypeProtos.MinorType.VARCHAR
+              && (castExprInFilter.getMajorType().getPrecision() > relatedPaths.get(idxFound).getMajorType().getPrecision())) {
             continue;
           }
         }
