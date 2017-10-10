@@ -47,6 +47,8 @@ public class IndexPlanTest extends BaseJsonTest {
   private static final String sliceTargetDefault = "alter session reset `planner.slice_target`";
   private static final String noIndexPlan = "alter session set `planner.enable_index_planning` = false";
   private static final String defaultHavingIndexPlan = "alter session reset `planner.enable_index_planning`";
+  private static final String defaultnonCoveringSelectivityThreshold = "alter session set `planner.index.noncovering_selectivity_threshold` = 0.025";
+  private static final String incrnonCoveringSelectivityThreshold = "alter session set `planner.index.noncovering_selectivity_threshold` = 0.25";
   private static final String disableFTS = "alter session set `planner.disable_full_table_scan` = true";
   private static final String enableFTS = "alter session reset `planner.disable_full_table_scan`";
   private static final String preferIntersectPlans = "alter session set `planner.index.prefer_intersect_plans` = true";
@@ -108,6 +110,7 @@ public class IndexPlanTest extends BaseJsonTest {
             "hash_i_cast_timestamp_firstlogin", "$CAST(activity.irs.firstlogin@TIMESTAMP)", "id.ssn"
         };
     gen.generateTableWithIndex(PRIMARY_TABLE_NAME, PRIMARY_TABLE_SIZE, indexDef);
+    test(incrnonCoveringSelectivityThreshold);
   }
 
   @AfterClass
@@ -118,6 +121,7 @@ public class IndexPlanTest extends BaseJsonTest {
    //     admin.deleteTable(PRIMARY_TABLE_NAME);
       }
     }
+    test(defaultnonCoveringSelectivityThreshold);
   }
 
   @Test
