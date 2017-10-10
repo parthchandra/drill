@@ -20,10 +20,8 @@ package org.apache.drill.exec.planner.physical;
 import java.util.List;
 
 import org.apache.drill.common.expression.FieldReference;
-import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.record.VectorWrapper;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 @JsonTypeInfo(use=JsonTypeInfo.Id.CLASS, include=JsonTypeInfo.As.PROPERTY, property="@class")
@@ -54,11 +52,5 @@ public interface PartitionFunction  {
    * @return FieldReference for the partition function
    */
   FieldReference getPartitionFieldRef();
-
-  /**
-   * Initialization for the partition function.  Currently uses a SubScan for initialization.
-   * @param subScan
-   */
-  void initialize(SubScan subScan);
 
 }

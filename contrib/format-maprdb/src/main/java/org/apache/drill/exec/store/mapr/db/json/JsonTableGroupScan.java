@@ -460,10 +460,11 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
         factor = Math.min(1.0, 1.0 / Math.sqrt(100.0 / metaTable.getScanStats().getPartitionCount()));
       }
       logger.info("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
-              "condition: {} rowCount: {}, avgRowSize: {}, estimatedSize {}",
+              "condition: {} rowCount: {}, avgRowSize: {}, estimatedSize: {}, partitionCount: {}",
           this, (index == null ? "null" : index.getIndexName()), (index == null ? "null" : index.getIndexInfo()),
           (condition == null ? "null" : condition.toString()), stats.getEstimatedNumRows(),
-          (stats.getEstimatedNumRows() == 0 ? 0 : stats.getEstimatedSize()/stats.getEstimatedNumRows()), stats.getEstimatedSize());
+          (stats.getEstimatedNumRows() == 0 ? 0 : stats.getEstimatedSize()/stats.getEstimatedNumRows()), stats.getEstimatedSize(),
+          stats.getPartitionCount());
       return new MapRDBStatisticsPayload(factor * stats.getEstimatedNumRows(),
           ((stats.getEstimatedNumRows() == 0 ? 0 : (double)stats.getEstimatedSize()/stats.getEstimatedNumRows())));
     } else {
@@ -571,7 +572,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
   @Override
   @JsonIgnore
   public PartitionFunction getRangePartitionFunction(List<FieldReference> refList) {
-    return new JsonTableRangePartitionFunction(refList, scanSpec.getTableName());
+    return new JsonTableRangePartitionFunction(refList, scanSpec.getTableName(), this.getUserName(), this.getFormatPlugin());
   }
 
   /**

@@ -20,10 +20,9 @@ package org.apache.drill.exec.store.mapr.db.json;
 import java.util.List;
 
 import org.apache.drill.common.expression.FieldReference;
-import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.planner.physical.AbstractRangePartitionFunction;
 import org.apache.drill.exec.record.VectorWrapper;
-import org.apache.drill.exec.store.mapr.db.MapRDBSubScan;
+import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.vector.ValueVector;
 import org.ojai.store.QueryCondition;
 
@@ -53,6 +52,9 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   protected String tableName;
 
   @JsonIgnore
+  protected String userName;
+
+  @JsonIgnore
   protected ValueVector partitionKeyVector = null;
 
   // List of start keys of the scan ranges for the table.
@@ -62,10 +64,6 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   // List of stop keys of the scan ranges for the table.
   @JsonProperty
   protected List<byte[]> stopKeys = null;
-
-  // Whether the start/stop keys have been initialized
-  @JsonIgnore
-  protected boolean isInitialized = false;
 
   @JsonCreator
   public JsonTableRangePartitionFunction(
@@ -80,18 +78,20 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   }
 
   public JsonTableRangePartitionFunction(List<FieldReference> refList,
-      String tableName) {
+      String tableName, String userName, MapRDBFormatPlugin formatPlugin) {
     this.refList = refList;
     this.tableName = tableName;
+    this.userName = userName;
+    initialize(formatPlugin);
   }
 
   @JsonProperty("refList")
   @Override
   public List<FieldReference> getPartitionRefList() {
-	  return refList;
-	}
+    return refList;
+  }
 
-	@Override
+  @Override
   public void setup(List<VectorWrapper<?>> partitionKeys) {
     if (partitionKeys.size() != 1) {
       throw new UnsupportedOperationException(
@@ -181,17 +181,10 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
   }
 
 
-  @Override
-  public void initialize(SubScan subScan) {
-
-    if (isInitialized) {
-      return;
-    }
-
-    MapRDBSubScan dbSubScan = (MapRDBSubScan) subScan;
+  public void initialize(MapRDBFormatPlugin plugin) {
 
     // get the table handle from the table cache
-    Table table = dbSubScan.getFormatPlugin().getJsonTableCache().getTable(tableName, dbSubScan.getUserName());
+    Table table = plugin.getJsonTableCache().getTable(tableName, userName);
 
     // Set the condition to null such that all scan ranges are retrieved for the primary table.
     // The reason is the row keys could typically belong to any one of the tablets of the table, so
@@ -202,20 +195,39 @@ public class JsonTableRangePartitionFunction extends AbstractRangePartitionFunct
 
     logger.debug("Num scan ranges for table {} = {}", table.getName(), ranges.size());
 
+    int count = 0;
     for (ScanRange r : ranges) {
       QueryCondition condition = r.getCondition();
       List<RowkeyRange> rowkeyRanges =  ((ConditionImpl)condition).getRowkeyRanges();
       byte[] start = rowkeyRanges.get(0).getStartRow();
       byte[] stop  = rowkeyRanges.get(rowkeyRanges.size() - 1).getStopRow();
 
+      Preconditions.checkNotNull(start, String.format("Encountered a null start key at position %d for scan range condition %s.", count, condition.toString()));
+      Preconditions.checkNotNull(stop, String.format("Encountered a null stop key at position %d for scan range condition %s.", count, condition.toString()));
+
+      if (count > 0) {
+        // after the first start key, rest should be non-empty
+        Preconditions.checkState( !(Bytes.equals(start, MapRConstants.EMPTY_BYTE_ARRAY)), String.format("Encountered an empty start key at position %d", count));
+      }
+
+      if (count < ranges.size() - 1) {
+        // except for the last stop key, rest should be non-empty
+        Preconditions.checkState( !(Bytes.equals(stop, MapRConstants.EMPTY_BYTE_ARRAY)), String.format("Encountered an empty stop key at position %d", count));
+      }
+
       startKeys.add(start);
       stopKeys.add(stop);
+      count++;
     }
 
     // check validity; only need to check one of the lists since they are populated together
     Preconditions.checkArgument(startKeys.size() > 0, "Found empty list of start/stopKeys.");
 
-    isInitialized = true;
+    Preconditions.checkState(startKeys.size() == ranges.size(),
+        String.format("Mismatch between the lengths: num start keys = %d, num scan ranges = %d", startKeys.size(), ranges.size()));
+
+    Preconditions.checkState(stopKeys.size() == ranges.size(),
+        String.format("Mismatch between the lengths: num stop keys = %d, num scan ranges = %d", stopKeys.size(), ranges.size()));
 
   }
 

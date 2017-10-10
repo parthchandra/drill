@@ -54,11 +54,6 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
       materializedSender.setOperatorId(0);
       materializedSender.setCost(exchange.getCost());
 
-      // range partition sender needs access to the subscan for internal use
-      if (materializedSender instanceof RangePartitionSender) {
-        ((RangePartitionSender)materializedSender).getPartitionFunction().initialize(iNode.getSubScan());
-      }
-
 //      logger.debug("Visit sending exchange, materialized {} with child {}.", materializedSender, child);
       return materializedSender;
 

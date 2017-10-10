@@ -20,7 +20,6 @@ package org.apache.drill.exec.planner.physical;
 import java.util.List;
 
 import org.apache.drill.common.expression.FieldReference;
-import org.apache.drill.exec.physical.base.SubScan;
 import org.apache.drill.exec.record.VectorWrapper;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -35,8 +34,6 @@ public abstract class AbstractRangePartitionFunction  implements PartitionFuncti
   public abstract void setup(List<VectorWrapper<?>> partitionKeys);
 
   public abstract int eval(int index, int numPartitions);
-
-  public abstract void initialize(SubScan subScan);
 
   @JsonIgnore
   @Override
