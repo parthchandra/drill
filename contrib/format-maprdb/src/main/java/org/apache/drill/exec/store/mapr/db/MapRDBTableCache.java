@@ -190,7 +190,7 @@ public class MapRDBTableCache {
 
     public int hashCode() {
 
-      final int IdxDescHashCode = (indexDesc == null) ? 0 : indexDesc.hashCode();
+      final int IdxDescHashCode = (indexDesc == null) ? 0 : indexDesc.getIndexFid().hashCode();
       return (path.hashCode() + IdxDescHashCode + ugi.hashCode());
     }
 
