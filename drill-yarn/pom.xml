@@ -27,6 +27,9 @@
   <artifactId>drill-yarn</artifactId>
   <packaging>jar</packaging>
   <name>Drill-on-YARN</name>
+  <properties>
+    <DoY.skip>true</DoY.skip>
+  </properties>
 
   <build>
     <plugins>
@@ -34,6 +37,7 @@
          <groupId>org.apache.maven.plugins</groupId>
          <artifactId>maven-surefire-plugin</artifactId>
          <configuration>
+             <skip>${DoY.skip}</skip>
            <systemPropertyVariables>
              <drillScriptDir>${project.basedir}/../distribution/src/resources</drillScriptDir>
              <logback.configurationFile>doy-test-logback.xml</logback.configurationFile>
