@@ -32,6 +32,7 @@ import static org.apache.drill.test.TestConfigLinkage.MOCK_PROPERTY;
 import static org.apache.drill.test.TestConfigLinkage.createMockPropOptionDefinition;
 
 public class StatusResourcesTest {
+    @Ignore
   @Test
   public void testRetrieveInternalOption() throws Exception {
     OptionDefinition optionDefinition = createMockPropOptionDefinition();
@@ -57,6 +58,7 @@ public class StatusResourcesTest {
     }
   }
 
+    @Ignore
   @Test
   public void testRetrievePublicOption() throws Exception {
     FixtureBuilder builder = ClusterFixture.builder().
