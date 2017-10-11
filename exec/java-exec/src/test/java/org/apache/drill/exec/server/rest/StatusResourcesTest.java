@@ -27,6 +27,7 @@ import org.apache.drill.test.FixtureBuilder;
 import org.apache.drill.test.RestClientFixture;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.Ignore;
 
 import static org.apache.drill.test.TestConfigLinkage.MOCK_PROPERTY;
 import static org.apache.drill.test.TestConfigLinkage.createMockPropOptionDefinition;
