@@ -259,8 +259,8 @@ public class TestNullInputMiniPlan extends MiniPlanUnitTestBase{
     testTwoInputNullBatchHandling(join);
   }
 
-  @Test
   @Ignore("Full Merge join is not supported.")
+  @Test
   public void testFullMergeJoinEmptyBoth() throws Exception {
     final PhysicalOperator join = new MergeJoinPOP(null, null, Lists.newArrayList(joinCond("a", "EQUALS", "b")), JoinRelType.FULL);
     testTwoInputNullBatchHandling(join);
@@ -304,6 +304,7 @@ public class TestNullInputMiniPlan extends MiniPlanUnitTestBase{
   }
 
 
+  @Ignore("See DRILL-5851")
   @Test
   public void testHashJoinLeftEmpty() throws Exception {
     RecordBatch left = createScanBatchFromJson(SINGLE_EMPTY_JSON);
@@ -335,6 +336,7 @@ public class TestNullInputMiniPlan extends MiniPlanUnitTestBase{
         .go();
   }
 
+  @Ignore("See DRILL-5851")
   @Test
   public void testHashJoinRightEmpty() throws Exception {
     List<String> leftJsonBatches = Lists.newArrayList(
