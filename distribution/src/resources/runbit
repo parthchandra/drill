@@ -31,6 +31,9 @@
 #                           (Set in drill-config.sh.)
 #   DRILLBIT_LOG_PATH       Path to the Drillbit log file.
 #                           (Set in drill-config.sh.)
+#   DRILLBIT_MAX_PROC_MEM   Optional argument to enforce a cap on the
+#                           total memory that a drillbit can ask the system.
+#                           Format: size[k|K|m|M|g|G] or value%
 #   DRILL_JAVA_OPTS         Optional JVM arguments such as system
 #                           property overides used by both the
 #                           drillbit (server) and client,
@@ -90,6 +93,97 @@ BITCMD="$JAVA $DRILL_ALL_JAVA_OPTS -cp $CP org.apache.drill.exec.server.Drillbit
 if [ -n "$_DRILL_WRAPPER_" ]; then
   BITCMD="$_DRILL_WRAPPER_ $BITCMD"
 fi
+
+### Checking if within Memory Limits
+if [ -n "$DRILLBIT_MAX_PROC_MEM" ] ; then
+  #OS Check
+  if [ "$OSTYPE" != "linux-gnu" ]; then 
+    echo ` date +%Y-%m-%d" "%H:%M:%S`"  [WARN]    Detected unsupported OSTYPE ("$OSTYPE"). Currently, only Linux is supported. Ignoring DRILLBIT_MAX_PROC_MEM="$DRILLBIT_MAX_PROC_MEM;
+    exit 126
+  fi
+  #Defining scaling constants
+  let scaleMBtoKB=1024;
+  let scaleGBtoMB=scaleMBtoKB;
+  let scaleGBtoKB=$scaleMBtoKB*1024;
+  # Capture current system state
+  let totalSysMem=`cat /proc/meminfo | grep MemTotal | awk '{print $2}'`/$scaleGBtoKB
+  let currentFreeMem=`cat /proc/meminfo | grep MemFree | awk '{print $2}'`/$scaleGBtoKB
+
+  # Estimating Maximum Process Memory Allowed
+  dbitMaxProcMem=`echo $DRILLBIT_MAX_PROC_MEM | tr '[A-Z]' '[a-z]'`
+  # Extracting Numeric Value
+  DbitMaxProcmemParamValue=`echo ${dbitMaxProcMem:0:${#dbitMaxProcMem}-1}`;
+  if [[ "$dbitMaxProcMem" = *g ]]; then
+    let maxDrillProcMemInGB=$DbitMaxProcmemParamValue
+  elif [[ "$dbitMaxProcMem" = *m ]]; then
+    let maxDrillProcMemInGB=$DbitMaxProcmemParamValue/$scaleGBtoMB
+  elif [[ "$dbitMaxProcMem" = *k ]]; then
+    let maxDrillProcMemInGB=$DbitMaxProcmemParamValue/$scaleGBtoKB
+  elif [[ "$dbitMaxProcMem" = *% ]]; then
+    #Note: For now, only with %age option will we check for available system memory
+    percSysMemForDrillProc=$DbitMaxProcmemParamValue
+    let maxDrillProcMemInGB=$totalSysMem*$percSysMemForDrillProc/100
+    if [ $maxDrillProcMemInGB -gt $currentFreeMem ] ; then
+      #let revisedPercForDrillProc=100*$currentFreeMem/$totalSysMem
+      echo ` date +%Y-%m-%d" "%H:%M:%S`"  [ERROR]    "$percSysMemForDrillProc"% allocation ( "$maxDrillProcMemInGB" GB) exceeds currently available memory at "$currentFreeMem" GB."
+      #percSysMemForDrillProc=$revisedPercForDrillProc
+      #maxDrillProcMemInGB=$currentFreeMem
+      exit 126
+    fi
+  fi
+
+  # Calculating sum of requested parameters
+  let memParamsTotal=0
+  MemoryOptList="Xmx MaxDirectMemorySize ReservedCodeCacheSize"
+  for fltr in $MemoryOptList ; do 
+    #Extract the last occurrence of the param, as that takes effect 
+    memParamStr=`echo $BITCMD| tr ' ' '\n' | grep $fltr | tail -1 | sed 's|Xmx|Xmx=|g'` 
+    #debug:: memParam=`echo $memParamStr | tr 'A-Z' 'a-z' | cut -f1 -d=`
+    memParamValue=`echo $memParamStr | tr 'A-Z' 'a-z' | cut -f2 -d=`
+    #Convert and sum up
+    if [[ "$memParamValue" = *k ]]; then 
+      memParamValueInGB=`echo ${memParamValue:0:${#memParamValue}-1}/$scaleGBtoKB|bc`
+      # ceiling(memParamValueInGB) 
+      if [ `echo ${memParamValue:0:${#memParamValue}-1}%$scaleGBtoKB|bc` -gt 0 ]; then
+        (( memParamValueInGB++ ))
+      fi
+    elif [[ "$memParamValue" = *m ]]; then 
+      memParamValueInGB=`echo ${memParamValue:0:${#memParamValue}-1}/$scaleGBtoMB|bc`
+      # ceiling(memParamValueInGB) 
+      if [ `echo ${memParamValue:0:${#memParamValue}-1}%$scaleGBtoMB|bc` -gt 0 ]; then
+        (( memParamValueInGB++ ))
+      fi
+    else
+      memParamValueInGB=${memParamValue:0:${#memParamValue}-1}
+    fi
+    let "memParamsTotal += memParamValueInGB" 
+  done
+
+  # Performming the final check
+  echo -n ` date +%Y-%m-%d" "%H:%M:%S`"  [INFO]    ";
+  if [[ "$dbitMaxProcMem" = *% ]]; then
+    echo "Max Memory Permitted : "$percSysMemForDrillProc"% ("$maxDrillProcMemInGB" of "$totalSysMem" GB)"
+  else
+    echo "Max Memory Permitted : "$maxDrillProcMemInGB" GB"
+  fi
+  # Enforce Limit if envVar defined and excess requested is excess
+  if [ $maxDrillProcMemInGB -lt $memParamsTotal ] ; then
+    echo ` date +%Y-%m-%d" "%H:%M:%S`"  [ERROR]    Unable to start Drillbit due to memory constraint violations"
+    echo "  Total Memory Requested : "$memParamsTotal" GB"
+    echo "  Check the following settings to possibly modify (or increase the Max Memory Permitted):"
+    for fltr in $MemoryOptList ; do
+      echo -e "\t"`echo $BITCMD| tr ' ' '\n' | grep $fltr | tail -1`
+    done
+    echo "  For the MapR Distribution, please set the values in \${MAPR_HOME}/conf/conf.d/warden.drill-bits.conf"
+    exit 126
+  elif [ $maxDrillProcMemInGB -gt $memParamsTotal ] ; then
+    let spareCapacity=$maxDrillProcMemInGB-$memParamsTotal;
+    if [ $spareCapacity -gt 0 ]; then
+      echo ` date +%Y-%m-%d" "%H:%M:%S`"  [WARN]    You have an allocation of "$spareCapacity" GB that is currently unused. You can increase your existing memory configuration (e.g. DRILL_MAX_DIRECT_MEMORY) to use this extra memory";
+    fi
+  fi
+fi
+
 
 # Run the command (exec) or just print it (debug).
 # Three options: run as a child (run), run & replace this process (exec) or
