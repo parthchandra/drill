@@ -178,7 +178,7 @@ public class JsonConditionBuilder extends AbstractExprVisitor<JsonScanSpec, Void
   private JsonScanSpec createJsonScanSpec(FunctionCall call,
       CompareFunctionsProcessor processor) {
     String functionName = processor.getFunctionName();
-    String fieldPath = processor.getPath().asPathString(false);
+    String fieldPath = FieldPathHelper.schemaPath2FieldPath(processor.getPath()).asPathString();
     Value fieldValue = processor.getValue();
 
     QueryCondition cond = null;
