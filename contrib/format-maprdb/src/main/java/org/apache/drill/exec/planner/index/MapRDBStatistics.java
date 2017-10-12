@@ -175,7 +175,7 @@ public class MapRDBStatistics implements Statistics {
       payloadMap = statsCache.get(rexConditionAsString);
       if (payloadMap != null) {
         if (payloadMap.get(tabIdxName) != null) {
-          return payloadMap.get(tabIdxName).getLeadingRowCount();
+          return payloadMap.get(tabIdxName).getRowCount();
         } else {
           // We might not have computed rowcount for the given condition from the tab/index in question.
           // For rowcount it does not matter which index was used to get the rowcount for the given condition.
@@ -192,12 +192,14 @@ public class MapRDBStatistics implements Statistics {
       }
     } else if (condition == null
         && fullTableScanPayload != null) {
-      return fullTableScanPayload.getLeadingRowCount();
+      return fullTableScanPayload.getRowCount();
     }
     if (condition != null) {
       conditionAsStr = condition.toString();
     }
-    logger.debug("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
+    if (statsAvailable) {
+      logger.debug("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
+    }
     return ROWCOUNT_UNKNOWN;
   }
 
@@ -228,7 +230,7 @@ public class MapRDBStatistics implements Statistics {
       }
     }
     if (statsAvailable) {
-      logger.debug("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
+      logger.debug("Statistics: Leading filter row count is UNKNOWN for filter: {}", conditionAsStr);
     }
     return ROWCOUNT_UNKNOWN;
   }
@@ -247,19 +249,21 @@ public class MapRDBStatistics implements Statistics {
       payloadMap = statsCache.get(rexConditionAsString);
       if (payloadMap != null) {
         if (payloadMap.get(tabIdxName) != null) {
-          return payloadMap.get(tabIdxName).getRowCount();
+          return payloadMap.get(tabIdxName).getLeadingRowCount();
         }
         // Unlike rowcount, leading rowcount is dependent on the index. So, if tab/idx is
         // not found, we are out of luck!
       }
     } else if (condition == null
         && fullTableScanPayload != null) {
-      return fullTableScanPayload.getRowCount();
+      return fullTableScanPayload.getLeadingRowCount();
     }
     if (condition != null) {
       conditionAsStr = condition.toString();
     }
-    logger.debug("Statistics: Filter row count is UNKNOWN for filter: {}", conditionAsStr);
+    if (statsAvailable) {
+      logger.debug("Statistics: Leading filter row count is UNKNOWN for filter: {}", conditionAsStr);
+    }
     return ROWCOUNT_UNKNOWN;
   }
 
