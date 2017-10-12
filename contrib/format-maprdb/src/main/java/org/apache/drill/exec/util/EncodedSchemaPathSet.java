@@ -25,6 +25,7 @@ import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.util.DrillStringUtils;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.exec.store.mapr.db.json.FieldPathHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -114,7 +115,7 @@ public class EncodedSchemaPathSet {
     String[] schemaPathStrings = new String[encodedPaths.size()];
     Iterator<SchemaPath> encodedPathsItr = encodedPaths.iterator();
     for (int i = 0; i < schemaPathStrings.length; i++) {
-      schemaPathStrings[i] = encodedPathsItr.next().asPathString(false);
+      schemaPathStrings[i] = FieldPathHelper.schemaPath2FieldPath(encodedPathsItr.next()).asPathString();
     }
     String[] decodedStrings = decode(schemaPathStrings);
     if (decodedStrings == schemaPathStrings) {

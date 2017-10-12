@@ -140,14 +140,14 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
   @Override
   public Void visitFunctionCall(FunctionCall call, Void v) throws RuntimeException {
     final String functionName = call.getName();
+    final String fieldName = FieldPathHelper.schemaPath2FieldPath(getSchemaPathArg(call.args.get(0))).asPathString();
     switch(functionName) {
     case "ojai_sizeof": {
       // ojai_sizeof(field, "<rel-op>", <int-value>)
-      final SchemaPath schemaPath = getSchemaPathArg(call.args.get(0));
       final String relOp = getStringArg(call.args.get(1));
       final long size = getLongArg(call.args.get(2));
       queryCond = MapRDBImpl.newCondition()
-          .sizeOf(schemaPath.asPathString(false), STRING_TO_RELOP.get(relOp), size)
+          .sizeOf(fieldName, STRING_TO_RELOP.get(relOp), size)
           .build();
       break;
     }
@@ -155,14 +155,13 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
     case "ojai_typeof":
     case "ojai_nottypeof": {
       // ojai_[not]typeof(field, <type-code>);
-      final SchemaPath schemaPath = getSchemaPathArg(call.args.get(0));
       final int typeCode = getIntArg(call.args.get(1));
       final Value.Type typeValue = Value.Type.valueOf(typeCode);
       queryCond = MapRDBImpl.newCondition();
       if (functionName.equals("ojai_typeof")) {
-        queryCond.typeOf(schemaPath.asPathString(false), typeValue);
+        queryCond.typeOf(fieldName, typeValue);
       } else {
-        queryCond.notTypeOf(schemaPath.asPathString(false), typeValue);
+        queryCond.notTypeOf(fieldName, typeValue);
       }
       queryCond.build();
       break;
@@ -175,10 +174,10 @@ class OjaiFunctionsProcessor extends AbstractExprVisitor<Void, Void, RuntimeExce
       final String regex = getStringArg(call.args.get(1));
       if (functionName.equals("ojai_matches")) {
         queryCond = MapRDBImpl.newCondition()
-            .matches(schemaPath.asPathString(false), regex);
+            .matches(fieldName, regex);
       } else {
         queryCond = MapRDBImpl.newCondition()
-            .notMatches(schemaPath.asPathString(false), regex);
+            .notMatches(fieldName, regex);
       }
       queryCond.build();
       break;

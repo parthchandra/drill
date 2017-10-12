@@ -47,10 +47,12 @@ import org.apache.drill.exec.store.dfs.FileSystemPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatMatcher;
 import org.apache.drill.exec.store.mapr.db.MapRDBFormatPlugin;
 import org.apache.drill.exec.store.mapr.db.MapRDBGroupScan;
+import org.apache.drill.exec.store.mapr.db.json.FieldPathHelper;
 import org.apache.drill.exec.util.ImpersonationUtil;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.ojai.FieldPath;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
@@ -147,7 +149,7 @@ public class MapRDBIndexDiscover extends IndexDiscoverBase implements IndexDisco
       fieldName = fieldName.split(":")[1];
     }
     if (fieldName.contains(".")) {
-      return SchemaPath.parseFrom(fieldName);
+      return FieldPathHelper.fieldPath2SchemaPath(FieldPath.parseFrom(fieldName));
     }
     return SchemaPath.getSimplePath(fieldName);
   }
