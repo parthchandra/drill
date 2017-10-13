@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -43,6 +43,11 @@ public class EncodedSchemaPathSetTests {
   @Test
   public void testSimpleSchemaPathSets() {
     testEncoding(new String[] {"a", "b", "c"});
+  }
+
+  @Test
+  public void testComplexSchemaPathSets() {
+    testEncoding(new String[] {"a.b.c", "b.`a.c`", "`c`.`b`.`a`"});
   }
 
   @Test

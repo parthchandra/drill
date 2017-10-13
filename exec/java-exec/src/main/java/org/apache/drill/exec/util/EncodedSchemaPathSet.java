@@ -25,7 +25,6 @@ import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.util.DrillStringUtils;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
-import org.apache.drill.exec.store.mapr.db.json.FieldPathHelper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -115,7 +114,13 @@ public class EncodedSchemaPathSet {
     String[] schemaPathStrings = new String[encodedPaths.size()];
     Iterator<SchemaPath> encodedPathsItr = encodedPaths.iterator();
     for (int i = 0; i < schemaPathStrings.length; i++) {
-      schemaPathStrings[i] = FieldPathHelper.schemaPath2FieldPath(encodedPathsItr.next()).asPathString();
+      SchemaPath schemaPath = encodedPathsItr.next();
+      if (schemaPath.getRootSegmentPath().startsWith(ENC_PREFIX)) {
+        // encoded schema path contains only root segment
+        schemaPathStrings[i] = schemaPath.getRootSegmentPath();
+      } else {
+        schemaPathStrings[i] = schemaPath.toExpr();
+      }
     }
     String[] decodedStrings = decode(schemaPathStrings);
     if (decodedStrings == schemaPathStrings) {
@@ -123,7 +128,7 @@ public class EncodedSchemaPathSet {
     } else {
       ImmutableList.Builder<SchemaPath> builder = new ImmutableList.Builder<>();
       for (String decodedString : decodedStrings) {
-        if ("*".equals(decodedString)) {
+        if ("*".equals(decodedString) || "`*`".equals(decodedString)) {
           builder.add(Utilities.STAR_COLUMN);
         } else {
           builder.add(SchemaPath.parseFrom(decodedString));
