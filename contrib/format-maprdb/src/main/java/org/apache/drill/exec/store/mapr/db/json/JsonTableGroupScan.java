@@ -526,7 +526,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
           scalingFactor = forcedScalingFactor;
         }
       }
-      logger.debug("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
+      logger.info("index_plan_info: getEstimatedRowCount obtained from DB Client for {}: indexName: {}, indexInfo: {}, " +
               "condition: {} rowCount: {}, avgRowSize: {}, estimatedSize {}, partitionCount {}, totalPartitionCount {}, " +
           "scalingFactor {}",
           this, (index == null ? "null" : index.getIndexName()), (index == null ? "null" : index.getIndexInfo()),
@@ -536,7 +536,7 @@ public class JsonTableGroupScan extends MapRDBGroupScan implements IndexGroupSca
       return new MapRDBStatisticsPayload(scalingFactor * stats.getEstimatedNumRows(), scalingFactor * stats.getEstimatedNumRows(),
           ((stats.getEstimatedNumRows() == 0 ? 0 : (double)stats.getEstimatedSize()/stats.getEstimatedNumRows())));
     } else {
-      logger.debug("index_plan_info: getEstimatedRowCount: {} indexName: {}, indexInfo: {}, " +
+      logger.info("index_plan_info: getEstimatedRowCount: {} indexName: {}, indexInfo: {}, " +
               "condition: {} rowCount: UNKNOWN, avgRowSize: UNKNOWN", this, (index == null ? "null" : index.getIndexName()),
           (index == null ? "null" : index.getIndexInfo()), (condition == null ? "null" : condition.toString()));
       return new MapRDBStatisticsPayload(ROWCOUNT_UNKNOWN, ROWCOUNT_UNKNOWN, AVG_ROWSIZE_UNKNOWN);
