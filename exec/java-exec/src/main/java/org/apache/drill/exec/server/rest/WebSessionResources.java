@@ -19,9 +19,9 @@
 package org.apache.drill.exec.server.rest;
 
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.DefaultChannelPromise;
 import org.apache.drill.common.AutoCloseables;
 import org.apache.drill.exec.memory.BufferAllocator;
+import org.apache.drill.exec.rpc.ChannelClosedException;
 import org.apache.drill.exec.rpc.user.UserSession;
 
 import java.net.SocketAddress;
@@ -42,16 +42,12 @@ public class WebSessionResources implements AutoCloseable {
 
   private ChannelPromise closeFuture;
 
-  WebSessionResources(BufferAllocator allocator, SocketAddress remoteAddress, UserSession userSession) {
+  WebSessionResources(BufferAllocator allocator, SocketAddress remoteAddress,
+                      UserSession userSession, ChannelPromise closeFuture) {
     this.allocator = allocator;
     this.remoteAddress = remoteAddress;
     this.webUserSession = userSession;
-
-    // Just create a dummy close future which is needed by Foreman only. Foreman uses this future to add a close
-    // listener to known about channel close event from underlying layer. Since in this case there is no actual channel
-    // involved there won't be any real close event for Foreman. Foreman is taking care of cleaning up its own listener
-    // and this dummy close future will be garbage collected.
-    closeFuture = new DefaultChannelPromise(null);
+    this.closeFuture = closeFuture;
   }
 
   public UserSession getSession() {
@@ -76,6 +72,16 @@ public class WebSessionResources implements AutoCloseable {
       AutoCloseables.close(webUserSession, allocator);
     } catch (Exception ex) {
       logger.error("Failure while closing the session resources", ex);
+    }
+
+    // Notify all the listeners of this closeFuture for failure events so that listeners can do cleanup related to this
+    // WebSession. This will be called after every query execution by AnonymousWebUserConnection::cleanupSession and
+    // for authenticated user it is called Session is destroyed.
+    // In case when all queries are successfully completed it's a no-op operation whereas in cases
+    // when there are queries still running for this session, it will help listener (Foreman) to cancel the queries.
+    if (closeFuture != null) {
+      closeFuture.setFailure(new ChannelClosedException("Http connection is closed by Web Client"));
+      closeFuture = null;
     }
   }
 }
