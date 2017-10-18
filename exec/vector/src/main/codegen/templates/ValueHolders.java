@@ -37,7 +37,7 @@ public final class ${className} implements ValueHolder{
   public static final MajorType TYPE = Types.${mode.name?lower_case}(MinorType.${minor.class?upper_case});
   
   public MajorType getType() {return TYPE;}
-  
+
     <#if mode.name == "Repeated">
     
     /** The first index (inclusive) into the Vector. **/
@@ -58,6 +58,11 @@ public final class ${className} implements ValueHolder{
     public ${field.type} ${field.name};
     </#list>
     
+    <#if minor.class == "VarChar">
+    // -1: unknown, 0: not ascii, 1: is ascii
+    public int asciiMode = -1;
+    </#if>
+
     <#if minor.class.startsWith("Decimal")>
     public static final int maxPrecision = ${minor.maxPrecisionDigits};
     <#if minor.class.startsWith("Decimal28") || minor.class.startsWith("Decimal38")>
@@ -93,7 +98,7 @@ public final class ${className} implements ValueHolder{
       return ((buffer.getInt(start) & 0x80000000) != 0);
     }
     </#if></#if>
-    
+
     @Deprecated
     public int hashCode(){
       throw new UnsupportedOperationException();
