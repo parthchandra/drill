@@ -204,6 +204,9 @@ public interface ExecConstants {
   String PARQUET_PAGEREADER_USE_FADVISE = "store.parquet.reader.pagereader.usefadvise";
   OptionValidator PARQUET_PAGEREADER_USE_FADVISE_VALIDATOR = new  BooleanValidator(PARQUET_PAGEREADER_USE_FADVISE, false);
 
+  String PARQUET_ENABLE_FS_RETRY = "store.parquet.reader.enableFSRetry";
+  OptionValidator PARQUET_ENABLE_FS_RETRY_VALIDATOR = new  BooleanValidator(PARQUET_ENABLE_FS_RETRY, false);
+
   OptionValidator COMPILE_SCALAR_REPLACEMENT = new BooleanValidator("exec.compile.scalar_replacement", false);
 
   String JSON_ALL_TEXT_MODE = "store.json.all_text_mode";

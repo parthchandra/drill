@@ -123,6 +123,7 @@ public class ParquetRecordReader extends AbstractRecordReader {
   public boolean useFadvise;
   public boolean enforceTotalSize;
   public long readQueueSize;
+  public boolean enableFSRetry;
 
   @SuppressWarnings("unused")
   private String name;
@@ -224,6 +225,8 @@ public class ParquetRecordReader extends AbstractRecordReader {
         fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_QUEUE_SIZE).num_val;
     enforceTotalSize =
         fragmentContext.getOptions().getOption(ExecConstants.PARQUET_PAGEREADER_ENFORCETOTALSIZE).bool_val;
+    enableFSRetry =
+        fragmentContext.getOptions().getOption(ExecConstants.PARQUET_ENABLE_FS_RETRY).bool_val;
 
     setColumns(columns);
   }

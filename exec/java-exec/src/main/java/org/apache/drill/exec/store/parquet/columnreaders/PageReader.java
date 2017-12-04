@@ -19,6 +19,7 @@ package org.apache.drill.exec.store.parquet.columnreaders;
 
 import com.google.common.base.Stopwatch;
 import io.netty.buffer.ByteBufUtil;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.util.filereader.BufferedDirectBufInputStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DrillBuf;
@@ -42,8 +43,10 @@ import org.apache.parquet.format.PageType;
 import org.apache.parquet.format.Util;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
 import org.apache.parquet.hadoop.CodecFactory;
+import org.apache.parquet.hadoop.ParquetFileReader;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
+import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.schema.PrimitiveType;
 
 import java.io.IOException;
@@ -127,7 +130,30 @@ class PageReader {
        .append(this.parentColumnReader.columnChunkMetaData.toString() )
        .toString();
     try {
-      inputStream  = fs.open(path);
+      inputStream  = null;
+
+      int retry = parentColumnReader.parentReader.enableFSRetry ? 3 : 1;
+      while (inputStream == null && retry > 0) {
+        try {
+          inputStream  = fs.open(path);
+          retry--;
+        } catch (Exception exception) {
+          retry--;
+          if (retry <= 0 ) {
+            throw exception; // rethrow if the exception still occurs after a retry
+          }
+        }
+        if (inputStream == null && retry > 0) {
+          try {
+            Thread.sleep(100);
+          } catch (InterruptedException e1) {
+            // Do nothing
+          }
+        }
+      }
+      if (inputStream == null ) {
+        logger.error("Failed to open input stream {}", path);
+      }
       BufferAllocator allocator =  parentColumnReader.parentReader.getOperatorContext().getAllocator();
       columnChunkMetaData.getTotalUncompressedSize();
       useBufferedReader  = parentColumnReader.parentReader.useBufferedReader;

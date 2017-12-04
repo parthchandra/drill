@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.util.DrillVersionInfo;
+import org.apache.drill.exec.ExecConstants;
+import org.apache.drill.exec.ops.QueryContext;
 import org.apache.drill.exec.store.AbstractRecordReader;
 import org.apache.drill.exec.store.TimedRunnable;
 import org.apache.drill.exec.store.dfs.DrillPathFilter;
@@ -100,7 +102,7 @@ public class Metadata {
    * @param path
    * @throws IOException
    */
-  public static void createMeta(FileSystem fs, String path, ParquetFormatConfig formatConfig) throws IOException {
+  public static void createMeta(FileSystem fs, String path, ParquetFormatConfig formatConfig ) throws IOException {
     Metadata metadata = new Metadata(fs, formatConfig);
     metadata.createMetaFilesRecursively(path);
   }
@@ -113,8 +115,8 @@ public class Metadata {
    * @return
    * @throws IOException
    */
-  public static ParquetTableMetadata_v3 getParquetTableMetadata(FileSystem fs, String path, ParquetFormatConfig formatConfig)
-      throws IOException {
+  public static ParquetTableMetadata_v3 getParquetTableMetadata(FileSystem fs, String path,
+      ParquetFormatConfig formatConfig) throws IOException {
     Metadata metadata = new Metadata(fs, formatConfig);
     return metadata.getParquetTableMetadata(path);
   }
@@ -129,7 +131,7 @@ public class Metadata {
    */
   public static ParquetTableMetadata_v3 getParquetTableMetadata(FileSystem fs,
       List<FileStatus> fileStatuses, ParquetFormatConfig formatConfig) throws IOException {
-    Metadata metadata = new Metadata(fs, formatConfig);
+    Metadata metadata = new Metadata(fs, formatConfig );
     return metadata.getParquetTableMetadata(fileStatuses);
   }
 
@@ -141,13 +143,17 @@ public class Metadata {
    * @return
    * @throws IOException
    */
-  public static ParquetTableMetadataBase readBlockMeta(FileSystem fs, String path, MetadataContext metaContext, ParquetFormatConfig formatConfig) throws IOException {
+  public static ParquetTableMetadataBase readBlockMeta(FileSystem fs, String path,
+      MetadataContext metaContext, ParquetFormatConfig formatConfig)
+      throws IOException {
     Metadata metadata = new Metadata(fs, formatConfig);
     metadata.readBlockMeta(path, false, metaContext);
     return metadata.parquetTableMetadata;
   }
 
-  public static ParquetTableMetadataDirs readMetadataDirs(FileSystem fs, String path, MetadataContext metaContext, ParquetFormatConfig formatConfig) throws IOException {
+  public static ParquetTableMetadataDirs readMetadataDirs(FileSystem fs, String path,
+      MetadataContext metaContext, ParquetFormatConfig formatConfig)
+      throws IOException {
     Metadata metadata = new Metadata(fs, formatConfig);
     metadata.readBlockMeta(path, true, metaContext);
     return metadata.parquetTableMetadataDirs;
@@ -379,7 +385,29 @@ public class Metadata {
    */
   private ParquetFileMetadata_v3 getParquetFileMetadata_v3(ParquetTableMetadata_v3 parquetTableMetadata,
       FileStatus file) throws IOException {
-    ParquetMetadata metadata = ParquetFileReader.readFooter(fs.getConf(), file);
+    //ParquetMetadata metadata = ParquetFileReader.readFooter(fs.getConf(), file);
+    ParquetMetadata metadata = null;
+
+    int retry = 2;
+        //context.getOptions().getOption(ExecConstants.PARQUET_ENABLE_FS_RETRY).bool_val ? 3 : 1;
+    while (metadata == null && retry > 0) {
+      try {
+        metadata = ParquetFileReader.readFooter(fs.getConf(), file);
+        retry--;
+      } catch (RuntimeException exception) {
+        retry--;
+        if (retry <= 0 ) {
+          throw exception; // rethrow if the exception still occurs after a retry
+        }
+      }
+      if (metadata == null && retry > 0) {
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e1) {
+          // Do nothing
+        }
+      }
+    }
     MessageType schema = metadata.getFileMetaData().getSchema();
 
 //    Map<SchemaPath, OriginalType> originalTypeMap = Maps.newHashMap();
