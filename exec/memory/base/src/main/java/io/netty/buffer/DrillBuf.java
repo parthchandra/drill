@@ -703,7 +703,18 @@ public final class DrillBuf extends AbstractByteBuf implements AutoCloseable {
 
   @Override
   public ByteBuf getBytes(int index, ByteBuf dst, int dstIndex, int length) {
-    udle.getBytes(index + offset, dst, dstIndex, length);
+    final int BULK_COPY_THR = 1024;
+    if (length < BULK_COPY_THR && udle.hasMemoryAddress() && dst.hasMemoryAddress()) {
+      if (dst.capacity() < (dstIndex+length)) {
+        throw new IndexOutOfBoundsException();
+      }
+      for (int idx = 0; idx < length; ++idx) {
+        byte value = getByte(index + idx);
+        PlatformDependent.putByte(dst.memoryAddress() + dstIndex + idx, value);
+      }
+    } else {
+      udle.getBytes(index + offset, dst, dstIndex, length);
+    }
     return this;
   }
 

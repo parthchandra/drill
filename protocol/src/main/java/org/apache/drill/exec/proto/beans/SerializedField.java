@@ -55,6 +55,8 @@ public final class SerializedField implements Externalizable, Message<Serialized
     private int valueCount;
     private int varByteLength;
     private int bufferLength;
+    private Boolean isDup;
+    private int logicalValueCount;
 
     public SerializedField()
     {
@@ -141,6 +143,32 @@ public final class SerializedField implements Externalizable, Message<Serialized
         return this;
     }
 
+    // isDup
+
+    public Boolean getIsDup()
+    {
+        return isDup;
+    }
+
+    public SerializedField setIsDup(Boolean isDup)
+    {
+        this.isDup = isDup;
+        return this;
+    }
+
+    // logicalValueCount
+
+    public int getLogicalValueCount()
+    {
+        return logicalValueCount;
+    }
+
+    public SerializedField setLogicalValueCount(int logicalValueCount)
+    {
+        this.logicalValueCount = logicalValueCount;
+        return this;
+    }
+
     // java serialization
 
     public void readExternal(ObjectInput in) throws IOException
@@ -218,6 +246,12 @@ public final class SerializedField implements Externalizable, Message<Serialized
                 case 7:
                     message.bufferLength = input.readInt32();
                     break;
+                case 8:
+                    message.isDup = input.readBool();
+                    break;
+                case 9:
+                    message.logicalValueCount = input.readInt32();
+                    break;
                 default:
                     input.handleUnknownField(number, this);
             }   
@@ -253,6 +287,12 @@ public final class SerializedField implements Externalizable, Message<Serialized
 
         if(message.bufferLength != 0)
             output.writeInt32(7, message.bufferLength, false);
+
+        if(message.isDup != null)
+            output.writeBool(8, message.isDup, false);
+
+        if(message.logicalValueCount != 0)
+            output.writeInt32(9, message.logicalValueCount, false);
     }
 
     public String getFieldName(int number)
@@ -265,6 +305,8 @@ public final class SerializedField implements Externalizable, Message<Serialized
             case 4: return "valueCount";
             case 5: return "varByteLength";
             case 7: return "bufferLength";
+            case 8: return "isDup";
+            case 9: return "logicalValueCount";
             default: return null;
         }
     }
@@ -284,6 +326,8 @@ public final class SerializedField implements Externalizable, Message<Serialized
         __fieldMap.put("valueCount", 4);
         __fieldMap.put("varByteLength", 5);
         __fieldMap.put("bufferLength", 7);
+        __fieldMap.put("isDup", 8);
+        __fieldMap.put("logicalValueCount", 9);
     }
     
 }

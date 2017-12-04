@@ -1092,6 +1092,10 @@ public final class SchemaUserBitShared
                     output.writeInt32(5, message.getVarByteLength(), false);
                 if(message.hasBufferLength())
                     output.writeInt32(7, message.getBufferLength(), false);
+                if(message.hasIsDup())
+                    output.writeBool(8, message.getIsDup(), false);
+                if(message.hasLogicalValueCount())
+                    output.writeInt32(9, message.getLogicalValueCount(), false);
             }
             public boolean isInitialized(org.apache.drill.exec.proto.UserBitShared.SerializedField message)
             {
@@ -1152,6 +1156,12 @@ public final class SchemaUserBitShared
                         case 7:
                             builder.setBufferLength(input.readInt32());
                             break;
+                        case 8:
+                            builder.setIsDup(input.readBool());
+                            break;
+                        case 9:
+                            builder.setLogicalValueCount(input.readInt32());
+                            break;
                         default:
                             input.handleUnknownField(number, this);
                     }
@@ -1198,6 +1208,8 @@ public final class SchemaUserBitShared
                 case 4: return "valueCount";
                 case 5: return "varByteLength";
                 case 7: return "bufferLength";
+                case 8: return "isDup";
+                case 9: return "logicalValueCount";
                 default: return null;
             }
         }
@@ -1215,6 +1227,8 @@ public final class SchemaUserBitShared
             fieldMap.put("valueCount", 4);
             fieldMap.put("varByteLength", 5);
             fieldMap.put("bufferLength", 7);
+            fieldMap.put("isDup", 8);
+            fieldMap.put("logicalValueCount", 9);
         }
     }
 

@@ -291,7 +291,7 @@ public class DecimalUtility extends CoreDecimalUtility{
   }
 
   /**
-   * Function converts the BigDecimal and stores it in out internal sparse representation
+   * Function converts the BigDecimal and stores it in our internal sparse representation
    */
   public static void getSparseFromBigDecimal(BigDecimal input, ByteBuf data, int startIndex, int scale, int precision,
       int nDecimalDigits) {
@@ -358,6 +358,77 @@ public class DecimalUtility extends CoreDecimalUtility{
     // Set the negative sign
     if (sign == true) {
         data.setInt(startIndex, data.getInt(startIndex) | 0x80000000);
+    }
+  }
+
+  /**
+   * Function converts the BigDecimal and stores it in our internal sparse representation
+   */
+  public static void getSparseFromBigDecimal(BigDecimal input, byte[] data, int startIndex, int scale, int precision,
+      int nDecimalDigits) {
+
+    // Initialize the buffer
+    for (int i = 0; i < nDecimalDigits; i++) {
+      MemoryUtils.putInt(data, startIndex + (i * INTEGER_SIZE), 0);
+    }
+
+    boolean sign = false;
+
+    if (input.signum() == -1) {
+        // negative input
+        sign = true;
+        input = input.abs();
+    }
+
+    // Truncate the input as per the scale provided
+    input = input.setScale(scale, BigDecimal.ROUND_HALF_UP);
+
+    // Separate out the integer part
+    BigDecimal integerPart = input.setScale(0, BigDecimal.ROUND_DOWN);
+
+    int destIndex = nDecimalDigits - roundUp(scale) - 1;
+
+    // we use base 1 billion integer digits for out integernal representation
+    BigDecimal base = new BigDecimal(DIGITS_BASE);
+
+    while (integerPart.compareTo(BigDecimal.ZERO) == 1) {
+        // store the modulo as the integer value
+        MemoryUtils.putInt(data, startIndex + (destIndex * INTEGER_SIZE), (integerPart.remainder(base)).intValue());
+        destIndex--;
+        // Divide by base 1 billion
+        integerPart = (integerPart.divide(base)).setScale(0, BigDecimal.ROUND_DOWN);
+    }
+
+    /* Sparse representation contains padding of additional zeroes
+     * so each digit contains MAX_DIGITS for ease of arithmetic
+     */
+    int actualDigits;
+    if ((actualDigits = (scale % MAX_DIGITS)) != 0) {
+        // Pad additional zeroes
+        scale = scale + (MAX_DIGITS - actualDigits);
+        input = input.setScale(scale, BigDecimal.ROUND_DOWN);
+    }
+
+    //separate out the fractional part
+    BigDecimal fractionalPart = input.remainder(BigDecimal.ONE).movePointRight(scale);
+
+    destIndex = nDecimalDigits - 1;
+
+    while (scale > 0) {
+        // Get next set of MAX_DIGITS (9) store it in the DrillBuf
+        fractionalPart = fractionalPart.movePointLeft(MAX_DIGITS);
+        BigDecimal temp = fractionalPart.remainder(BigDecimal.ONE);
+
+        MemoryUtils.putInt(data, startIndex + (destIndex * INTEGER_SIZE), (temp.unscaledValue().intValue()));
+        destIndex--;
+
+        fractionalPart = fractionalPart.setScale(0, BigDecimal.ROUND_DOWN);
+        scale -= MAX_DIGITS;
+    }
+
+    // Set the negative sign
+    if (sign == true) {
+        MemoryUtils.putInt(data, startIndex, MemoryUtils.getInt(data, startIndex) | 0x80000000);
     }
   }
 
@@ -740,5 +811,6 @@ public class DecimalUtility extends CoreDecimalUtility{
     }
     return cmp * invert;
   }
+
 }
 

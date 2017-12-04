@@ -28,7 +28,13 @@
 package org.apache.drill.exec.vector;
 
 <#include "/@includes/vv_imports.ftl" />
+import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+import org.apache.drill.exec.expr.holders.Decimal28SparseHolder;
 import org.apache.drill.exec.util.DecimalUtility;
+import org.apache.drill.exec.util.MemoryUtils;
 
 /**
  * ${minor.class} implements a vector of fixed width values. Elements in the vector are accessed
@@ -861,7 +867,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
       setArrayItem(index, holder.start, holder.buffer);
     }
 
-      <#if minor.class == "Decimal28Sparse" || minor.class == "Decimal38Sparse">
+    <#if minor.class == "Decimal28Sparse" || minor.class == "Decimal38Sparse">
     public void set(int index, BigDecimal value) {
       DecimalUtility.getSparseFromBigDecimal(value, data, index * VALUE_WIDTH,
            field.getScale(), field.getPrecision(), ${minor.nDecimalDigits});
@@ -872,6 +878,46 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
         reAlloc();
       }
       set(index, value);
+    }
+
+    /**
+     * Copies the bulk input into this value vector and extends its capacity if necessary.
+     * @param input bulk input
+     */
+    public <T extends VLBulkEntry> void setSafe(VLBulkInput<T> input) {
+      setSafe(input, null);
+    }
+
+    /**
+     * Copies the bulk input into this value vector and extends its capacity if necessary. The callback
+     * mechanism allows decoration as caller is invoked for each bulk entry.
+     *
+     * @param input bulk input
+     * @param callback a bulk input callback object (optional)
+     */
+    public <T extends VLBulkEntry> void setSafe(VLBulkInput<T> input, VLBulkInput.BulkInputCallback<T> callback) {
+      // Let's allocate a buffered mutator to optimize memory copy performance
+      BufferedMutator bufferedMutator = new BufferedMutator(input.getStartIndex(), ${minor.class}Vector.this);
+
+      // Let's process the input
+      while (input.hasNext()) {
+        T entry = input.next();
+        bufferedMutator.setSafe(entry);
+
+        if (callback != null) {
+          callback.onNewBulkEntry(entry);
+        }
+      }
+
+      // Flush any data not yet copied to this VL container
+      bufferedMutator.flush();
+
+      // Inform the input object we're done reading
+      input.done();
+
+      if (callback != null) {
+        callback.onEndBulkInput();
+      }
     }
 
     public void setScalar(int index, BigDecimal value) throws VectorOverflowException {
@@ -888,7 +934,7 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
       setSafe(index, value);
     }
 
-      </#if>
+    </#if>
     public void set(int index, int start, DrillBuf buffer){
       data.setBytes(index * VALUE_WIDTH, buffer, start, VALUE_WIDTH);
     }
@@ -1068,6 +1114,196 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
       data.writerIndex(valueCount * VALUE_WIDTH);
     }
   }
+
+  <#if minor.class == "Int" || minor.class == "UInt4" || minor.class == "UInt1" || minor.class == "Decimal38Sparse" || minor.class == "Decimal28Sparse">
+  /**
+   * Helper class to buffer container mutation as a means to optimize native memory copy operations.
+   *
+   * NB: this class is automatically generated from ValueVectorTypes.tdd using FreeMarker.
+   */
+  public static final class BufferedMutator {
+    /** The default buffer size */
+    private static final int DEFAULT_BUFF_SZ = 1024 << 2;
+    /** Byte buffer */
+    private final ByteBuffer buffer;
+
+    /** Tracks the index where to copy future values */
+    private int currentIdx;
+    /** Parent conatiner object */
+    private final ${minor.class}Vector parent;
+
+    /** @see {@link #BufferedMutator(int _start_idx, int _buff_sz, ${minor.class}Vector _parent)} */
+    public BufferedMutator(int _start_idx, ${minor.class}Vector _parent) {
+      this(_start_idx, DEFAULT_BUFF_SZ, _parent);
+    }
+
+    /**
+     * Buffered mutator to optimize bulk access to the underlying vector container
+     * @param _start_idx start idex of the first value to be copied
+     * @param _buff_sz buffer length to us
+     * @param _parent parent container object
+     */
+    public BufferedMutator(int start_idx, int _buff_sz, ${minor.class}Vector parent) {
+      this.buffer = ByteBuffer.allocate(_buff_sz);
+
+      // set the buffer to the native byte order
+      buffer.order(ByteOrder.nativeOrder());
+
+      this.currentIdx = start_idx;
+      this.parent     = parent;
+    }
+
+    <#if minor.class == "Int" || minor.class == "UInt4">
+    public void setSafe(int value) {
+      if (buffer.remaining() < 4) {
+        flush();
+      }
+
+      int tgt_pos         = buffer.position();
+      byte[] buffer_array = buffer.array();
+
+      writeInt(value, buffer_array, tgt_pos);
+      buffer.position(tgt_pos+4);
+    }
+
+    public void setSafe(int[] values, int numValues) {
+      int remaining       = numValues;
+      byte[] buffer_array = buffer.array();
+      int src_pos         = 0;
+
+      do {
+        if (buffer.remaining() < 4) {
+            flush();
+        }
+
+        int toCopy  = Math.min(remaining, buffer.remaining() / 4);
+        int tgt_pos = buffer.position();
+
+        for (int idx = 0; idx < toCopy; idx++, tgt_pos += 4, src_pos++) {
+          writeInt(values[src_pos], buffer_array, tgt_pos);
+        }
+
+        // Update counters
+        buffer.position(tgt_pos);
+        remaining -= toCopy;
+
+      } while (remaining > 0);
+    }
+
+    public static final void writeInt(int val, byte[] buffer, int pos) {
+      MemoryUtils.putInt(buffer, pos, val);
+    }
+    </#if> <#-- minor.class -->
+
+    <#if minor.class == "UInt1">
+    public void setSafe(byte value) {
+      if (buffer.remaining() < 1) {
+        flush();
+      }
+      buffer.put(value);
+    }
+
+    public void setSafe(byte[] values, int numValues) {
+      int remaining       = numValues;
+      byte[] buffer_array = buffer.array();
+      int src_pos         = 0;
+
+      do {
+        if (buffer.remaining() < 1) {
+            flush();
+        }
+
+        int toCopy  = Math.min(remaining, buffer.remaining());
+        int tgt_pos = buffer.position();
+
+        for (int idx = 0; idx < toCopy; idx++) {
+          buffer_array[tgt_pos++] = values[src_pos++];
+        }
+
+        // Update counters
+        buffer.position(tgt_pos);
+        remaining -= toCopy;
+
+      } while (remaining > 0);
+    }
+    </#if> <#-- minor.class -->
+
+    <#if minor.class == "Decimal38Sparse" || minor.class == "Decimal28Sparse">
+    public void setSafe(VLBulkEntry bulkEntry) {
+      assert bulkEntry.arrayBacked() : "Sparse decimal bulk processing should be backed by a byte array";
+
+      final int width           = ${minor.class}Vector.VALUE_WIDTH;
+      final int[] lengths       = bulkEntry.getValuesLength();
+      final byte[] src_array    = bulkEntry.getArrayData();
+      final byte[] buffer_array = buffer.array();
+      int remaining             = bulkEntry.getNumValues();
+      int currSrcIdx            = 0;
+      int currSrcDataPos        = bulkEntry.getDataStartOffset();
+
+      do {
+        if (buffer.remaining() < width) {
+          flush();
+        }
+
+        int numEntriesToProcess = Math.min(remaining, buffer.remaining() / width);
+        int tgt_pos             = buffer.position();
+
+        for (int idx = 0; idx < numEntriesToProcess; ++idx) {
+          final int entryLen = lengths[currSrcIdx+idx];
+
+          if (entryLen < 0) { // null entry
+            continue;
+          }
+
+          final BigDecimal intermediate =
+            DecimalUtility.getBigDecimalFromByteArray(src_array, currSrcDataPos, entryLen, parent.getField().getScale());
+
+          DecimalUtility.getSparseFromBigDecimal(intermediate,
+            buffer_array, tgt_pos + idx * width, parent.getField().getScale(),
+            parent.getField().getPrecision(), ${minor.nDecimalDigits});
+
+          currSrcDataPos += entryLen;
+        }
+
+        // Update counters
+        buffer.position(tgt_pos + numEntriesToProcess * width);
+        remaining  -= numEntriesToProcess;
+        currSrcIdx += numEntriesToProcess;
+
+      } while (remaining > 0);
+    }
+    </#if> <#-- minor.class -->
+
+    /**
+     * @return the backing byte buffer; this is useful when the caller can infer the values to write but
+     *         wants to avoid having to use yet another intermediary byte array; caller is responsible for
+     *         flushing the buffer
+    */
+    public ByteBuffer getByteBuffer() {
+      return buffer;
+    }
+
+    public void flush() {
+      int numElements = buffer.position() / ${minor.class}Vector.VALUE_WIDTH;
+
+      if (numElements == 0) {
+        return; // NOOP
+      }
+
+      while((currentIdx + numElements -1) >= parent.getValueCapacity()) {
+        parent.reAlloc();
+      }
+
+      parent.data.setBytes(currentIdx * ${minor.class}Vector.VALUE_WIDTH, buffer.array(), 0, buffer.position());
+
+      // Update the start index
+      currentIdx += numElements;
+
+      // Reset the byte buffer
+      buffer.clear();
+    }
+  }
+  </#if> <#-- minor.class -->
 }
 </#if> <#-- type.major -->
 </#list>

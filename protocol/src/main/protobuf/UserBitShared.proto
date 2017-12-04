@@ -148,6 +148,8 @@ message SerializedField {
   optional int32 value_count = 4;
   optional int32 var_byte_length = 5;
   optional int32 buffer_length = 7;
+  optional bool is_dup = 8;
+  optional int32 logical_value_count = 9;
 }
 
 message NodeStatus {
