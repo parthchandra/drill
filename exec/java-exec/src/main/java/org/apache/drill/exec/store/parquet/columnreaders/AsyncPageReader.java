@@ -432,7 +432,7 @@ class AsyncPageReader extends PageReader {
       DrillBuf pageData = null;
       timer.reset();
       try {
-        long s = parent.dataReader.getPos();
+        //long s = parent.dataReader.getPos();
         PageHeader pageHeader = Util.readPageHeader(parent.dataReader);
         //long e = parent.dataReader.getPos();
         //if (logger.isTraceEnabled()) {
@@ -440,7 +440,7 @@ class AsyncPageReader extends PageReader {
         //}
         int compressedSize = pageHeader.getCompressed_page_size();
         if (parent.parentColumnReader.isShuttingDown) { return null; } //Opportunity to skip expensive Parquet processing
-        s = parent.dataReader.getPos();
+        //s = parent.dataReader.getPos();
         pageData = parent.dataReader.getNext(compressedSize);
         bytesRead = compressedSize;
         //e = parent.dataReader.getPos();

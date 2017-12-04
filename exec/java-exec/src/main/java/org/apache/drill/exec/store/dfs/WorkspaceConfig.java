@@ -26,7 +26,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *  - writable flag to indicate whether the location supports creating new tables.
  *  - default storage format for new tables created in this workspace.
  */
-@JsonIgnoreProperties(value = {"storageformat"})
+@JsonIgnoreProperties(value = {"storageformat"}, ignoreUnknown=true)
 public class WorkspaceConfig {
 
   /** Default workspace is a root directory which supports read, but not write. */
