@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 
 import org.apache.drill.exec.store.parquet.columnreaders.VLColumnBulkInput.ColumnPrecisionInfo;
 import org.apache.drill.exec.store.parquet.columnreaders.VLColumnBulkInput.PageDataInfo;
-import org.apache.drill.exec.util.MemoryUtils;
 import org.apache.parquet.column.values.ValuesReader;
 import org.apache.parquet.io.api.Binary;
 
@@ -67,14 +66,16 @@ final class VLEntryDictionaryReader extends VLAbstractEntryReader {
 
       valueLengths[numValues++] = dataLen;
 
-      if (dataLen <= 8) {
-        vlCopyLELong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
-      } else {
-        vlCopyGTLong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
-      }
+      if (dataLen > 0) {
+        if (dataLen <= 8) {
+          vlCopyLELong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
+        } else {
+          vlCopyGTLong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
+        }
 
-      // Update the counters
-      tgtPos += dataLen;
+        // Update the counters
+        tgtPos += dataLen;
+      }
     }
 
     // We're here either because a) the Parquet metadata is wrong (advertises more values than the real count)

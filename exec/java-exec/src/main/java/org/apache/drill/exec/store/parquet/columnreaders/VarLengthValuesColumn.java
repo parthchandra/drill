@@ -34,6 +34,7 @@ import org.apache.parquet.io.api.Binary;
 
 import io.netty.buffer.DrillBuf;
 
+@SuppressWarnings("unchecked")
 public abstract class VarLengthValuesColumn<V extends ValueVector> extends VarLengthColumn {
 
   Binary currLengthDeterminingDictVal;
@@ -53,8 +54,11 @@ public abstract class VarLengthValuesColumn<V extends ValueVector> extends VarLe
     if (columnChunkMetaData.getEncodings().contains(Encoding.PLAIN_DICTIONARY)) {
       usingDictionary = true;
       // We didn't implement the fixed length optimization when a Parquet Dictionary is used; as there are
-      // no data point about this use-case.
+      // no data point about this use-case. Will also enable bulk processing by default since early data
+      // profiling (for detecting the best processing strategy to use) is disabled when the column precision
+      // is already set.
       bulkReaderState.columnPrecInfo.columnPrecisionType = ColumnPrecisionType.DT_PRECISION_IS_VARIABLE;
+      bulkReaderState.columnPrecInfo.bulkProcess         = true;
     }
     else {
       usingDictionary = false;
@@ -93,7 +97,11 @@ public abstract class VarLengthValuesColumn<V extends ValueVector> extends VarLe
     // Process this batch
     setSafe(bulkInput);
 
-    return bulkInput.getReadBatchFields();
+    // Somehow the Batch Reader uses this variable to propagate the batch-size (picks the first column and
+    // then reads the "valuesReadInCurrentPass" variable value).
+    valuesReadInCurrentPass = bulkInput.getReadBatchFields();
+
+    return valuesReadInCurrentPass;
   }
 
   @Override

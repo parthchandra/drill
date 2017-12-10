@@ -38,6 +38,8 @@ final class VLNullableEntryReader extends VLAbstractEntryReader {
   /** {@inheritDoc} */
   @Override
   VLColumnBulkEntry getEntry(int valuesToRead) {
+    assert valuesToRead > 0;
+
     // Bulk processing is effective for smaller precisions
     if (bulkProcess()) {
       return getEntryBulk(valuesToRead);
@@ -62,10 +64,8 @@ final class VLNullableEntryReader extends VLAbstractEntryReader {
     int tgt_pos   = 0;
     int src_pos   = 0;
 
-    if (readBatch > 0) {
-      // Initialize the reader if needed
-      pageInfo.definitionLevels.readFirstIntegerIfNeeded();
-    }
+    // Initialize the reader if needed
+    pageInfo.definitionLevels.readFirstIntegerIfNeeded();
 
     for (; numValues < readBatch; ) {
       // Non-null entry
@@ -108,7 +108,7 @@ final class VLNullableEntryReader extends VLAbstractEntryReader {
       }
 
       // read the next definition-level value since we know the current entry has been processed
-      pageInfo.definitionLevels.nextInteger();
+      pageInfo.definitionLevels.nextIntegerIfNotEOF();
     }
 
     // We're here either because a) the Parquet metadata is wrong (advertises more values than the real count)
@@ -132,6 +132,9 @@ final class VLNullableEntryReader extends VLAbstractEntryReader {
   }
 
   VLColumnBulkEntry getEntrySingle(int valuesToRead) {
+
+    // Initialize the reader if needed
+    pageInfo.definitionLevels.readFirstIntegerIfNeeded();
 
     final int[] value_lengths = entry.getValuesLength();
 
@@ -166,7 +169,7 @@ final class VLNullableEntryReader extends VLAbstractEntryReader {
     }
 
     // read the next definition-level value since we know the current entry has been processed
-    pageInfo.definitionLevels.nextInteger();
+    pageInfo.definitionLevels.nextIntegerIfNotEOF();
 
     return entry;
   }

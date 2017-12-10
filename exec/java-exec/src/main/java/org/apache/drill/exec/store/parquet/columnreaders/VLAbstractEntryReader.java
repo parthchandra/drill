@@ -200,7 +200,15 @@ abstract class VLAbstractEntryReader {
     }
 
     if (remaining > 0) {
-      vlCopyLELong(src, srcIndex + numLongEntries * MemoryUtils.LONG_NUM_BYTES, dest, destIndex + numLongEntries * MemoryUtils.LONG_NUM_BYTES, remaining);
+      final int srcPos  = srcIndex  + numLongEntries * MemoryUtils.LONG_NUM_BYTES;
+      final int destPos = destIndex + numLongEntries * MemoryUtils.LONG_NUM_BYTES;
+
+      if (srcPos + 7 < src.length) {
+        MemoryUtils.putLong(src, srcPos, dest, destPos);
+
+      } else {
+        vlCopyLELong(src, srcPos, dest, destPos, remaining);
+      }
     }
   }
 

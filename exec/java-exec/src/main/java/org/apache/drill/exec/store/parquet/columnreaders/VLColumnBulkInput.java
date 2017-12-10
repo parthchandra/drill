@@ -39,7 +39,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
   /** Column precision type information (owner by caller) */
   private final ColumnPrecisionInfo columnPrecInfo;
   /** Custom definition level reader */
-  private final CustomDefinitionLevelReader custDefLevelReader;
+  private final DefLevelReaderWrapper custDefLevelReader;
 
   /** The records to read */
   private final int recordsToRead;
@@ -81,7 +81,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     }
 
     // Initialize the buffered-page-payload object if there are page(s) to be processed
-    if (parentInst.pageReader.hasPage() && oprReadState.numPageFieldsRead < parentInst.pageReader.currentPageCount) {
+    if (parentInst.pageReader.hasPage() && oprReadState.numPageFieldsProcessed < parentInst.pageReader.currentPageCount) {
       setBufferedPagePayload();
     }
   }
@@ -92,7 +92,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     try {
       if (oprReadState.batchFieldIndex < recordsToRead) {
         // We need to ensure there is a page of data to be read
-        if (!parentInst.pageReader.hasPage() || parentInst.pageReader.currentPageCount == oprReadState.numPageFieldsRead) {
+        if (!parentInst.pageReader.hasPage() || parentInst.pageReader.currentPageCount == oprReadState.numPageFieldsProcessed) {
           long totalValueCount = parentInst.columnChunkMetaData.getValueCount();
 
           if (totalValueCount == (parentInst.totalValuesRead + oprReadState.batchFieldIndex) || !parentInst.pageReader.next()) {
@@ -101,8 +101,8 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
           }
 
           // Reset the state object page read metadata
-          oprReadState.numPageFieldsRead = 0;
-          oprReadState.pageReadPos       = parentInst.pageReader.readyToReadPosInBytes;
+          oprReadState.numPageFieldsProcessed = 0;
+          oprReadState.pageReadPos            = parentInst.pageReader.readyToReadPosInBytes;
 
           // Update the definition level information
           setDefinitionLevelOnNewPage();
@@ -123,7 +123,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
   @Override
   public final VLBulkEntry next() {
     final int toReadRemaining = recordsToRead - oprReadState.batchFieldIndex;
-    final int pageRemaining   = parentInst.pageReader.currentPageCount - oprReadState.numPageFieldsRead;
+    final int pageRemaining   = parentInst.pageReader.currentPageCount - oprReadState.numPageFieldsProcessed;
     final int remaining       = Math.min(toReadRemaining, pageRemaining);
     final VLBulkEntry result  = buffPagePayload.getEntry(remaining);
 
@@ -133,7 +133,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
       if (pageInfo.dictionaryValueReader == null) {
         oprReadState.pageReadPos += (result.getTotalLength() + 4 * result.getNumValues());
       }
-      oprReadState.numPageFieldsRead += result.getNumValues();
+      oprReadState.numPageFieldsProcessed += result.getNumValues();
       oprReadState.batchFieldIndex   += result.getNumValues();
     }
     return result;
@@ -161,7 +161,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     if (pageInfo.dictionaryValueReader == null) {
       parentInst.pageReader.readyToReadPosInBytes = oprReadState.pageReadPos;
     }
-    parentInst.pageReader.valuesRead = oprReadState.numPageFieldsRead;
+    parentInst.pageReader.valuesRead = oprReadState.numPageFieldsProcessed;
     parentInst.totalValuesRead      += oprReadState.batchFieldIndex;
   }
 
@@ -171,9 +171,9 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
 
   private final void setDefinitionLevelOnNewPage() {
     if (parentInst.pageReader.currentPageCount > 0) {
-      custDefLevelReader.set(parentInst.pageReader.definitionLevels);
+      custDefLevelReader.set(parentInst.pageReader.definitionLevels, parentInst.pageReader.currentPageCount);
     } else {
-      custDefLevelReader.set(null);
+      custDefLevelReader.set(null, 0);
     }
   }
 
@@ -188,8 +188,9 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
       pageInfo.pageDataLen  = (int) parentInst.pageReader.byteLength;
     }
 
+    pageInfo.numPageValues     = parentInst.pageReader.currentPageCount;
     pageInfo.definitionLevels  = custDefLevelReader;
-    pageInfo.numPageFieldsRead = oprReadState.numPageFieldsRead;
+    pageInfo.numPageFieldsRead = oprReadState.numPageFieldsProcessed;
 
     if (buffPagePayload == null) {
       buffPagePayload = new VLBulkPageReader(pageInfo, columnPrecInfo, callback);
@@ -210,7 +211,6 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
    * @throws IOException
    */
   private final void guessColumnPrecision(ColumnPrecisionInfo columnPrecInfo) throws IOException {
-    assert !parentInst.usingDictionary : "Fixed length optimization not available for the Dictionary functionality..";
     columnPrecInfo.columnPrecisionType = ColumnPrecisionType.DT_PRECISION_IS_VARIABLE;
 
     loadPageIfNeeed();
@@ -330,7 +330,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
      * A custom definition level reader which overcomes Parquet's ValueReader limitations (that is,
      * no ability to peek)
      */
-    final CustomDefinitionLevelReader definitionLevelReader = new CustomDefinitionLevelReader();
+    final DefLevelReaderWrapper definitionLevelReader = new DefLevelReaderWrapper();
   }
 
   /** Container class to hold a column precision information */
@@ -355,20 +355,22 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
   private final static class OprBulkReadState {
     /** reader position within current page */
     long pageReadPos;
-    /** number of fields read within current page */
-    int numPageFieldsRead;
+    /** number of fields processed within the current page */
+    int numPageFieldsProcessed;
     /** field index within current batch */
     int batchFieldIndex;
 
       OprBulkReadState(long pageReadPos, int numPageFieldsRead, int batchFieldIndex) {
-        this.pageReadPos       = pageReadPos;
-        this.numPageFieldsRead = numPageFieldsRead;
-        this.batchFieldIndex   = batchFieldIndex;
+        this.pageReadPos            = pageReadPos;
+        this.numPageFieldsProcessed = numPageFieldsRead;
+        this.batchFieldIndex        = batchFieldIndex;
       }
   }
 
   /** Container class for holding page data information */
   final static class PageDataInfo {
+    /** Number of values within the current page */
+    int numPageValues;
     /** Page data buffer */
     DrillBuf pageData;
     /** Offset within the page data */
@@ -378,7 +380,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     /** number of fields read within current page */
     int numPageFieldsRead;
     /** Definition Level */
-    CustomDefinitionLevelReader definitionLevels;
+    DefLevelReaderWrapper definitionLevels;
     /** Dictionary value reader */
     ValuesReader dictionaryValueReader;
   }
@@ -410,12 +412,14 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     }
   }
 
-  /** A custom value reader with the ability to control when to read the next value */
-  final static class CustomDefinitionLevelReader {
+  /** A wrapper value reader with the ability to control when to read the next value */
+  final static class DefLevelReaderWrapper {
     /** Definition Level */
     private ValuesReader definitionLevels;
     /** Peeked value     */
     private int currValue;
+    /** Remaining values */
+    private int remaining;
 
     /**
      * @return true if the current page has definition levels to be read
@@ -432,7 +436,7 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     public void readFirstIntegerIfNeeded() {
       assert definitionLevels != null;
       if (currValue == -1) {
-        currValue = definitionLevels.readInteger();
+        setNextInteger();
       }
     }
 
@@ -440,21 +444,12 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
      * Set the {@link PageReader#definitionLevels} object; if a null value is passed, then it is understood
      * the current page doesn't have definition levels to be processed
      * @param definitionLevels {@link ValuesReader} object
+     * @param numValues total number of values that can be read from the stream
      */
-    void set(ValuesReader _definitionLevels) {
-      definitionLevels = _definitionLevels;
-      currValue        = -1;
-    }
-
-    /**
-     * Set the {@link PageReader#definitionLevels} object; if a null value is passed, then it is understood
-     * the current page doesn't have definition levels to be processed
-     * @param definitionLevels {@link ValuesReader} object
-     * @param currValue current value
-     */
-    void set(ValuesReader _definitionLevels, int _currValue) {
+    void set(ValuesReader _definitionLevels, int numValues) {
       this.definitionLevels = _definitionLevels;
-      this.currValue        = _currValue;
+      this.currValue        = -1;
+      this.remaining        = numValues;
     }
 
     /**
@@ -467,11 +462,11 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
     }
 
     /**
-     * @return read the next integer from the underlying {@link ValuesReader}
+     * @return internally reads the next integer from the underlying {@link ValuesReader}; false if the stream
+     *         reached EOF
      */
-    public int nextInteger() {
-      setCurrInteger();
-      return readCurrInteger();
+    public boolean nextIntegerIfNotEOF() {
+      return setNextInteger();
     }
 
     /**
@@ -485,8 +480,18 @@ final class VLColumnBulkInput<V extends ValueVector> implements VLBulkInput<VLBu
       return definitionLevels;
     }
 
-    private void setCurrInteger() {
-      currValue = definitionLevels.readInteger();
+    private boolean setNextInteger() {
+      if (remaining > 0) {
+        --remaining;
+        try {
+        currValue = definitionLevels.readInteger();
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+        return true;
+      }
+      currValue = -1;
+      return false;
     }
   }
 

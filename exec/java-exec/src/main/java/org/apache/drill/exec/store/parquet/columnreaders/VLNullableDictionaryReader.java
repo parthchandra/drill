@@ -38,6 +38,8 @@ final class VLNullableDictionaryReader extends VLAbstractEntryReader {
   /** {@inheritDoc} */
   @Override
   final VLColumnBulkEntry getEntry(int valuesToRead) {
+    assert valuesToRead > 0;
+
     // Bulk processing is effecting for smaller precisions
     if (bulkProcess()) {
       return getEntryBulk(valuesToRead);
@@ -57,10 +59,8 @@ final class VLNullableDictionaryReader extends VLAbstractEntryReader {
     int numNulls  = 0;
     int tgtPos    = 0;
 
-    if (readBatch > 0) {
-      // Initialize the reader if needed
-      pageInfo.definitionLevels.readFirstIntegerIfNeeded();
-    }
+    // Initialize the reader if needed
+    pageInfo.definitionLevels.readFirstIntegerIfNeeded();
 
     for (int idx = 0; idx < readBatch; ++idx ) {
       if (pageInfo.definitionLevels.readCurrInteger() == 1) {
@@ -73,14 +73,16 @@ final class VLNullableDictionaryReader extends VLAbstractEntryReader {
 
         valueLengths[numValues++] = dataLen;
 
-        if (dataLen <= 8) {
-          vlCopyLELong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
-        } else {
-          vlCopyGTLong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
-        }
+        if (dataLen > 0) {
+          if (dataLen <= 8) {
+            vlCopyLELong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
+          } else {
+            vlCopyGTLong(currEntry.getBytes(), 0, tgtBuff, tgtPos, dataLen);
+          }
 
-        // Update the counters
-        tgtPos += dataLen;
+          // Update the counters
+          tgtPos += dataLen;
+        }
 
       } else {
         valueLengths[numValues++] = -1;
@@ -88,7 +90,7 @@ final class VLNullableDictionaryReader extends VLAbstractEntryReader {
       }
 
       // read the next definition-level value since we know the current entry has been processed
-      pageInfo.definitionLevels.nextInteger();
+      pageInfo.definitionLevels.nextIntegerIfNotEOF();
     }
 
     // We're here either because a) the Parquet metadata is wrong (advertises more values than the real count)
@@ -104,6 +106,9 @@ final class VLNullableDictionaryReader extends VLAbstractEntryReader {
 
   private final VLColumnBulkEntry getEntrySingle(int valsToReadWithinPage) {
     final int[] valueLengths = entry.getValuesLength();
+
+    // Initialize the reader if needed
+    pageInfo.definitionLevels.readFirstIntegerIfNeeded();
 
     if (pageInfo.definitionLevels.readCurrInteger() == 1) {
       final ValuesReader valueReader = pageInfo.dictionaryValueReader;
@@ -124,7 +129,7 @@ final class VLNullableDictionaryReader extends VLAbstractEntryReader {
     }
 
     // read the next definition-level value since we know the current entry has been processed
-    pageInfo.definitionLevels.nextInteger();
+    pageInfo.definitionLevels.nextIntegerIfNotEOF();
 
     return entry;
   }

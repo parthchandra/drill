@@ -91,7 +91,7 @@ public class ScanBatch implements CloseableRecordBatch {
    * @param context
    * @param oContext
    * @param readerList
-   * @param implicitColumnList : either an emptylist when all the readers do not have implicit
+   * @param implicitColumnList : either an empty list when all the readers do not have implicit
    *                        columns, or there is a one-to-one mapping between reader and implicitColumns.
    */
   public ScanBatch(PhysicalOperator subScanConfig, FragmentContext context,
@@ -433,12 +433,6 @@ public class ScanBatch implements CloseableRecordBatch {
                   clazz.getSimpleName(), v.getClass().getSimpleName()));
         }
 
-        if (isImplicitField && optimizeImplColumns) {
-          // Turn on duplicate value support for implicit columns
-          final NullableVarCharVector implicitVec = (NullableVarCharVector) v;
-          implicitVec.setDuplicateValsOnly(true);
-        }
-
         final ValueVector old = fieldVectorMap.put(field.getName(), v);
         if (old != null) {
           old.clear();
@@ -489,6 +483,10 @@ public class ScanBatch implements CloseableRecordBatch {
         for (Map.Entry<String, String> entry : implicitValues.entrySet()) {
           @SuppressWarnings("resource")
           final NullableVarCharVector v = (NullableVarCharVector) implicitFieldVectorMap.get(entry.getKey());
+          if (optimizeImplColumns) {
+            // Need to set it here as the clear() method will unset this optimization
+            v.setDuplicateValsOnly(true);
+          }
           String val;
           if ((val = entry.getValue()) != null) {
             AllocationHelper.allocate(v, 1, val.length());

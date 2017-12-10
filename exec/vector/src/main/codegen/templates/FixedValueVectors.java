@@ -958,6 +958,12 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements F
       data.set${(minor.javaType!type.javaType)?cap_first}(index * VALUE_WIDTH, value);
     }
 
+    <#if (type.width == 1)>
+    public void set(int index, byte[] values, int startOff, int len) {
+      data.setBytes(index * VALUE_WIDTH, values, startOff, len);
+    }
+    </#if>
+
     public void setSafe(int index, <#if (type.width >= 4)>${minor.javaType!type.javaType}<#else>int</#if> value) {
       while(index >= getValueCapacity()) {
         reAlloc();

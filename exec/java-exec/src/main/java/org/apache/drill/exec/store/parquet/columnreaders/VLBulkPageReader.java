@@ -68,6 +68,7 @@ final class VLBulkPageReader {
     this.pageInfo.pageDataLen       = _pageInfo.pageDataLen;
     this.pageInfo.numPageFieldsRead = _pageInfo.numPageFieldsRead;
     this.pageInfo.definitionLevels  = _pageInfo.definitionLevels;
+    pageInfo.dictionaryValueReader = _pageInfo.dictionaryValueReader;
     this.columnPrecInfo             = _columnPrecInfo;
     this.entry                      = new VLColumnBulkEntry(this.columnPrecInfo);
     this.containerCallback          = _containerCallback;
@@ -106,7 +107,7 @@ final class VLBulkPageReader {
           try {
             containerCallback.resetDefinitionLevelReader(pageInfo.numPageFieldsRead);
             // Update the definition level object reference
-            pageInfo.definitionLevels.set(containerCallback.getDefinitionLevelsReader());
+            pageInfo.definitionLevels.set(containerCallback.getDefinitionLevelsReader(), pageInfo.numPageValues);
 
           } catch (IOException ie) {
             throw new DrillRuntimeException(ie);
