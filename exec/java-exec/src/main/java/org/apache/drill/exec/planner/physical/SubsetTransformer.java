@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -53,7 +53,7 @@ public abstract class SubsetTransformer<T extends RelNode, E extends Exception> 
     boolean transform = false;
     for (RelNode rel : ((RelSubset)candidateSet).getRelList()) {
       if (isPhysical(rel)) {
-        RelNode newRel = RelOptRule.convert(candidateSet, rel.getTraitSet().plus(Prel.DRILL_PHYSICAL));
+        RelNode newRel = RelOptRule.convert(candidateSet, rel.getTraitSet().plus(Prel.DRILL_PHYSICAL).simplify());
         RelNode out = convertChild(n, newRel);
         if (out != null) {
           call.transformTo(out);
