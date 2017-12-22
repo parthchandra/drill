@@ -55,30 +55,28 @@ final class VLBulkPageReader {
   final VLAbstractEntryReader dictionaryReader;
   final VLAbstractEntryReader nullableDictionaryReader;
 
-  VLBulkPageReader(
-    PageDataInfo _pageInfo,
-    ColumnPrecisionInfo _columnPrecInfo,
-    VLColumnBulkInputCallback _containerCallback) {
+  VLBulkPageReader(PageDataInfo _pageInfo, ColumnPrecisionInfo _columnPrecInfo,
+      VLColumnBulkInputCallback _containerCallback) {
 
     // Set the buffer to the native byte order
     buffer.order(ByteOrder.nativeOrder());
 
-    this.pageInfo.pageData          = _pageInfo.pageData;
-    this.pageInfo.pageDataOff       = _pageInfo.pageDataOff;
-    this.pageInfo.pageDataLen       = _pageInfo.pageDataLen;
+    this.pageInfo.pageData = _pageInfo.pageData;
+    this.pageInfo.pageDataOff = _pageInfo.pageDataOff;
+    this.pageInfo.pageDataLen = _pageInfo.pageDataLen;
     this.pageInfo.numPageFieldsRead = _pageInfo.numPageFieldsRead;
-    this.pageInfo.definitionLevels  = _pageInfo.definitionLevels;
+    this.pageInfo.definitionLevels = _pageInfo.definitionLevels;
     pageInfo.dictionaryValueReader = _pageInfo.dictionaryValueReader;
-    this.columnPrecInfo             = _columnPrecInfo;
-    this.entry                      = new VLColumnBulkEntry(this.columnPrecInfo);
-    this.containerCallback          = _containerCallback;
+    this.columnPrecInfo = _columnPrecInfo;
+    this.entry = new VLColumnBulkEntry(this.columnPrecInfo);
+    this.containerCallback = _containerCallback;
 
     // Initialize the Variable Length Entry Readers
-    fixedReader              = new VLFixedEntryReader(buffer, pageInfo, columnPrecInfo, entry);
-    nullableFixedReader      = new VLNullableFixedEntryReader(buffer, pageInfo, columnPrecInfo, entry);
-    variableLengthReader     = new VLEntryReader(buffer, pageInfo, columnPrecInfo, entry);
-    nullableVLReader         = new VLNullableEntryReader(buffer, pageInfo, columnPrecInfo, entry);
-    dictionaryReader         = new VLEntryDictionaryReader(buffer, pageInfo, columnPrecInfo, entry);
+    fixedReader = new VLFixedEntryReader(buffer, pageInfo, columnPrecInfo, entry);
+    nullableFixedReader = new VLNullableFixedEntryReader(buffer, pageInfo, columnPrecInfo, entry);
+    variableLengthReader = new VLEntryReader(buffer, pageInfo, columnPrecInfo, entry);
+    nullableVLReader = new VLNullableEntryReader(buffer, pageInfo, columnPrecInfo, entry);
+    dictionaryReader = new VLEntryDictionaryReader(buffer, pageInfo, columnPrecInfo, entry);
     nullableDictionaryReader = new VLNullableDictionaryReader(buffer, pageInfo, columnPrecInfo, entry);
   }
 
