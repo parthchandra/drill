@@ -29,7 +29,7 @@ public class DrillParserConfig implements SqlParser.Config {
 
   private final long identifierMaxLength;
   private final Quoting quotingIdentifiers;
-  public static SqlConformance DRILL_CONFORMANCE = new DrillConformance();
+  public final static SqlConformance DRILL_CONFORMANCE = new DrillConformance();
 
   public DrillParserConfig(PlannerSettings settings) {
     identifierMaxLength = settings.getIdentifierMaxLength();

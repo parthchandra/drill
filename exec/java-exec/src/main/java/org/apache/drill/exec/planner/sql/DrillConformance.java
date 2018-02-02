@@ -17,8 +17,8 @@
  */
 package org.apache.drill.exec.planner.sql;
 
-import org.apache.calcite.sql.validate.SqlConformance;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
+import org.apache.calcite.sql.validate.SqlDelegatingConformance;
 
 /**
  * Drill's SQL conformance is SqlConformanceEnum.DEFAULT except for method isApplyAllowed().
@@ -26,74 +26,18 @@ import org.apache.calcite.sql.validate.SqlConformanceEnum;
  * to join with output of right side (sub-query or table function that will be invoked for each row).
  * Refer to DRILL-5999 for more information.
  */
-public class DrillConformance implements SqlConformance {
-  final private static SqlConformanceEnum defaultConformance = SqlConformanceEnum.DEFAULT;
+public class DrillConformance extends SqlDelegatingConformance {
 
-  SqlConformanceEnum getDefaultConformance() {
-    return defaultConformance;
+  public DrillConformance() {
+    super(SqlConformanceEnum.DEFAULT);
   }
 
-  public boolean isGroupByAlias() {
-    return getDefaultConformance().isGroupByAlias();
+  public DrillConformance(SqlConformanceEnum flavor) {
+    super(flavor);
   }
 
-  public boolean isGroupByOrdinal() {
-    return getDefaultConformance().isGroupByOrdinal();
-  }
-
-  public boolean isHavingAlias() {
-    return getDefaultConformance().isHavingAlias();
-  }
-
-  public boolean isSortByOrdinal() {
-    return getDefaultConformance().isSortByOrdinal();
-  }
-
-  public boolean isSortByAlias() {
-    return getDefaultConformance().isSortByAlias();
-  }
-
-  public boolean isSortByAliasObscures() {
-    return getDefaultConformance().isSortByAliasObscures();
-  }
-
-  public boolean isFromRequired() {
-    return getDefaultConformance().isFromRequired();
-  }
-
-  public boolean isBangEqualAllowed() {
-    return getDefaultConformance().isBangEqualAllowed();
-  }
-
-  @Override public boolean isMinusAllowed() {
-    return getDefaultConformance().isMinusAllowed();
-  }
-
-  @Override public boolean isPercentRemainderAllowed() {
-    return getDefaultConformance().isPercentRemainderAllowed();
-  }
-
+  @Override
   public boolean isApplyAllowed() {
     return true;
-  }
-
-  public boolean isInsertSubsetColumnsAllowed() {
-    return getDefaultConformance().isInsertSubsetColumnsAllowed();
-  }
-
-  public boolean allowNiladicParentheses() {
-    return getDefaultConformance().allowNiladicParentheses();
-  }
-
-  public boolean allowExtend() {
-    return getDefaultConformance().allowExtend();
-  }
-
-  public boolean isLimitStartCountAllowed() {
-    return getDefaultConformance().isLimitStartCountAllowed();
-  }
-
-  public boolean allowGeometry() {
-    return getDefaultConformance().allowGeometry();
   }
 }
