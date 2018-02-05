@@ -25,6 +25,7 @@ import org.apache.drill.exec.physical.config.HashJoinPOP;
 import org.apache.drill.exec.physical.config.HashPartitionSender;
 import org.apache.drill.exec.physical.config.HashToRandomExchange;
 import org.apache.drill.exec.physical.config.IteratorValidator;
+import org.apache.drill.exec.physical.config.LateralJoinPOP;
 import org.apache.drill.exec.physical.config.Limit;
 import org.apache.drill.exec.physical.config.MergeJoinPOP;
 import org.apache.drill.exec.physical.config.MergingReceiverPOP;
@@ -69,6 +70,7 @@ public interface PhysicalVisitor<RETURN, EXTRA, EXCEP extends Throwable> {
   public RETURN visitMergeJoin(MergeJoinPOP join, EXTRA value) throws EXCEP;
   public RETURN visitHashJoin(HashJoinPOP join, EXTRA value) throws EXCEP;
   public RETURN visitNestedLoopJoin(NestedLoopJoinPOP join, EXTRA value) throws EXCEP;
+  public RETURN visitLateralJoin(LateralJoinPOP join, EXTRA value) throws EXCEP;
   public RETURN visitSender(Sender sender, EXTRA value) throws EXCEP;
   public RETURN visitReceiver(Receiver receiver, EXTRA value) throws EXCEP;
   public RETURN visitStreamingAggregate(StreamingAggregate agg, EXTRA value) throws EXCEP;
