@@ -61,7 +61,9 @@ public enum CoreOperatorType implements com.dyuproject.protostuff.EnumLite<CoreO
     AVRO_SUB_SCAN(36),
     PCAP_SUB_SCAN(37),
     KAFKA_SUB_SCAN(38),
-    KUDU_SUB_SCAN(39);
+    KUDU_SUB_SCAN(39),
+    LATERAL_JOIN(40),
+    UNNEST(41);
     
     public final int number;
     
@@ -119,6 +121,8 @@ public enum CoreOperatorType implements com.dyuproject.protostuff.EnumLite<CoreO
             case 37: return PCAP_SUB_SCAN;
             case 38: return KAFKA_SUB_SCAN;
             case 39: return KUDU_SUB_SCAN;
+            case 40: return LATERAL_JOIN;
+            case 41: return UNNEST;
             default: return null;
         }
     }
