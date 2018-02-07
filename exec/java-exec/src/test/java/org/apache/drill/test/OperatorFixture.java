@@ -17,15 +17,10 @@
  */
 package org.apache.drill.test;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.netty.buffer.DrillBuf;
 import org.apache.calcite.schema.SchemaPlus;
 import org.apache.drill.common.config.DrillConfig;
@@ -45,10 +40,8 @@ import org.apache.drill.exec.ops.BufferManager;
 import org.apache.drill.exec.ops.BufferManagerImpl;
 import org.apache.drill.exec.ops.ContextInformation;
 import org.apache.drill.exec.ops.FragmentContext;
-import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.ops.OpProfileDef;
 import org.apache.drill.exec.ops.OperatorContext;
-import org.apache.drill.exec.ops.OperatorStatReceiver;
 import org.apache.drill.exec.ops.OperatorStats;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.planner.PhysicalPlanReaderTestFactory;
@@ -73,7 +66,10 @@ import org.apache.drill.test.rowSet.RowSet.ExtendableRowSet;
 import org.apache.drill.test.rowSet.RowSetBuilder;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import com.google.common.util.concurrent.ListenableFuture;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Test fixture for operator and (especially) "sub-operator" tests.
@@ -160,6 +156,8 @@ public class OperatorFixture extends BaseFixture implements AutoCloseable {
     private final BufferAllocator allocator;
     private final ExecutorService scanExecutorService;
     private final ExecutorService scanDecodeExecutorService;
+    private final List<OperatorContext> contexts = Lists.newLinkedList();
+
 
     private ExecutorState executorState = new OperatorFixture.MockExecutorState();
     private ExecutionControls controls;
@@ -254,7 +252,9 @@ public class OperatorFixture extends BaseFixture implements AutoCloseable {
         popConfig.getInitialAllocation(),
         popConfig.getMaxAllocation()
       );
-      return new MockOperatorContext(this, childAllocator, popConfig);
+      OperatorContext context = new MockOperatorContext(this, childAllocator, popConfig);
+      contexts.add(context);
+      return context;
     }
 
     @Override
@@ -289,6 +289,9 @@ public class OperatorFixture extends BaseFixture implements AutoCloseable {
 
     @Override
     public void close() {
+      for(OperatorContext context : contexts) {
+        context.close();
+      }
       bufferManager.close();
     }
 
