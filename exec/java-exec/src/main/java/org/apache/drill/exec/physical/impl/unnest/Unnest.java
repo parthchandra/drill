@@ -20,6 +20,7 @@ package org.apache.drill.exec.physical.impl.unnest;
 import org.apache.drill.exec.compile.TemplateClassDefinition;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.impl.flatten.FlattenTemplate;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TransferPair;
@@ -30,7 +31,8 @@ import java.util.List;
 public interface Unnest {
   TemplateClassDefinition<Unnest> TEMPLATE_DEFINITION = new TemplateClassDefinition<Unnest>(Unnest.class, UnnestTemplate.class);
 
-  void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing, List<TransferPair> transfers)  throws SchemaChangeException;
+  void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing, List<TransferPair> transfers,
+      LateralContract lateral) throws SchemaChangeException;
 
   interface Monitor {
     /**
