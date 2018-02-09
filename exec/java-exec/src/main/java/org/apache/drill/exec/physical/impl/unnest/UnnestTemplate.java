@@ -22,6 +22,7 @@ import org.apache.drill.exec.exception.OversizedAllocationException;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TransferPair;
@@ -39,11 +40,10 @@ public abstract class UnnestTemplate implements Unnest {
   private static final int OUTPUT_ROW_COUNT = ValueVector.MAX_ROW_COUNT;
 
   private ImmutableList<TransferPair> transfers;
-  private BufferAllocator outputAllocator;
+  private LateralContract lateral; // corresponding lateral Join (or other operator implementing the Lateral Contract)
   private SelectionVectorMode svMode;
   private RepeatedValueVector fieldToUnnest;
   private RepeatedValueVector.RepeatedAccessor accessor;
-  private int valueIndex;
 
   /**
    * The output batch limit starts at OUTPUT_ROW_COUNT, but may be decreased
@@ -51,10 +51,12 @@ public abstract class UnnestTemplate implements Unnest {
    */
   private int outputLimit = OUTPUT_ROW_COUNT;
 
+
+  // The index in the unnest column that is being processed.We start at zero and continue until
+  // InnerValueCount is reached or  if the batch limit is reached
   // this allows for groups to be written between batches if we run out of space, for cases where we have finished
   // a batch on the boundary it will be set to 0
-  private int innerValueIndex = -1;
-  private int currentInnerValueIndex;
+  private int innerValueIndex = 0;
 
   @Override
   public void setUnnestField(RepeatedValueVector unnestField) {
@@ -67,7 +69,7 @@ public abstract class UnnestTemplate implements Unnest {
     return fieldToUnnest;
   }
 
-  @Override
+   @Override
   public void setOutputCount(int outputCount) {
     outputLimit = outputCount;
   }
@@ -87,59 +89,21 @@ public abstract class UnnestTemplate implements Unnest {
           innerValueIndex = 0;
         }
 
-        final int initialInnerValueIndex = currentInnerValueIndex;
-        // restore state to local stack
-        int valueIndexLocal = valueIndex;
-        int innerValueIndexLocal = innerValueIndex;
-        int currentInnerValueIndexLocal = currentInnerValueIndex;
-        outer: {
-          int outputIndex = firstOutputIndex;
-          int recordsThisCall = 0;
-          final int valueCount = accessor.getValueCount();
-          for ( ; valueIndexLocal < valueCount; valueIndexLocal++) {
-            final int innerValueCount = accessor.getInnerValueCountAt(valueIndexLocal);
-            for ( ; innerValueIndexLocal < innerValueCount; innerValueIndexLocal++) {
-              // If we've hit the batch size limit, stop and flush what we've got so far.
-              if (recordsThisCall == outputLimit) {
-                // Flush this batch.
-                break outer;
-              }
+        // Current record being processed in the incoming record batch. We could keep
+        // track of it, but it is better to check with the Lateral Join and get the
+        // current record being processed thru the Lateral Join Contract.
+        int currentRecord  = lateral.getRecordIndex();
+        int currentValueIndex = innerValueIndex;
 
-              try {
-                doEval(valueIndexLocal, outputIndex);
-              } catch (OversizedAllocationException ex) {
-                // unable to flatten due to a soft buffer overflow. split the batch here and resume execution.
-                logger.debug("Reached allocation limit. Splitting the batch at input index: {} - inner index: {} - current completed index: {}",
-                    valueIndexLocal, innerValueIndexLocal, currentInnerValueIndexLocal) ;
+        final int innerValueCount = accessor.getInnerValueCountAt(currentRecord);
 
-                /*
-                 * TODO
-                 * We can't further reduce the output limits here because it won't have
-                 * any effect. The vectors have already gotten large, and there's currently
-                 * no way to reduce their size. Ideally, we could reduce the outputLimit,
-                 * and reduce the size of the currently used vectors.
-                 */
-                break outer;
-              } catch (SchemaChangeException e) {
-                throw new UnsupportedOperationException(e);
-              }
-              outputIndex++;
-              currentInnerValueIndexLocal++;
-              ++recordsThisCall;
-            }
-            innerValueIndexLocal = 0;
-          }
-        }
-        // save state to heap
-        valueIndex = valueIndexLocal;
-        innerValueIndex = innerValueIndexLocal;
-        currentInnerValueIndex = currentInnerValueIndexLocal;
-        // transfer the computed range
-        final int delta = currentInnerValueIndexLocal - initialInnerValueIndex;
+        int count = Math.min(innerValueCount, outputLimit);
+
         for (TransferPair t : transfers) {
-          t.splitAndTransfer(initialInnerValueIndex, delta);
+          t.splitAndTransfer(innerValueIndex, count);
         }
-        return delta;
+        innerValueIndex += count;
+        return count;
 
       default:
         throw new UnsupportedOperationException();
@@ -147,7 +111,8 @@ public abstract class UnnestTemplate implements Unnest {
   }
 
   @Override
-  public final void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing, List<TransferPair> transfers)  throws SchemaChangeException{
+  public final void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing, List<TransferPair>
+      transfers, LateralContract lateral)  throws SchemaChangeException{
 
     this.svMode = incoming.getSchema().getSelectionVectorMode();
     switch (svMode) {
@@ -157,14 +122,13 @@ public abstract class UnnestTemplate implements Unnest {
         throw new UnsupportedOperationException("Unnest does not support selection vector inputs.");
     }
     this.transfers = ImmutableList.copyOf(transfers);
-    outputAllocator = outgoing.getOutgoingContainer().getAllocator();
+    this.lateral  = lateral;
     doSetup(context, incoming, outgoing);
   }
 
   @Override
   public void resetGroupIndex() {
-    this.valueIndex = 0;
-    this.currentInnerValueIndex = 0;
+    this.innerValueIndex = 0;
   }
 
   public abstract void doSetup(@Named("context") FragmentContext context,

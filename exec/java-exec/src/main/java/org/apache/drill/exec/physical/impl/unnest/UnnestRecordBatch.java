@@ -74,10 +74,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   private LateralContract lateral;
 
   private final Unnest.Monitor monitor = new Unnest.Monitor() {
-    @Override
-    public int getBufferSizeFor(int recordCount) {
+    @Override public int getBufferSizeFor(int recordCount) {
       int bufferSize = 0;
-      for(final ValueVector vv : allocationVectors) {
+      for (final ValueVector vv : allocationVectors) {
         bufferSize += vv.getBufferSizeFor(recordCount);
       }
       return bufferSize;
@@ -85,6 +84,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   };
 
   private static final String EMPTY_STRING = "";
+
 
   private class ClassifierResult {
     public List<String> outputNames;
@@ -97,6 +97,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       // note:  don't clear the internal maps since they have cumulative data..
     }
   }
+
 
   private class UnnestMemoryManager {
     private final int outputRowCount;
@@ -113,29 +114,26 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       final MaterializedField field = incoming.getSchema().getColumn(typedFieldId.getFieldIds()[0]);
 
       // Get column size of unnest column.
-      RecordBatchSizer.ColumnSize columnSize = RecordBatchSizer.getColumn(incoming.getValueAccessorById(field.getValueClass(),
-          typedFieldId.getFieldIds()).getValueVector(), field.getName());
-
-      // Average rowWidth of unnest column
-      final int avgRowWidthUnnestColumn = RecordBatchSizer.safeDivide(columnSize.netSize, incoming.getRecordCount());
-
-      // Average rowWidth excluding the unnest column.
-      final int avgRowWidthWithOutUnnestColumn = sizer.netRowWidth() - avgRowWidthUnnestColumn;
+      RecordBatchSizer.ColumnSize columnSize = RecordBatchSizer
+          .getColumn(incoming.getValueAccessorById(field.getValueClass(), typedFieldId.getFieldIds()).getValueVector(),
+              field.getName());
 
       // Average rowWidth of single element in the unnest list.
       // subtract the offset vector size from column data size.
-      final int avgRowWidthSingleUnnestEntry =
-          RecordBatchSizer.safeDivide(columnSize.netSize - (OFFSET_VECTOR_WIDTH * columnSize.valueCount), columnSize.elementCount);
+      final int avgRowWidthSingleUnnestEntry = RecordBatchSizer
+          .safeDivide(columnSize.netSize - (OFFSET_VECTOR_WIDTH * columnSize.valueCount), columnSize.elementCount);
 
       // Average rowWidth of outgoing batch.
-      final int avgOutgoingRowWidth = avgRowWidthWithOutUnnestColumn + avgRowWidthSingleUnnestEntry;
+      //final int avgOutgoingRowWidth = avgRowWidthWithOutUnnestColumn + avgRowWidthSingleUnnestEntry;
+      final int avgOutgoingRowWidth = avgRowWidthSingleUnnestEntry;
 
       // Number of rows in outgoing batch
       outputRowCount = Math.max(MIN_NUM_ROWS, Math.min(MAX_NUM_ROWS,
-          RecordBatchSizer.safeDivide((outputBatchSize/WORST_CASE_FRAGMENTATION_FACTOR), avgOutgoingRowWidth)));
+          RecordBatchSizer.safeDivide((outputBatchSize / WORST_CASE_FRAGMENTATION_FACTOR), avgOutgoingRowWidth)));
 
-      logger.debug("unnest incoming batch sizer : {}, outputBatchSize : {}," +
-              "avgOutgoingRowWidth : {}, outputRowCount : {}", sizer, outputBatchSize, avgOutgoingRowWidth, outputRowCount);
+      logger.debug(
+          "unnest incoming batch sizer : {}, outputBatchSize : {}," + "avgOutgoingRowWidth : {}, outputRowCount : {}",
+          sizer, outputBatchSize, avgOutgoingRowWidth, outputRowCount);
     }
 
     public int getOutputRowCount() {
@@ -151,45 +149,44 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     outputBatchSize = context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
   }
 
-  @Override
-  public int getRecordCount() {
+  @Override public int getRecordCount() {
     return recordCount;
   }
 
 
-  @Override
-  protected void killIncoming(boolean sendUpstream) {
+  @Override protected void killIncoming(boolean sendUpstream) {
     super.killIncoming(sendUpstream);
     hasRemainder = false;
   }
 
 
-  @Override
-  public IterOutcome innerNext() {
+  @Override public IterOutcome innerNext() {
     if (hasRemainder) {
-      handleRemainder();
-      return IterOutcome.OK;
+      return handleRemainder();
     }
-    return super.innerNext();
+    // WE do not need to call next() unlike the other operators.
+    // When unnest's innerNext is called, the LateralJoin would have already
+    // updated the incoming vector.
+    // We do, however, need to call doWork() to do the actual work.
+    //return super.innerNext();
+    return doWork();
   }
 
-  @Override
-  public VectorContainer getOutgoingContainer() {
+  @Override public VectorContainer getOutgoingContainer() {
     return this.container;
   }
 
-  @SuppressWarnings("resource")
-  private void setUnnestVector() {
+  @SuppressWarnings("resource") private void setUnnestVector() {
     final TypedFieldId typedFieldId = incoming.getValueVectorId(popConfig.getColumn());
     final MaterializedField field = incoming.getSchema().getColumn(typedFieldId.getFieldIds()[0]);
     final RepeatedValueVector vector;
-    final ValueVector inVV = incoming.getValueAccessorById(
-        field.getValueClass(), typedFieldId.getFieldIds()).getValueVector();
+    final ValueVector inVV =
+        incoming.getValueAccessorById(field.getValueClass(), typedFieldId.getFieldIds()).getValueVector();
 
-    if (! (inVV instanceof RepeatedValueVector)) {
+    if (!(inVV instanceof RepeatedValueVector)) {
       if (incoming.getRecordCount() != 0) {
-        throw UserException.unsupportedError().message("Unnest does not support inputs of non-list values.").build
-            (logger);
+        throw UserException.unsupportedError().message("Unnest does not support inputs of non-list values.")
+            .build(logger);
       }
       //when incoming recordCount is 0, don't throw exception since the type being seen here is not solid
       logger.error("setUnnestVector cast failed and recordcount is 0, create empty vector anyway.");
@@ -200,8 +197,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     unnest.setUnnestField(vector);
   }
 
-  @Override
-  protected IterOutcome doWork() {
+  @Override protected IterOutcome doWork() {
     UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize, popConfig.getColumn());
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
 
@@ -217,7 +213,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     setUnnestVector();
 
     int childCount = incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCount();
-    int outputRecords = childCount == 0 ? 0: unnest.unnestRecords(incomingRecordCount, 0, monitor);
+    int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0, monitor);
     // TODO - change this to be based on the repeated vector length
     if (outputRecords < childCount) {
       setValueCount(outputRecords);
@@ -227,7 +223,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     } else {
       setValueCount(outputRecords);
       unnest.resetGroupIndex();
-      for(VectorWrapper<?> v: incoming) {
+      for (VectorWrapper<?> v : incoming) {
         v.clear();
       }
       this.recordCount = outputRecords;
@@ -238,14 +234,19 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       container.buildSchema(SelectionVectorMode.NONE);
     }
 
-    return IterOutcome.OK;
+    // If the current incoming record has spilled into two batches, we return
+    // IterOutcome.OK so that the Lateral Join can keep calling next() until the
+    // entire incoming recods has been unnested. If the entire records has been
+    // unnested, we return EMIT and any blocking operators in the pipeline will
+    // unblock.
+    return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
   }
 
-  private void handleRemainder() {
+  private IterOutcome handleRemainder() {
     int remainingRecordCount = unnest.getUnnestField().getAccessor().getInnerValueCount() - remainderIndex;
     if (!doAlloc()) {
       outOfMemory = true;
-      return;
+      return IterOutcome.OUT_OF_MEMORY;
     }
 
     int projRecords = unnest.unnestRecords(remainingRecordCount, 0, monitor);
@@ -268,6 +269,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     if (complexWriters != null) {
       container.buildSchema(SelectionVectorMode.NONE);
     }
+    return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
   }
 
   public void addComplexWriter(ComplexWriter writer) {
@@ -323,24 +325,25 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
    * the end of one of the other vectors while we are copying the data of the other vectors alongside each new unnested
    * value coming out of the repeated field.)
    */
-  @SuppressWarnings("resource")
-  private TransferPair getUnnestFieldTransferPair(FieldReference reference) {
+  @SuppressWarnings("resource") private TransferPair getUnnestFieldTransferPair(FieldReference reference) {
     final TypedFieldId fieldId = incoming.getValueVectorId(popConfig.getColumn());
     final Class<?> vectorClass = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]).getValueClass();
     final ValueVector unnestField = incoming.getValueAccessorById(vectorClass, fieldId.getFieldIds()).getValueVector();
 
     TransferPair tp = null;
     if (unnestField instanceof RepeatedMapVector) {
-      tp = ((RepeatedMapVector) unnestField).getTransferPairToSingleMap(reference.getAsNamePart().getName(), oContext.getAllocator());
-    } else if ( !(unnestField instanceof RepeatedValueVector) ) {
-      if(incoming.getRecordCount() != 0) {
-        throw UserException.unsupportedError().message("Unnest does not support inputs of non-list values.").build
-            (logger);
+      tp = ((RepeatedMapVector) unnestField)
+          .getTransferPairToSingleMap(reference.getAsNamePart().getName(), oContext.getAllocator());
+    } else if (!(unnestField instanceof RepeatedValueVector)) {
+      if (incoming.getRecordCount() != 0) {
+        throw UserException.unsupportedError().message("Unnest does not support inputs of non-list values.")
+            .build(logger);
       }
       logger.error("Cannot cast {} to RepeatedValueVector", unnestField);
       //when incoming recordCount is 0, don't throw exception since the type being seen here is not solid
       final ValueVector vv = new RepeatedMapVector(unnestField.getField(), oContext.getAllocator(), null);
-      tp = RepeatedValueVector.class.cast(vv).getTransferPair(reference.getAsNamePart().getName(), oContext.getAllocator());
+      tp = RepeatedValueVector.class.cast(vv)
+          .getTransferPair(reference.getAsNamePart().getName(), oContext.getAllocator());
     } else {
       final ValueVector vvIn = RepeatedValueVector.class.cast(unnestField).getDataVector();
       // vvIn may be null because of fast schema return for repeated list vectors
@@ -351,8 +354,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     return tp;
   }
 
-  @Override
-  protected boolean setupNewSchema() throws SchemaChangeException {
+  @Override protected boolean setupNewSchema() throws SchemaChangeException {
     this.allocationVectors = Lists.newArrayList();
     container.clear();
     final List<NamedExpression> exprs = getExpressionList();
@@ -363,8 +365,10 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     cg.getCodeGenerator().plainJavaCapable(true);
     final IntHashSet transferFieldIds = new IntHashSet();
 
-    final NamedExpression unnestExpr = new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
-    final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression)ExpressionTreeMaterializer.materialize(unnestExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
+    final NamedExpression unnestExpr =
+        new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
+    final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression) ExpressionTreeMaterializer
+        .materialize(unnestExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
     final FieldReference fieldReference = unnestExpr.getRef();
     final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
 
@@ -373,7 +377,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
       // checks that list has only default ValueVector and replaces resulting ValueVector to INT typed ValueVector
       if (exprs.size() == 0 && unnestVector.getField().getType().equals(Types.LATE_BIND_TYPE)) {
-        final MaterializedField outputField = MaterializedField.create(fieldReference.getAsNamePart().getName(), Types.OPTIONAL_INT);
+        final MaterializedField outputField =
+            MaterializedField.create(fieldReference.getAsNamePart().getName(), Types.OPTIONAL_INT);
         final ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
 
         container.add(vector);
@@ -401,12 +406,13 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         }
       }
 
-      final LogicalExpression expr = ExpressionTreeMaterializer.materialize(namedExpression.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
+      final LogicalExpression expr = ExpressionTreeMaterializer
+          .materialize(namedExpression.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
       if (collector.hasErrors()) {
-        throw new SchemaChangeException(String.format("Failure while trying to materialize incoming schema.  Errors:\n %s.", collector.toErrorString()));
+        throw new SchemaChangeException(String
+            .format("Failure while trying to materialize incoming schema.  Errors:\n %s.", collector.toErrorString()));
       }
-      if (expr instanceof DrillFuncHolderExpr &&
-          ((DrillFuncHolderExpr) expr).getHolder().isComplexWriterFuncHolder()) {
+      if (expr instanceof DrillFuncHolderExpr && ((DrillFuncHolderExpr) expr).getHolder().isComplexWriterFuncHolder()) {
         // Need to process ComplexWriter function evaluation.
         // Lazy initialization of the list of complex writers, if not done yet.
         if (complexWriters == null) {
@@ -421,8 +427,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         final MaterializedField outputField;
         if (expr instanceof ValueVectorReadExpression) {
           final TypedFieldId id = ValueVectorReadExpression.class.cast(expr).getFieldId();
-          @SuppressWarnings("resource")
-          final ValueVector incomingVector = incoming.getValueAccessorById(id.getIntermediateClass(), id.getFieldIds()).getValueVector();
+          @SuppressWarnings("resource") final ValueVector incomingVector =
+              incoming.getValueAccessorById(id.getIntermediateClass(), id.getFieldIds()).getValueVector();
           // outputField is taken from the incoming schema to avoid the loss of nested fields
           // when the first batch will be empty.
           if (incomingVector != null) {
@@ -433,8 +439,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         } else {
           outputField = MaterializedField.create(outputName, expr.getMajorType());
         }
-        @SuppressWarnings("resource")
-        final ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
+        @SuppressWarnings("resource") final ValueVector vector =
+            TypeHelper.getNewVector(outputField, oContext.getAllocator());
         allocationVectors.add(vector);
         TypedFieldId fid = container.add(vector);
         ValueVectorWriteExpression write = new ValueVectorWriteExpression(fid, expr, true);
@@ -451,7 +457,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
     try {
       this.unnest = context.getImplementationClass(cg.getCodeGenerator());
-      unnest.setup(context, incoming, this, transfers);
+      unnest.setup(context, incoming, this, transfers, lateral);
     } catch (ClassTransformationException | IOException e) {
       throw new SchemaChangeException("Failure while attempting to load generated class", e);
     }
