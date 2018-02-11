@@ -34,18 +34,7 @@ public interface Unnest {
   void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing, List<TransferPair> transfers,
       LateralContract lateral) throws SchemaChangeException;
 
-  interface Monitor {
-    /**
-     * Get the required buffer size for the specified number of records.
-     * {@see ValueVector#getBufferSizeFor(int)} for the meaning of this.
-     *
-     * @param recordCount the number of records processed so far
-     * @return the buffer size the vectors report as being in use
-     */
-    int getBufferSizeFor(int recordCount);
-  }
-
-  int unnestRecords(int recordCount, int firstOutputIndex, Monitor monitor);
+  int unnestRecords(int recordCount, int firstOutputIndex);
 
   void setUnnestField(RepeatedValueVector repeatedColumn);
   void setOutputCount(int outputCount);
