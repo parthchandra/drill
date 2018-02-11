@@ -59,44 +59,20 @@ import org.apache.drill.exec.vector.complex.writer.BaseWriter.ComplexWriter;
 import java.io.IOException;
 import java.util.List;
 
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK_NEW_SCHEMA;
+
 // TODO - handle the case where a user tries to unnest a scalar, should just act as a project all of the columns exactly
 // as they come in
 public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UnnestRecordBatch.class);
 
   private Unnest unnest;
-  private List<ValueVector> allocationVectors;
-  private List<ComplexWriter> complexWriters;
   private boolean hasRemainder = false;
   private int remainderIndex = 0;
   private int recordCount;
   private long outputBatchSize;
   private LateralContract lateral;
-
-  private final Unnest.Monitor monitor = new Unnest.Monitor() {
-    @Override public int getBufferSizeFor(int recordCount) {
-      int bufferSize = 0;
-      for (final ValueVector vv : allocationVectors) {
-        bufferSize += vv.getBufferSizeFor(recordCount);
-      }
-      return bufferSize;
-    }
-  };
-
-  private static final String EMPTY_STRING = "";
-
-
-  private class ClassifierResult {
-    public List<String> outputNames;
-
-    private void clear() {
-      if (outputNames != null) {
-        outputNames.clear();
-      }
-
-      // note:  don't clear the internal maps since they have cumulative data..
-    }
-  }
+  private MaterializedField unnestFieldMetadata;
 
 
   private class UnnestMemoryManager {
@@ -124,7 +100,6 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
           .safeDivide(columnSize.netSize - (OFFSET_VECTOR_WIDTH * columnSize.valueCount), columnSize.elementCount);
 
       // Average rowWidth of outgoing batch.
-      //final int avgOutgoingRowWidth = avgRowWidthWithOutUnnestColumn + avgRowWidthSingleUnnestEntry;
       final int avgOutgoingRowWidth = avgRowWidthSingleUnnestEntry;
 
       // Number of rows in outgoing batch
@@ -164,12 +139,53 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     if (hasRemainder) {
       return handleRemainder();
     }
+
+    // Short circuit if record batch has already sent all data and is done
+    if (state == BatchState.DONE) {
+      return IterOutcome.NONE;
+    }
+
     // WE do not need to call next() unlike the other operators.
     // When unnest's innerNext is called, the LateralJoin would have already
     // updated the incoming vector.
     // We do, however, need to call doWork() to do the actual work.
-    //return super.innerNext();
-    return doWork();
+    // We also need to handle schema build if it is the first batch
+
+    //IterOutcome upstream  = IterOutcome.OK;
+    if ((state == BatchState.FIRST)) {
+      state = BatchState.NOT_FIRST;
+      try {
+        stats.startSetup();
+        setupNewSchema();
+      } catch (SchemaChangeException ex) {
+        kill(false);
+        logger.error("Failure during query", ex);
+        context.getExecutorState().fail(ex);
+        return IterOutcome.STOP;
+      } finally {
+        stats.stopSetup();
+      }
+      return IterOutcome.OK_NEW_SCHEMA;
+    } else {
+      assert state != BatchState.FIRST : "First batch should be OK_NEW_SCHEMA";
+      container.zeroVectors();
+
+      // Check if schema has changed
+      if (lateral.getRecordIndex() == 0 && schemaChanged()) {
+        hasRemainder = true; // next call to next will handle the actual data.
+        try {
+          setupNewSchema();
+        } catch (SchemaChangeException ex) {
+          kill(false);
+          logger.error("Failure during query", ex);
+          context.getExecutorState().fail(ex);
+          return IterOutcome.STOP;
+        }
+        return OK_NEW_SCHEMA;
+      }
+      return doWork();
+    }
+
   }
 
   @Override public VectorContainer getOutgoingContainer() {
@@ -188,6 +204,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         throw UserException.unsupportedError().message("Unnest does not support inputs of non-list values.")
             .build(logger);
       }
+      // Inherited from FLATTEN. When does this happen???
       //when incoming recordCount is 0, don't throw exception since the type being seen here is not solid
       logger.error("setUnnestVector cast failed and recordcount is 0, create empty vector anyway.");
       vector = new RepeatedMapVector(field, oContext.getAllocator(), null);
@@ -203,35 +220,23 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
     int incomingRecordCount = incoming.getRecordCount();
 
-    if (!doAlloc()) {
-      outOfMemory = true;
-      return IterOutcome.OUT_OF_MEMORY;
-    }
-
     // we call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
     // inside of the the unnest for the current batch
     setUnnestVector();
 
     int childCount = incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCount();
-    int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0, monitor);
+    int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0);
     // TODO - change this to be based on the repeated vector length
     if (outputRecords < childCount) {
-      setValueCount(outputRecords);
       hasRemainder = true;
       remainderIndex = outputRecords;
       this.recordCount = remainderIndex;
     } else {
-      setValueCount(outputRecords);
       unnest.resetGroupIndex();
       for (VectorWrapper<?> v : incoming) {
         v.clear();
       }
       this.recordCount = outputRecords;
-    }
-    // In case of complex writer expression, vectors would be added to batch run-time.
-    // We have to re-build the schema.
-    if (complexWriters != null) {
-      container.buildSchema(SelectionVectorMode.NONE);
     }
 
     // If the current incoming record has spilled into two batches, we return
@@ -244,18 +249,12 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   private IterOutcome handleRemainder() {
     int remainingRecordCount = unnest.getUnnestField().getAccessor().getInnerValueCount() - remainderIndex;
-    if (!doAlloc()) {
-      outOfMemory = true;
-      return IterOutcome.OUT_OF_MEMORY;
-    }
 
-    int projRecords = unnest.unnestRecords(remainingRecordCount, 0, monitor);
+    int projRecords = unnest.unnestRecords(remainingRecordCount, 0);
     if (projRecords < remainingRecordCount) {
-      setValueCount(projRecords);
       this.recordCount = projRecords;
       remainderIndex += projRecords;
     } else {
-      setValueCount(remainingRecordCount);
       hasRemainder = false;
       remainderIndex = 0;
       for (VectorWrapper<?> v : incoming) {
@@ -264,56 +263,20 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       unnest.resetGroupIndex();
       this.recordCount = remainingRecordCount;
     }
-    // In case of complex writer expression, vectors would be added to batch run-time.
-    // We have to re-build the schema.
-    if (complexWriters != null) {
-      container.buildSchema(SelectionVectorMode.NONE);
-    }
     return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
   }
 
-  public void addComplexWriter(ComplexWriter writer) {
-    complexWriters.add(writer);
-  }
 
-  private boolean doAlloc() {
-    //Allocate vv in the allocationVectors.
-    for (ValueVector v : this.allocationVectors) {
-      if (!v.allocateNewSafe()) {
-        return false;
-      }
-    }
+  //private boolean doAlloc() {
+  //  return true;
+  //}
 
-    //Allocate vv for complexWriters.
-    if (complexWriters == null) {
-      return true;
-    }
+  //private void setValueCount(int count) {
+  //}
 
-    for (ComplexWriter writer : complexWriters) {
-      writer.allocate();
-    }
-
-    return true;
-  }
-
-  private void setValueCount(int count) {
-    for (ValueVector v : allocationVectors) {
-      ValueVector.Mutator m = v.getMutator();
-      m.setValueCount(count);
-    }
-
-    if (complexWriters == null) {
-      return;
-    }
-
-    for (ComplexWriter writer : complexWriters) {
-      writer.setValueCount(count);
-    }
-  }
-
-  private FieldReference getRef(NamedExpression e) {
-    return e.getRef();
-  }
+  //private FieldReference getRef(NamedExpression e) {
+  //  return e.getRef();
+  //}
 
   /**
    * The data layout is the same for the actual data within a repeated field, as it is in a scalar vector for
@@ -355,16 +318,15 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   @Override protected boolean setupNewSchema() throws SchemaChangeException {
-    this.allocationVectors = Lists.newArrayList();
     container.clear();
-    final List<NamedExpression> exprs = getExpressionList();
     final ErrorCollector collector = new ErrorCollectorImpl();
     final List<TransferPair> transfers = Lists.newArrayList();
 
     final ClassGenerator<Unnest> cg = CodeGenerator.getRoot(Unnest.TEMPLATE_DEFINITION, context.getOptions());
     cg.getCodeGenerator().plainJavaCapable(true);
-    final IntHashSet transferFieldIds = new IntHashSet();
+    cg.getCodeGenerator().preferPlainJava(true);
 
+    final IntHashSet transferFieldIds = new IntHashSet();
     final NamedExpression unnestExpr =
         new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
     final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression) ExpressionTreeMaterializer
@@ -375,83 +337,13 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     if (transferPair != null) {
       final ValueVector unnestVector = transferPair.getTo();
 
-      // checks that list has only default ValueVector and replaces resulting ValueVector to INT typed ValueVector
-      if (exprs.size() == 0 && unnestVector.getField().getType().equals(Types.LATE_BIND_TYPE)) {
-        final MaterializedField outputField =
-            MaterializedField.create(fieldReference.getAsNamePart().getName(), Types.OPTIONAL_INT);
-        final ValueVector vector = TypeHelper.getNewVector(outputField, oContext.getAllocator());
-
-        container.add(vector);
-      } else {
-        transfers.add(transferPair);
-        container.add(unnestVector);
-        transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
-      }
+      transfers.add(transferPair);
+      container.add(unnestVector);
+      transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
     }
 
-    logger.debug("Added transfer for project expression.");
+    logger.debug("Added transfer for unnest expression.");
 
-    ClassifierResult result = new ClassifierResult();
-
-    for (NamedExpression namedExpression : exprs) {
-      result.clear();
-
-      String outputName = getRef(namedExpression).getRootSegment().getPath();
-      if (result != null && result.outputNames != null && result.outputNames.size() > 0) {
-        for (int j = 0; j < result.outputNames.size(); j++) {
-          if (!result.outputNames.get(j).equals(EMPTY_STRING)) {
-            outputName = result.outputNames.get(j);
-            break;
-          }
-        }
-      }
-
-      final LogicalExpression expr = ExpressionTreeMaterializer
-          .materialize(namedExpression.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
-      if (collector.hasErrors()) {
-        throw new SchemaChangeException(String
-            .format("Failure while trying to materialize incoming schema.  Errors:\n %s.", collector.toErrorString()));
-      }
-      if (expr instanceof DrillFuncHolderExpr && ((DrillFuncHolderExpr) expr).getHolder().isComplexWriterFuncHolder()) {
-        // Need to process ComplexWriter function evaluation.
-        // Lazy initialization of the list of complex writers, if not done yet.
-        if (complexWriters == null) {
-          complexWriters = Lists.newArrayList();
-        }
-
-        // The reference name will be passed to ComplexWriter, used as the name of the output vector from the writer.
-        ((DrillFuncHolderExpr) expr).getFieldReference(namedExpression.getRef());
-        cg.addExpr(expr);
-      } else {
-        // need to do evaluation.
-        final MaterializedField outputField;
-        if (expr instanceof ValueVectorReadExpression) {
-          final TypedFieldId id = ValueVectorReadExpression.class.cast(expr).getFieldId();
-          @SuppressWarnings("resource") final ValueVector incomingVector =
-              incoming.getValueAccessorById(id.getIntermediateClass(), id.getFieldIds()).getValueVector();
-          // outputField is taken from the incoming schema to avoid the loss of nested fields
-          // when the first batch will be empty.
-          if (incomingVector != null) {
-            outputField = incomingVector.getField().clone();
-          } else {
-            outputField = MaterializedField.create(outputName, expr.getMajorType());
-          }
-        } else {
-          outputField = MaterializedField.create(outputName, expr.getMajorType());
-        }
-        @SuppressWarnings("resource") final ValueVector vector =
-            TypeHelper.getNewVector(outputField, oContext.getAllocator());
-        allocationVectors.add(vector);
-        TypedFieldId fid = container.add(vector);
-        ValueVectorWriteExpression write = new ValueVectorWriteExpression(fid, expr, true);
-        cg.addExpr(write);
-
-        logger.debug("Added eval for project expression.");
-      }
-    }
-
-    cg.rotateBlock();
-    cg.getEvalBlock()._return(JExpr.TRUE);
 
     container.buildSchema(SelectionVectorMode.NONE);
 
@@ -464,16 +356,20 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     return true;
   }
 
-  private List<NamedExpression> getExpressionList() {
-
-    List<NamedExpression> exprs = Lists.newArrayList();
-    for (MaterializedField field : incoming.getSchema()) {
-      String fieldName = field.getName();
-      if (fieldName.equals(popConfig.getColumn().getRootSegmentPath())) {
-        continue;
-      }
-      exprs.add(new NamedExpression(SchemaPath.getSimplePath(fieldName), new FieldReference(fieldName)));
+  /**
+   * Compares the schema of the unnest column in the current incoming with the previous incoming.
+   *
+   * @return true if the schema has changed, false otherwise
+   */
+  private boolean schemaChanged() {
+    final TypedFieldId fieldId = incoming.getValueVectorId(popConfig.getColumn());
+    MaterializedField thisField = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]);
+    MaterializedField prevField = unnestFieldMetadata;
+    unnestFieldMetadata = thisField;
+    if (prevField == null || !prevField.isEquivalent(thisField)) {
+      return true;
     }
-    return exprs;
+    return false;
   }
+
 }

@@ -18,9 +18,7 @@
 package org.apache.drill.exec.physical.impl.unnest;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.drill.exec.exception.OversizedAllocationException;
 import org.apache.drill.exec.exception.SchemaChangeException;
-import org.apache.drill.exec.memory.BufferAllocator;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
@@ -75,8 +73,7 @@ public abstract class UnnestTemplate implements Unnest {
   }
 
   @Override
-  public final int unnestRecords(final int recordCount, final int firstOutputIndex,
-      final Monitor monitor) {
+  public final int unnestRecords(final int recordCount, final int firstOutputIndex) {
     switch (svMode) {
       case FOUR_BYTE:
         throw new UnsupportedOperationException("Unnest does not support selection vector inputs.");
@@ -123,7 +120,7 @@ public abstract class UnnestTemplate implements Unnest {
     }
     this.transfers = ImmutableList.copyOf(transfers);
     this.lateral  = lateral;
-    doSetup(context, incoming, outgoing);
+    //doSetup(context, incoming, outgoing);
   }
 
   @Override
@@ -131,9 +128,9 @@ public abstract class UnnestTemplate implements Unnest {
     this.innerValueIndex = 0;
   }
 
-  public abstract void doSetup(@Named("context") FragmentContext context,
-                               @Named("incoming") RecordBatch incoming,
-                               @Named("outgoing") RecordBatch outgoing) throws SchemaChangeException;
-  public abstract boolean doEval(@Named("inIndex") int inIndex,
-                                 @Named("outIndex") int outIndex) throws SchemaChangeException;
+  //public abstract void doSetup(@Named("context") FragmentContext context,
+  //                             @Named("incoming") RecordBatch incoming,
+  //                             @Named("outgoing") RecordBatch outgoing) throws SchemaChangeException;
+  //public abstract boolean doEval(@Named("inIndex") int inIndex,
+  //                               @Named("outIndex") int outIndex) throws SchemaChangeException;
 }
