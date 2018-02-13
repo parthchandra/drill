@@ -17,11 +17,8 @@
  */
 package org.apache.drill.exec.physical.impl.unnest;
 
-import com.carrotsearch.hppc.IntHashSet;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.UserException;
-import org.apache.drill.common.expression.ErrorCollector;
-import org.apache.drill.common.expression.ErrorCollectorImpl;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.logical.data.NamedExpression;
@@ -31,8 +28,6 @@ import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.ClassGenerator;
 import org.apache.drill.exec.expr.CodeGenerator;
-import org.apache.drill.exec.expr.ExpressionTreeMaterializer;
-import org.apache.drill.exec.expr.ValueVectorReadExpression;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.UnnestPOP;
@@ -44,7 +39,6 @@ import org.apache.drill.exec.record.RecordBatchSizer;
 import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.record.TypedFieldId;
 import org.apache.drill.exec.record.VectorContainer;
-import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.RepeatedMapVector;
 import org.apache.drill.exec.vector.complex.RepeatedValueVector;
@@ -54,8 +48,7 @@ import java.util.List;
 
 import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK_NEW_SCHEMA;
 
-// TODO - handle the case where a user tries to unnest a scalar, should just act as a project all of the columns exactly
-// as they come in
+// TODO - handle the case where a user tries to unnest a scalar, should just return the column as is
 public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UnnestRecordBatch.class);
 
@@ -68,6 +61,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   private MaterializedField unnestFieldMetadata;
 
 
+  /**
+   * Memory manager for Unnest. Estimates the batch size exactly like we do for Flatten.
+   */
   private class UnnestMemoryManager {
     private final int outputRowCount;
     private static final int OFFSET_VECTOR_WIDTH = 4;
@@ -117,18 +113,21 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     outputBatchSize = context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
   }
 
-  @Override public int getRecordCount() {
+  @Override
+  public int getRecordCount() {
     return recordCount;
   }
 
 
-  @Override protected void killIncoming(boolean sendUpstream) {
+  @Override
+  protected void killIncoming(boolean sendUpstream) {
     super.killIncoming(sendUpstream);
     hasRemainder = false;
   }
 
 
-  @Override public IterOutcome innerNext() {
+  @Override
+  public IterOutcome innerNext() {
     if (hasRemainder) {
       return handleRemainder();
     }
@@ -138,17 +137,19 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       return IterOutcome.NONE;
     }
 
-    // WE do not need to call next() unlike the other operators.
+    // We do not need to call next() unlike the other operators.
     // When unnest's innerNext is called, the LateralJoin would have already
     // updated the incoming vector.
     // We do, however, need to call doWork() to do the actual work.
     // We also need to handle schema build if it is the first batch
 
-    //IterOutcome upstream  = IterOutcome.OK;
     if ((state == BatchState.FIRST)) {
       state = BatchState.NOT_FIRST;
       try {
         stats.startSetup();
+        hasRemainder = true; // next call to next will handle the actual data.
+        schemaChanged(); // checks if schema has changed (redundant in this case becaause it has) AND saves the
+                         // current field metadata for check in subsequent iterations
         setupNewSchema();
       } catch (SchemaChangeException ex) {
         kill(false);
@@ -165,7 +166,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
       // Check if schema has changed
       if (lateral.getRecordIndex() == 0 && schemaChanged()) {
-        hasRemainder = true; // next call to next will handle the actual data.
+        hasRemainder = true;     // next call to next will handle the actual data.
         try {
           setupNewSchema();
         } catch (SchemaChangeException ex) {
@@ -176,12 +177,16 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         }
         return OK_NEW_SCHEMA;
       }
+      if (lateral.getRecordIndex() == 0) {
+        unnest.resetGroupIndex();
+      }
       return doWork();
     }
 
   }
 
-  @Override public VectorContainer getOutgoingContainer() {
+  @Override
+  public VectorContainer getOutgoingContainer() {
     return this.container;
   }
 
@@ -207,28 +212,32 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     unnest.setUnnestField(vector);
   }
 
-  @Override protected IterOutcome doWork() {
-    UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize, popConfig.getColumn());
+  @Override
+  protected IterOutcome doWork() {
+    final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize, popConfig
+        .getColumn
+        ());
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
-
-    int incomingRecordCount = incoming.getRecordCount();
-
+    final int incomingRecordCount = incoming.getRecordCount();
+    final int currentRecord = lateral.getRecordIndex();
     // we call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
     // inside of the the unnest for the current batch
     setUnnestVector();
 
-    int childCount = incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCount();
-    int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0);
-    // TODO - change this to be based on the repeated vector length
+    //expected output count is the num of values in the unnest colum array for the current record
+    final int childCount =
+        incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord);
+
+    // unnest the data
+    final int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0);
+
+    // Keep track of any spill over into another batch. HAppens only if you artificially set the output batch
+    // size for unnest to a low number
     if (outputRecords < childCount) {
       hasRemainder = true;
       remainderIndex = outputRecords;
       this.recordCount = remainderIndex;
     } else {
-      unnest.resetGroupIndex();
-      for (VectorWrapper<?> v : incoming) {
-        v.clear();
-      }
       this.recordCount = outputRecords;
     }
 
@@ -241,35 +250,20 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   private IterOutcome handleRemainder() {
-    int remainingRecordCount = unnest.getUnnestField().getAccessor().getInnerValueCount() - remainderIndex;
-
-    int projRecords = unnest.unnestRecords(remainingRecordCount, 0);
+    final int currentRecord = lateral.getRecordIndex();
+    final int remainingRecordCount =
+        unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord) - remainderIndex;
+    final int projRecords = unnest.unnestRecords(remainingRecordCount, 0);
     if (projRecords < remainingRecordCount) {
       this.recordCount = projRecords;
-      remainderIndex += projRecords;
+      this.remainderIndex += projRecords;
     } else {
-      hasRemainder = false;
-      remainderIndex = 0;
-      for (VectorWrapper<?> v : incoming) {
-        v.clear();
-      }
-      unnest.resetGroupIndex();
+      this.hasRemainder = false;
+      this.remainderIndex = 0;
       this.recordCount = remainingRecordCount;
     }
     return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
   }
-
-
-  //private boolean doAlloc() {
-  //  return true;
-  //}
-
-  //private void setValueCount(int count) {
-  //}
-
-  //private FieldReference getRef(NamedExpression e) {
-  //  return e.getRef();
-  //}
 
   /**
    * The data layout is the same for the actual data within a repeated field, as it is in a scalar vector for
@@ -312,37 +306,30 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   @Override protected boolean setupNewSchema() throws SchemaChangeException {
     container.clear();
-    final ErrorCollector collector = new ErrorCollectorImpl();
     final List<TransferPair> transfers = Lists.newArrayList();
 
+    //TODO: Remove code gen.
+    // It is totally unnecessary to do code gen for Unnest since the transfer of the vector
+    // is sufficient to unnest the data
     final ClassGenerator<Unnest> cg = CodeGenerator.getRoot(Unnest.TEMPLATE_DEFINITION, context.getOptions());
     cg.getCodeGenerator().plainJavaCapable(true);
     cg.getCodeGenerator().preferPlainJava(true);
 
-    final IntHashSet transferFieldIds = new IntHashSet();
     final NamedExpression unnestExpr =
         new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
-    final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression) ExpressionTreeMaterializer
-        .materialize(unnestExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
     final FieldReference fieldReference = unnestExpr.getRef();
     final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
 
-    if (transferPair != null) {
-      final ValueVector unnestVector = transferPair.getTo();
-
-      transfers.add(transferPair);
-      container.add(unnestVector);
-      transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
-    }
-
+    final ValueVector unnestVector = transferPair.getTo();
+    transfers.add(transferPair);
+    container.add(unnestVector);
     logger.debug("Added transfer for unnest expression.");
-
-
     container.buildSchema(SelectionVectorMode.NONE);
 
     try {
       this.unnest = context.getImplementationClass(cg.getCodeGenerator());
       unnest.setup(context, incoming, this, transfers, lateral);
+      setUnnestVector();
     } catch (ClassTransformationException | IOException e) {
       throw new SchemaChangeException("Failure while attempting to load generated class", e);
     }
@@ -350,15 +337,19 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   /**
-   * Compares the schema of the unnest column in the current incoming with the previous incoming.
+   * Compares the schema of the unnest column in the current incoming with the schema of
+   * the unnest column in the previous incoming.
+   * Also saves the schema for comparison in future iterations
    *
    * @return true if the schema has changed, false otherwise
    */
   private boolean schemaChanged() {
     final TypedFieldId fieldId = incoming.getValueVectorId(popConfig.getColumn());
-    MaterializedField thisField = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]);
-    MaterializedField prevField = unnestFieldMetadata;
+    final MaterializedField thisField = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]);
+    final MaterializedField prevField = unnestFieldMetadata;
     unnestFieldMetadata = thisField;
+    // isEquivalent may return false if the order of the fields has changed. This usually does not
+    // happen but if it does we end up throwing a spurious schema change exeption
     if (prevField == null || !prevField.isEquivalent(thisField)) {
       return true;
     }

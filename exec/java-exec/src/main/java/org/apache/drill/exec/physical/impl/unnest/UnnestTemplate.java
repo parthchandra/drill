@@ -67,7 +67,7 @@ public abstract class UnnestTemplate implements Unnest {
     return fieldToUnnest;
   }
 
-   @Override
+  @Override
   public void setOutputCount(int outputCount) {
     outputLimit = outputCount;
   }
@@ -87,14 +87,11 @@ public abstract class UnnestTemplate implements Unnest {
         }
 
         // Current record being processed in the incoming record batch. We could keep
-        // track of it, but it is better to check with the Lateral Join and get the
+        // track of it ourselves, but it is better to check with the Lateral Join and get the
         // current record being processed thru the Lateral Join Contract.
-        int currentRecord  = lateral.getRecordIndex();
-        int currentValueIndex = innerValueIndex;
-
+        final int currentRecord = lateral.getRecordIndex();
         final int innerValueCount = accessor.getInnerValueCountAt(currentRecord);
-
-        int count = Math.min(innerValueCount, outputLimit);
+        final int count = Math.min(innerValueCount, outputLimit);
 
         for (TransferPair t : transfers) {
           t.splitAndTransfer(innerValueIndex, count);
@@ -107,9 +104,8 @@ public abstract class UnnestTemplate implements Unnest {
     }
   }
 
-  @Override
-  public final void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing, List<TransferPair>
-      transfers, LateralContract lateral)  throws SchemaChangeException{
+  @Override public final void setup(FragmentContext context, RecordBatch incoming, RecordBatch outgoing,
+      List<TransferPair> transfers, LateralContract lateral) throws SchemaChangeException {
 
     this.svMode = incoming.getSchema().getSelectionVectorMode();
     switch (svMode) {
@@ -119,12 +115,10 @@ public abstract class UnnestTemplate implements Unnest {
         throw new UnsupportedOperationException("Unnest does not support selection vector inputs.");
     }
     this.transfers = ImmutableList.copyOf(transfers);
-    this.lateral  = lateral;
-    //doSetup(context, incoming, outgoing);
+    this.lateral = lateral;
   }
 
-  @Override
-  public void resetGroupIndex() {
+  @Override public void resetGroupIndex() {
     this.innerValueIndex = 0;
   }
 
