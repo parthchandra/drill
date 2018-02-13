@@ -156,6 +156,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       state = BatchState.NOT_FIRST;
       try {
         stats.startSetup();
+        hasRemainder = true; // next call to next will handle the actual data.
         setupNewSchema();
       } catch (SchemaChangeException ex) {
         kill(false);
@@ -182,6 +183,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
           return IterOutcome.STOP;
         }
         return OK_NEW_SCHEMA;
+      }
+      if (lateral.getRecordIndex() == 0) {
+        unnest.resetGroupIndex();
       }
       return doWork();
     }
@@ -219,12 +223,13 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
 
     int incomingRecordCount = incoming.getRecordCount();
+    int currentRecord = lateral.getRecordIndex();
 
     // we call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
     // inside of the the unnest for the current batch
     setUnnestVector();
 
-    int childCount = incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCount();
+    int childCount = incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord);
     int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0);
     // TODO - change this to be based on the repeated vector length
     if (outputRecords < childCount) {
@@ -232,10 +237,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       remainderIndex = outputRecords;
       this.recordCount = remainderIndex;
     } else {
-      unnest.resetGroupIndex();
-      for (VectorWrapper<?> v : incoming) {
-        v.clear();
-      }
+      //for (VectorWrapper<?> v : incoming) {
+      //  v.clear();
+      //}
       this.recordCount = outputRecords;
     }
 
@@ -248,7 +252,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   private IterOutcome handleRemainder() {
-    int remainingRecordCount = unnest.getUnnestField().getAccessor().getInnerValueCount() - remainderIndex;
+    int currentRecord = lateral.getRecordIndex();
+    int remainingRecordCount =
+        unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord) - remainderIndex;
 
     int projRecords = unnest.unnestRecords(remainingRecordCount, 0);
     if (projRecords < remainingRecordCount) {
@@ -257,10 +263,10 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     } else {
       hasRemainder = false;
       remainderIndex = 0;
-      for (VectorWrapper<?> v : incoming) {
-        v.clear();
-      }
-      unnest.resetGroupIndex();
+      //for (VectorWrapper<?> v : incoming) {
+      //  v.clear();
+      //}
+      //unnest.resetGroupIndex();
       this.recordCount = remainingRecordCount;
     }
     return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
@@ -326,21 +332,21 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     cg.getCodeGenerator().plainJavaCapable(true);
     cg.getCodeGenerator().preferPlainJava(true);
 
-    final IntHashSet transferFieldIds = new IntHashSet();
+    //final IntHashSet transferFieldIds = new IntHashSet();
     final NamedExpression unnestExpr =
         new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
-    final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression) ExpressionTreeMaterializer
-        .materialize(unnestExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
+    //final ValueVectorReadExpression vectorRead = (ValueVectorReadExpression) ExpressionTreeMaterializer
+    //    .materialize(unnestExpr.getExpr(), incoming, collector, context.getFunctionRegistry(), true);
     final FieldReference fieldReference = unnestExpr.getRef();
     final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
 
-    if (transferPair != null) {
+    //if (transferPair != null) {
       final ValueVector unnestVector = transferPair.getTo();
 
       transfers.add(transferPair);
       container.add(unnestVector);
-      transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
-    }
+      //transferFieldIds.add(vectorRead.getFieldId().getFieldIds()[0]);
+    //}
 
     logger.debug("Added transfer for unnest expression.");
 
@@ -350,6 +356,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     try {
       this.unnest = context.getImplementationClass(cg.getCodeGenerator());
       unnest.setup(context, incoming, this, transfers, lateral);
+      setUnnestVector();
     } catch (ClassTransformationException | IOException e) {
       throw new SchemaChangeException("Failure while attempting to load generated class", e);
     }
