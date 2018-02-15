@@ -20,6 +20,7 @@ package org.apache.drill.exec.physical.impl.join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.drill.exec.compile.TemplateClassDefinition;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.physical.config.LateralJoinPOP;
 import org.apache.drill.exec.record.ExpandableHyperContainer;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.VectorContainer;
@@ -34,10 +35,13 @@ public interface LateralJoin {
     new TemplateClassDefinition<>(LateralJoin.class, LateralJoinTemplate.class);
 
   public void setupLateralJoin(FragmentContext context, RecordBatch left,
-                               RecordBatch right, LateralJoinBatch outgoing);
+                               RecordBatch right, LateralJoinBatch outgoing,
+                               JoinRelType joinType);
 
   // Produce output records taking into account join type
-  public int outputRecords(JoinRelType joinType, int leftIndex, int rightIndex);
+  public int crossJoinAndOutputRecords(int leftIndex, int rightIndex);
+
+  public void generateLeftJoinOutput(int leftIndex);
 
   // Project the record at offset 'leftIndex' in the left input batch into the output container at offset 'outIndex'
   public void emitLeft(int leftIndex, int outIndex);

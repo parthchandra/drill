@@ -30,20 +30,17 @@ import javax.inject.Named;
  */
 public abstract class LateralJoinTemplate implements LateralJoin {
 
-  // Current left input batch being processed
-  private RecordBatch left = null;
-
   // Current right input batch being processed
   private RecordBatch right = null;
 
-  // Output batch
-  private LateralJoinBatch outgoing = null;
-
+  // Index in outgoing container where new record will be inserted
   private int outputIndex = 0;
 
+  // Keep the join type at setup phase
+  private JoinRelType joinType;
+
   /**
-   * Method initializes necessary state and invokes the doSetup() to set the
-   * input and output value vector references.
+   * Method initializes necessary state and invokes the doSetup() to set the input and output value vector references.
    *
    * @param context Fragment context
    * @param left Current left input batch being processed
@@ -52,80 +49,98 @@ public abstract class LateralJoinTemplate implements LateralJoin {
    */
   public void setupLateralJoin(FragmentContext context,
                                RecordBatch left, RecordBatch right,
-                               LateralJoinBatch outgoing) {
-    this.left = left;
+                               LateralJoinBatch outgoing, JoinRelType joinType) {
     this.right = right;
-    this.outgoing = outgoing;
-
-    doSetup(context, this.right, this.left, this.outgoing);
+    this.joinType = joinType;
+    doSetup(context, this.right, left, outgoing);
   }
 
   /**
-   * Main entry point for producing the output records. Thin wrapper around populateOutgoingBatch(), this method
-   * controls which left batch we are processing and fetches the next left input batch once we exhaust the current one.
+   * Main entry point for producing the output records. This method populates the output batch after cross join of
+   * the record in a given left batch at left index and all the corresponding right batches produced for
+   * this left index. The right container is copied starting from rightIndex until number of records in the container.
    *
-   * @param joinType join type (INNER ot LEFT)
    * @return the number of records produced in the output batch
    */
-  public int outputRecords(JoinRelType joinType, int leftIndex, int rightIndex) {
+  public int crossJoinAndOutputRecords(int leftIndex, int rightIndex) {
 
-    final int numOutputRecords = populateOutputBatch(joinType, leftIndex, rightIndex, outputIndex);
-
-    // Check if output batch was exhausted
-    if (numOutputRecords >= LateralJoinBatch.MAX_BATCH_SIZE) {
-      // reset the output index for next new batch
-      outputIndex = 0;
-      return numOutputRecords;
-    }
-
-    outputIndex = numOutputRecords;
-    return numOutputRecords;
-  }
-
-  public int populateOutputBatch(JoinRelType joinRelType, int leftIndex,
-                                 int rightIndex, int outputBatchIndex) {
-
-    int finalOutputIndex = outputBatchIndex;
     final int rightRecordCount = right.getRecordCount();
+    int currentOutputIndex = outputIndex;
 
-    // Check if right batch is empty
-    if (rightRecordCount == 0) {
-      Preconditions.checkState(rightIndex == -1, "Right batch record count is 0 but index is not -1");
+    // If there is no record in right batch just return current index in output batch
+    if (rightRecordCount <= 0) {
+      return currentOutputIndex;
+    }
 
-      // Check if the join type is Left Join in which case we will populate outgoing container with only left side
-      // columns
-      if (joinRelType == JoinRelType.LEFT) {
-        emitLeft(leftIndex, finalOutputIndex);
-        ++finalOutputIndex;
+    // Check if right batch is empty since we have to handle left join case
+    Preconditions.checkState(rightIndex != -1, "Right batch record count is >0 but index is -1");
+    // For every record in right side just emit left and right records in output container
+    for (; rightIndex < rightRecordCount; ++rightIndex) {
+      emitLeft(leftIndex, currentOutputIndex);
+      emitRight(rightIndex, currentOutputIndex);
+      ++currentOutputIndex;
 
-        if (finalOutputIndex >= LateralJoinBatch.MAX_BATCH_SIZE) {
-          return finalOutputIndex;
-        }
-      }
-    } else {
-      Preconditions.checkState(rightIndex != -1, "Right batch record count is >0 but index is -1");
-      // For every record in right side just emit left and right records in output container
-      for (; rightIndex < rightRecordCount; ++rightIndex) {
-        emitLeft(leftIndex, finalOutputIndex);
-        emitRight(rightIndex, finalOutputIndex);
-        ++finalOutputIndex;
-
-        if (finalOutputIndex >= LateralJoinBatch.MAX_BATCH_SIZE) {
-          break;
-        }
+      if (currentOutputIndex >= LateralJoinBatch.MAX_BATCH_SIZE) {
+        break;
       }
     }
-    return finalOutputIndex;
+
+    updateOutputIndex(currentOutputIndex);
+    return currentOutputIndex;
   }
 
+  /**
+   * If current output batch is full then reset the output index for next output batch
+   * Otherwise it means we still have space left in output batch, so next call will continue populating from
+   * newOutputIndex
+   * @param newOutputIndex - new output index of outgoing batch after copying the records
+   */
+  private void updateOutputIndex(int newOutputIndex) {
+    outputIndex = (newOutputIndex >= LateralJoinBatch.MAX_BATCH_SIZE) ?
+      0 : newOutputIndex;
+  }
+
+  /**
+   * Method to copy just the left batch record at given leftIndex, the right side records will be NULL. This is
+   * used in case when Join Type is LEFT and we have only seen empty batches from right side
+   * @param leftIndex - index in left batch to copy record from
+   */
+  public void generateLeftJoinOutput(int leftIndex) {
+    int currentOutputIndex = outputIndex;
+
+    if (JoinRelType.LEFT == joinType) {
+      emitLeft(leftIndex, currentOutputIndex++);
+      updateOutputIndex(currentOutputIndex);
+    }
+  }
+
+  /**
+   * Generated method to setup vector references in rightBatch, leftBatch and outgoing batch. It should be called
+   * after initial schema build phase, when the schema for outgoing container is known. This method should also be
+   * called after each New Schema discovery during execution.
+   * @param context
+   * @param rightBatch - right incoming batch
+   * @param leftBatch - left incoming batch
+   * @param outgoing - output batch
+   */
   public abstract void doSetup(@Named("context") FragmentContext context,
                                @Named("rightBatch") RecordBatch rightBatch,
                                @Named("leftBatch") RecordBatch leftBatch,
                                @Named("outgoing") RecordBatch outgoing);
 
+  /**
+   * Generated method to copy the record from right batch at rightIndex to outgoing batch at outIndex
+   * @param rightIndex - index to copy record from the right batch
+   * @param outIndex - index to copy record to a outgoing batch
+   */
   public abstract void emitRight(@Named("rightIndex") int rightIndex,
                                  @Named("outIndex") int outIndex);
 
+  /**
+   * Generated method to copy the record from left batch at leftIndex to outgoing batch at outIndex
+   * @param leftIndex - index to copy record from the left batch
+   * @param outIndex - index to copy record to a outgoing batch
+   */
   public abstract void emitLeft(@Named("leftIndex") int leftIndex,
                                 @Named("outIndex") int outIndex);
 }
