@@ -106,7 +106,8 @@ public class TestNestedLoopJoinCorrectness extends SubOperatorTest {
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
-    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext, leftContainer, leftOutcomes);
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
 
     // Get the right container with dummy data
     final List<VectorContainer> rightContainer = new ArrayList<>(5);
@@ -117,7 +118,8 @@ public class TestNestedLoopJoinCorrectness extends SubOperatorTest {
     rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     rightOutcomes.add(RecordBatch.IterOutcome.OK);
 
-    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext, rightContainer, rightOutcomes);
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
 
     final NestedLoopJoinBatch nljBatch = new NestedLoopJoinBatch(nljPopConfig, fixture.getFragmentContext(), leftMockBatch, rightMockBatch);
 

@@ -50,12 +50,13 @@ public class MockRecordBatch implements CloseableRecordBatch {
   private final BufferAllocator allocator;
 
   public MockRecordBatch(FragmentContext context, OperatorContext oContext,
-                         List<VectorContainer> testContainers, List<IterOutcome> iterOutcomes) {
+                         List<VectorContainer> testContainers, List<IterOutcome> iterOutcomes,
+                         BatchSchema schema) {
     this.context = context;
     this.oContext = oContext;
     this.allocator = oContext.getAllocator();
     this.allTestContainers = testContainers;
-    this.container = new VectorContainer();
+    this.container = new VectorContainer(allocator, schema);
     this.allOutcomes = iterOutcomes;
     this.currentContainerIndex = 0;
     this.currentOutcomeIndex = 0;
@@ -65,6 +66,7 @@ public class MockRecordBatch implements CloseableRecordBatch {
   @Override
   public void close() throws Exception {
     container.clear();
+    container.setRecordCount(0);
     currentContainerIndex = 0;
     currentOutcomeIndex = 0;
   }
@@ -96,9 +98,9 @@ public class MockRecordBatch implements CloseableRecordBatch {
 
   @Override
   public void kill(boolean sendUpstream) {
+    isDone = true;
     container.clear();
-    currentContainerIndex = 0;
-    currentOutcomeIndex = 0;
+    container.setRecordCount(0);
   }
 
   @Override
@@ -119,10 +121,19 @@ public class MockRecordBatch implements CloseableRecordBatch {
   @Override
   public IterOutcome next() {
 
+    if(isDone) {
+      return IterOutcome.NONE;
+    }
+
     IterOutcome currentOutcome = IterOutcome.OK;
 
     if (currentContainerIndex < allTestContainers.size()) {
-      container = allTestContainers.get(currentContainerIndex);
+      final VectorContainer input = allTestContainers.get(currentContainerIndex);
+      final int recordCount = input.getRecordCount();
+      // We need to do this since the downstream operator expects vector reference to be same
+      // after first next call in cases when schema is not changed
+      container.transferIn(input);
+      container.setRecordCount(recordCount);
     }
 
     if (currentOutcomeIndex < allOutcomes.size()) {
@@ -132,11 +143,10 @@ public class MockRecordBatch implements CloseableRecordBatch {
       currentOutcome = IterOutcome.NONE;
     }
 
-    final BatchSchema schema = container.getSchema();
-
     switch (currentOutcome) {
       case OK:
       case OK_NEW_SCHEMA:
+      case EMIT:
         ++currentContainerIndex;
         return currentOutcome;
       case NONE:
@@ -144,11 +154,9 @@ public class MockRecordBatch implements CloseableRecordBatch {
       case OUT_OF_MEMORY:
       //case OK_NEW_SCHEMA:
         isDone = true;
-        container = new VectorContainer(allocator, schema);
         container.setRecordCount(0);
         return currentOutcome;
       case NOT_YET:
-        container = new VectorContainer(allocator, schema);
         container.setRecordCount(0);
         return currentOutcome;
       default:
