@@ -18,80 +18,50 @@
 
 package org.apache.drill.exec.physical.config;
 
-import java.util.Iterator;
-import java.util.List;
-
-import org.apache.drill.common.expression.LogicalExpression;
-import org.apache.drill.exec.physical.base.AbstractBase;
-import org.apache.drill.exec.physical.base.PhysicalOperator;
-import org.apache.drill.exec.physical.base.PhysicalVisitor;
-import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
-import org.apache.calcite.rel.core.JoinRelType;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Iterators;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.logical.data.JoinCondition;
+import org.apache.drill.exec.physical.base.AbstractJoinPop;
+import org.apache.drill.exec.physical.base.PhysicalOperator;
+import org.apache.drill.exec.proto.UserBitShared.CoreOperatorType;
+
+import java.util.List;
 
 @JsonTypeName("lateral-join")
-public class LateralJoinPOP extends AbstractBase {
+public class LateralJoinPOP extends AbstractJoinPop {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LateralJoinPOP.class);
-
-
-  private final PhysicalOperator left;
-  private final PhysicalOperator right;
-  private final JoinRelType joinType;
-  private final LogicalExpression condition;
 
   @JsonCreator
   public LateralJoinPOP(
       @JsonProperty("left") PhysicalOperator left,
       @JsonProperty("right") PhysicalOperator right,
-      @JsonProperty("joinType") JoinRelType joinType,
-      @JsonProperty("condition") LogicalExpression condition
-  ) {
-    this.left = left;
-    this.right = right;
-    // For lateral, JoinRelType should always be INNER since right side always work on input from left side
-    this.joinType = joinType;
-    this.condition = condition;
-  }
-
-  @Override
-  public <T, X, E extends Throwable> T accept(PhysicalVisitor<T, X, E> physicalVisitor, X value) throws E {
-    return physicalVisitor.visitLateralJoin(this, value);
+      @JsonProperty("joinType") JoinRelType joinType) {
+    super(left, right, joinType, null, null);
   }
 
   @Override
   public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) {
     Preconditions.checkArgument(children.size() == 2,
       "Lateral join should have two physical operators");
-    return new LateralJoinPOP(children.get(0), children.get(1), joinType, condition);
+    return new LateralJoinPOP(children.get(0), children.get(1), joinType);
   }
 
   @Override
-  public Iterator<PhysicalOperator> iterator() {
-    return Iterators.forArray(left, right);
+  public LogicalExpression getCondition() {
+    throw new UnsupportedOperationException("Lateral Join doesn't support having join condition's");
   }
 
-  public PhysicalOperator getLeft() {
-    return left;
+  @Override
+  public List<JoinCondition> getConditions() {
+    throw new UnsupportedOperationException("Lateral Join doesn't support having join condition's");
   }
-
-  public PhysicalOperator getRight() {
-    return right;
-  }
-
-  public JoinRelType getJoinType() {
-    return joinType;
-  }
-
-  public LogicalExpression getCondition() { return condition; }
 
   @Override
   public int getOperatorType() {
     return CoreOperatorType.LATERAL_JOIN_VALUE;
   }
 }
-
