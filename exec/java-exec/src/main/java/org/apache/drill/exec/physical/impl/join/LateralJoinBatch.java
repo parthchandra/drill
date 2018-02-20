@@ -18,15 +18,10 @@
 package org.apache.drill.exec.physical.impl.join;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.sun.codemodel.JExpr;
 import com.sun.codemodel.JExpression;
 import com.sun.codemodel.JVar;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.drill.common.exceptions.DrillRuntimeException;
-import org.apache.drill.common.expression.ErrorCollector;
-import org.apache.drill.common.expression.ErrorCollectorImpl;
-import org.apache.drill.common.expression.LogicalExpression;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.common.types.Types;
 import org.apache.drill.exec.compile.sig.GeneratorMapping;
@@ -34,30 +29,28 @@ import org.apache.drill.exec.compile.sig.MappingSet;
 import org.apache.drill.exec.exception.ClassTransformationException;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.exception.SchemaChangeException;
-import org.apache.drill.exec.expr.BatchReference;
 import org.apache.drill.exec.expr.ClassGenerator;
 import org.apache.drill.exec.expr.CodeGenerator;
-import org.apache.drill.exec.expr.ExpressionTreeMaterializer;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.LateralJoinPOP;
-import org.apache.drill.exec.physical.impl.filter.ReturnValueExpression;
-import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
 import org.apache.drill.exec.record.AbstractBinaryRecordBatch;
 import org.apache.drill.exec.record.BatchSchema;
-import org.apache.drill.exec.record.ExpandableHyperContainer;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TypedFieldId;
-import org.apache.drill.exec.record.VectorAccessible;
+import org.apache.drill.exec.record.VectorAccessibleUtilities;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.vector.AllocationHelper;
-import org.apache.drill.exec.vector.ValueVector;
-import org.apache.drill.exec.vector.complex.AbstractContainerVector;
 
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.Map;
+
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.EMIT;
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.NONE;
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK;
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK_NEW_SCHEMA;
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OUT_OF_MEMORY;
+import static org.apache.drill.exec.record.RecordBatch.IterOutcome.STOP;
 
 /*
  * RecordBatch implementation for the lateral join operator
@@ -85,13 +78,14 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   private int outputRecords = 0;
 
   // Current index of record in left incoming which is being processed
-  private int joinIndex = -1;
+  private int leftJoinIndex = -1;
 
-  // We accumulate all the batches on the right side in a hyper container.
-  private ExpandableHyperContainer rightContainer = new ExpandableHyperContainer();
+  // Current index of record in right incoming which is being processed
+  private int rightJoinIndex = -1;
 
-  // Record count of the individual batches in the right hyper container
-  private LinkedList<Integer> rightCounts = new LinkedList<>();
+  private boolean handleLeftBatchNextTime = false;
+
+  private boolean enableLateralCGDebugging = true;
 
   // Generator mapping for the right side
   private static final GeneratorMapping EMIT_RIGHT =
@@ -115,8 +109,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
   // Mapping set for the right side
   private static final MappingSet emitRightMapping =
-    new MappingSet("rightCompositeIndex" /* read index */, "outIndex" /* write index */,
-      "rightContainer" /* read container */,"outgoing" /* write container */,
+    new MappingSet("rightIndex" /* read index */, "outIndex" /* write index */,
+      "rightBatch" /* read container */,"outgoing" /* write container */,
       EMIT_RIGHT_CONSTANT, EMIT_RIGHT);
 
   // Mapping set for the left side
@@ -130,6 +124,196 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     super(popConfig, context, left, right);
     Preconditions.checkNotNull(left);
     Preconditions.checkNotNull(right);
+    enableLateralCGDebugging = true;//context.getConfig().getBoolean(ExecConstants.ENABLE_CODE_DUMP_DEBUG_LATERAL);
+  }
+
+  public boolean handleSchemaChange() {
+    try {
+      stats.startSetup();
+      setupNewSchema();
+      lateralJoiner = setupWorker();
+      lateralJoiner.setupLateralJoin(context, left, right, this);
+      return true;
+    } catch (SchemaChangeException ex) {
+      context.getExecutorState().fail(ex);
+      kill(false);
+      return false;
+    } finally {
+      stats.stopSetup();
+    }
+  }
+
+  public boolean isTerminalOutcome(IterOutcome outcome) {
+    return (outcome == STOP || outcome == OUT_OF_MEMORY || outcome == NONE);
+  }
+
+  public IterOutcome processLeftBatch(RecordBatch leftBatch) {
+
+    // Call next() on left side until we get a non-empty RecordBatch with OK outcome.
+    // OR we get either of OK_NEW_SCHEMA/EMIT/NONE/STOP/OOM/NOT_YET outcome with any type
+    // of batch.
+    boolean needLeftBatch = leftJoinIndex == -1;
+
+    // If left batch is empty
+    while (needLeftBatch && !handleLeftBatchNextTime) {
+      leftUpstream = next(LEFT_INPUT, leftBatch);
+      final boolean emptyLeftBatch = leftBatch.getRecordCount() <=0;
+
+      switch (leftUpstream) {
+        case OK_NEW_SCHEMA:
+          // This means there is already some records from previous join inside left batch
+          // So we need to pass that downstream and then handle the OK_NEW_SCHEMA in subsequent next call
+          if (outputRecords > 0) {
+            handleLeftBatchNextTime = true;
+            return OK_NEW_SCHEMA;
+          }
+          // This OK_NEW_SCHEMA is received post build schema phase and from left side
+          if (emptyLeftBatch) {
+            if (!isSchemaChanged(left.getSchema(), leftSchema)) {
+              logger.warn("New schema received from left side is same as previous known left schema. Ignoring this " +
+                "schema change");
+              continue;
+            }
+            if (handleSchemaChange()) {
+              container.setRecordCount(0);
+              leftJoinIndex = -1;
+              return OK_NEW_SCHEMA;
+            } else {
+              return STOP;
+            }
+          } // else - setup the new schema information after getting it from right side too.
+        case OK:
+          // With OK outcome we will keep calling next until we get a batch with >0 records
+          if (emptyLeftBatch) {
+            leftJoinIndex = -1;
+            continue;
+          } else {
+            leftJoinIndex = 0;
+          }
+          break;
+        case EMIT:
+          // don't call next on right batch
+          if (emptyLeftBatch) {
+            leftJoinIndex = -1;
+            container.setRecordCount(0);
+            return EMIT;
+          } else {
+            leftJoinIndex = 0;
+          }
+          break;
+        case OUT_OF_MEMORY:
+        case NONE:
+        case STOP:
+          // Not using =0 since if outgoing container is empty then no point returning anything
+          if (outputRecords > 0) {
+            handleLeftBatchNextTime = true;
+          }
+          //TODO we got a STOP, shouldn't we stop immediately ?
+          // TODO: check what killAndDrain will do w.r.t UNNEST, we discussed about calling right side
+          // of LATERAL with NONE outcome or calling stop explicitly when NONE is seen on left side
+          killAndDrainIncoming(right, rightUpstream, RIGHT_INPUT);
+          return leftUpstream;
+        case NOT_YET:
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException ex) {
+            logger.debug("Thread interrupted while sleeping to call next on left branch of LATERAL since it " +
+              "received NOT_YET");
+          }
+          break;
+      }
+
+      needLeftBatch = leftJoinIndex == -1;
+    }
+
+    // Just return the know left outcome. We can reach here in 2 cases:
+    // 1) We have processed all the records in previous batch and now getting a new batch
+    // 2) We have some left over records from previous batch
+    return leftUpstream;
+  }
+
+  public IterOutcome processRightBatch(RecordBatch right) {
+    // Check if we still have records left to process in left incoming from new batch or previously half processed
+    // batch. We are making sure to update leftJoinIndex and rightJoinIndex correctly. Like for new
+    // batch leftJoinIndex will always be set to zero and once leftSide batch is fully processed then
+    // it will be set to -1.
+    // Whereas rightJoinIndex is to keep track of record in right batch being joined with
+    // record in left batch. So when there are cases such that all records in right batch is not consumed
+    // by the output, then joinIndex will be a valid index. When all records are consumed it will be set to -1.
+    boolean needNewRightBatch = (leftJoinIndex >= 0) && (rightJoinIndex == -1);
+    while (needNewRightBatch) {
+      rightUpstream = next(RIGHT_INPUT, right);
+      switch (rightUpstream) {
+        case OK_NEW_SCHEMA:
+          // TODO: Need to set the container schema properly but ignore the batch since it's expected to be empty
+          // We should not get OK_NEW_SCHEMA multiple times for the same left incoming batch. So there won't be a
+          // case where we get OK_NEW_SCHEMA --> OK (with batch) ---> OK_NEW_SCHEMA --> OK/EMIT
+          // fall through
+          //
+          // Right batch with OK_NEW_SCHEMA is always going to be an empty batch, so let's pass the new schema
+          // downstream and later with subsequent next() call the join output will be produced
+          Preconditions.checkState(right.getRecordCount() == 0,
+            "Right side batch with OK_NEW_SCHEMA is not empty");
+
+          if (!isSchemaChanged(right.getSchema(), rightSchema)) {
+            logger.warn("New schema received from right side is same as previous known right schema. Ignoring this " + "schema change");
+            continue;
+          }
+          if (handleSchemaChange()) {
+            container.setRecordCount(0);
+            rightJoinIndex = -1;
+            return OK_NEW_SCHEMA;
+          } else {
+            return STOP;
+          }
+        case OK:
+        case EMIT:
+          // Even if there are no records we should not call next() again because in case of LEFT join
+          // empty batch is of importance too
+          rightJoinIndex = (right.getRecordCount() > 0) ? 0 : -1;
+          needNewRightBatch = false;
+          break;
+        case OUT_OF_MEMORY:
+        case NONE:
+        case STOP:
+          //TODO we got a STOP, shouldn't we stop immediately ?
+          // TODO: Should we kill left side if right side fails ?
+          killAndDrainIncoming(left, leftUpstream, LEFT_INPUT);
+          needNewRightBatch = false;
+          break;
+        case NOT_YET:
+          try {
+            Thread.sleep(10);
+          } catch (InterruptedException ex) {
+            logger.debug("Thread interrupted while sleeping to call next on left branch of LATERAL since it " +
+              "received NOT_YET");
+          }
+          break;
+      }
+    }
+
+    return rightUpstream;
+  }
+
+  public void handlePreviousLeftBatch() {
+    if (leftUpstream == OK_NEW_SCHEMA) {
+
+      if (!isSchemaChanged(left.getSchema(), leftSchema)) {
+        logger.warn("New schema received from left side is same as previous known left schema. Ignoring this " +
+          "schema change");
+      }
+
+      if (left.getRecordCount() > 0) {
+        leftJoinIndex = 0;
+      } else {
+        if (handleSchemaChange()) {
+          container.setRecordCount(0);
+          leftJoinIndex = -1;
+        } else {
+          leftUpstream = STOP;
+        }
+      }
+    }
   }
 
   /**
@@ -141,53 +325,166 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   @Override
   public IterOutcome innerNext() {
 
-    // Accumulate batches on the right in a hyper container
+    if (handleLeftBatchNextTime) {
+      handlePreviousLeftBatch();
+    }
+
+    // We don't do anything special on FIRST state. Process left batch first and then right batch if need be
+    IterOutcome childOutcome = processLeftBatch(left);
+    handleLeftBatchNextTime = false;
+
+    // If the left batch doesn't have any record in the incoming batch or the state returned from
+    // left side is terminal state then just return the IterOutcome and don't call next() on
+    // right branch
+    if (left.getRecordCount() == 0 || isTerminalOutcome(childOutcome)) {
+      return childOutcome;
+    }
+
+    // Left side has some records in the batch so let's process right batch
+    childOutcome = processRightBatch(right);
+
+    // reset the left & right outcomes to OK here and send the empty batch downstream
+    if (childOutcome == OK_NEW_SCHEMA) {
+      leftUpstream = OK;
+      rightUpstream = OK;
+      return childOutcome;
+    }
+
+    if (isTerminalOutcome(childOutcome)) {
+      return childOutcome;
+    }
+
+    // If OK_NEW_SCHEMA is seen only on non empty left batch but not on right batch
+    if (leftUpstream == OK_NEW_SCHEMA) {
+      if(!handleSchemaChange()) {
+        return STOP;
+      }
+    }
+
     if (state == BatchState.FIRST) {
-
-      // exit if we have an empty left batch
-      if (leftUpstream == IterOutcome.NONE) {
-        // inform upstream that we don't need anymore data and make sure we clean up any batches already in queue
-        killAndDrainRight();
-        return IterOutcome.NONE;
-      }
-
-      boolean drainRight = rightUpstream != IterOutcome.NONE ? true : false;
-      while (drainRight) {
-        rightUpstream = next(RIGHT_INPUT, right);
-        switch (rightUpstream) {
-          case OK_NEW_SCHEMA:
-            if (!right.getSchema().equals(rightSchema)) {
-              throw new DrillRuntimeException("Lateral join does not handle schema change. Schema change" +
-                  " found on the right side of Lateral Join.");
-            }
-            // fall through
-          case OK:
-            addBatchToHyperContainer(right);
-            break;
-          case OUT_OF_MEMORY:
-            return IterOutcome.OUT_OF_MEMORY;
-          case NONE:
-          case STOP:
-            //TODO we got a STOP, shouldn't we stop immediately ?
-          case NOT_YET:
-            drainRight = false;
-            break;
-        }
-      }
-      lateralJoiner.setupLateralJoin(context, left, rightContainer, rightCounts, this);
+      lateralJoiner.setupLateralJoin(context, left, right, this);
       state = BatchState.NOT_FIRST;
     }
 
     // allocate space for the outgoing batch
     allocateVectors();
 
-    // invoke the runtime generated method to emit records in the output batch
-    outputRecords = lateralJoiner.outputRecords(popConfig.getJoinType());
+    while (outputRecords <= LateralJoinBatch.MAX_BATCH_SIZE) {
+      // invoke the runtime generated method to emit records in the output batch for each leftJoinIndex
+      outputRecords = lateralJoiner.outputRecords(popConfig.getJoinType(), leftJoinIndex, rightJoinIndex);
 
-    // Set the record count
-    for (final VectorWrapper<?> vw : container) {
-      vw.getValueVector().getMutator().setValueCount(outputRecords);
+      if (right.getRecordCount() == 0) {
+        rightJoinIndex = -1;
+      } else { // One right batch might span across multiple output batch. So rightIndex will be moving sum of all the
+        // output records for this record batch until it's fully consumed
+        rightJoinIndex += outputRecords;
+      }
+
+      boolean isLeftEmpty = leftJoinIndex >= left.getRecordCount();
+      final boolean isRightEmpty = rightJoinIndex == -1 || rightJoinIndex >= right.getRecordCount();
+
+      // Check if above join to produce output was based on empty right batch or
+      // it resulted in right side batch to be fully consumed. In this scenario only if rightUpstream
+      // is EMIT then increase the leftJoinIndex.
+      // Otherwise it means for the given right batch there is still some record left to be processed.
+      if (isRightEmpty) {
+        if (rightUpstream == EMIT) {
+          ++leftJoinIndex;
+
+          // Check if previous left record was last one, then set leftJoinIndex to -1
+          isLeftEmpty = leftJoinIndex >= left.getRecordCount();
+          if (isLeftEmpty) {
+            leftJoinIndex = -1;
+            clearBatchVectors(left);
+          }
+        }
+
+        // Release vectors of right batch. This will happen for both rightUpstream = EMIT/OK
+        clearBatchVectors(right);
+        rightJoinIndex = -1;
+      }
+
+      // Check if output batch is full
+      if (outputRecords >= MAX_BATCH_SIZE) {
+        break;
+      } else { // output batch still has some space
+        // Check if left side still has records or not
+        if (!isLeftEmpty) {
+          // Then just get the right side of the batch and make sure rightJoinIndex is properly set
+          rightUpstream = processRightBatch(right);
+
+          Preconditions.checkState(rightUpstream != OK_NEW_SCHEMA, "Unexpected Schema change on right side for " +
+            "the same left batch");
+
+          if (isTerminalOutcome(rightUpstream)) {
+            return rightUpstream;
+          }
+        } else {
+
+          // The left batch was with EMIT outcome, then return output to downstream layer
+          if (leftUpstream == EMIT) {
+            finalizeOutputContainer();
+            return EMIT;
+          }
+
+          if (leftUpstream == OK_NEW_SCHEMA) {
+            // return output batch with OK_NEW_SCHEMA and reset the state to OK
+            finalizeOutputContainer();
+            leftUpstream = OK;
+            return OK_NEW_SCHEMA;
+          }
+
+          // Can only reach here if previous left batch came with OK outcome
+          //
+          // Then get both left batch and the right batch and make sure indexes are properly set
+          // TODO: Problem since if we see OK_NEW_SCHEMA then we just re-create the schema in the container
+          // and pass it through
+          leftUpstream = processLeftBatch(left);
+          if (handleLeftBatchNextTime) {
+            // We should return the current output batch with OK outcome and don't reset the leftUpstream
+            finalizeOutputContainer();
+            return OK;
+          }
+
+          // If left batch is not there then don't call next on right batch
+          if (isTerminalOutcome(leftUpstream)) {
+            return leftUpstream;
+          }
+
+          // Since we are here that means leftBatch came with OK/EMIT outcome only and now we can call
+          // next on right batch too. It will not hit OK_NEW_SCHEMA since left side have not seen that outcome
+          rightUpstream = processRightBatch(right);
+          Preconditions.checkState(rightUpstream != OK_NEW_SCHEMA, "Unexpected schema change in right branch");
+
+          if (isTerminalOutcome(rightUpstream)) {
+            return rightUpstream;
+          }
+
+        }
+      }
     }
+
+    finalizeOutputContainer();
+
+    // TODO: Need to change this condition based on recordCount and left and right outcome
+    // and also left and right join index.
+    // The left batch was with EMIT outcome, then return output to downstream layer
+    if (leftUpstream == EMIT) {
+      return EMIT;
+    }
+
+    if (leftUpstream == OK_NEW_SCHEMA) {
+      // return output batch with OK_NEW_SCHEMA and reset the state to OK
+      leftUpstream = OK;
+      return OK_NEW_SCHEMA;
+    }
+
+    return OK;
+  }
+
+  private void finalizeOutputContainer() {
+
+    VectorAccessibleUtilities.setValueCount(container, outputRecords);
 
     // Set the record count in the container
     container.setRecordCount(outputRecords);
@@ -195,24 +492,83 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     logger.debug("Number of records emitted: " + outputRecords);
 
-    return (outputRecords > 0) ? IterOutcome.OK : IterOutcome.NONE;
+    // We are about to send the output batch so reset the outputRecords for future next call
+    outputRecords = 0;
   }
 
-  private void killAndDrainRight() {
-    if (!hasMore(rightUpstream)) {
+  private void killAndDrainIncoming(RecordBatch batch, IterOutcome outcome,
+                                    int batchIndex) {
+    if (!hasMore(outcome)) {
       return;
     }
-    right.kill(true);
-    while (hasMore(rightUpstream)) {
-      for (final VectorWrapper<?> wrapper : right) {
+
+    batch.kill(true);
+    while (hasMore(outcome)) {
+      for (final VectorWrapper<?> wrapper : batch) {
         wrapper.getValueVector().clear();
       }
-      rightUpstream = next(HashJoinHelper.RIGHT_INPUT, right);
+      outcome = next(batchIndex, batch);
+    }
+    if (batchIndex == RIGHT_INPUT) {
+      rightUpstream = outcome;
+    } else {
+      leftUpstream = outcome;
     }
   }
 
   private boolean hasMore(IterOutcome outcome) {
-    return outcome == IterOutcome.OK || outcome == IterOutcome.OK_NEW_SCHEMA;
+    return outcome == OK || outcome == OK_NEW_SCHEMA;
+  }
+
+  private boolean isSchemaChanged(BatchSchema newSchema, BatchSchema oldSchema) {
+    return newSchema.isEquivalent(oldSchema);
+  }
+
+  private void setupNewSchema() throws SchemaChangeException {
+
+    // Clear up the container
+    container.clear();
+
+    leftSchema = left.getSchema();
+    rightSchema = right.getSchema();
+
+    if (leftSchema == null || rightSchema == null) {
+      throw new SchemaChangeException("Either of left or right schema was not set properly in the batches. Hence " +
+        "failed to setupNewSchema");
+    }
+
+    // Setup LeftSchema
+
+    // Get the left schema and set it in container
+    leftSchema = left.getSchema();
+    for (final VectorWrapper<?> vectorWrapper : left) {
+      container.addOrGet(vectorWrapper.getField());
+    }
+
+    // Setup RightSchema
+
+
+    // Get the right schema and set it in container
+    for (final VectorWrapper<?> vectorWrapper : right) {
+      MaterializedField rightField = vectorWrapper.getField();
+      TypeProtos.MajorType rightFieldType = vectorWrapper.getField().getType();
+
+      // make right input schema optional if we have LEFT join
+      if (popConfig.getJoinType() == JoinRelType.LEFT &&
+        rightFieldType.getMode() == TypeProtos.DataMode.REQUIRED) {
+        final TypeProtos.MajorType outputType =
+          Types.overrideMode(rightField.getType(), TypeProtos.DataMode.OPTIONAL);
+
+        // Create the right field with optional type. This will also take care of creating
+        // children fields in case of ValueVectors of map type
+        rightField = rightField.withType(outputType);
+      }
+      container.addOrGet(rightField);
+    }
+
+    // Let's build schema for the container
+    container.setRecordCount(0);
+    container.buildSchema(BatchSchema.SelectionVectorMode.NONE);
   }
 
   /**
@@ -223,16 +579,17 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
    * 3. emitRight() -> Project record from the right side (which is a hyper container)
    * @return the runtime generated class that implements the LateralJoin interface
    */
-  private LateralJoin setupWorker() throws IOException, ClassTransformationException, SchemaChangeException {
-    final CodeGenerator<LateralJoin> nLJCodeGenerator = CodeGenerator.get(
+  private LateralJoin setupWorker() throws SchemaChangeException {
+    final CodeGenerator<LateralJoin> lateralCG = CodeGenerator.get(
       LateralJoin.TEMPLATE_DEFINITION, context.getOptions());
-    nLJCodeGenerator.plainJavaCapable(true);
-    // Uncomment out this line to debug the generated code. Make this configurable
-    // nLJCodeGenerator.saveCodeForDebugging(true);
-    final ClassGenerator<LateralJoin> nLJClassGenerator = nLJCodeGenerator.getRoot();
+    lateralCG.plainJavaCapable(true);
+
+    // To enabled code gen dump for lateral use the setting ExecConstants.ENABLE_CODE_DUMP_DEBUG_LATERAL
+    lateralCG.saveCodeForDebugging(enableLateralCGDebugging);
+    final ClassGenerator<LateralJoin> nLJClassGenerator = lateralCG.getRoot();
 
     // generate doEval
-    final ErrorCollector collector = new ErrorCollectorImpl();
+    //final ErrorCollector collector = new ErrorCollectorImpl();
 
     /*
         Logical expression may contain fields from left and right batches. During code generation (materialization)
@@ -244,12 +601,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         2. Join with an OR predicate:
         select * from t1 inner join t2 on on t1.c1 = t2.c1 OR t1.c2 = t2.c2
      */
+    /*
     Map<VectorAccessible, BatchReference> batches = ImmutableMap
         .<VectorAccessible, BatchReference>builder()
         .put(left, new BatchReference("leftBatch", "leftIndex"))
-        .put(rightContainer,
-          new BatchReference("rightContainer", "rightBatchIndex",
-            "rightRecordIndexWithinBatch"))
+        .put(right, new BatchReference("rightBatch", "rightIndex"))
         .build();
 
     LogicalExpression materialize = ExpressionTreeMaterializer.materialize(
@@ -266,6 +622,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     }
 
     nLJClassGenerator.addExpr(new ReturnValueExpression(materialize), ClassGenerator.BlkCreateMode.FALSE);
+    */
 
     // generate emitLeft
     nLJClassGenerator.setMappingSet(emitLeftMapping);
@@ -297,8 +654,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // generate emitRight
     fieldId = 0;
     nLJClassGenerator.setMappingSet(emitRightMapping);
-    JExpression batchIndex = JExpr.direct("batchIndex");
-    JExpression recordIndexWithinBatch = JExpr.direct("recordIndexWithinBatch");
+    JExpression rightIndex = JExpr.direct("rightIndex");
 
     if (rightSchema != null) {
       // Set the input and output value vector references corresponding to the right batch
@@ -316,21 +672,25 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         MaterializedField newField = MaterializedField.create(field.getName(), outputType);
         container.addOrGet(newField);
 
-        JVar inVV = nLJClassGenerator.declareVectorValueSetupAndMember("rightContainer",
-            new TypedFieldId(inputType, true, fieldId));
+        JVar inVV = nLJClassGenerator.declareVectorValueSetupAndMember("rightBatch",
+            new TypedFieldId(inputType, false, fieldId));
         JVar outVV = nLJClassGenerator.declareVectorValueSetupAndMember("outgoing",
             new TypedFieldId(outputType, false, outputFieldId));
         nLJClassGenerator.getEvalBlock().add(outVV.invoke("copyFromSafe")
-            .arg(recordIndexWithinBatch)
+            .arg(rightIndex)
             .arg(outIndex)
-            .arg(inVV.component(batchIndex)));
+            .arg(inVV));
         nLJClassGenerator.rotateBlock();
         fieldId++;
         outputFieldId++;
       }
     }
 
-    return context.getImplementationClass(nLJCodeGenerator);
+    try {
+      return context.getImplementationClass(lateralCG);
+    } catch (IOException | ClassTransformationException ex) {
+      throw new SchemaChangeException("Failed while setting up generated class with new schema information", ex);
+    }
   }
 
   /**
@@ -346,79 +706,45 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
    * Builds the output container's schema. Goes over the left and the right
    * batch and adds the corresponding vectors to the output container.
    * @throws SchemaChangeException if batch schema was changed during execution
+   *
+   * TODO: We should evaluate that the columnToUnnest should still be considered while
+   * building the left schema or not, since there is the overhead of copying that column.
+   * Or we should leave it upto project to extract required columns/fields within a column
+   * and remove columns which are not needed.
    */
   @Override
   protected void buildSchema() throws SchemaChangeException {
-    try {
-      if (! prefetchFirstBatchFromBothSides()) {
+      if (!prefetchFirstBatchFromBothSides()) {
         return;
       }
 
-      // Get the left schema and set it in container
-      if (leftUpstream != IterOutcome.NONE) {
-        leftSchema = left.getSchema();
-        for (final VectorWrapper<?> vectorWrapper : left) {
-          container.addOrGet(vectorWrapper.getField());
-        }
-      }
+      // Setup output container schema based on known left and right schema
+      setupNewSchema();
 
-      // Get the right schema and set it in container
-      if (rightUpstream != IterOutcome.NONE) {
-        for (final VectorWrapper<?> vectorWrapper : right) {
-          MaterializedField rightField = vectorWrapper.getField();
-          TypeProtos.MajorType rightFieldType = vectorWrapper.getField().getType();
+      // TODO: Let's not add this right batch in HyperContainer as of now, since it's the first batch and is expected
+      // to be empty
+      Preconditions.checkState (right.getRecordCount() == 0, "Unexpected non-empty first right batch received");
+      //addBatchToHyperContainer(right);
+      // Release the vectors received from right side
+      clearBatchVectors(right);
 
-          // make right input schema optional if we have LEFT join
-          if (popConfig.getJoinType() == JoinRelType.LEFT
-            && rightFieldType.getMode() == TypeProtos.DataMode.REQUIRED) {
-            final TypeProtos.MajorType outputType =
-              Types.overrideMode(rightField.getType(), TypeProtos.DataMode.OPTIONAL);
 
-            // Create the right field with optional type. This will also take care of creating
-            // children fields in case of ValueVectors of map type
-            rightField = rightField.withType(outputType);
-          }
-          container.addOrGet(rightField);
-        }
-        rightSchema = right.getSchema();
-        addBatchToHyperContainer(right);
-      }
-
-      // Allocate memory for all the value vectors inside output batch
-      allocateVectors();
+      // We should not allocate memory for all the value vectors inside output batch
+      // since this is buildSchema phase and we are sending empty batches downstream
+      //allocateVectors();
       lateralJoiner = setupWorker();
 
-      // if left batch is empty, fetch next
-      if (leftUpstream != IterOutcome.NONE && left.getRecordCount() == 0) {
-        leftUpstream = next(LEFT_INPUT, left);
-      }
+      // Set join index as invalid (-1) if the left side is empty, else set it to 0
+      leftJoinIndex = (left.getRecordCount() <= 0) ? -1 : 0;
 
-      container.setRecordCount(0);
-      container.buildSchema(BatchSchema.SelectionVectorMode.NONE);
-
-    } catch (ClassTransformationException | IOException e) {
-      throw new SchemaChangeException(e);
-    }
-  }
-
-  private void addBatchToHyperContainer(RecordBatch inputBatch) {
-    final RecordBatchData batchCopy = new RecordBatchData(inputBatch, oContext.getAllocator());
-    boolean success = false;
-    try {
-      rightCounts.addLast(inputBatch.getRecordCount());
-      rightContainer.addBatch(batchCopy.getContainer());
-      success = true;
-    } finally {
-      if (!success) {
-        batchCopy.clear();
-      }
-    }
+      // Reset the left side of the IterOutcome since for this call OK_NEW_SCHEMA will be returned correctly
+      // by buildSchema caller.
+      leftUpstream = OK;
+      rightUpstream = OK;
   }
 
   @Override
   public void close() {
-    rightContainer.clear();
-    rightCounts.clear();
     super.close();
   }
 
@@ -430,7 +756,16 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
   @Override
   public int getRecordCount() {
-    return outputRecords;
+    return container.getRecordCount();
+  }
+
+  /**
+   * Helps to free the memory of value vectors inside a RecordBatch
+   * @param batch
+   */
+  private void clearBatchVectors(RecordBatch batch) {
+    // Clearing off ValueVector also make sure that future getValueCount will always return 0
+    VectorAccessibleUtilities.clear(batch);
   }
 
   /**
@@ -441,18 +776,20 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
    */
   @Override
   public RecordBatch getIncoming() {
-    assert (left != null);
+    Preconditions.checkState (left != null, "Retuning null left batch. It's unexpected since right side will only be " +
+      "called iff there is any valid left batch");
     return left;
   }
 
   /**
-   * Returns the current row index which the calling operator should process in current incoming record batch
+   * Returns the current row index which the calling operator should process in current incoming left record batch
    *
    * @return - int - index of row to process.
    */
   @Override
   public int getRecordIndex() {
-    assert (joinIndex < left.getRecordCount());
-    return joinIndex;
+    Preconditions.checkState (leftJoinIndex < left.getRecordCount(),
+      String.format("Left join index: %d is out of bounds: %d", leftJoinIndex, left.getRecordCount()));
+    return leftJoinIndex;
   }
 }

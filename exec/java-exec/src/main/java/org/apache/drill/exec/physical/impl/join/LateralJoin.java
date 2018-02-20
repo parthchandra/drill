@@ -34,19 +34,18 @@ public interface LateralJoin {
     new TemplateClassDefinition<>(LateralJoin.class, LateralJoinTemplate.class);
 
   public void setupLateralJoin(FragmentContext context, RecordBatch left,
-                               ExpandableHyperContainer rightContainer, LinkedList<Integer> rightCounts,
-                               LateralJoinBatch outgoing);
+                               RecordBatch right, LateralJoinBatch outgoing);
 
   // Produce output records taking into account join type
-  public int outputRecords(JoinRelType joinType);
+  public int outputRecords(JoinRelType joinType, int leftIndex, int rightIndex);
 
   // Project the record at offset 'leftIndex' in the left input batch into the output container at offset 'outIndex'
   public void emitLeft(int leftIndex, int outIndex);
 
   // Project the record from the hyper container given the batch index and the record within the batch at 'outIndex'
-  public void emitRight(int batchIndex, int recordIndexWithinBatch, int outIndex);
+  public void emitRight(int rightIndex, int outIndex);
 
   // Setup the input/output value vector references
-  public void doSetup(FragmentContext context, VectorContainer rightContainer,
+  public void doSetup(FragmentContext context, RecordBatch rightBatch,
                       RecordBatch leftBatch, RecordBatch outgoing);
 }
