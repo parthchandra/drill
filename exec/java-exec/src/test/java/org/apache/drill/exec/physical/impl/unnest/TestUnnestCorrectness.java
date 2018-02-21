@@ -33,6 +33,7 @@ import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.mock.MockStorePOP;
 import org.apache.drill.exec.vector.ValueVector;
+import org.apache.drill.exec.vector.complex.MapVector;
 import org.apache.drill.test.SubOperatorTest;
 import org.apache.drill.test.rowSet.RowSet;
 import org.apache.drill.test.rowSet.RowSetBuilder;
@@ -56,6 +57,7 @@ import static org.junit.Assert.assertTrue;
 
   // use MockLateralJoinPop for MockRecordBatch ??
   public static PhysicalOperator mockPopConfig;
+
 
   @BeforeClass public static void setUpBeforeClass() throws Exception {
     mockPopConfig = new MockStorePOP(null);
@@ -197,20 +199,27 @@ import static org.junit.Assert.assertTrue;
         for (ValueVector vv : vw.getValueVectors()) {
           int valueCount = vv.getAccessor().getValueCount();
           if (valueCount != baseline[i].length) {
-            fail("Test failed in validating unnest (RepeatedInt) output. Value count mismatch.");
+            fail("Test failed in validating unnest output. Value count mismatch.");
           }
           for (int j = 0; j < valueCount; j++) {
-            if (baseline[i][j] != vv.getAccessor().getObject(j)) {
-              fail("Test failed in validating unnest (RepeatedInt) output. Value mismatch");
+
+            if(vv instanceof MapVector) {
+              if (!compareMapBaseline((Object)baseline[i][j], vv.getAccessor().getObject(j))) {
+                fail("Test failed in validating unnest(Map) output. Value mismatch");
+              }
+            } else {
+              if (baseline[i][j] != vv.getAccessor().getObject(j)) {
+                fail("Test failed in validating unnest output. Value mismatch");
+              }
             }
           }
           i++;
+
         }
       }
 
       assertTrue(((MockLateralJoinBatch) lateralJoinBatch).isCompleted());
 
-    } catch (AssertionError error) {
     } finally {
       // Close all the resources for this test case
       unnestBatch.close();
@@ -260,16 +269,22 @@ import static org.junit.Assert.assertTrue;
 
     Object[][] d = {
       {
-        new Object[] {},
-        new Object[] {
-            new Object[] {11, new String[] {"1.1.1", "1.1.2" }},
-            new Object[] {12, new String[] {"1.2.1", "1.2.2" }}
-        },
+          new Object[] {},
+          new Object[] {
+              new Object[] {11, new String[] {"1.1.1", "1.1.2" }},
+              new Object[] {12, new String[] {"1.2.1", "1.2.2" }}
+          },
 
+          new Object[] {
+              new Object[] {21, new String[] {"2.1.1", "2.1.2" }},
+              new Object[] {22, new String[] {}},
+              new Object[] {23, new String[] {"2.3.1", "2.3.2" }}
+          }
+      },
+      {
         new Object[] {
-            new Object[] {21, new String[] {"d2.1.1", "d2.1.2" }},
-            new Object[] {22, new String[] {}},
-            new Object[] {23, new String[] {"d2.3.1", "d2.3.2" }}
+            new Object[] {31, new String[] {"3.1.1", "3.1.2" }},
+            new Object[] {32, new String[] {"3.2.1", "3.2.2" }}
         }
       }
     };
@@ -282,18 +297,27 @@ import static org.junit.Assert.assertTrue;
     Object[][] d = {
         new Object[] {},    // Empty record batch returned by OK_NEW_SCHEMA
         new Object[] {},    // First incoming batch is empty
-
         new Object[] {
-            new Object[] {11, new String[] {"1.1.1", "1.1.2"}},
-            new Object[] {12, new String[] {"1.2.1", "1.2.2"}}},
-
+            "{\"colA\":11,\"colB\":[\"1.1.1\",\"1.1.2\"]}",
+            "{\"colA\":12,\"colB\":[\"1.2.1\",\"1.2.2\"]}"
+        },
         new Object[] {
-            new Object[] {21, new String[] {"d2.1.1", "d2.1.2"}},
-            new Object[] {22, new String[] {}},
-            new Object[] {23, new String[] {"d2.3.1", "d2.3.2"}}}
-
+            "{\"colA\":21,\"colB\":[\"2.1.1\",\"2.1.2\"]}",
+            "{\"colA\":22,\"colB\":[]}",
+            "{\"colA\":23,\"colB\":[\"2.3.1\",\"2.3.2\"]}"
+        },
+        new Object[] {
+            "{\"colA\":31,\"colB\":[\"3.1.1\",\"3.1.2\"]}",
+            "{\"colA\":32,\"colB\":[\"3.2.1\",\"3.2.2\"]}"
+        }
     };
     return d;
+  }
+
+  private boolean compareMapBaseline(Object baselineValue, Object vector) {
+    String vv = vector.toString();
+    String b = (String)baselineValue;
+    return vv.equalsIgnoreCase(b);
   }
 
   private boolean isTerminal(RecordBatch.IterOutcome outcome) {
