@@ -25,6 +25,7 @@ import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.physical.impl.MockRecordBatch;
+import org.apache.drill.exec.physical.rowSet.impl.TestResultSetLoaderMapArray;
 import org.apache.drill.exec.record.ExpandableHyperContainer;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TupleMetadata;
@@ -69,12 +70,15 @@ import static org.junit.Assert.assertTrue;
   public void testUnnestFixedWidthColumn() throws Exception {
 
     Object[][] data = {
-        { (Object) new int[] {1, 2}, (Object) new int[] {3, 4, 5}},
-        { (Object) new int[] {6, 7, 8, 9}, (Object) new int[] {10, 11, 12, 13}}
+        { (Object) new int[] {1, 2},
+          (Object) new int[] {3, 4, 5}},
+        { (Object) new int[] {6, 7, 8, 9},
+          (Object) new int[] {10, 11, 12, 13}}
     };
 
     // Create input schema
-    TupleMetadata incomingSchema = new SchemaBuilder().add("someColumn", TypeProtos.MinorType.INT)
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("rowNumber", TypeProtos.MinorType.INT)
         .addArray("unnestColumn", TypeProtos.MinorType.INT).buildSchema();
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
@@ -87,21 +91,40 @@ import static org.junit.Assert.assertTrue;
   }
 
   @Test
-  public void testUnnestVarWidth() throws Exception {
+  public void testUnnestVarWidthColumn() throws Exception {
 
     Object[][] data = {
-        { (Object) new String[] {"", "zero"}, (Object) new String[] {"one", "two", "three"}},
-        { (Object) new String[] {"four", "five", "six", "seven"}, (Object) new String[] {"eight", "nine", "ten",
-            "eleven", "twelve"}}
+        { (Object) new String[] {"", "zero"},
+          (Object) new String[] {"one", "two", "three"}},
+        { (Object) new String[] {"four", "five", "six", "seven"},
+          (Object) new String[] {"eight", "nine", "ten", "eleven", "twelve"}}
     };
 
     // Create input schema
-    TupleMetadata incomingSchema = new SchemaBuilder().add("someColumn", TypeProtos.MinorType.INT)
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("someColumn", TypeProtos.MinorType.INT)
         .addArray("unnestColumn", TypeProtos.MinorType.VARCHAR).buildSchema();
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
     String[][] baseline = {{}, {null, ""}, {"one", "two", "three"}, {"four", "five", "six", "seven"}, {"eight", "nine",
         "ten", "eleven", "twelve"}};
+
+    RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
+
+    testUnnest(incomingSchema, iterOutcomes, data, baseline);
+
+  }
+
+  @Test
+  public void testUnnestMapColumn() throws Exception {
+
+    Object[][] data = getMapData();
+
+    // Create input schema
+    TupleMetadata incomingSchema = getRepeatedMapSchema();
+
+    // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
+    Object[][] baseline = getMapBaseline();
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
@@ -202,6 +225,75 @@ import static org.junit.Assert.assertTrue;
       }
     }
 
+  }
+
+  /**
+   * Build a schema with a repeated map -
+   *
+   *  {
+   *    rowNum,
+   *    mapColumn : [
+   *       {
+   *         colA,
+   *         colB : [
+   *            varcharCol
+   *         ]
+   *       }
+   *    ]
+   *  }
+   *
+   * @see TestResultSetLoaderMapArray TestResultSetLoaderMapArray for similar schema and data
+   * @return TupleMetadata corresponding to the schema
+   */
+  private TupleMetadata getRepeatedMapSchema() {
+    TupleMetadata schema = new SchemaBuilder()
+        .add("rowNum", TypeProtos.MinorType.INT)
+        .addMapArray("unnestColumn")
+        .add("colA", TypeProtos.MinorType.INT)
+        .addArray("colB", TypeProtos.MinorType.VARCHAR)
+        .buildMap()
+        .buildSchema();
+    return schema;
+  }
+
+  private Object[][] getMapData( ) {
+
+    Object[][] d = {
+      {
+        new Object[] {},
+        new Object[] {
+            new Object[] {11, new String[] {"1.1.1", "1.1.2" }},
+            new Object[] {12, new String[] {"1.2.1", "1.2.2" }}
+        },
+
+        new Object[] {
+            new Object[] {21, new String[] {"d2.1.1", "d2.1.2" }},
+            new Object[] {22, new String[] {}},
+            new Object[] {23, new String[] {"d2.3.1", "d2.3.2" }}
+        }
+      }
+    };
+
+    return d;
+  }
+
+  private Object[][] getMapBaseline() {
+
+    Object[][] d = {
+        new Object[] {},    // Empty record batch returned by OK_NEW_SCHEMA
+        new Object[] {},    // First incoming batch is empty
+
+        new Object[] {
+            new Object[] {11, new String[] {"1.1.1", "1.1.2"}},
+            new Object[] {12, new String[] {"1.2.1", "1.2.2"}}},
+
+        new Object[] {
+            new Object[] {21, new String[] {"d2.1.1", "d2.1.2"}},
+            new Object[] {22, new String[] {}},
+            new Object[] {23, new String[] {"d2.3.1", "d2.3.2"}}}
+
+    };
+    return d;
   }
 
   private boolean isTerminal(RecordBatch.IterOutcome outcome) {
