@@ -67,7 +67,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   private class UnnestMemoryManager {
     private final int outputRowCount;
     private static final int OFFSET_VECTOR_WIDTH = 4;
-    private static final int WORST_CASE_FRAGMENTATION_FACTOR = 2;
+    private static final int WORST_CASE_FRAGMENTATION_FACTOR = 1;
     private static final int MAX_NUM_ROWS = ValueVector.MAX_ROW_COUNT;
     private static final int MIN_NUM_ROWS = 1;
 
@@ -121,13 +121,15 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   @Override
   protected void killIncoming(boolean sendUpstream) {
-    super.killIncoming(sendUpstream);
+    // Do not call kill on incoming. Lateral Join has the
+    // responsibility for killing incoming
     hasRemainder = false;
   }
 
 
   @Override
   public IterOutcome innerNext() {
+
     if (hasRemainder) {
       return handleRemainder();
     }
@@ -214,9 +216,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   @Override
   protected IterOutcome doWork() {
-    final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize, popConfig
-        .getColumn
-        ());
+    final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
+        popConfig.getColumn());
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
     final int incomingRecordCount = incoming.getRecordCount();
     final int currentRecord = lateral.getRecordIndex();
@@ -229,7 +230,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord);
 
     // unnest the data
-    final int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(incomingRecordCount, 0);
+    final int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(childCount, 0);
 
     // Keep track of any spill over into another batch. HAppens only if you artificially set the output batch
     // size for unnest to a low number
@@ -250,6 +251,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   private IterOutcome handleRemainder() {
+    final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
+        popConfig.getColumn());
+    unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
     final int currentRecord = lateral.getRecordIndex();
     final int remainingRecordCount =
         unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord) - remainderIndex;

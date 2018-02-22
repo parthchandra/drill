@@ -91,7 +91,7 @@ public abstract class UnnestTemplate implements Unnest {
         // current record being processed thru the Lateral Join Contract.
         final int currentRecord = lateral.getRecordIndex();
         final int innerValueCount = accessor.getInnerValueCountAt(currentRecord);
-        final int count = Math.min(innerValueCount, outputLimit);
+        final int count = Math.min(Math.min(innerValueCount, outputLimit), recordCount);
 
         for (TransferPair t : transfers) {
           t.splitAndTransfer(innerValueIndex, count);
