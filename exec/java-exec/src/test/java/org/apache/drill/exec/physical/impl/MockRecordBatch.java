@@ -132,6 +132,11 @@ public class MockRecordBatch implements CloseableRecordBatch {
       final int recordCount = input.getRecordCount();
       // We need to do this since the downstream operator expects vector reference to be same
       // after first next call in cases when schema is not changed
+      final BatchSchema inputSchema = input.getSchema();
+      if (!container.getSchema().isEquivalent(inputSchema)) {
+        container.clear();
+        container = new VectorContainer(allocator, inputSchema);
+      }
       container.transferIn(input);
       container.setRecordCount(recordCount);
     }
