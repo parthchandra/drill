@@ -61,7 +61,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LateralJoinBatch.class);
 
   // Maximum number records in the outgoing batch
-  protected static final int MAX_BATCH_SIZE = 4096;
+  // Made public for testing
+  public static int MAX_BATCH_SIZE = 4096;
 
   // Input indexes to correctly update the stats
   protected static final int LEFT_INPUT = 0;
@@ -169,31 +170,32 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
       switch (leftUpstream) {
         case OK_NEW_SCHEMA:
-          // This means there is already some records from previous join inside left batch
-          // So we need to pass that downstream and then handle the OK_NEW_SCHEMA in subsequent next call
-          if (outputRecords > 0) {
-            processLeftBatchInFuture = true;
-            return OK_NEW_SCHEMA;
-          }
-
           // This OK_NEW_SCHEMA is received post build schema phase and from left side
+          // If schema didn't actually changed then just handle it as OK outcome
           if (!isSchemaChanged(left.getSchema(), leftSchema)) {
             logger.warn("New schema received from left side is same as previous known left schema. Ignoring this " +
               "schema change");
 
             // Current left batch is empty and schema didn't changed as well, so let's get next batch and loose
             // OK_NEW_SCHEMA outcome
+            processLeftBatchInFuture = false;
             if (emptyLeftBatch) {
-              processLeftBatchInFuture = false;
               continue;
+            } else {
+              leftUpstream = OK;
             }
+          } else if (outputRecords > 0) {
+            // This means there is already some records from previous join inside left batch
+            // So we need to pass that downstream and then handle the OK_NEW_SCHEMA in subsequent next call
+            processLeftBatchInFuture = true;
+            return OK_NEW_SCHEMA;
           }
 
           // If left batch is empty with actual schema change then just rebuild the output container and send empty
           // batch downstream
           if (emptyLeftBatch) {
             if (handleSchemaChange()) {
-              container.setRecordCount(0);
+              //container.setRecordCount(0);
               leftJoinIndex = -1;
               return OK_NEW_SCHEMA;
             } else {
@@ -213,7 +215,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
           // don't call next on right batch
           if (emptyLeftBatch) {
             leftJoinIndex = -1;
-            container.setRecordCount(0);
+            //container.setRecordCount(0);
             return EMIT;
           } else {
             leftJoinIndex = 0;
@@ -229,7 +231,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
           //TODO we got a STOP, shouldn't we stop immediately ?
           // TODO: check what killAndDrain will do w.r.t UNNEST, we discussed about calling right side
           // of LATERAL with NONE outcome or calling stop explicitly when NONE is seen on left side
-          killAndDrainIncoming(right, rightUpstream, RIGHT_INPUT);
+          //killAndDrainIncoming(right, rightUpstream, RIGHT_INPUT);
+          //VectorAccessibleUtilities.clear(container);
           return leftUpstream;
         case NOT_YET:
           try {
@@ -292,8 +295,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         case STOP:
           //TODO we got a STOP, shouldn't we stop immediately ?
           // TODO: Should we kill left side if right side fails ?
-          killAndDrainIncoming(left, leftUpstream, LEFT_INPUT);
-          VectorAccessibleUtilities.clear(container);
+          //killAndDrainIncoming(left, leftUpstream, LEFT_INPUT);
+          //VectorAccessibleUtilities.clear(container);
           needNewRightBatch = false;
           break;
         case NOT_YET:
@@ -330,6 +333,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // left side is terminal state then just return the IterOutcome and don't call next() on
     // right branch
     if (left.getRecordCount() == 0 || isTerminalOutcome(childOutcome)) {
+      container.setRecordCount(0);
       return childOutcome;
     }
 
@@ -369,6 +373,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
   private IterOutcome produceOutputBatch() {
 
+    boolean isLeftProcessed = false;
+
     // Try to fully pack the outgoing container
     while (outputRecords < LateralJoinBatch.MAX_BATCH_SIZE) {
       int previousOutputCount = outputRecords;
@@ -384,8 +390,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         rightJoinIndex = -1;
       } else {
         // One right batch might span across multiple output batch. So rightIndex will be moving sum of all the
-        // output records for this record batch until it's fully consumed
-        rightJoinIndex += outputRecords;
+        // output records for this record batch until it's fully consumed.
+        //
+        // Also it can be so that one output batch can contain records from 2 different right batch hence the
+        // rightJoinIndex should move by number of records in output batch for current right batch only.
+        rightJoinIndex += outputRecords - previousOutputCount;
       }
 
       final boolean isRightProcessed = rightJoinIndex == -1 || rightJoinIndex >= right.getRecordCount();
@@ -411,7 +420,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       }
 
       // Check if previous left record was last one, then set leftJoinIndex to -1
-      final boolean isLeftProcessed = leftJoinIndex >= left.getRecordCount();
+      isLeftProcessed = leftJoinIndex >= left.getRecordCount();
       if (isLeftProcessed) {
         leftJoinIndex = -1;
         VectorAccessibleUtilities.clear(left);
@@ -433,6 +442,18 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
               finalizeOutputContainer();
               return OK;
             }
+
+            // If left batch received a terminal outcome then don't call right batch
+            if (isTerminalOutcome(leftUpstream)) {
+              finalizeOutputContainer();
+              return leftUpstream;
+            }
+
+            // If we have received the left batch with EMIT outcome and is empty then we should return previous output
+            // batch with EMIT outcome
+            if (leftUpstream == EMIT && left.getRecordCount() == 0) {
+              break;
+            }
           }
         }
 
@@ -449,6 +470,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         Preconditions.checkState(rightUpstream != OK_NEW_SCHEMA, "Unexpected schema change in right branch");
 
         if (isTerminalOutcome(rightUpstream)) {
+          finalizeOutputContainer();
           return rightUpstream;
         }
       }
@@ -456,7 +478,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     finalizeOutputContainer();
 
-    if (leftUpstream == EMIT) {
+    // Check if output batch was full and left was fully consumed or not. Since if left is not consumed entirely
+    // but output batch is full, then if the left batch came with EMIT outcome we should send this output batch along
+    // with OK outcome not with EMIT. Whereas if output is full and left is also fully consumed then we should send
+    // EMIT outcome.
+    if (leftUpstream == EMIT && isLeftProcessed) {
       return EMIT;
     }
 
@@ -484,6 +510,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     // We are about to send the output batch so reset the outputRecords for future next call
     outputRecords = 0;
+    // Update the output index for next output batch to zero
+    lateralJoiner.updateOutputIndex(0);
   }
 
   private void killAndDrainIncoming(RecordBatch batch, IterOutcome outcome,
@@ -511,7 +539,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   }
 
   private boolean isSchemaChanged(BatchSchema newSchema, BatchSchema oldSchema) {
-    return newSchema.isEquivalent(oldSchema);
+    return !newSchema.isEquivalent(oldSchema);
   }
 
   /**
@@ -697,6 +725,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   @Override
   protected void killIncoming(boolean sendUpstream) {
     this.left.kill(sendUpstream);
+    // Reset the left side outcome as STOP since as part of right kill when UNNEST will ask IterOutcome of left incoming
+    // from LATERAL and based on that it can make decision if the kill is coming from downstream to LATERAL or upstream
+    // to LATERAL. Like LIMIT operator being present downstream to LATERAL or upstream to LATERAL and downstream to
+    // UNNEST.
+    leftUpstream = STOP;
     this.right.kill(sendUpstream);
   }
 

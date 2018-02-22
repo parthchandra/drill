@@ -95,7 +95,7 @@ public abstract class LateralJoinTemplate implements LateralJoin {
    * newOutputIndex
    * @param newOutputIndex - new output index of outgoing batch after copying the records
    */
-  private void updateOutputIndex(int newOutputIndex) {
+  public void updateOutputIndex(int newOutputIndex) {
     outputIndex = (newOutputIndex >= LateralJoinBatch.MAX_BATCH_SIZE) ?
       0 : newOutputIndex;
   }

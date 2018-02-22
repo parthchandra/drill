@@ -49,14 +49,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   //private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(TestNestedNotYet.class);
 
   // Operator Context for mock batch
-  public static OperatorContext operatorContext;
-
-  // For now using MockStorePop for MockRecordBatch
-  public static PhysicalOperator mockPopConfig;
+  private static OperatorContext operatorContext;
 
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
-    mockPopConfig = new MockStorePOP(null);
+    PhysicalOperator mockPopConfig = new MockStorePOP(null);
     operatorContext = fixture.newOperatorContext(mockPopConfig);
   }
 
@@ -131,8 +128,8 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       }
 
       // TODO: We can add check for output correctness as well
-      assertTrue (((MockRecordBatch) leftMockBatch).isCompleted());
-      assertTrue(((MockRecordBatch) rightMockBatch).isCompleted());
+      //assertTrue (((MockRecordBatch) leftMockBatch).isCompleted());
+      //assertTrue(((MockRecordBatch) rightMockBatch).isCompleted());
     } catch (AssertionError | Exception error){
       fail();
     } finally {
@@ -381,7 +378,12 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     }
   }
 
-
+  /**
+   * Test to show correct IterOutcome produced by LATERAL when one record in left batch produces only 1 right batch
+   * with EMIT outcome. Then output of LATERAL should be produced by OK outcome after the join. It verifies the number
+   * of records in the output batch based on left and right input batches.
+   * @throws Exception
+   */
   @Test
   public void testLateral1RecordLeftBatchTo1RightRecordBatch() throws Exception {
     // Create left input schema
@@ -461,6 +463,13 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     }
   }
 
+  /**
+   * Test to show correct IterOutcome & output produced by LATERAL when one record in left batch produces 2 right
+   * batches with OK and EMIT outcome respectively. Then output of LATERAL should be produced with OK outcome after the
+   * join is done using both right batch with the left batch. It verifies the number of records in the output batch
+   * based on left and right input batches.
+   * @throws Exception
+   */
   @Test
   public void testLateral1RecordLeftBatchTo2RightRecordBatch() throws Exception {
     // Create left input schema
@@ -629,7 +638,1052 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     }
   }
 
+  /**
+   * Test to show LATERAL tries to pack the output batch until it's full or all the data is consumed from left and
+   * right side. We have multiple left and right batches which fits after join inside the same output batch, hence
+   * LATERAL only generates one output batch.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralFillingUpOutputBatch() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
 
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(2, 20, "item20")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(4, 41, "item41")
+      .addRow(5, 51, "item51")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(2);
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(2);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      assertTrue(ljBatch.getRecordCount() ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount() +
+          leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      leftRowSet2.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+      nonEmptyRightRowSet2.clear();
+    }
+  }
+
+  /**
+   * When multiple left batch is received with different schema, then LATERAL produces output for each schema type
+   * separately (even though output batch is not filled completely) and handles the schema change in left batch.
+   * Moreover in this case the schema change was only for columns which are not produced by the UNNEST or right branch.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralHandlingSchemaChangeForNonUnnestField() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema1 = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create left input schema 2
+    TupleMetadata leftSchema2 = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.VARCHAR)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema1)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema2)
+      .addRow(2, "20", "item20")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(4, 41, "item41")
+      .addRow(5, 51, "item51")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(2);
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(2);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+      // This means 2 output record batches were received because of Schema change
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount() +
+          leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      leftRowSet2.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+      nonEmptyRightRowSet2.clear();
+    }
+  }
+
+  /**
+   * When multiple left batch is received with same schema but with OK_NEW_SCHEMA, then LATERAL detects that
+   * correctly and suppresses schema change operation by producing output in same batch created with initial schema.
+   * The schema change was only for columns which are not produced by the UNNEST or right branch.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralHandlingOK_NEW_SCHEMA_WithNoActualSchemaChange() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(2, 20, "item20")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(4, 41, "item41")
+      .addRow(5, 51, "item51")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(2);
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(2);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount() +
+          leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
+      // This means only 1 output record batch was received.
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      leftRowSet2.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+      nonEmptyRightRowSet2.clear();
+    }
+  }
+
+
+  /**
+   * When multiple left batch is received with same schema but with OK_NEW_SCHEMA, then LATERAL detects that
+   * correctly and suppresses schema change operation by producing output in same batch created with initial schema.
+   * The schema change was only for columns which are not produced by the UNNEST or right branch.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralHandlingEMITFromLeft() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet emptyLeftRowSet = fixture.rowSetBuilder(leftSchema)
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(3, 30, "item30")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(4, 41, "item41")
+      .addRow(5, 51, "item51")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(emptyLeftRowSet.container());
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 1st output batch is received for first EMIT from LEFT side
+      assertTrue(RecordBatch.IterOutcome.EMIT == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // 2nd output batch is received for second EMIT from LEFT side
+      assertTrue(RecordBatch.IterOutcome.EMIT == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // Compare the total records generated in 2 output batches with expected count.
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount() +
+          leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      emptyLeftRowSet.clear();
+      leftRowSet1.clear();
+      leftRowSet2.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+      nonEmptyRightRowSet2.clear();
+    }
+  }
+
+  /**
+   * Test for the case where LATERAL received a left batch with OK outcome and then populate the Join output in the
+   * outgoing batch. There is still some space left in output batch so LATERAL call's next() on left side and receive
+   * NONE outcome from left side. Then in this case LATERAL should produce the previous output batch with OK outcome
+   * and then handle NONE outcome in future next() call.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralHandlingNoneAfterOK() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(leftRowSet1.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 1st output batch is received for first EMIT from LEFT side
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // Compare the total records generated in 2 output batches with expected count.
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+    }
+  }
+
+  /**
+   * Test for the case when LATERAL received a left batch with OK outcome and then populate the Join output in the
+   * outgoing batch. There is still some space left in output batch so LATERAL call's next() on left side and receive
+   * EMIT outcome from left side with empty batch. Then in this case LATERAL should produce the previous output batch
+   * with EMIT outcome.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralHandlingEmptyEMITAfterOK() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet emptyLeftRowSet = fixture.rowSetBuilder(leftSchema)
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(emptyLeftRowSet.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 1st output batch is received for first EMIT from LEFT side
+      assertTrue(RecordBatch.IterOutcome.EMIT == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // Compare the total records generated in 2 output batches with expected count.
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      emptyLeftRowSet.clear();
+      leftRowSet1.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+    }
+  }
+
+  /**
+   * Test for the case when LATERAL received a left batch with OK outcome and then populate the Join output in the
+   * outgoing batch. There is still some space left in output batch so LATERAL call's next() on left side and receive
+   * EMIT outcome from left side with non-empty batch. Then in this case LATERAL should produce the output batch with
+   * EMIT outcome if second left and right batches are also consumed entirely in same output batch.
+   * @throws Exception
+   */
+  @Test
+  public void testLateralHandlingNonEmptyEMITAfterOK() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(2, 20, "item20")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(4, 41, "item41")
+      .addRow(5, 51, "item51")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 1st output batch is received for first EMIT from LEFT side
+      assertTrue(RecordBatch.IterOutcome.EMIT == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // Compare the total records generated in 2 output batches with expected count.
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount()) +
+          (leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      // Expected since first right batch is supposed to be empty
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      leftRowSet2.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+      nonEmptyRightRowSet2.clear();
+    }
+  }
+
+  /**
+   * Temporary test to validate LATERAL handling output batch getting filled without consuming full output from left
+   * and right batch join.
+   *
+   * For this test we are updating {@link LateralJoinBatch#MAX_BATCH_SIZE} by making it public, which might not expected
+   * after including the BatchSizing logic
+   * @throws Exception
+   */
+  @Test
+  public void testHandlingNonEmpty_EMITAfterOK_WithMultipleOutput() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(2, 20, "item20")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(4, 41, "item41")
+      .addRow(5, 51, "item51")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(leftRowSet1.container());
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    int originalMaxBatchSize = LateralJoinBatch.MAX_BATCH_SIZE;
+    LateralJoinBatch.MAX_BATCH_SIZE = 2;
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 1st output batch
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+      assertTrue(ljBatch.getRecordCount() == LateralJoinBatch.MAX_BATCH_SIZE);
+
+      // 2nd output batch
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      assertTrue(ljBatch.getRecordCount() == LateralJoinBatch.MAX_BATCH_SIZE);
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // 3rd output batch
+      assertTrue(RecordBatch.IterOutcome.EMIT == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // Compare the total records generated in 2 output batches with expected count.
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount()) +
+          (leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } catch (AssertionError | Exception error){
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      leftRowSet2.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+      nonEmptyRightRowSet2.clear();
+      LateralJoinBatch.MAX_BATCH_SIZE = originalMaxBatchSize;
+    }
+  }
+
+  @Test
+  public void testHandlingOOMFromLeft() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(leftRowSet1.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.OUT_OF_MEMORY);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 1st output batch
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
+
+      // 2nd output batch
+      assertTrue(RecordBatch.IterOutcome.OUT_OF_MEMORY == ljBatch.next());
+
+      // Compare the total records generated in 2 output batches with expected count.
+      assertTrue(totalRecordCount ==
+        (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount()));
+
+      // TODO: We are not draining left or right batch anymore on receiving terminal outcome from either branch
+      // TODO: since not sure if that's the right behavior
+      //assertTrue(((MockRecordBatch) leftMockBatch).isCompleted());
+      //assertTrue(((MockRecordBatch) rightMockBatch).isCompleted());
+
+    } catch (AssertionError | Exception error){
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+    }
+  }
+
+  @Test
+  public void testHandlingOOMFromRight() throws Exception {
+    // Create left input schema
+    TupleMetadata leftSchema = new SchemaBuilder()
+      .add("id_left", TypeProtos.MinorType.INT)
+      .add("cost_left", TypeProtos.MinorType.INT)
+      .add("name_left", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create right input schema
+    TupleMetadata rightSchema = new SchemaBuilder()
+      .add("id_right", TypeProtos.MinorType.INT)
+      .add("cost_right", TypeProtos.MinorType.INT)
+      .add("name_right", TypeProtos.MinorType.VARCHAR)
+      .buildSchema();
+
+    // Create data for left input
+    final RowSet.SingleRowSet leftRowSet1 = fixture.rowSetBuilder(leftSchema)
+      .addRow(1, 10, "item10")
+      .build();
+
+    // Create data for right input
+    final RowSet.SingleRowSet emptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .build();
+
+    final RowSet.SingleRowSet nonEmptyRightRowSet1 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, "item11")
+      .addRow(2, 21, "item21")
+      .addRow(3, 31, "item31")
+      .build();
+
+    final LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.FULL);
+
+    // Get the left container with dummy data for NLJ
+    final List<VectorContainer> leftContainer = new ArrayList<>(3);
+    leftContainer.add(leftRowSet1.container());
+
+    // Get the left IterOutcomes for NLJ
+    final List<RecordBatch.IterOutcome> leftOutcomes = new ArrayList<>(3);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final List<VectorContainer> rightContainer = new ArrayList<>(5);
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet1.container());
+
+    final List<RecordBatch.IterOutcome> rightOutcomes = new ArrayList<>(5);
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.OUT_OF_MEMORY);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      // int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+
+      // 2nd output batch
+      assertTrue(RecordBatch.IterOutcome.OUT_OF_MEMORY == ljBatch.next());
+
+      // Compare the total records generated in 2 output batches with expected count.
+      //assertTrue(totalRecordCount ==
+      //  (leftRowSet1.rowCount() * nonEmptyRightRowSet1.rowCount()));
+      // TODO: We are not draining left or right batch anymore on receiving terminal outcome from either branch
+      // TODO: since not sure if that's the right behavior
+      //assertTrue(((MockRecordBatch) leftMockBatch).isCompleted());
+      //assertTrue(((MockRecordBatch) rightMockBatch).isCompleted());
+
+    } catch (AssertionError | Exception error){
+      fail();
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet1.clear();
+      emptyRightRowSet.clear();
+      nonEmptyRightRowSet1.clear();
+    }
+  }
 
   private boolean isTerminal(RecordBatch.IterOutcome outcome) {
     return (outcome == RecordBatch.IterOutcome.NONE || outcome == RecordBatch.IterOutcome.STOP) || (outcome == RecordBatch.IterOutcome.OUT_OF_MEMORY);

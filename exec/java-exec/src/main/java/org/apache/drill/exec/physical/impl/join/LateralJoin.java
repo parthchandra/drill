@@ -43,6 +43,8 @@ public interface LateralJoin {
 
   public void generateLeftJoinOutput(int leftIndex);
 
+  public void updateOutputIndex(int newOutputIndex);
+
   // Project the record at offset 'leftIndex' in the left input batch into the output container at offset 'outIndex'
   public void emitLeft(int leftIndex, int outIndex);
 
