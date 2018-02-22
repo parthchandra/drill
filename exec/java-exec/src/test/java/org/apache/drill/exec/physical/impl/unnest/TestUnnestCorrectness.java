@@ -21,6 +21,7 @@ import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
+import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.UnnestPOP;
@@ -33,6 +34,7 @@ import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.mock.MockStorePOP;
 import org.apache.drill.exec.vector.ValueVector;
+import org.apache.drill.exec.vector.VarCharVector;
 import org.apache.drill.exec.vector.complex.MapVector;
 import org.apache.drill.test.SubOperatorTest;
 import org.apache.drill.test.rowSet.RowSet;
@@ -40,6 +42,7 @@ import org.apache.drill.test.rowSet.RowSetBuilder;
 import org.apache.drill.test.rowSet.SchemaBuilder;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -69,13 +72,13 @@ import static org.junit.Assert.assertTrue;
   }
 
   @Test
-  public void testUnnestFixedWidthColumn() throws Exception {
+  public void testUnnestFixedWidthColumn() {
 
     Object[][] data = {
         { (Object) new int[] {1, 2},
           (Object) new int[] {3, 4, 5}},
         { (Object) new int[] {6, 7, 8, 9},
-          (Object) new int[] {10, 11, 12, 13}}
+          (Object) new int[] {10, 11, 12, 13, 14}}
     };
 
     // Create input schema
@@ -88,12 +91,16 @@ import static org.junit.Assert.assertTrue;
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
-    testUnnest(incomingSchema, iterOutcomes, data, baseline);
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
 
   }
 
   @Test
-  public void testUnnestVarWidthColumn() throws Exception {
+  public void testUnnestVarWidthColumn() {
 
     Object[][] data = {
         { (Object) new String[] {"", "zero"},
@@ -108,17 +115,21 @@ import static org.junit.Assert.assertTrue;
         .addArray("unnestColumn", TypeProtos.MinorType.VARCHAR).buildSchema();
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
-    String[][] baseline = {{}, {null, ""}, {"one", "two", "three"}, {"four", "five", "six", "seven"}, {"eight", "nine",
-        "ten", "eleven", "twelve"}};
+    String[][] baseline = {{}, {"", "zero"}, {"one", "two", "three"}, {"four", "five", "six", "seven"},
+        {"eight", "nine", "ten", "eleven", "twelve"}};
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
-    testUnnest(incomingSchema, iterOutcomes, data, baseline);
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
 
   }
 
   @Test
-  public void testUnnestMapColumn() throws Exception {
+  public void testUnnestMapColumn() {
 
     Object[][] data = getMapData();
 
@@ -130,13 +141,174 @@ import static org.junit.Assert.assertTrue;
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
-    testUnnest(incomingSchema, iterOutcomes, data, baseline);
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
 
   }
 
-  private <T> void testUnnest( TupleMetadata incomingSchema, RecordBatch.IterOutcome[] iterOutcomes, T[][] data,
-      T[][] baseline) throws
-      Exception {
+  @Test
+  public void testUnnestEmptyList() {
+
+    Object[][] data = {
+        { (Object) new String[] {},
+          (Object) new String[] {}
+        },
+        { (Object) new String[] {},
+          (Object) new String[] {}
+        }
+    };
+
+    // Create input schema
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("someColumn", TypeProtos.MinorType.INT)
+        .addArray("unnestColumn", TypeProtos.MinorType.VARCHAR).buildSchema();
+
+    // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
+    // All subsequent batches are also empty
+    String[][] baseline = {{}, {}, {}, {}, {}};
+
+    RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
+
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
+
+  }
+
+  @Test
+  public void testUnnestMultipleNewSchemaIncoming() {
+
+    // Schema changes in incoming have no effect on unnest unless the type of the
+    // unnest column itself has changed
+    Object[][] data = {
+        {
+            (Object) new String[] {"0", "1"},
+            (Object) new String[] {"2", "3", "4"}
+        },
+        {
+            (Object) new String[] {"5", "6" },
+        },
+        {
+            (Object) new String[] {"9"}
+        }
+    };
+
+    // Create input schema
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("someColumn", TypeProtos.MinorType.INT)
+        .addArray("unnestColumn", TypeProtos.MinorType.VARCHAR).buildSchema();
+
+    // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
+    String[][] baseline = {{}, {"0", "1"}, {"2", "3", "4"}, {"5", "6" }, {"9"} };
+
+    RecordBatch.IterOutcome[] iterOutcomes = {
+        RecordBatch.IterOutcome.OK_NEW_SCHEMA,
+        RecordBatch.IterOutcome.OK,
+        RecordBatch.IterOutcome.OK_NEW_SCHEMA};
+
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
+
+  }
+
+  @Ignore
+  @Test
+  public void testUnnestSchemaChange() {
+    Object[][] data = {
+        {
+            (Object) new String[] {"0", "1"},
+            (Object) new String[] {"2", "3", "4"}
+        },
+        {
+            (Object) new String[] {"5", "6" },
+        },
+        {
+            (Object) new int[] {9}
+        }
+    };
+
+    // Create input schema
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("someColumn", TypeProtos.MinorType.INT)
+        .addArray("unnestColumn", TypeProtos.MinorType.VARCHAR).buildSchema();
+
+    // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
+    // Another empty batch introduced by the schema change in the last batch
+    Object[][] baseline = {{}, {"0", "1"}, {"2", "3", "4"}, {"5", "6" }, {}, {9} };
+
+    RecordBatch.IterOutcome[] iterOutcomes = {
+        RecordBatch.IterOutcome.OK_NEW_SCHEMA,
+        RecordBatch.IterOutcome.OK,
+        RecordBatch.IterOutcome.OK_NEW_SCHEMA};
+
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
+
+  }
+
+  @Test
+  public void testUnnestLimitBatchSize() {
+
+    final int limitedOutputBatchSize = 1024;
+    final int limitedOutputBatchSizeBytes = 1024*4*1; // num rows * size of int
+    final int inputBatchSize = 1024+1;
+    // single record batch with single row. The unnest column has one
+    // more record than the batch size we want in the output
+    Object[][] data = new Object[1][1];
+
+    for (int i = 0; i < data.length; i++) {
+      for (int j = 0; j < data[i].length; j++) {
+        data[i][j] = new int[inputBatchSize];
+        for (int k =0; k < inputBatchSize; k++) {
+          ((int[])data[i][j])[k] = k;
+        }
+      }
+    }
+    Integer[][] baseline = new Integer[3][];
+    baseline[0] = new Integer[] {};
+    baseline[1] = new Integer[limitedOutputBatchSize];
+    baseline[2] = new Integer[1];
+    for (int i = 0; i < limitedOutputBatchSize; i++) {
+      baseline[1][i] = i;
+    }
+    baseline[2][0] = limitedOutputBatchSize;
+
+    // Create input schema
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("rowNumber", TypeProtos.MinorType.INT)
+        .addArray("unnestColumn", TypeProtos.MinorType.INT).buildSchema();
+
+    RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK};
+
+    final long outputBatchSize = fixture.getFragmentContext().getOptions().getOption(ExecConstants
+        .OUTPUT_BATCH_SIZE_VALIDATOR);
+    fixture.getFragmentContext().getOptions().setLocalOption(ExecConstants.OUTPUT_BATCH_SIZE, limitedOutputBatchSizeBytes);
+
+    try {
+      testUnnestSingleSchema(incomingSchema, iterOutcomes, data, baseline);
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    } finally {
+      fixture.getFragmentContext().getOptions().setLocalOption(ExecConstants.OUTPUT_BATCH_SIZE, outputBatchSize);
+    }
+
+  }
+
+  private <T> void testUnnestSingleSchema( TupleMetadata incomingSchema,
+      RecordBatch.IterOutcome[] iterOutcomes,
+      T[][] data,
+      T[][] baseline) throws Exception {
 
     // Get the incoming container with dummy data for LJ
     final List<VectorContainer> incomingContainer = new ArrayList<>(data.length);
@@ -203,13 +375,21 @@ import static org.junit.Assert.assertTrue;
           }
           for (int j = 0; j < valueCount; j++) {
 
-            if(vv instanceof MapVector) {
-              if (!compareMapBaseline((Object)baseline[i][j], vv.getAccessor().getObject(j))) {
+            if (vv instanceof MapVector) {
+              if (!compareMapBaseline((Object) baseline[i][j], vv.getAccessor().getObject(j))) {
                 fail("Test failed in validating unnest(Map) output. Value mismatch");
               }
+            } else  if (vv instanceof VarCharVector) {
+              Object val = vv.getAccessor().getObject(j);
+              if (((String) baseline[i][j]).compareTo(val.toString()) != 0) {
+                fail("Test failed in validating unnest output. Value mismatch. Baseline value[]" + i + "][" + j + "]"
+                    + ": " + baseline[i][j] + "   VV.getObject(j): " + val);
+              }
             } else {
-              if (baseline[i][j] != vv.getAccessor().getObject(j)) {
-                fail("Test failed in validating unnest output. Value mismatch");
+              Object val = vv.getAccessor().getObject(j);
+              if (!baseline[i][j].equals(val)) {
+                fail("Test failed in validating unnest output. Value mismatch. Baseline value["+i+"]["+j+"]"+": "+
+                    baseline[i][j] + "   VV.getObject(j): " + val);
               }
             }
           }
@@ -220,6 +400,8 @@ import static org.junit.Assert.assertTrue;
 
       assertTrue(((MockLateralJoinBatch) lateralJoinBatch).isCompleted());
 
+    } catch (Exception e) {
+      fail("Test failed in validating unnest output. Exception : " + e.getMessage());
     } finally {
       // Close all the resources for this test case
       unnestBatch.close();
