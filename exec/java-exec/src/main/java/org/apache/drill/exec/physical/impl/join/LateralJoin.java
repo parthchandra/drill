@@ -41,7 +41,7 @@ public interface LateralJoin {
   // Produce output records taking into account join type
   public int crossJoinAndOutputRecords(int leftIndex, int rightIndex);
 
-  public void generateLeftJoinOutput(int leftIndex);
+  public int generateLeftJoinOutput(int leftIndex);
 
   public void updateOutputIndex(int newOutputIndex);
 

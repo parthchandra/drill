@@ -105,13 +105,14 @@ public abstract class LateralJoinTemplate implements LateralJoin {
    * used in case when Join Type is LEFT and we have only seen empty batches from right side
    * @param leftIndex - index in left batch to copy record from
    */
-  public void generateLeftJoinOutput(int leftIndex) {
+  public int generateLeftJoinOutput(int leftIndex) {
     int currentOutputIndex = outputIndex;
 
     if (JoinRelType.LEFT == joinType) {
       emitLeft(leftIndex, currentOutputIndex++);
       updateOutputIndex(currentOutputIndex);
     }
+    return currentOutputIndex;
   }
 
   /**
