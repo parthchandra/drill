@@ -27,6 +27,7 @@ import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
 import org.apache.drill.exec.record.BatchSchema;
 import org.apache.drill.exec.record.CloseableRecordBatch;
 import org.apache.drill.exec.record.ExpandableHyperContainer;
+import org.apache.drill.exec.record.HyperVectorWrapper;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.record.TypedFieldId;
@@ -37,6 +38,7 @@ import org.apache.drill.exec.record.selection.SelectionVector2;
 import org.apache.drill.exec.record.selection.SelectionVector4;
 import org.apache.drill.exec.vector.ValueVector;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -58,7 +60,7 @@ public class MockLateralJoinBatch implements LateralContract, CloseableRecordBat
   private final FragmentContext context;
   private  final OperatorContext oContext;
 
-  private ExpandableHyperContainer results = new ExpandableHyperContainer();
+  private List<ValueVector> resultList = new ArrayList<>();
 
   public MockLateralJoinBatch(FragmentContext context, OperatorContext oContext, RecordBatch incoming) {
     this.context = context;
@@ -145,13 +147,13 @@ public class MockLateralJoinBatch implements LateralContract, CloseableRecordBat
     return null;
   }
 
-  public ExpandableHyperContainer getResults() {
-    return results;
+  public List<ValueVector> getResultList() {
+    return resultList;
   }
 
   @Override
   public void close() throws Exception {
-    results.clear();
+
   }
 
   @Override public int getRecordCount() {
@@ -206,7 +208,9 @@ public class MockLateralJoinBatch implements LateralContract, CloseableRecordBat
     final RecordBatchData batchCopy = new RecordBatchData(inputBatch, oContext.getAllocator());
     boolean success = false;
     try {
-      results.addBatch(batchCopy.getContainer());
+      for (VectorWrapper<?> w : batchCopy.getContainer()) {
+        resultList.add(w.getValueVector());
+      }
       success = true;
     } finally {
       if (!success) {
