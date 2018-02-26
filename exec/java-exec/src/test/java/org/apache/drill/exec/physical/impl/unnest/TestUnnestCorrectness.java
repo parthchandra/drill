@@ -18,6 +18,7 @@
 package org.apache.drill.exec.physical.impl.unnest;
 
 import org.apache.drill.categories.OperatorTest;
+import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
@@ -27,11 +28,9 @@ import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.physical.impl.MockRecordBatch;
 import org.apache.drill.exec.physical.rowSet.impl.TestResultSetLoaderMapArray;
-import org.apache.drill.exec.record.ExpandableHyperContainer;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.TupleMetadata;
 import org.apache.drill.exec.record.VectorContainer;
-import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.mock.MockStorePOP;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.VarCharVector;
@@ -42,7 +41,6 @@ import org.apache.drill.test.rowSet.RowSetBuilder;
 import org.apache.drill.test.rowSet.SchemaBuilder;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -318,8 +316,131 @@ import static org.junit.Assert.assertTrue;
 
   }
 
+  @Test
+  // Limit sends a kill. Unnest has more than one record batch for a record when
+  // the kill is sent.
+  public void testUnnestKillFromLimitSubquery1() {
+
+    // similar to previous test; we split a record across more than one batch.
+    // but we also set a limit less than the size of the batch so only one batch gets output.
+
+    final int limitedOutputBatchSize = 1024;
+    final int limitedOutputBatchSizeBytes = 1024*4*1; // num rows * size of int
+    final int inputBatchSize = 1024+1;
+    // single record batch with single row. The unnest column has one
+    // more record than the batch size we want in the output
+    Object[][] data = new Object[1][1];
+
+    for (int i = 0; i < data.length; i++) {
+      for (int j = 0; j < data[i].length; j++) {
+        data[i][j] = new int[inputBatchSize];
+        for (int k =0; k < inputBatchSize; k++) {
+          ((int[])data[i][j])[k] = k;
+        }
+      }
+    }
+    Integer[][] baseline = new Integer[3][];
+    baseline[0] = new Integer[] {};
+    baseline[1] = new Integer[limitedOutputBatchSize];
+    baseline[2] = new Integer[1];
+    for (int i = 0; i < limitedOutputBatchSize; i++) {
+      baseline[1][i] = i;
+    }
+    baseline[2] = new Integer[] {}; // because of kill the next batch is an empty batch
+
+    // Create input schema
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("rowNumber", TypeProtos.MinorType.INT)
+        .addArray("unnestColumn", TypeProtos.MinorType.INT).buildSchema();
+
+    TupleMetadata[] incomingSchemas = {incomingSchema};
+
+    RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK};
+
+    final long outputBatchSize = fixture.getFragmentContext().getOptions().getOption(ExecConstants
+        .OUTPUT_BATCH_SIZE_VALIDATOR);
+    fixture.getFragmentContext().getOptions().setLocalOption(ExecConstants.OUTPUT_BATCH_SIZE, limitedOutputBatchSizeBytes);
+
+    try {
+      testUnnest(incomingSchemas, iterOutcomes, 100, -1, data, baseline); // Limit of 100 values for unnest.
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    } finally {
+      fixture.getFragmentContext().getOptions().setLocalOption(ExecConstants.OUTPUT_BATCH_SIZE, outputBatchSize);
+    }
+
+  }
+
+  @Test
+  // Limit sends a kill. Unnest has exactly one record batch for a record when
+  // the kill is sent. This test is actually useless since it tests the behaviour of
+  // the mock lateral which doesn't send kill at all if it gets an EMIT. We expect limit
+  // to do the same so let's keep the test to demonstrate the expected behaviour.
+  public void testUnnestKillFromLimitSubquery2() {
+
+    // similar to previous test but the size of the array fits exactly into the record batch;
+
+
+    final int limitedOutputBatchSize = 1024;
+    final int limitedOutputBatchSizeBytes = 1024*4; // num rows * size of int
+    final int inputBatchSize = 1024;
+    // single record batch with single row. The unnest column has one
+    // more record than the batch size we want in the output
+    Object[][] data = new Object[1][1];
+
+    for (int i = 0; i < data.length; i++) {
+      for (int j = 0; j < data[i].length; j++) {
+        data[i][j] = new int[inputBatchSize];
+        for (int k =0; k < inputBatchSize; k++) {
+          ((int[])data[i][j])[k] = k;
+        }
+      }
+    }
+    Integer[][] baseline = new Integer[2][];
+    baseline[0] = new Integer[] {};
+    baseline[1] = new Integer[limitedOutputBatchSize];
+    for (int i = 0; i < limitedOutputBatchSize; i++) {
+      baseline[1][i] = i;
+    }
+
+    // Create input schema
+    TupleMetadata incomingSchema = new SchemaBuilder()
+        .add("rowNumber", TypeProtos.MinorType.INT)
+        .addArray("unnestColumn", TypeProtos.MinorType.INT).buildSchema();
+
+    TupleMetadata[] incomingSchemas = {incomingSchema};
+
+    RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK};
+
+    final long outputBatchSize = fixture.getFragmentContext().getOptions().getOption(ExecConstants
+        .OUTPUT_BATCH_SIZE_VALIDATOR);
+    fixture.getFragmentContext().getOptions().setLocalOption(ExecConstants.OUTPUT_BATCH_SIZE, limitedOutputBatchSizeBytes);
+
+    try {
+      testUnnest(incomingSchemas, iterOutcomes, 100, -1, data, baseline); // Limit of 100 values for unnest.
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    } finally {
+      fixture.getFragmentContext().getOptions().setLocalOption(ExecConstants.OUTPUT_BATCH_SIZE, outputBatchSize);
+    }
+
+  }
+
+  // test unnest for various input conditions without invoking kill
+  private <T> void testUnnest(
+      TupleMetadata[] incomingSchemas,
+      RecordBatch.IterOutcome[] iterOutcomes,
+      T[][] data,
+      T[][] baseline ) throws Exception{
+    testUnnest(incomingSchemas, iterOutcomes, -1, -1, data, baseline);
+  }
+
+  // test unnest for various input conditions optionally invoking kill. if the kill or killBatch
+  // parameter is greater than 0 then the record batch is sent a kill after that many batches have been processed
   private <T> void testUnnest( TupleMetadata[] incomingSchemas,
       RecordBatch.IterOutcome[] iterOutcomes,
+      int unnestLimit, // kill unnest after every 'unnestLimit' number of values in every record
+      int execKill, // number of batches after which to kill the execution (!)
       T[][] data,
       T[][] baseline) throws Exception {
 
@@ -368,12 +489,19 @@ import static org.junit.Assert.assertTrue;
 
     // set backpointer to lateral join in unnest
     lateralJoinBatch.setUnnest(unnestBatch);
+    lateralJoinBatch.setUnnestLimit(unnestLimit);
 
     // Simulate the pipeline by calling next on the incoming
     List<ValueVector> results = null;
+    int batchesProcessed = 0;
     try {
       while (!isTerminal(lateralJoinBatch.next())) {
-        // nothing to do
+        batchesProcessed++;
+        if (batchesProcessed == execKill) {
+          lateralJoinBatch.getContext().getExecutorState().fail(new DrillException("Testing failure of execution."));
+          lateralJoinBatch.kill(true);
+        }
+        // else nothing to do
       }
 
       // Check results against baseline
