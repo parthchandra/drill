@@ -816,4 +816,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       String.format("Left join index: %d is out of bounds: %d", leftJoinIndex, left.getRecordCount()));
     return leftJoinIndex;
   }
+
+  /**
+   * Returns the current {@link org.apache.drill.exec.record.RecordBatch.IterOutcome} for the left incoming batch
+   */
+  public IterOutcome getLeftOutcome() {
+    return leftUpstream;
+  }
 }

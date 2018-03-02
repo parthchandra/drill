@@ -19,6 +19,7 @@
 package org.apache.drill.exec.physical.base;
 
 import org.apache.drill.exec.record.RecordBatch;
+import org.apache.drill.exec.record.RecordBatch.IterOutcome;
 
 /**
  * Contract between Lateral Join and any operator on right side of it consuming the input
@@ -37,4 +38,9 @@ public interface LateralContract {
    * @return
    */
   int getRecordIndex();
+
+  /**
+   * Get the current outcome of left incoming batch
+   */
+  IterOutcome getLeftOutcome();
 }

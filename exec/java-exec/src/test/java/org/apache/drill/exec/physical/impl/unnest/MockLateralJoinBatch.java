@@ -77,6 +77,15 @@ public class MockLateralJoinBatch implements LateralContract, CloseableRecordBat
     return recordIndex;
   }
 
+  /**
+   * TODO: Update based on the requirement.
+   * @return
+   */
+  @Override
+  public IterOutcome getLeftOutcome() {
+    return IterOutcome.OK;
+  }
+
   public void moveToNextRecord() {
     recordIndex++;
   }
