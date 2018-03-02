@@ -158,10 +158,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testBuildSchemaEmptyLRBatch() throws Exception {
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(emptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -213,7 +213,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     // Get the left container with dummy data
     leftContainer.add(nonEmptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -253,10 +253,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testBuildSchemaNonEmptyLEmptyRBatch() throws Exception {
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -299,10 +299,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testBuildSchemaEmptyLNonEmptyRBatch() throws Exception {
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(emptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -335,6 +335,46 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   }
 
   /**
+   * Test for receiving unexpected EMIT outcome during build phase on left side.
+   * @throws Exception
+   */
+  @Test
+  public void testBuildSchemaWithEMITOutcome() throws Exception {
+    // Get the left container with dummy data for Lateral Join
+    leftContainer.add(emptyLeftRowSet.container());
+
+    // Get the left IterOutcomes for Lateral Join
+    leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    rightContainer.add(nonEmptyRightRowSet.container());
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      ljBatch.next();
+      fail();
+    } catch (AssertionError | Exception error) {
+      // Expected since first right batch is supposed to be empty
+      assertTrue(error instanceof IllegalStateException);
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+    }
+  }
+
+  /**
    * Test to show correct IterOutcome produced by LATERAL when one record in left batch produces only 1 right batch
    * with EMIT outcome. Then output of LATERAL should be produced by OK outcome after the join. It verifies the number
    * of records in the output batch based on left and right input batches.
@@ -343,10 +383,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
    */
   @Test
   public void test1RecordLeftBatchTo1RightRecordBatch() throws Exception {
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -391,10 +431,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
    */
   @Test
   public void test1RecordLeftBatchTo2RightRecordBatch() throws Exception {
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -448,10 +488,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void test1RecordLeftBatchToEmptyRightBatch() throws Exception {
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -504,11 +544,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, 51, "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.OK);
 
@@ -577,11 +617,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, 51, "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
@@ -666,11 +706,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, "51", "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
@@ -724,6 +764,12 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     }
   }
 
+  /**
+   * Verify if there is no schema change on left side and LATERAL still sees an unexpected schema change on right side
+   * then it handles it correctly.
+   * handle it corr
+   * @throws Exception
+   */
   @Test
   public void testHandlingUnexpectedSchemaChangeForUnnestField() throws Exception {
     // Create left input schema 2
@@ -755,11 +801,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, "51", "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.OK);
 
@@ -824,11 +870,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, 51, "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
@@ -894,11 +940,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, 51, "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
@@ -966,12 +1012,12 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, 51, "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(emptyLeftRowSet.container());
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
     leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
@@ -1035,10 +1081,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testHandlingNoneAfterOK() throws Exception {
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -1091,11 +1137,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testHandlingEmptyEMITAfterOK() throws Exception {
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(emptyLeftRowSet.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
 
@@ -1160,11 +1206,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       .addRow(5, 51, "item51")
       .build();
 
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     leftOutcomes.add(RecordBatch.IterOutcome.EMIT);
 
@@ -1415,7 +1461,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
    */
   @Test
   public void testBasicLeftLateralJoin() throws Exception {
-    // Get the left container with dummy data for NLJ
+    // Get the left container with dummy data for Lateral Join
     leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
@@ -1481,7 +1527,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch
@@ -1552,7 +1598,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     leftContainer.add(leftRowSet2.container());
 
-    // Get the left IterOutcomes for NLJ
+    // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
 
     // Create Left MockRecordBatch

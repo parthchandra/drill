@@ -690,6 +690,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   private boolean setBatchState(IterOutcome outcome) {
     switch(outcome) {
       case STOP:
+      case EMIT:
         state = BatchState.STOP;
         return false;
       case OUT_OF_MEMORY:
