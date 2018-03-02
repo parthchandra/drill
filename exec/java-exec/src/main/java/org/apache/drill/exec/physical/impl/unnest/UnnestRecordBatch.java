@@ -336,13 +336,6 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     container.clear();
     final List<TransferPair> transfers = Lists.newArrayList();
 
-    //TODO: Remove code gen.
-    // It is totally unnecessary to do code gen for Unnest since the transfer of the vector
-    // is sufficient to unnest the data
-    final ClassGenerator<Unnest> cg = CodeGenerator.getRoot(Unnest.TEMPLATE_DEFINITION, context.getOptions());
-    cg.getCodeGenerator().plainJavaCapable(true);
-    cg.getCodeGenerator().preferPlainJava(true);
-
     final NamedExpression unnestExpr =
         new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
     final FieldReference fieldReference = unnestExpr.getRef();
@@ -354,13 +347,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     logger.debug("Added transfer for unnest expression.");
     container.buildSchema(SelectionVectorMode.NONE);
 
-    try {
-      this.unnest = context.getImplementationClass(cg.getCodeGenerator());
-      unnest.setup(context, incoming, this, transfers, lateral);
-      setUnnestVector();
-    } catch (ClassTransformationException | IOException e) {
-      throw new SchemaChangeException("Failure while attempting to load generated class", e);
-    }
+    this.unnest = new UnnestImpl();
+    unnest.setup(context, incoming, this, transfers, lateral);
+    setUnnestVector();
     return true;
   }
 
