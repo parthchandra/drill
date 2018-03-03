@@ -350,7 +350,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // reset the left & right outcomes to OK here and send the empty batch downstream
     // Assumption being right side will always send OK_NEW_SCHEMA with empty batch which is what UNNEST will do
     if (childOutcome == OK_NEW_SCHEMA) {
-      leftUpstream = OK;
+      leftUpstream = (leftUpstream != EMIT) ? OK : leftUpstream;
       rightUpstream = OK;
       return childOutcome;
     }
