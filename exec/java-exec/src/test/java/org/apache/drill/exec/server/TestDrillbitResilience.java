@@ -650,6 +650,7 @@ public class TestDrillbitResilience extends DrillTest {
 
   @Test // DRILL-2383: Cancellation TC 3: cancel after all result set are produced but not all are fetched
   @Repeat(count = NUM_RUNS)
+  @Ignore
   public void cancelAfterAllResultsProduced() {
     final long before = countAllocatedMemory();
 

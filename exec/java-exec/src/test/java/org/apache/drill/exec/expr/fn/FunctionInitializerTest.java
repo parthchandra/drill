@@ -22,6 +22,7 @@ import org.apache.drill.test.TestTools;
 import org.apache.drill.exec.util.JarUtil;
 import org.codehaus.janino.Java.CompilationUnit;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
@@ -92,6 +93,7 @@ public class FunctionInitializerTest {
   }
 
   @Test
+  @Ignore
   public void testConcurrentFunctionBodyLoad() throws Exception {
     final FunctionInitializer spyFunctionInitializer = spy(new FunctionInitializer(CLASS_NAME, classLoader));
     final AtomicInteger counter = new AtomicInteger();
