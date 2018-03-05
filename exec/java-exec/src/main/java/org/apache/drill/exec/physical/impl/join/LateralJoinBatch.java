@@ -228,11 +228,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
           if (outputRecords > 0) {
             processLeftBatchInFuture = true;
           }
-          //TODO we got a STOP, shouldn't we stop immediately ?
-          // TODO: check what killAndDrain will do w.r.t UNNEST, we discussed about calling right side
-          // of LATERAL with NONE outcome or calling stop explicitly when NONE is seen on left side
-          //killAndDrainIncoming(right, rightUpstream, RIGHT_INPUT);
-          //VectorAccessibleUtilities.clear(container);
           return leftUpstream;
         case NOT_YET:
           try {
@@ -243,10 +238,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
           }
           break;
       }
-
       needLeftBatch = leftJoinIndex == -1;
     }
-
     return leftUpstream;
   }
 
@@ -259,7 +252,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
    */
   private IterOutcome processRightBatch() {
     // Check if we still have records left to process in left incoming from new batch or previously half processed
-    // batch. We are making sure to update leftJoinIndex and rightJoinIndex correctly. Like for new
+    // batch based on indexes. We are making sure to update leftJoinIndex and rightJoinIndex correctly. Like for new
     // batch leftJoinIndex will always be set to zero and once leftSide batch is fully processed then
     // it will be set to -1.
     // Whereas rightJoinIndex is to keep track of record in right batch being joined with
@@ -300,10 +293,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         case OUT_OF_MEMORY:
         case NONE:
         case STOP:
-          //TODO we got a STOP, shouldn't we stop immediately ?
-          // TODO: Should we kill left side if right side fails ?
-          //killAndDrainIncoming(left, leftUpstream, LEFT_INPUT);
-          //VectorAccessibleUtilities.clear(container);
           needNewRightBatch = false;
           break;
         case NOT_YET:
@@ -316,7 +305,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
           break;
       }
     }
-
     return rightUpstream;
   }
 
@@ -374,10 +362,18 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     // allocate space for the outgoing batch
     allocateVectors();
-
     return produceOutputBatch();
   }
 
+  /**
+   * Get's the current left and right incoming batch and does the cross join to fill the output batch. If all the
+   * records in the either or both the batches are consumed then it get's next batch from that branch depending upon
+   * if output batch still has some space left. If output batch is full then the output if finalized to be sent
+   * downstream. Subsequent call's knows how to consume previously half consumed (if any) batches and producing the
+   * output using that.
+   *
+   * @return - IterOutcome to be send along with output batch to downstream operator
+   */
   private IterOutcome produceOutputBatch() {
 
     boolean isLeftProcessed = false;
@@ -498,7 +494,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       leftUpstream = OK;
       return OK_NEW_SCHEMA;
     }
-
     return OK;
   }
 
@@ -521,32 +516,40 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     lateralJoiner.updateOutputIndex(0);
   }
 
-  private void killAndDrainIncoming(RecordBatch batch, IterOutcome outcome,
-                                    int batchIndex) {
-    if (!hasMore(outcome)) {
-      return;
-    }
-
-    batch.kill(true);
-    while (hasMore(outcome)) {
-      for (final VectorWrapper<?> wrapper : batch) {
-        wrapper.getValueVector().clear();
-      }
-      outcome = next(batchIndex, batch);
-    }
-    if (batchIndex == RIGHT_INPUT) {
-      rightUpstream = outcome;
-    } else {
-      leftUpstream = outcome;
-    }
-  }
-
-  private boolean hasMore(IterOutcome outcome) {
-    return outcome == OK || outcome == OK_NEW_SCHEMA || outcome == EMIT;
-  }
-
+  /**
+   * Check if the schema changed between provided newSchema and oldSchema. It relies on
+   * {@link BatchSchema#isEquivalent(BatchSchema)}.
+   * @param newSchema - New Schema information
+   * @param oldSchema -  - New Schema information to compare with
+   *
+   * @return - true - if newSchema is not same as oldSchema
+   *         - false - if newSchema is same as oldSchema
+   */
   private boolean isSchemaChanged(BatchSchema newSchema, BatchSchema oldSchema) {
     return (newSchema == null || oldSchema == null) || !newSchema.isEquivalent(oldSchema);
+  }
+
+  /**
+   * Validate if the input schema is not null and doesn't contain any Selection Vector.
+   * @param schema - input schema to verify
+   * @return - true: valid input schema
+   *           false: invalid input schema
+   */
+  private boolean verifyInputSchema(BatchSchema schema) {
+
+    boolean isValid = true;
+    if (schema == null) {
+      logger.error("Null schema found for the incoming batch");
+      isValid = false;
+    } else {
+      final BatchSchema.SelectionVectorMode svMode = schema.getSelectionVectorMode();
+      if (svMode != BatchSchema.SelectionVectorMode.NONE) {
+        logger.error("Incoming batch schema found with selection vector which is not supported. SVMode: {}",
+          svMode.toString());
+        isValid = false;
+      }
+    }
+    return isValid;
   }
 
   /**
@@ -560,9 +563,12 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     leftSchema = left.getSchema();
     rightSchema = right.getSchema();
 
-    if (leftSchema == null || rightSchema == null) {
-      throw new SchemaChangeException("Either of left or right schema was not set properly in the batches. Hence " +
-        "failed to setupNewSchema");
+    if (!verifyInputSchema(leftSchema)) {
+      throw new SchemaChangeException("Invalid Schema found for left incoming batch");
+    }
+
+    if (!verifyInputSchema(rightSchema)) {
+      throw new SchemaChangeException("Invalid Schema found for right incoming batch");
     }
 
     // Setup LeftSchema in outgoing container
@@ -701,18 +707,19 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         state = BatchState.DONE;
         return false;
     }
-
     return true;
   }
 
   /**
-   * Method to get left and right batch during build schema phase for lateral. If left batch sees a failure outcome
-   * then we don't even call next on right branch, since there is no left incoming.
+   * Method to get left and right batch during build schema phase for {@link LateralJoinBatch}. If left batch sees a
+   * failure outcome then we don't even call next on right branch, since there is no left incoming.
    * @return true if both the left/right batch was received without failure outcome.
    *         false if either of batch is received with failure outcome.
+   *
    * @throws SchemaChangeException
    */
-  private boolean getBatchForBuildSchema() {
+  @Override
+  protected boolean prefetchFirstBatchFromBothSides() {
     // Left can get batch with zero or more records with OK_NEW_SCHEMA outcome as first batch
     leftUpstream = next(0, left);
 
@@ -729,7 +736,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       throw new IllegalStateException("Unexpected IterOutcome.EMIT received either from left or right side in " +
         "buildSchema phase");
     }
-
     return validBatch;
   }
 
@@ -743,10 +749,9 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   @Override
   protected void buildSchema() throws SchemaChangeException {
     // Prefetch a RecordBatch from both left and right branch
-    if (!getBatchForBuildSchema()) {
+    if (!prefetchFirstBatchFromBothSides()) {
       return;
     }
-
     Preconditions.checkState(right.getRecordCount() == 0, "Unexpected non-empty first right batch received");
 
     // Setup output container schema based on known left and right schema
@@ -754,7 +759,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     // Release the vectors received from right side
     VectorAccessibleUtilities.clear(right);
-
 
     // We should not allocate memory for all the value vectors inside output batch
     // since this is buildSchema phase and we are sending empty batches downstream

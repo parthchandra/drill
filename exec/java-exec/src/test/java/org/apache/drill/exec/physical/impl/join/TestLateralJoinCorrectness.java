@@ -19,7 +19,9 @@ package org.apache.drill.exec.physical.impl.join;
 
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.drill.categories.OperatorTest;
+import org.apache.drill.common.exceptions.DrillRuntimeException;
 import org.apache.drill.common.types.TypeProtos;
+import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.LateralJoinPOP;
@@ -2368,6 +2370,53 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       rightMockBatch_1.close();
       leftContainer2.clear();
       leftOutcomes2.clear();
+    }
+  }
+
+  /**
+   * Test unsupported incoming batch to LATERAL with SelectionVector
+   * @throws Exception
+   */
+  @Test
+  public void testUnsupportedSelectionVector() throws Exception {
+    final RowSet.SingleRowSet leftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(2, 20, "item20")
+      .withSv2()
+      .build();
+
+    // Get the left container with dummy data for Lateral Join
+    leftContainer.add(leftRowSet2.container());
+
+    // Get the left IterOutcomes for Lateral Join
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    rightContainer.add(emptyRightRowSet.container());
+
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    try {
+      ljBatch.next();
+      fail();
+    } catch (AssertionError | Exception error) {
+      assertTrue(error instanceof DrillRuntimeException);
+      assertTrue(error.getCause() instanceof SchemaChangeException);
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
+      leftRowSet2.clear();
     }
   }
 }
