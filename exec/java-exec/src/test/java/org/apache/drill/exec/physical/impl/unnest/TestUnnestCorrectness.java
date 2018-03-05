@@ -19,6 +19,7 @@ package org.apache.drill.exec.physical.impl.unnest;
 
 import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.common.exceptions.DrillException;
+import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
@@ -426,6 +427,41 @@ import static org.junit.Assert.assertTrue;
 
   }
 
+
+  @Test
+  public void testUnnestNonArrayColumn() {
+
+    Object[][] data = {
+        { (Object) new Integer (1),
+            (Object) new Integer (3)},
+        { (Object) new Integer (6),
+            (Object) new Integer (10)}
+    };
+
+    // Create input schema
+    TupleMetadata incomingSchema =
+        new SchemaBuilder()
+            .add("rowNumber", TypeProtos.MinorType.INT)
+            .add("unnestColumn", TypeProtos.MinorType.INT)
+            .buildSchema();
+    TupleMetadata[] incomingSchemas = { incomingSchema, incomingSchema };
+
+    // We expect an Exception
+    Integer[][] baseline = {};
+
+    RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
+
+    try {
+      testUnnest(incomingSchemas, iterOutcomes, data, baseline);
+    } catch (UserException e) {
+      return; // succeeded
+    } catch (Exception e) {
+      fail("Failed due to exception: " + e.getMessage());
+    }
+
+  }
+
+
   // test unnest for various input conditions without invoking kill
   private <T> void testUnnest(
       TupleMetadata[] incomingSchemas,
@@ -540,6 +576,8 @@ import static org.junit.Assert.assertTrue;
 
       assertTrue(((MockLateralJoinBatch) lateralJoinBatch).isCompleted());
 
+    } catch (UserException e) {
+      throw e; // Valid exception
     } catch (Exception e) {
       fail("Test failed in validating unnest output. Exception : " + e.getMessage());
     } finally {
@@ -548,8 +586,10 @@ import static org.junit.Assert.assertTrue;
       lateralJoinBatch.close();
       incomingMockBatch.close();
 
-      for(ValueVector vv : results) {
-        vv.clear();
+      if (results != null) {
+        for (ValueVector vv : results) {
+          vv.clear();
+        }
       }
       for(RowSet.SingleRowSet rowSet: rowSets) {
         rowSet.clear();
