@@ -29,7 +29,7 @@ import org.apache.drill.exec.physical.impl.MockRecordBatch;
 import org.apache.drill.exec.physical.rowSet.impl.TestResultSetLoaderMapArray;
 import org.apache.drill.exec.record.ExpandableHyperContainer;
 import org.apache.drill.exec.record.RecordBatch;
-import org.apache.drill.exec.record.TupleMetadata;
+import org.apache.drill.exec.record.metadata.TupleMetadata;
 import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.record.VectorWrapper;
 import org.apache.drill.exec.store.mock.MockStorePOP;
