@@ -89,7 +89,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
    * Public Methods
    * ****************************************************************************************************************/
   public LateralJoinBatch(LateralJoinPOP popConfig, FragmentContext context,
-                          RecordBatch left, RecordBatch right) throws OutOfMemoryException {
+                             RecordBatch left, RecordBatch right) throws OutOfMemoryException {
     super(popConfig, context, left, right);
     Preconditions.checkNotNull(left);
     Preconditions.checkNotNull(right);
@@ -484,11 +484,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         matchedRecordFound = true;
       }
 
-      // One right batch might span across multiple output batch. So rightIndex will be moving sum of all the
-      // output records for this record batch until it's fully consumed.
-      //
-      // Also it can be so that one output batch can contain records from 2 different right batch hence the
-      // rightJoinIndex should move by number of records in output batch for current right batch only.
+        // One right batch might span across multiple output batch. So rightIndex will be moving sum of all the
+        // output records for this record batch until it's fully consumed.
+        //
+        // Also it can be so that one output batch can contain records from 2 different right batch hence the
+        // rightJoinIndex should move by number of records in output batch for current right batch only.
       rightJoinIndex += outputIndex - previousOutputCount;
       final boolean isRightProcessed = rightJoinIndex == -1 || rightJoinIndex >= right.getRecordCount();
 
@@ -741,7 +741,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // If there is no record in right batch just return current index in output batch
     if (rightRecordCount <= 0) {
       return;
-    }
+}
 
     // Check if right batch is empty since we have to handle left join case
     Preconditions.checkState(rightJoinIndex != -1, "Right batch record count is >0 but index is -1");
@@ -819,7 +819,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   @VisibleForTesting
   public void setMaxOutputRowCount(int outputRowCount) {
     maxOutputRowCount = outputRowCount;
-  }
+}
 
   /**
    * Used only for testing to disable output batch calculation using memory manager and instead use the static max
