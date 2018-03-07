@@ -303,11 +303,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // output container based on new left schema and old right schema. If schema change failed then return STOP
     // downstream
     if (leftUpstream == OK_NEW_SCHEMA && !handleSchemaChange()) {
-      return STOP;
+        return STOP;
     }
 
     // Setup the references of left, right and outgoing container in generated operator
-    state = BatchState.NOT_FIRST;
+      state = BatchState.NOT_FIRST;
 
     // allocate space for the outgoing batch
     allocateVectors();
@@ -343,11 +343,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         matchedRecordFound = true;
       }
 
-      // One right batch might span across multiple output batch. So rightIndex will be moving sum of all the
-      // output records for this record batch until it's fully consumed.
-      //
-      // Also it can be so that one output batch can contain records from 2 different right batch hence the
-      // rightJoinIndex should move by number of records in output batch for current right batch only.
+        // One right batch might span across multiple output batch. So rightIndex will be moving sum of all the
+        // output records for this record batch until it's fully consumed.
+        //
+        // Also it can be so that one output batch can contain records from 2 different right batch hence the
+        // rightJoinIndex should move by number of records in output batch for current right batch only.
       rightJoinIndex += outputIndex - previousOutputCount;
       final boolean isRightProcessed = rightJoinIndex == -1 || rightJoinIndex >= right.getRecordCount();
 
@@ -714,7 +714,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // If there is no record in right batch just return current index in output batch
     if (rightRecordCount <= 0) {
       return outBatchIndex;
-    }
+}
 
     // Check if right batch is empty since we have to handle left join case
     Preconditions.checkState(rightIndex != -1, "Right batch record count is >0 but index is -1");
