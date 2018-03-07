@@ -622,9 +622,15 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     int fieldId = 0;
     int outputFieldId = 0;
+
+    Preconditions.checkArgument(rightSchema.getFieldCount() == 1);
+    MaterializedField rightField = rightSchema.getColumn(0);
     if (leftSchema != null) {
       // Set the input and output value vector references corresponding to the left batch
       for (MaterializedField field : leftSchema) {
+        if(field.getName().equals(rightField.getName())) {
+          continue;
+        }
         final TypeProtos.MajorType fieldType = field.getType();
 
         // Add the vector to the output container
