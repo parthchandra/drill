@@ -14,7 +14,7 @@
   <parent>
     <artifactId>drill-contrib-parent</artifactId>
     <groupId>org.apache.drill.contrib</groupId>
-    <version>1.13.0</version>
+    <version>1.13.1-SNAPSHOT</version>
   </parent>
 
   <artifactId>drill-kudu-storage</artifactId>
