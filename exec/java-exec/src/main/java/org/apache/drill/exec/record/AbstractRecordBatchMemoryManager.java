@@ -19,15 +19,20 @@
 package org.apache.drill.exec.record;
 
 import org.apache.drill.exec.vector.ValueVector;
+import org.apache.drill.exec.vector.VariableWidthVector;
 
 public abstract class AbstractRecordBatchMemoryManager {
-  protected static final int OFFSET_VECTOR_WIDTH = 4;
-  protected static final int WORST_CASE_FRAGMENTATION_FACTOR = 2;
-  protected static final int MAX_NUM_ROWS = ValueVector.MAX_ROW_COUNT;
-  protected static final int MIN_NUM_ROWS = 1;
+  private static final int WORST_CASE_FRAGMENTATION_FACTOR = 2;
+  private static final int MAX_NUM_ROWS = ValueVector.MAX_ROW_COUNT;
+  private static final int MIN_NUM_ROWS = 1;
   private int outputRowCount = MAX_NUM_ROWS;
   private int outgoingRowWidth;
   private RecordBatchSizer sizer;
+  private int outputBatchSize;
+
+  public AbstractRecordBatchMemoryManager(int configureOutputSize) {
+    outputBatchSize = configureOutputSize;
+  }
 
   public void update(int inputIndex) {};
 
@@ -78,4 +83,15 @@ public abstract class AbstractRecordBatchMemoryManager {
     return sizer.getColumn(name);
   }
 
+  public int getOutputBatchSize() {
+    return outputBatchSize;
+  }
+
+  public int getFragmentationFactor() {
+    return WORST_CASE_FRAGMENTATION_FACTOR;
+  }
+
+  public int getOffsetVectorWidth() {
+    return VariableWidthVector.offsetsField.getWidth();
+  }
 }

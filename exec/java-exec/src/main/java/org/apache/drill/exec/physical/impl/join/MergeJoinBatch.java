@@ -17,12 +17,13 @@
  */
 package org.apache.drill.exec.physical.impl.join;
 
-import static org.apache.drill.exec.compile.sig.GeneratorMapping.GM;
-
-import java.io.IOException;
-import java.util.List;
-
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.sun.codemodel.JClass;
+import com.sun.codemodel.JConditional;
+import com.sun.codemodel.JExpr;
+import com.sun.codemodel.JMod;
+import com.sun.codemodel.JVar;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.drill.common.expression.ErrorCollector;
 import org.apache.drill.common.expression.ErrorCollectorImpl;
@@ -46,31 +47,29 @@ import org.apache.drill.exec.expr.fn.FunctionGenerationHelper;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.config.MergeJoinPOP;
 import org.apache.drill.exec.physical.impl.common.Comparator;
-import org.apache.drill.exec.record.RecordBatchSizer;
+import org.apache.drill.exec.record.AbstractBinaryRecordBatch;
 import org.apache.drill.exec.record.BatchSchema;
+import org.apache.drill.exec.record.JoinBatchMemoryManager;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
+import org.apache.drill.exec.record.RecordBatchSizer;
 import org.apache.drill.exec.record.RecordIterator;
 import org.apache.drill.exec.record.TypedFieldId;
 import org.apache.drill.exec.record.VectorAccessible;
 import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.record.VectorWrapper;
-import org.apache.drill.exec.record.AbstractRecordBatch;
-import org.apache.drill.exec.record.AbstractRecordBatchMemoryManager;
 import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.AbstractContainerVector;
 
-import com.google.common.base.Preconditions;
-import com.sun.codemodel.JClass;
-import com.sun.codemodel.JConditional;
-import com.sun.codemodel.JExpr;
-import com.sun.codemodel.JMod;
-import com.sun.codemodel.JVar;
+import java.io.IOException;
+import java.util.List;
+
+import static org.apache.drill.exec.compile.sig.GeneratorMapping.GM;
 
 /**
  * A join operator merges two sorted streams using record iterator.
  */
-public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
+public class MergeJoinBatch extends AbstractBinaryRecordBatch<MergeJoinPOP> {
 
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(MergeJoinBatch.class);
 
@@ -95,8 +94,6 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
       GM("doSetup", "doSetup", null, null),
       GM("doSetup", "doCompare", null, null));
 
-  private final RecordBatch left;
-  private final RecordBatch right;
   private final RecordIterator leftIterator;
   private final RecordIterator rightIterator;
   private final JoinStatus status;
@@ -104,17 +101,17 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
   private final List<Comparator> comparators;
   private final JoinRelType joinType;
   private JoinWorker worker;
-  private final int outputBatchSize;
 
   private static final String LEFT_INPUT = "LEFT INPUT";
   private static final String RIGHT_INPUT = "RIGHT INPUT";
 
-  private class MergeJoinMemoryManager extends AbstractRecordBatchMemoryManager {
-    private int leftRowWidth;
-    private int rightRowWidth;
+  private final JoinBatchMemoryManager mergeJoinMemoryManager;
 
-    private RecordBatchSizer leftSizer;
-    private RecordBatchSizer rightSizer;
+  private class MergeJoinMemoryManager extends JoinBatchMemoryManager {
+
+    MergeJoinMemoryManager(int outputBatchSize, RecordBatch leftBatch, RecordBatch rightBatch) {
+      super(outputBatchSize, leftBatch, rightBatch);
+    }
 
     /**
      * mergejoin operates on one record at a time from the left and right batches
@@ -126,63 +123,38 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
      */
     @Override
     public void update(int inputIndex) {
-      switch(inputIndex) {
-        case 0:
-          leftSizer = new RecordBatchSizer(left);
-          leftRowWidth = leftSizer.netRowWidth();
-          break;
-        case 1:
-          rightSizer = new RecordBatchSizer(right);
-          rightRowWidth = rightSizer.netRowWidth();
-        default:
-          break;
-      }
+      // get the previously computed row width
+      final int previousRowWidth = getOutgoingRowWidth();
 
-      final int newOutgoingRowWidth = leftRowWidth + rightRowWidth;
+      // update the memory manager state based on new batch
+      super.update(inputIndex);
 
-      // If outgoing row width is 0, just return. This is possible for empty batches or
-      // when first set of batches come with OK_NEW_SCHEMA and no data.
-      if (newOutgoingRowWidth == 0) {
-        return;
-      }
-
-      // update the value to be used for next batch(es)
-      setOutputRowCount(outputBatchSize, newOutgoingRowWidth);
+      // Get the newly computed row width
+      final int newOutgoingRowWidth = getOutgoingRowWidth();
 
       // Adjust for the current batch.
       // calculate memory used so far based on previous outgoing row width and how many rows we already processed.
-      final long memoryUsed = status.getOutPosition() * getOutgoingRowWidth();
+      final long memoryUsed = status.getOutPosition() * previousRowWidth;
       // This is the remaining memory.
-      final long remainingMemory = Math.max(outputBatchSize/WORST_CASE_FRAGMENTATION_FACTOR - memoryUsed, 0);
+      final long remainingMemory = Math.max(getOutputBatchSize()/getFragmentationFactor() - memoryUsed, 0);
       // These are number of rows we can fit in remaining memory based on new outgoing row width.
       final int numOutputRowsRemaining = RecordBatchSizer.safeDivide(remainingMemory, newOutgoingRowWidth);
 
       status.setTargetOutputRowCount(status.getOutPosition() + numOutputRowsRemaining);
-      setOutgoingRowWidth(newOutgoingRowWidth);
-    }
-
-    @Override
-    public RecordBatchSizer.ColumnSize getColumnSize(String name) {
-      if (leftSizer != null && leftSizer.getColumn(name) != null) {
-        return leftSizer.getColumn(name);
-      }
-      return rightSizer == null ? null : rightSizer.getColumn(name);
     }
   }
 
-  private final MergeJoinMemoryManager mergeJoinMemoryManager = new MergeJoinMemoryManager();
-
   protected MergeJoinBatch(MergeJoinPOP popConfig, FragmentContext context, RecordBatch left, RecordBatch right) throws OutOfMemoryException {
-    super(popConfig, context, true);
+    super(popConfig, context, true, left, right);
 
-    outputBatchSize = (int) context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
+    // Instantiate the batch memory manager
+    final int outputBatchSize = (int) context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
+    mergeJoinMemoryManager = new MergeJoinMemoryManager(outputBatchSize, left, right);
 
     if (popConfig.getConditions().size() == 0) {
       throw new UnsupportedOperationException("Merge Join currently does not support cartesian join.  This join operator was configured with 0 conditions");
     }
-    this.left = left;
     this.leftIterator = new RecordIterator(left, this, oContext, 0, false, mergeJoinMemoryManager);
-    this.right = right;
     this.rightIterator = new RecordIterator(right, this, oContext, 1, mergeJoinMemoryManager);
     this.joinType = popConfig.getJoinType();
     this.status = new JoinStatus(leftIterator, rightIterator, this);
@@ -207,21 +179,10 @@ public class MergeJoinBatch extends AbstractRecordBatch<MergeJoinPOP> {
   public void buildSchema() {
     // initialize iterators
     status.initialize();
-
     final IterOutcome leftOutcome = status.getLeftStatus();
     final IterOutcome rightOutcome = status.getRightStatus();
-    if (leftOutcome == IterOutcome.STOP || rightOutcome == IterOutcome.STOP) {
-      state = BatchState.STOP;
-      return;
-    }
 
-    if (leftOutcome == IterOutcome.OUT_OF_MEMORY || rightOutcome == IterOutcome.OUT_OF_MEMORY) {
-      state = BatchState.OUT_OF_MEMORY;
-      return;
-    }
-
-    if (leftOutcome == IterOutcome.NONE && rightOutcome == IterOutcome.NONE) {
-      state = BatchState.DONE;
+    if (!verifyOutcomeToSetBatchState(leftOutcome, rightOutcome)) {
       return;
     }
 
