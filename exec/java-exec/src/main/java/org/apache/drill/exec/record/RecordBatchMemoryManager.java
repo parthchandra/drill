@@ -19,15 +19,17 @@
 package org.apache.drill.exec.record;
 
 import com.google.common.base.Preconditions;
+import org.apache.drill.exec.vector.UInt4Vector;
 import org.apache.drill.exec.vector.ValueVector;
+import org.apache.drill.exec.vector.VariableWidthVector;
 
 public class RecordBatchMemoryManager {
-  protected static final int OFFSET_VECTOR_WIDTH = 4;
   protected static final int MAX_NUM_ROWS = ValueVector.MAX_ROW_COUNT;
   protected static final int MIN_NUM_ROWS = 1;
   protected static final int DEFAULT_INPUT_INDEX = 0;
   private int outputRowCount = MAX_NUM_ROWS;
   private int outgoingRowWidth;
+  private int outputBatchSize;
   private RecordBatchSizer[] sizer;
   private BatchStats[] inputBatchStats;
   private BatchStats outputBatchStats;
@@ -127,14 +129,16 @@ public class RecordBatchMemoryManager {
     return inputBatchStats[index] == null ? 0 : inputBatchStats[index].getTotalRecords();
   }
 
-  public RecordBatchMemoryManager(int numInputs) {
+  public RecordBatchMemoryManager(int numInputs, int configuredOutputSize) {
     this.numInputs = numInputs;
+    this.outputBatchSize = configuredOutputSize;
     sizer = new RecordBatchSizer[numInputs];
     inputBatchStats = new BatchStats[numInputs];
     outputBatchStats = new BatchStats();
   }
 
-  public RecordBatchMemoryManager() {
+  public RecordBatchMemoryManager(int configuredOutputSize) {
+    this.outputBatchSize = configuredOutputSize;
     sizer = new RecordBatchSizer[numInputs];
     inputBatchStats = new BatchStats[numInputs];
     outputBatchStats = new BatchStats();
@@ -224,5 +228,13 @@ public class RecordBatchMemoryManager {
     outputBatchStats.incNumBatches();
     outputBatchStats.incTotalRecords(outputRecords);
     outputBatchStats.incSumBatchSizes(outgoingRowWidth * outputRecords);
+  }
+
+  public int getOutputBatchSize() {
+    return outputBatchSize;
+  }
+
+  public int getOffsetVectorWidth() {
+    return UInt4Vector.VALUE_WIDTH;
   }
 }
