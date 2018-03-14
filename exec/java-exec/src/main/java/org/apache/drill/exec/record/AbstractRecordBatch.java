@@ -42,6 +42,7 @@ public abstract class AbstractRecordBatch<T extends PhysicalOperator> implements
   protected final OperatorContext oContext;
   protected final OperatorStats stats;
   protected final boolean unionTypeEnabled;
+  //private final int outputBatchSize;
 
   protected BatchState state;
 
@@ -71,6 +72,7 @@ public abstract class AbstractRecordBatch<T extends PhysicalOperator> implements
     } else {
       unionTypeEnabled = false;
     }
+    //outputBatchSize = (int) context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
   }
 
   protected static enum BatchState {

@@ -46,6 +46,31 @@ public abstract class AbstractBinaryRecordBatch<T extends PhysicalOperator> exte
     this.right = right;
   }
 
+  protected boolean verifyOutcomeToSetBatchState(IterOutcome leftOutcome, IterOutcome rightOutcome) {
+    if (leftOutcome == IterOutcome.STOP || rightUpstream == IterOutcome.STOP) {
+      state = BatchState.STOP;
+      return false;
+    }
+
+    if (leftOutcome == IterOutcome.OUT_OF_MEMORY || rightUpstream == IterOutcome.OUT_OF_MEMORY) {
+      state = BatchState.OUT_OF_MEMORY;
+      return false;
+    }
+
+    if (checkForEarlyFinish(leftOutcome, rightOutcome)) {
+      state = BatchState.DONE;
+      return false;
+    }
+
+    // EMIT outcome is not expected as part of first batch from either side
+    if (leftOutcome == IterOutcome.EMIT || rightOutcome == IterOutcome.EMIT) {
+      state = BatchState.STOP;
+      throw new IllegalStateException("Unexpected IterOutcome.EMIT received either from left or right side in " +
+        "buildSchema phase");
+    }
+    return true;
+  }
+
   /**
    * Prefetch first batch from both inputs.
    * @return true if caller should continue processing
@@ -54,32 +79,8 @@ public abstract class AbstractBinaryRecordBatch<T extends PhysicalOperator> exte
   protected boolean prefetchFirstBatchFromBothSides() {
     // Left can get batch with zero or more records with OK_NEW_SCHEMA outcome as first batch
     leftUpstream = next(0, left);
-
     rightUpstream = next(1, right);
-
-    if (leftUpstream == IterOutcome.STOP || rightUpstream == IterOutcome.STOP) {
-      state = BatchState.STOP;
-      return false;
-    }
-
-    if (leftUpstream == IterOutcome.OUT_OF_MEMORY || rightUpstream == IterOutcome.OUT_OF_MEMORY) {
-      state = BatchState.OUT_OF_MEMORY;
-      return false;
-    }
-
-    if (checkForEarlyFinish()) {
-      state = BatchState.DONE;
-      return false;
-    }
-
-    // EMIT outcome is not expected as part of first batch from either side
-    if (leftUpstream == IterOutcome.EMIT || rightUpstream == IterOutcome.EMIT) {
-      state = BatchState.STOP;
-      throw new IllegalStateException("Unexpected IterOutcome.EMIT received either from left or right side in " +
-        "buildSchema phase");
-    }
-
-    return true;
+    return verifyOutcomeToSetBatchState(leftUpstream, rightUpstream);
   }
 
   /*
@@ -87,7 +88,7 @@ public abstract class AbstractBinaryRecordBatch<T extends PhysicalOperator> exte
    * @return true if the further processing can stop.
    *         false if the further processing is needed.
    */
-  protected boolean checkForEarlyFinish() {
-    return (leftUpstream == IterOutcome.NONE && rightUpstream == IterOutcome.NONE);
+  protected boolean checkForEarlyFinish(IterOutcome leftOutcome, IterOutcome rightOutcome) {
+    return (leftOutcome == IterOutcome.NONE && rightOutcome == IterOutcome.NONE);
   }
 }
