@@ -36,7 +36,7 @@ import org.apache.drill.exec.record.VectorContainer;
 import org.apache.drill.exec.store.mock.MockStorePOP;
 import org.apache.drill.test.SubOperatorTest;
 import org.apache.drill.test.rowSet.RowSet;
-import org.apache.drill.test.rowSet.SchemaBuilder;
+import org.apache.drill.test.rowSet.schema.SchemaBuilder;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
