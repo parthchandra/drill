@@ -39,7 +39,7 @@ import org.apache.drill.exec.vector.complex.MapVector;
 import org.apache.drill.test.SubOperatorTest;
 import org.apache.drill.test.rowSet.RowSet;
 import org.apache.drill.test.rowSet.RowSetBuilder;
-import org.apache.drill.test.rowSet.SchemaBuilder;
+import org.apache.drill.test.rowSet.schema.SchemaBuilder;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -620,9 +620,9 @@ import static org.junit.Assert.assertTrue;
     TupleMetadata schema = new SchemaBuilder()
         .add("rowNum", TypeProtos.MinorType.INT)
         .addMapArray("unnestColumn")
-        .add("colA", TypeProtos.MinorType.INT)
-        .addArray("colB", TypeProtos.MinorType.VARCHAR)
-        .buildMap()
+          .add("colA", TypeProtos.MinorType.INT)
+          .addArray("colB", TypeProtos.MinorType.VARCHAR)
+          .resumeSchema()
         .buildSchema();
     return schema;
   }
