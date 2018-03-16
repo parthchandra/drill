@@ -96,8 +96,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
       // Average rowWidth of single element in the unnest list.
       // subtract the offset vector size from column data size.
-      final int avgRowWidthSingleUnnestEntry = RecordBatchSizer
-          .safeDivide(columnSize.netSize - (OFFSET_VECTOR_WIDTH * columnSize.valueCount), columnSize.elementCount);
+      final int avgRowWidthSingleUnnestEntry = RecordBatchSizer.safeDivide(
+        columnSize.getTotalNetSize() - (OFFSET_VECTOR_WIDTH * columnSize.getValueCount()), columnSize.getElementCount());
 
       // Average rowWidth of outgoing batch.
       final int avgOutgoingRowWidth = avgRowWidthSingleUnnestEntry;
