@@ -42,7 +42,7 @@ import org.apache.drill.exec.vector.complex.MapVector;
 import org.apache.drill.test.SubOperatorTest;
 import org.apache.drill.test.rowSet.RowSet;
 import org.apache.drill.test.rowSet.RowSetBuilder;
-import org.apache.drill.test.rowSet.SchemaBuilder;
+import org.apache.drill.test.rowSet.schema.SchemaBuilder;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
@@ -673,12 +673,11 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
         .addMapArray("unnestColumn")
         .add("colA", TypeProtos.MinorType.INT)
         .addArray("colB", TypeProtos.MinorType.VARCHAR)
-        .buildMap()
+        .resumeSchema()
         .buildSchema();
     return schema;
   }
-
-  private Object[][] getMapData( ) {
+private Object[][] getMapData( ) {
 
     Object[][] d = {
       {
