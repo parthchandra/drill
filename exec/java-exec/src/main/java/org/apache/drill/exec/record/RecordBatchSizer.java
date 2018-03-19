@@ -363,7 +363,8 @@ public class RecordBatchSizer {
           // Calculate pure data size.
           if (isVariableWidth) {
             UInt4Vector  offsetVector = ((VariableWidthVector)v).getOffsetVector();
-            totalDataSize = offsetVector.getAccessor().get(valueCount);
+            // TODO: Remove this line when the commit from open source for DRILL-6262 is merged
+            totalDataSize = (valueCount == 0) ? 0 : offsetVector.getAccessor().get(valueCount);
           } else {
             totalDataSize = v.getPayloadByteCount(valueCount);
           }
