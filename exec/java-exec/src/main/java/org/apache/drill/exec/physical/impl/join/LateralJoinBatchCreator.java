@@ -20,6 +20,7 @@ package org.apache.drill.exec.physical.impl.join;
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.ops.ExecutorFragmentContext;
 import org.apache.drill.exec.physical.config.LateralJoinPOP;
+import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.physical.impl.BatchCreator;
 import org.apache.drill.exec.record.RecordBatch;
 
@@ -29,6 +30,11 @@ public class LateralJoinBatchCreator implements BatchCreator<LateralJoinPOP> {
   @Override
   public LateralJoinBatch getBatch(ExecutorFragmentContext context, LateralJoinPOP config, List<RecordBatch> children)
       throws ExecutionSetupException {
-    return new LateralJoinBatch(config, context, children.get(0), children.get(1));
+    LateralJoinBatch ljBatch = new LateralJoinBatch(config, context, children.get(0), children.get(1));
+    UnnestPOP unnest = config.getUnnestForLateralJoin();
+    if (unnest != null) {
+      unnest.setLateral(ljBatch);
+    }
+    return ljBatch;
   }
 }

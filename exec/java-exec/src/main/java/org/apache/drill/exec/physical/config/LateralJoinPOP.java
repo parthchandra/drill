@@ -33,6 +33,9 @@ import java.util.List;
 public class LateralJoinPOP extends AbstractJoinPop {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(LateralJoinPOP.class);
 
+  @JsonProperty("subScanForRowKeyJoin")
+  private UnnestPOP unnestForLateralJoin;
+
   @JsonCreator
   public LateralJoinPOP(
       @JsonProperty("left") PhysicalOperator left,
@@ -46,6 +49,14 @@ public class LateralJoinPOP extends AbstractJoinPop {
     Preconditions.checkArgument(children.size() == 2,
       "Lateral join should have two physical operators");
     return new LateralJoinPOP(children.get(0), children.get(1), joinType);
+  }
+
+  public UnnestPOP getUnnestForLateralJoin() {
+    return this.unnestForLateralJoin;
+  }
+
+  public void setUnnestForLateralJoin(UnnestPOP unnest) {
+    this.unnestForLateralJoin = unnest;
   }
 
   @Override
