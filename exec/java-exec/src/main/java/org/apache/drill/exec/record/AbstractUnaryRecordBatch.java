@@ -104,6 +104,7 @@ public abstract class AbstractUnaryRecordBatch<T extends PhysicalOperator> exten
         }
         // fall through.
       case OK:
+      case EMIT:
         assert state != BatchState.FIRST : "First batch should be OK_NEW_SCHEMA";
         container.zeroVectors();
         IterOutcome out = doWork();

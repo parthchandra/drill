@@ -15,20 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.physical.impl.unnest;
+package org.apache.drill.exec.physical.impl.lateraljoin;
 
-import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.exec.ops.ExecutorFragmentContext;
-import org.apache.drill.exec.physical.config.UnnestPOP;
-import org.apache.drill.exec.physical.impl.BatchCreator;
-import org.apache.drill.exec.record.RecordBatch;
+import static org.junit.Assert.assertEquals;
+import org.apache.drill.test.BaseTestQuery;
+import org.junit.Test;
 
-import java.util.List;
+public class TestLateralPhysicalPlan extends BaseTestQuery {
 
-public class UnnestBatchCreator implements BatchCreator<UnnestPOP> {
-  @Override
-  public UnnestRecordBatch getBatch(ExecutorFragmentContext context, UnnestPOP config, List<RecordBatch> children)
-      throws ExecutionSetupException {
-    return new UnnestRecordBatch(config, context);
+  @Test
+  public void testLateralPlan1() throws Exception {
+    int numOutputRecords = testPhysical(getFile("lateraljoin/lateralplan1.json"));
+    assertEquals(numOutputRecords, 12);
   }
 }
