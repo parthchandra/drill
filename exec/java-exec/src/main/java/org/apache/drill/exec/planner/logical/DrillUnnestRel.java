@@ -15,20 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.drill.exec.physical.impl.unnest;
+package org.apache.drill.exec.planner.logical;
 
-import org.apache.drill.common.exceptions.ExecutionSetupException;
-import org.apache.drill.exec.ops.ExecutorFragmentContext;
-import org.apache.drill.exec.physical.config.UnnestPOP;
-import org.apache.drill.exec.physical.impl.BatchCreator;
-import org.apache.drill.exec.record.RecordBatch;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelTraitSet;
 
-import java.util.List;
+import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.RexNode;
+import org.apache.drill.common.logical.data.LogicalOperator;
+import org.apache.drill.exec.planner.common.DrillUnnestRelBase;
 
-public class UnnestBatchCreator implements BatchCreator<UnnestPOP> {
-  @Override
-  public UnnestRecordBatch getBatch(ExecutorFragmentContext context, UnnestPOP config, List<RecordBatch> children)
-      throws ExecutionSetupException {
-    return new UnnestRecordBatch(config, context);
+
+public class DrillUnnestRel extends DrillUnnestRelBase implements DrillRel {
+
+
+  public DrillUnnestRel(RelOptCluster cluster, RelTraitSet traits,
+                        RelDataType rowType, RexNode ref) {
+    super(cluster, traits, ref);
+    this.rowType = rowType;
   }
+
+  @Override
+  public LogicalOperator implement(DrillImplementor implementor) {
+    //TODO: implementation for direct convert from RelNode to logical operator for explainPlan
+    return null;
+  }
+
 }
