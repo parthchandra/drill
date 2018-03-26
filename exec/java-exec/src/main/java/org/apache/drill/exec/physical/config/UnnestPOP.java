@@ -40,16 +40,12 @@ public class UnnestPOP extends AbstractSingle {
 
   private SchemaPath column;
 
-  @JsonProperty("lateral")
-  private LateralContract lateral ;
-
   @JsonCreator
   public UnnestPOP(
       @JsonProperty("child") PhysicalOperator child, // Operator with incoming record batch
       @JsonProperty("column") SchemaPath column) {
     super(child);
     this.column = column;
-    this.lateral = null;
   }
 
 
@@ -70,17 +66,7 @@ public class UnnestPOP extends AbstractSingle {
   @Override
   public PhysicalOperator getNewWithChild(PhysicalOperator child) {
     UnnestPOP unnest =  new UnnestPOP(child, column);
-    unnest.setLateral(this.getLateral());
     return unnest;
-  }
-
- @JsonProperty("lateral")
-  public LateralContract getLateral() {
-    return lateral;
-  }
-
-  public void setLateral(LateralContract l) {
-    this.lateral = l;
   }
 
   @Override
