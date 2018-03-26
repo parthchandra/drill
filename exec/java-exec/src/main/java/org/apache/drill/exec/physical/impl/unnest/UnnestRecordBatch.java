@@ -17,6 +17,7 @@
  */
 package org.apache.drill.exec.physical.impl.unnest;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.FieldReference;
@@ -130,13 +131,19 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   @Override
   protected void killIncoming(boolean sendUpstream) {
+    // Kill may be received from an operator downstream of the corresponding lateral, or from
+    // a limit that is in a subqueruy between unnest and lateral. In the latter case, unnest has to handle the limit.
+    // In the former case, Lateral will handle most of the kill handling.
+
     // Do not call kill on incoming. Lateral Join has the responsibility for killing incoming
     if (context.getExecutorState().isFailed() || popConfig.getLateral().getLeftOutcome() == IterOutcome.STOP) {
+      logger.debug("Kill received. Stopping all processing");
       nextState = IterOutcome.NONE ;
     } else {
       // if we have already processed the record, then kill from a limit has no meaning.
       // if, however, we have values remaining to be emitted, and limit has been reached,
       // we abandon the remainder and send an empty batch with EMIT.
+      logger.debug("Kill received from subquery. Stopping processing of current input row.");
       if(hasRemainder) {
         nextState = IterOutcome.EMIT;
       }
@@ -172,6 +179,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       try {
         stats.startSetup();
         hasRemainder = true; // next call to next will handle the actual data.
+        logger.debug("First batch received");
         schemaChanged(); // checks if schema has changed (redundant in this case becaause it has) AND saves the
                          // current field metadata for check in subsequent iterations
         setupNewSchema();
@@ -243,25 +251,28 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
     final int incomingRecordCount = incoming.getRecordCount();
     final int currentRecord = popConfig.getLateral().getRecordIndex();
-    // we call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
+    // We call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
     // inside of the the unnest for the current batch
     setUnnestVector();
 
-    //expected output count is the num of values in the unnest colum array for the current record
+    //Expected output count is the num of values in the unnest colum array for the current record
     final int childCount =
         incomingRecordCount == 0 ? 0 : unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord);
 
-    // unnest the data
-    final int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(childCount, 0);
+    // Unnest the data
+    final int outputRecords = childCount == 0 ? 0 : unnest.unnestRecords(childCount);
 
-    // Keep track of any spill over into another batch. HAppens only if you artificially set the output batch
+    logger.debug("{} values out of {} were processed.", outputRecords, childCount);
+    // Keep track of any spill over into another batch. Happens only if you artificially set the output batch
     // size for unnest to a low number
     if (outputRecords < childCount) {
       hasRemainder = true;
       remainderIndex = outputRecords;
       this.recordCount = remainderIndex;
+      logger.debug("Output spilled into new batch. IterOutcome: OK.");
     } else {
       this.recordCount = outputRecords;
+      logger.debug("IterOutcome: EMIT.");
     }
 
     // If the current incoming record has spilled into two batches, we return
@@ -279,14 +290,17 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     final int currentRecord = popConfig.getLateral().getRecordIndex();
     final int remainingRecordCount =
         unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord) - remainderIndex;
-    final int projRecords = unnest.unnestRecords(remainingRecordCount, 0);
-    if (projRecords < remainingRecordCount) {
-      this.recordCount = projRecords;
-      this.remainderIndex += projRecords;
+    final int outputRecords = unnest.unnestRecords(remainingRecordCount);
+    logger.debug("{} values out of {} were processed.", outputRecords, remainingRecordCount);
+    if (outputRecords < remainingRecordCount) {
+      this.recordCount = outputRecords;
+      this.remainderIndex += outputRecords;
+      logger.debug("Output spilled into new batch. IterOutcome: OK.");
     } else {
       this.hasRemainder = false;
       this.remainderIndex = 0;
       this.recordCount = remainingRecordCount;
+      logger.debug("IterOutcome: EMIT.");
     }
     return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
   }
@@ -335,14 +349,9 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     recordCount = 0;
     final List<TransferPair> transfers = Lists.newArrayList();
 
-    //final NamedExpression unnestExpr =
-    //    new NamedExpression(popConfig.getColumn(), new FieldReference(popConfig.getColumn()));
-    //final FieldReference fieldReference = unnestExpr.getRef();
-
     final FieldReference fieldReference =
         new FieldReference(SchemaPath.getSimplePath(popConfig.getColumn().toString() + "_flat"));
 
-    //final FieldReference fieldReference = new FieldReference(popConfig.getColumn());
     final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
 
     final ValueVector unnestVector = transferPair.getTo();
@@ -368,10 +377,12 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     final TypedFieldId fieldId = incoming.getValueVectorId(popConfig.getColumn());
     final MaterializedField thisField = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]);
     final MaterializedField prevField = unnestFieldMetadata;
+    Preconditions.checkNotNull(thisField);
     unnestFieldMetadata = thisField;
     // isEquivalent may return false if the order of the fields has changed. This usually does not
     // happen but if it does we end up throwing a spurious schema change exeption
     if (prevField == null || !prevField.isEquivalent(thisField)) {
+      logger.debug("Schema changed");
       return true;
     }
     return false;
