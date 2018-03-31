@@ -19,9 +19,9 @@ package org.apache.drill.exec.planner.physical;
 
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
-import org.apache.calcite.rel.AbstractRelNode;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.UnnestPOP;
+import org.apache.drill.exec.planner.common.DrillUnnestRelBase;
 import org.apache.drill.exec.planner.physical.visitor.PrelVisitor;
 import org.apache.drill.exec.record.BatchSchema;
 
@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Iterator;
 
-public class UnnestPrel extends AbstractRelNode implements Prel {
+public class UnnestPrel extends DrillUnnestRelBase implements Prel {
 
   protected final UnnestPOP unnestPOP;
 

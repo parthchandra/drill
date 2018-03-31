@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -19,6 +19,7 @@ package org.apache.drill.exec.physical.impl.join;
 
 import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.exec.ops.ExecutorFragmentContext;
+import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.LateralJoinPOP;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.physical.impl.BatchCreator;
@@ -34,6 +35,7 @@ public class LateralJoinBatchCreator implements BatchCreator<LateralJoinPOP> {
     UnnestPOP unnest = config.getUnnestForLateralJoin();
     if (unnest != null) {
       unnest.setLateral(ljBatch);
+      unnest.getUnnestBatch().setIncoming((LateralContract)ljBatch);
     }
     return ljBatch;
   }

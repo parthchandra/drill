@@ -115,12 +115,8 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
     List<PhysicalOperator> children = Lists.newArrayList();
 
     children.add(op.getLeft().accept(this, iNode));
-
-    // keep track of the subscan in left input before visiting the right input such that subsequently we can
-    // use it for the rowkey join
-    UnnestPOP unnestInLeftInput = iNode.getUnnest();
-
     children.add(op.getRight().accept(this, iNode));
+    UnnestPOP unnestInLeftInput = iNode.getUnnest();
 
     PhysicalOperator newOp = op.getNewWithChildren(children);
     newOp.setCost(op.getCost());
@@ -128,6 +124,13 @@ public class Materializer extends AbstractPhysicalVisitor<PhysicalOperator, Mate
 
     ((LateralJoinPOP)newOp).setUnnestForLateralJoin(unnestInLeftInput);
 
+    return newOp;
+  }
+
+  @Override
+  public PhysicalOperator visitUnnest(UnnestPOP unnest, IndexedFragmentNode value) throws ExecutionSetupException {
+    PhysicalOperator newOp = visitOp(unnest, value);
+    value.addUnnest((UnnestPOP)newOp);
     return newOp;
   }
 

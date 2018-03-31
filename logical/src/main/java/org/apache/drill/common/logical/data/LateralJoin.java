@@ -20,26 +20,41 @@ package org.apache.drill.common.logical.data;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
-import org.apache.drill.common.expression.SchemaPath;
+import com.google.common.collect.Iterators;
 import org.apache.drill.common.logical.data.visitors.LogicalVisitor;
 
-@JsonTypeName("unnest")
-public class Unnest extends SingleInputOperator {
+import java.util.Iterator;
+import java.util.List;
 
-  private final SchemaPath column;
+@JsonTypeName("lateral-join")
+public class LateralJoin extends LogicalOperatorBase {
+  private final LogicalOperator left;
+  private final LogicalOperator right;
 
   @JsonCreator
-  public Unnest(@JsonProperty("column") SchemaPath column) {
-    this.column = column;
+  public LateralJoin(@JsonProperty("left") LogicalOperator left, @JsonProperty("right") LogicalOperator right) {
+    super();
+    this.left = left;
+    this.right = right;
+    left.registerAsSubscriber(this);
+    right.registerAsSubscriber(this);
   }
 
-  public SchemaPath getColumn() {
-    return column;
+  public LogicalOperator getLeft() {
+    return left;
+  }
+
+  public LogicalOperator getRight() {
+    return right;
+  }
+
+  @Override
+  public Iterator<LogicalOperator> iterator() {
+    return Iterators.forArray(getLeft(), getRight());
   }
 
   @Override
   public <T, X, E extends Throwable> T accept(LogicalVisitor<T, X, E> logicalVisitor, X value) throws E {
-    return logicalVisitor.visitUnnest(this, value);
+    return logicalVisitor.visitLateralJoin(this, value);
   }
-
 }

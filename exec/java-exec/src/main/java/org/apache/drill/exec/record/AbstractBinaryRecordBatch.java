@@ -91,4 +91,13 @@ public abstract class AbstractBinaryRecordBatch<T extends PhysicalOperator> exte
   protected boolean checkForEarlyFinish(IterOutcome leftOutcome, IterOutcome rightOutcome) {
     return (leftOutcome == IterOutcome.NONE && rightOutcome == IterOutcome.NONE);
   }
+
+  public RecordBatch getLeft() {
+    return this.left;
+  }
+
+  public RecordBatch getRight() {
+    return this.right;
+  }
+
 }

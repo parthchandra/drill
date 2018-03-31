@@ -140,6 +140,7 @@ public class IteratorValidatorBatchIterator implements CloseableRecordBatch {
     case OK:
     case OK_NEW_SCHEMA:
     case NONE:
+    case EMIT:
       return;
     default:
       throw new IllegalStateException(
@@ -268,6 +269,9 @@ public class IteratorValidatorBatchIterator implements CloseableRecordBatch {
           // NOT_YET and OUT_OF_MEMORY are allowed at any time, except if
           // terminated (checked above).
           // NOT_YET and OUT_OF_MEMORY OK don't change high-level state.
+          break;
+        case EMIT:
+          validateBatch();
           break;
         default:
           throw new AssertionError(

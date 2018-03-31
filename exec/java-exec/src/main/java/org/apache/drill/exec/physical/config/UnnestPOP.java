@@ -18,15 +18,21 @@
 package org.apache.drill.exec.physical.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.google.common.collect.Iterators;
+import org.apache.drill.common.exceptions.ExecutionSetupException;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.exec.physical.base.AbstractBase;
 import org.apache.drill.exec.physical.base.AbstractSingle;
 import org.apache.drill.exec.physical.base.LateralContract;
+import org.apache.drill.exec.physical.base.Leaf;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.base.PhysicalVisitor;
+import org.apache.drill.exec.physical.impl.unnest.UnnestRecordBatch;
 import org.apache.drill.exec.proto.beans.CoreOperatorType;
+import org.apache.drill.exec.record.RecordBatch;
 
 import java.util.Iterator;
 import java.util.List;
@@ -35,23 +41,36 @@ import static org.apache.drill.exec.proto.UserBitShared.CoreOperatorType.UNNEST_
 import static org.apache.drill.exec.proto.beans.CoreOperatorType.UNNEST;
 
 @JsonTypeName("unnest")
-public class UnnestPOP extends AbstractSingle {
+public class UnnestPOP extends AbstractBase implements Leaf {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UnnestPOP.class);
 
   private SchemaPath column;
+
+  @JsonProperty("lateral")
+  private LateralContract lateral ;
+
+  @JsonIgnore
+  private UnnestRecordBatch unnestBatch;
 
   @JsonCreator
   public UnnestPOP(
       @JsonProperty("child") PhysicalOperator child, // Operator with incoming record batch
       @JsonProperty("column") SchemaPath column) {
-    super(child);
     this.column = column;
   }
 
 
   @Override
+  public PhysicalOperator getNewWithChildren(List<PhysicalOperator> children) throws ExecutionSetupException {
+    assert children.isEmpty();
+    UnnestPOP newUnnest = new UnnestPOP(null, column);
+    newUnnest.setLateral(this.lateral);
+    return newUnnest;
+  }
+
+  @Override
   public Iterator<PhysicalOperator> iterator() {
-    return Iterators.singletonIterator(child);
+    return Iterators.emptyIterator();
   }
 
   public SchemaPath getColumn() {
@@ -63,10 +82,22 @@ public class UnnestPOP extends AbstractSingle {
     return physicalVisitor.visitUnnest(this, value);
   }
 
-  @Override
-  public PhysicalOperator getNewWithChild(PhysicalOperator child) {
-    UnnestPOP unnest =  new UnnestPOP(child, column);
-    return unnest;
+ @JsonProperty("lateral")
+  public LateralContract getLateral() {
+    return lateral;
+  }
+
+  public void setLateral(LateralContract l) {
+    this.lateral = l;
+  }
+
+  public void addUnnestBatch(UnnestRecordBatch unnestBatch) {
+    this.unnestBatch = unnestBatch;
+  }
+
+  @JsonIgnore
+  public UnnestRecordBatch getUnnestBatch() {
+    return this.unnestBatch;
   }
 
   @Override

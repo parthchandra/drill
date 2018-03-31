@@ -18,6 +18,7 @@
 package org.apache.drill.exec.physical.impl.unnest;
 
 import com.google.common.base.Preconditions;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.FieldReference;
@@ -32,10 +33,11 @@ import org.apache.drill.exec.expr.CodeGenerator;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.UnnestPOP;
+import org.apache.drill.exec.physical.impl.join.LateralJoinBatch;
+import org.apache.drill.exec.record.AbstractRecordBatch;
 import org.apache.drill.exec.record.AbstractSingleRecordBatch;
 import org.apache.drill.exec.record.AbstractTableFunctionRecordBatch;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
-import org.apache.drill.exec.record.CloseableRecordBatch;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.RecordBatchSizer;
@@ -46,7 +48,6 @@ import org.apache.drill.exec.vector.ValueVector;
 import org.apache.drill.exec.vector.complex.RepeatedMapVector;
 import org.apache.drill.exec.vector.complex.RepeatedValueVector;
 
-import java.io.IOException;
 import java.util.List;
 
 import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK;
@@ -71,6 +72,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
   private int recordCount;
   private long outputBatchSize;
   private MaterializedField unnestFieldMetadata;
+
 
   /**
    * Memory manager for Unnest. Estimates the batch size exactly like we do for Flatten.
@@ -119,6 +121,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
 
   public UnnestRecordBatch(UnnestPOP pop, FragmentContext context) throws OutOfMemoryException {
     super(pop, context);
+    pop.addUnnestBatch(this);
     // get the output batch size from config.
     outputBatchSize = context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
   }
@@ -150,6 +153,11 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
     hasRemainder = false; // whatever the case, we need to stop processing the current row.
   }
 
+  private void updateIncoming() {
+    if (incoming == null ) {
+      //incoming = popConfig.getLateral();
+    }
+  }
 
   @Override
   public IterOutcome innerNext() {
@@ -245,7 +253,6 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
     unnest.setUnnestField(vector);
   }
 
-  @Override
   protected IterOutcome doWork() {
     Preconditions.checkNotNull(lateral);
     final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
