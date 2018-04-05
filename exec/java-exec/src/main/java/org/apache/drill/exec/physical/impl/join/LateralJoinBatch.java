@@ -713,7 +713,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   /**
    * Simple method to allocate space for all the vectors in the container.
    */
-  private void allocateVectors() {;
+  private void allocateVectors() {
     for (VectorWrapper w : container) {
       RecordBatchSizer.ColumnSize colSize = lateralBatchMemoryManager.getColumnSize(w.getField().getName());
       colSize.allocateVector(w.getValueVector(), maxOutputRowCount);
