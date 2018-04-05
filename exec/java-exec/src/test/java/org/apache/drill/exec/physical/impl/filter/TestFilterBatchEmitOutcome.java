@@ -20,7 +20,7 @@ package org.apache.drill.exec.physical.impl.filter;
 import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.exec.physical.config.Filter;
 import org.apache.drill.exec.physical.impl.MockRecordBatch;
-import org.apache.drill.exec.physical.impl.BaseTestOpBatchEmitOutcome;
+import org.apache.drill.exec.physical.impl.agg.BaseTestOpBatchEmitOutcome;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.test.rowSet.RowSet;
 import org.junit.Test;
