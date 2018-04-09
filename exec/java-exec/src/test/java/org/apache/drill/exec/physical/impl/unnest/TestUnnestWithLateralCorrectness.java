@@ -25,6 +25,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ops.OperatorContext;
+import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.LateralJoinPOP;
 import org.apache.drill.exec.physical.config.UnnestPOP;
@@ -548,13 +549,13 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
     // setup Unnest record batch
     final UnnestRecordBatch unnestBatch =
-        new UnnestRecordBatch(unnestPopConfig, incomingMockBatch, fixture.getFragmentContext());
+        new UnnestRecordBatch(unnestPopConfig, fixture.getFragmentContext());
 
     final LateralJoinBatch lateralJoinBatch =
         new TestingLateralJoinBatch(ljPopConfig, fixture.getFragmentContext(), incomingMockBatch, unnestBatch);
 
-    // set pointer to Lateral in unnest pop config
-    unnestPopConfig.setLateral(lateralJoinBatch);
+    // set pointer to Lateral in unnest
+    unnestBatch.setIncoming((LateralContract) lateralJoinBatch);
 
     // Simulate the pipeline by calling next on the incoming
 

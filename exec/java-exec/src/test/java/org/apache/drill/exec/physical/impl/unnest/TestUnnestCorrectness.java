@@ -25,6 +25,7 @@ import org.apache.drill.common.expression.SchemaPath;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ops.OperatorContext;
+import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.physical.impl.MockRecordBatch;
@@ -516,12 +517,13 @@ import static org.junit.Assert.assertTrue;
     final MockLateralJoinBatch lateralJoinBatch =
         new MockLateralJoinBatch(fixture.getFragmentContext(), operatorContext, incomingMockBatch);
 
-    // set pointer to Lateral in unnest pop config
-    unnestPopConfig.setLateral(lateralJoinBatch);
 
     // setup Unnest record batch
     final UnnestRecordBatch unnestBatch =
-        new UnnestRecordBatch(unnestPopConfig, incomingMockBatch, fixture.getFragmentContext());
+        new UnnestRecordBatch(unnestPopConfig, fixture.getFragmentContext());
+
+    // set pointer to Lateral in unnest pop config
+    unnestBatch.setIncoming((LateralContract) lateralJoinBatch);
 
     // set backpointer to lateral join in unnest
     lateralJoinBatch.setUnnest(unnestBatch);
