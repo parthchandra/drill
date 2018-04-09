@@ -33,7 +33,9 @@ import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.record.AbstractSingleRecordBatch;
+import org.apache.drill.exec.record.AbstractTableFunctionRecordBatch;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
+import org.apache.drill.exec.record.CloseableRecordBatch;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.RecordBatchSizer;
@@ -51,7 +53,7 @@ import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK;
 import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK_NEW_SCHEMA;
 
 // TODO - handle the case where a user tries to unnest a scalar, should just return the column as is
-public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
+public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPOP> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UnnestRecordBatch.class);
 
   private Unnest unnest;
@@ -69,8 +71,6 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   private int recordCount;
   private long outputBatchSize;
   private MaterializedField unnestFieldMetadata;
-
-
 
   /**
    * Memory manager for Unnest. Estimates the batch size exactly like we do for Flatten.
@@ -117,8 +117,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
 
-  public UnnestRecordBatch(UnnestPOP pop, RecordBatch incoming, FragmentContext context) throws OutOfMemoryException {
-    super(pop, context, incoming);
+  public UnnestRecordBatch(UnnestPOP pop, FragmentContext context) throws OutOfMemoryException {
+    super(pop, context);
     // get the output batch size from config.
     outputBatchSize = context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
   }
@@ -128,15 +128,14 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     return recordCount;
   }
 
-
-  @Override
   protected void killIncoming(boolean sendUpstream) {
     // Kill may be received from an operator downstream of the corresponding lateral, or from
     // a limit that is in a subqueruy between unnest and lateral. In the latter case, unnest has to handle the limit.
     // In the former case, Lateral will handle most of the kill handling.
 
+    Preconditions.checkNotNull(lateral);
     // Do not call kill on incoming. Lateral Join has the responsibility for killing incoming
-    if (context.getExecutorState().isFailed() || popConfig.getLateral().getLeftOutcome() == IterOutcome.STOP) {
+    if (context.getExecutorState().isFailed() || lateral.getLeftOutcome() == IterOutcome.STOP) {
       logger.debug("Kill received. Stopping all processing");
       nextState = IterOutcome.NONE ;
     } else {
@@ -154,6 +153,8 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   @Override
   public IterOutcome innerNext() {
+
+    Preconditions.checkNotNull(lateral);
 
     // Short circuit if record batch has already sent all data and is done
     if (state == BatchState.DONE) {
@@ -197,7 +198,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
       container.zeroVectors();
 
       // Check if schema has changed
-      if (popConfig.getLateral().getRecordIndex() == 0 && schemaChanged()) {
+      if (lateral.getRecordIndex() == 0 && schemaChanged()) {
         hasRemainder = true;     // next call to next will handle the actual data.
         try {
           setupNewSchema();
@@ -209,7 +210,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
         }
         return OK_NEW_SCHEMA;
       }
-      if (popConfig.getLateral().getRecordIndex() == 0) {
+      if (lateral.getRecordIndex() == 0) {
         unnest.resetGroupIndex();
       }
       return doWork();
@@ -217,7 +218,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   }
 
-  @Override
+    @Override
   public VectorContainer getOutgoingContainer() {
     return this.container;
   }
@@ -246,11 +247,12 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
 
   @Override
   protected IterOutcome doWork() {
+    Preconditions.checkNotNull(lateral);
     final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
         popConfig.getColumn());
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
     final int incomingRecordCount = incoming.getRecordCount();
-    final int currentRecord = popConfig.getLateral().getRecordIndex();
+    final int currentRecord = lateral.getRecordIndex();
     // We call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
     // inside of the the unnest for the current batch
     setUnnestVector();
@@ -284,10 +286,11 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   private IterOutcome handleRemainder() {
+    Preconditions.checkNotNull(lateral);
     final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
         popConfig.getColumn());
     unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
-    final int currentRecord = popConfig.getLateral().getRecordIndex();
+    final int currentRecord = lateral.getRecordIndex();
     final int remainingRecordCount =
         unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord) - remainderIndex;
     final int outputRecords = unnest.unnestRecords(remainingRecordCount);
@@ -345,6 +348,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
   }
 
   @Override protected boolean setupNewSchema() throws SchemaChangeException {
+    Preconditions.checkNotNull(lateral);
     container.clear();
     recordCount = 0;
     final List<TransferPair> transfers = Lists.newArrayList();
@@ -361,7 +365,7 @@ public class UnnestRecordBatch extends AbstractSingleRecordBatch<UnnestPOP> {
     container.buildSchema(SelectionVectorMode.NONE);
 
     this.unnest = new UnnestImpl();
-    unnest.setup(context, incoming, this, transfers, popConfig.getLateral());
+    unnest.setup(context, incoming, this, transfers, lateral);
     setUnnestVector();
     return true;
   }
