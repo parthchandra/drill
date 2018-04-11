@@ -30,6 +30,7 @@ import org.apache.drill.exec.exception.SchemaChangeException;
 import org.apache.drill.exec.expr.ClassGenerator;
 import org.apache.drill.exec.expr.CodeGenerator;
 import org.apache.drill.exec.ops.FragmentContext;
+import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.record.AbstractSingleRecordBatch;
@@ -38,6 +39,7 @@ import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.CloseableRecordBatch;
 import org.apache.drill.exec.record.MaterializedField;
 import org.apache.drill.exec.record.RecordBatch;
+import org.apache.drill.exec.record.RecordBatchMemoryManager;
 import org.apache.drill.exec.record.RecordBatchSizer;
 import org.apache.drill.exec.record.TransferPair;
 import org.apache.drill.exec.record.TypedFieldId;
@@ -69,24 +71,40 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
   private IterOutcome nextState = OK;
   private int remainderIndex = 0;
   private int recordCount;
-  private long outputBatchSize;
   private MaterializedField unnestFieldMetadata;
+  private final UnnestMemoryManager memoryManager;
+
+  public enum Metric implements MetricDef {
+    INPUT_BATCH_COUNT,
+    AVG_INPUT_BATCH_BYTES,
+    AVG_INPUT_ROW_BYTES,
+    INPUT_RECORD_COUNT,
+    OUTPUT_BATCH_COUNT,
+    AVG_OUTPUT_BATCH_BYTES,
+    AVG_OUTPUT_ROW_BYTES,
+    OUTPUT_RECORD_COUNT;
+
+    @Override
+    public int metricId() {
+      return ordinal();
+    }
+  }
 
   /**
    * Memory manager for Unnest. Estimates the batch size exactly like we do for Flatten.
    */
-  private class UnnestMemoryManager {
-    private final int outputRowCount;
-    private static final int OFFSET_VECTOR_WIDTH = 4;
-    private static final int WORST_CASE_FRAGMENTATION_FACTOR = 1;
-    private static final int MAX_NUM_ROWS = ValueVector.MAX_ROW_COUNT;
-    private static final int MIN_NUM_ROWS = 1;
+  private class UnnestMemoryManager extends RecordBatchMemoryManager {
 
-    private UnnestMemoryManager(RecordBatch incoming, long outputBatchSize, SchemaPath unnestColumn) {
+    private UnnestMemoryManager(int outputBatchSize) {
+      super(outputBatchSize);
+    }
+
+    @Override
+    public void update() {
       // Get sizing information for the batch.
-      RecordBatchSizer sizer = new RecordBatchSizer(incoming);
+      setRecordBatchSizer(new RecordBatchSizer(incoming));
 
-      final TypedFieldId typedFieldId = incoming.getValueVectorId(unnestColumn);
+      final TypedFieldId typedFieldId = incoming.getValueVectorId(popConfig.getColumn());
       final MaterializedField field = incoming.getSchema().getColumn(typedFieldId.getFieldIds()[0]);
 
       // Get column size of unnest column.
@@ -97,30 +115,39 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
       // Average rowWidth of single element in the unnest list.
       // subtract the offset vector size from column data size.
       final int avgRowWidthSingleUnnestEntry = RecordBatchSizer
-          .safeDivide(columnSize.netSize - (OFFSET_VECTOR_WIDTH * columnSize.valueCount), columnSize.elementCount);
+          .safeDivide(columnSize.getTotalNetSize() - (getOffsetVectorWidth() * columnSize.getValueCount()), columnSize
+              .getElementCount());
 
       // Average rowWidth of outgoing batch.
       final int avgOutgoingRowWidth = avgRowWidthSingleUnnestEntry;
 
       // Number of rows in outgoing batch
-      outputRowCount = Math.max(MIN_NUM_ROWS, Math.min(MAX_NUM_ROWS,
-          RecordBatchSizer.safeDivide((outputBatchSize / WORST_CASE_FRAGMENTATION_FACTOR), avgOutgoingRowWidth)));
+      final int outputBatchSize = getOutputBatchSize();
+      // Number of rows in outgoing batch
+      setOutputRowCount(outputBatchSize, avgOutgoingRowWidth);
 
-      logger.debug(
-          "unnest incoming batch sizer : {}, outputBatchSize : {}," + "avgOutgoingRowWidth : {}, outputRowCount : {}",
-          sizer, outputBatchSize, avgOutgoingRowWidth, outputRowCount);
+      setOutgoingRowWidth(avgOutgoingRowWidth);
+
+      // Limit to lower bound of total number of rows possible for this batch
+      // i.e. all rows fit within memory budget.
+      setOutputRowCount(Math.min(columnSize.getElementCount(), getOutputRowCount()));
+
+      logger.debug("incoming batch size : {}", getRecordBatchSizer());
+
+      logger.debug("output batch size : {}, avg outgoing rowWidth : {}, output rowCount : {}",
+          outputBatchSize, avgOutgoingRowWidth, getOutputRowCount());
+
+      updateIncomingStats();
     }
 
-    public int getOutputRowCount() {
-      return outputRowCount;
-    }
   }
 
 
   public UnnestRecordBatch(UnnestPOP pop, FragmentContext context) throws OutOfMemoryException {
     super(pop, context);
     // get the output batch size from config.
-    outputBatchSize = context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
+    int configuredBatchSize = (int) context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
+    memoryManager = new UnnestMemoryManager(configuredBatchSize);
   }
 
   @Override
@@ -248,9 +275,8 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
   @Override
   protected IterOutcome doWork() {
     Preconditions.checkNotNull(lateral);
-    final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
-        popConfig.getColumn());
-    unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
+    memoryManager.update();
+    unnest.setOutputCount(memoryManager.getOutputRowCount());
     final int incomingRecordCount = incoming.getRecordCount();
     final int currentRecord = lateral.getRecordIndex();
     // We call this in setupSchema, but we also need to call it here so we have a reference to the appropriate vector
@@ -277,6 +303,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
       logger.debug("IterOutcome: EMIT.");
     }
 
+    memoryManager.updateOutgoingStats(outputRecords);
     // If the current incoming record has spilled into two batches, we return
     // IterOutcome.OK so that the Lateral Join can keep calling next() until the
     // entire incoming recods has been unnested. If the entire records has been
@@ -287,9 +314,8 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
 
   private IterOutcome handleRemainder() {
     Preconditions.checkNotNull(lateral);
-    final UnnestMemoryManager unnestMemoryManager = new UnnestMemoryManager(incoming, outputBatchSize,
-        popConfig.getColumn());
-    unnest.setOutputCount(unnestMemoryManager.getOutputRowCount());
+    memoryManager.update();
+    unnest.setOutputCount(memoryManager.getOutputRowCount());
     final int currentRecord = lateral.getRecordIndex();
     final int remainingRecordCount =
         unnest.getUnnestField().getAccessor().getInnerValueCountAt(currentRecord) - remainderIndex;
@@ -305,6 +331,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
       this.recordCount = remainingRecordCount;
       logger.debug("IterOutcome: EMIT.");
     }
+    memoryManager.updateOutgoingStats(outputRecords);
     return hasRemainder ? IterOutcome.OK : IterOutcome.EMIT;
   }
 
@@ -390,6 +417,35 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
       return true;
     }
     return false;
+  }
+
+  private void updateStats() {
+    if(memoryManager.getRecordBatchSizer() == null) {
+      return;
+    }
+    stats.setLongStat(Metric.INPUT_BATCH_COUNT, memoryManager.getNumIncomingBatches());
+    stats.setLongStat(Metric.AVG_INPUT_BATCH_BYTES, memoryManager.getAvgInputBatchSize());
+    stats.setLongStat(Metric.AVG_INPUT_ROW_BYTES, memoryManager.getAvgInputRowWidth());
+    stats.setLongStat(Metric.INPUT_RECORD_COUNT, memoryManager.getTotalInputRecords());
+    stats.setLongStat(Metric.OUTPUT_BATCH_COUNT, memoryManager.getNumOutgoingBatches());
+    stats.setLongStat(Metric.AVG_OUTPUT_BATCH_BYTES, memoryManager.getAvgOutputBatchSize());
+    stats.setLongStat(Metric.AVG_OUTPUT_ROW_BYTES, memoryManager.getAvgOutputRowWidth());
+    stats.setLongStat(Metric.OUTPUT_RECORD_COUNT, memoryManager.getTotalOutputRecords());
+
+    logger.debug("input: batch count : {}, avg batch bytes : {},  avg row bytes : {}, record count : {}",
+        memoryManager.getNumIncomingBatches(), memoryManager.getAvgInputBatchSize(),
+        memoryManager.getAvgInputRowWidth(), memoryManager.getTotalInputRecords());
+
+    logger.debug("output: batch count : {}, avg batch bytes : {},  avg row bytes : {}, record count : {}",
+        memoryManager.getNumOutgoingBatches(), memoryManager.getAvgOutputBatchSize(),
+        memoryManager.getAvgOutputRowWidth(), memoryManager.getTotalOutputRecords());
+
+  }
+
+  @Override
+  public void close() {
+    updateStats();
+    super.close();
   }
 
 }
