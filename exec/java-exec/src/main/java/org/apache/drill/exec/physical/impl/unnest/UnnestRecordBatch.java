@@ -213,6 +213,9 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
       } finally {
         stats.stopSetup();
       }
+      // since we never called next on an upstream operator, incoming stats are
+      // not updated. update input stats explicitly.
+      stats.batchReceived(0, incoming.getRecordCount(), true);
       return IterOutcome.OK_NEW_SCHEMA;
     } else {
       assert state != BatchState.FIRST : "First batch should be OK_NEW_SCHEMA";
@@ -229,11 +232,13 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
           context.getExecutorState().fail(ex);
           return IterOutcome.STOP;
         }
+        stats.batchReceived(0, incoming.getRecordCount(), true);
         return OK_NEW_SCHEMA;
       }
       if (lateral.getRecordIndex() == 0) {
         unnest.resetGroupIndex();
       }
+      stats.batchReceived(0, incoming.getRecordCount(), true);
       return doWork();
     }
 
@@ -353,7 +358,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
 
     //TODO: fixthis once planner changes are done
     final FieldReference fieldReference =
-        new FieldReference(SchemaPath.getSimplePath(popConfig.getColumn().toString() + "_flat"));
+        new FieldReference(SchemaPath.getSimplePath(popConfig.getColumn().rootName() + "_flat"));
 
     final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
 
