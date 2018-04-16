@@ -363,7 +363,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
 
     //TODO: fixthis once planner changes are done
     final FieldReference fieldReference =
-        new FieldReference(SchemaPath.getSimplePath(popConfig.getColumn().toString() + "_flat"));
+        new FieldReference(SchemaPath.getSimplePath(popConfig.getColumn().rootName() + "_flat"));
 
     final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
 
