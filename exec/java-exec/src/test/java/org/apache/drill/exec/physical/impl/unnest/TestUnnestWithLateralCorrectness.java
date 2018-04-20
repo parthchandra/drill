@@ -301,15 +301,14 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
   }
 
-  @Ignore ("Batch limits need to be sync'd with tthe record batch sizer. Fix once the calulations are stabilized")
+  //@Ignore ("Batch limits need to be sync'd with tthe record batch sizer. Fix once the calulations are stabilized")
   @Test
   public void testUnnestLimitBatchSize() {
 
-    final int limitedOutputBatchSize = 1024;
-    final int inputBatchSize = 1024+1;
-    final int limitedOutputBatchSizeBytes = 1024*(4 + 4 + 4 * inputBatchSize); // num rows * (size of int + size of
-                                                                               // int + size of int * num entries in
-                                                                               // array)
+    final int limitedOutputBatchSize = 128;
+    final int inputBatchSize = limitedOutputBatchSize + 1;
+    final int limitedOutputBatchSizeBytes = 4 * inputBatchSize * inputBatchSize; // approx
+
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output
     Object[][] data = new Object[1][1];
