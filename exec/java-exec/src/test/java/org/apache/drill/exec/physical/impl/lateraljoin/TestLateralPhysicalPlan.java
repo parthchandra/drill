@@ -19,8 +19,10 @@ package org.apache.drill.exec.physical.impl.lateraljoin;
 
 import static org.junit.Assert.assertEquals;
 import org.apache.drill.test.BaseTestQuery;
+import org.junit.Ignore;
 import org.junit.Test;
 
+@Ignore
 public class TestLateralPhysicalPlan extends BaseTestQuery {
 
   @Test

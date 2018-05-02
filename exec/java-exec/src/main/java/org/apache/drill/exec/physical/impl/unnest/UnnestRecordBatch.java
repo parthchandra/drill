@@ -18,29 +18,19 @@
 package org.apache.drill.exec.physical.impl.unnest;
 
 import com.google.common.base.Preconditions;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.Lists;
 import org.apache.drill.common.exceptions.UserException;
 import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.common.expression.SchemaPath;
-import org.apache.drill.common.logical.data.NamedExpression;
 import org.apache.drill.exec.ExecConstants;
-import org.apache.drill.exec.exception.ClassTransformationException;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.exception.SchemaChangeException;
-import org.apache.drill.exec.expr.ClassGenerator;
-import org.apache.drill.exec.expr.CodeGenerator;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.MetricDef;
-import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.config.UnnestPOP;
-import org.apache.drill.exec.physical.impl.join.LateralJoinBatch;
-import org.apache.drill.exec.record.AbstractRecordBatch;
-import org.apache.drill.exec.record.AbstractSingleRecordBatch;
 import org.apache.drill.exec.record.AbstractTableFunctionRecordBatch;
 import org.apache.drill.exec.record.BatchSchema.SelectionVectorMode;
 import org.apache.drill.exec.record.MaterializedField;
-import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.RecordBatchMemoryManager;
 import org.apache.drill.exec.record.RecordBatchSizer;
 import org.apache.drill.exec.record.TransferPair;
@@ -399,11 +389,15 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
     final MaterializedField thisField = incoming.getSchema().getColumn(fieldId.getFieldIds()[0]);
     final MaterializedField prevField = unnestFieldMetadata;
     Preconditions.checkNotNull(thisField);
-    unnestFieldMetadata = thisField;
+
     // isEquivalent may return false if the order of the fields has changed. This usually does not
     // happen but if it does we end up throwing a spurious schema change exeption
     if (prevField == null || !prevField.isEquivalent(thisField)) {
       logger.debug("Schema changed");
+      // We should store the clone of MaterializedField for unnest column instead of reference. When the column is of
+      // type Map and there is change in any children field of the Map then that will update the reference variable and
+      // isEquivalent check will still return true.
+      unnestFieldMetadata = thisField.clone();
       return true;
     }
     return false;

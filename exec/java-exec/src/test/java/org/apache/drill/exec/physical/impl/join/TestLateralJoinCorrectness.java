@@ -853,8 +853,8 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   }
 
   /**
-   * When multiple left batch is received with same schema but with OK_NEW_SCHEMA, then LATERAL detects that
-   * correctly and suppresses schema change operation by producing output in same batch created with initial schema.
+   * When multiple left batch is received with same schema but with OK_NEW_SCHEMA, then LATERAL rebuilds the
+   * schema each time and sends output in multiple output batches
    * The schema change was only for columns which are not produced by the UNNEST or right branch.
    *
    * @throws Exception
@@ -904,6 +904,8 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
       assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
       totalRecordCount += ljBatch.getRecordCount();
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
       assertTrue(totalRecordCount ==
         (nonEmptyLeftRowSet.rowCount() * nonEmptyRightRowSet.rowCount() +
           leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
@@ -922,9 +924,8 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   }
 
   /**
-   * When multiple left batch is received with same schema but with OK_NEW_SCHEMA, then LATERAL detects that
-   * correctly and suppresses false schema change indication from both left and right branch. It produces output in
-   * same batch created with initial schema.
+   * When multiple left batch is received with same schema but with OK_NEW_SCHEMA, then LATERAL correctly
+   * handles it by re-creating the schema and producing multiple batches of final output
    * The schema change is for columns common on both left and right side.
    *
    * @throws Exception
@@ -973,6 +974,9 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     try {
       int totalRecordCount = 0;
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      totalRecordCount += ljBatch.getRecordCount();
       assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
       totalRecordCount += ljBatch.getRecordCount();
