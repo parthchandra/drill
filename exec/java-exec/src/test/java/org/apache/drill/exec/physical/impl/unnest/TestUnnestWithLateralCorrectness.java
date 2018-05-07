@@ -156,6 +156,7 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
   }
 
+  @Ignore
   @Test
   public void testUnnestMapColumn() {
 
@@ -301,13 +302,14 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
   }
 
-  //@Ignore ("Batch limits need to be sync'd with tthe record batch sizer. Fix once the calulations are stabilized")
   @Test
   public void testUnnestLimitBatchSize() {
 
-    final int limitedOutputBatchSize = 128;
+    final int limitedOutputBatchSize = 127;
     final int inputBatchSize = limitedOutputBatchSize + 1;
-    final int limitedOutputBatchSizeBytes = 4 * inputBatchSize * inputBatchSize; // approx
+    // size of lateral output batch = 4N * (N+5) bytes, where N = outputBatchRowCount (if you do the math)
+    // configure the output batch size to be one more record than that so that the batch sizer can round down
+    final int limitedOutputBatchSizeBytes = 4 * limitedOutputBatchSize * (limitedOutputBatchSize + 6);
 
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output
@@ -363,11 +365,10 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
     // similar to previous test; we split a record across more than one batch.
     // but we also set a limit less than the size of the batch so only one batch gets output.
-    final int limitedOutputBatchSize = 1024;
-    final int inputBatchSize = 1024+1;
-    final int limitedOutputBatchSizeBytes = 1024*(4 + 4 + 4 * inputBatchSize); // num rows * (size of int + size of
-                                                                               // int + size of int * num entries in
-                                                                               // array)
+    final int limitedOutputBatchSize = 127;
+    final int inputBatchSize = limitedOutputBatchSize + 1;
+    final int limitedOutputBatchSizeBytes = 4 * limitedOutputBatchSize * (limitedOutputBatchSize + 6);
+
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output
     Object[][] data = new Object[1][1];
@@ -422,11 +423,10 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
     // similar to previous test but the size of the array fits exactly into the record batch;
 
-    final int limitedOutputBatchSize = 1024;
-    final int inputBatchSize = 1024;
-    final int limitedOutputBatchSizeBytes = 1024*(4 + 4 + 4 * inputBatchSize); // num rows * (size of int + size of
-                                                                               // int + size of int * num entries in
-                                                                               // array)
+    final int limitedOutputBatchSize = 127;
+    final int inputBatchSize = limitedOutputBatchSize + 1;
+    final int limitedOutputBatchSizeBytes = 4 * limitedOutputBatchSize * (limitedOutputBatchSize + 6);
+
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output
     Object[][] data = new Object[1][1];
@@ -871,9 +871,9 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
     final LateralJoinPOP ljPopConfig1 = new LateralJoinPOP(mockPopConfig, ljPopConfig2, JoinRelType.FULL);
 
     final LateralJoinBatch lateralJoinBatch2 =
-        new TestingLateralJoinBatch(ljPopConfig2, fixture.getFragmentContext(), projectBatch, unnestBatch2);
+        new LateralJoinBatch(ljPopConfig2, fixture.getFragmentContext(), projectBatch, unnestBatch2);
     final LateralJoinBatch lateralJoinBatch1 =
-        new TestingLateralJoinBatch(ljPopConfig1, fixture.getFragmentContext(), incomingMockBatch, lateralJoinBatch2);
+        new LateralJoinBatch(ljPopConfig1, fixture.getFragmentContext(), incomingMockBatch, lateralJoinBatch2);
 
     // set pointer to Lateral in unnest
     unnestBatch1.setIncoming((LateralContract) lateralJoinBatch1);
@@ -1012,6 +1012,7 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
     return ret.e;
   }
 
+  @Ignore
   @Test
   public void testNestedUnnestMapColumn() {
 
