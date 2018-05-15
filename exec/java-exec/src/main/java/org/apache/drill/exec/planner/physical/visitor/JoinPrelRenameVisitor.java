@@ -20,6 +20,7 @@ package org.apache.drill.exec.planner.physical.visitor;
 import java.util.List;
 
 import org.apache.drill.exec.planner.physical.JoinPrel;
+import org.apache.drill.exec.planner.physical.CorrelatePrel;
 import org.apache.drill.exec.planner.physical.Prel;
 import org.apache.calcite.rel.RelNode;
 
@@ -61,6 +62,29 @@ public class JoinPrelRenameVisitor extends BasePrelVisitor<Prel, Void, RuntimeEx
 
     RelNode left = prel.getJoinInput(0, children.get(0));
     RelNode right = prel.getJoinInput(leftCount, children.get(1));
+
+    reNamedChildren.add(left);
+    reNamedChildren.add(right);
+
+    return (Prel) prel.copy(prel.getTraitSet(), reNamedChildren);
+  }
+
+  @Override
+  public Prel visitCorrelate(CorrelatePrel prel, Void value) throws RuntimeException {
+
+    List<RelNode> children = Lists.newArrayList();
+
+    for(Prel child : prel){
+      child = child.accept(this, null);
+      children.add(child);
+    }
+
+    final int leftCount = children.get(0).getRowType().getFieldCount();
+
+    List<RelNode> reNamedChildren = Lists.newArrayList();
+
+    RelNode left = prel.getCorrelateInput(0, children.get(0));
+    RelNode right = prel.getCorrelateInput(leftCount, children.get(1));
 
     reNamedChildren.add(left);
     reNamedChildren.add(right);

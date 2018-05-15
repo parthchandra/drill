@@ -17,20 +17,32 @@
  */
 package org.apache.drill.exec.physical.impl.unnest;
 
+import com.google.common.base.Preconditions;
+import org.antlr.runtime.ANTLRStringStream;
+import org.antlr.runtime.CommonTokenStream;
+import org.antlr.runtime.RecognitionException;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.common.exceptions.DrillException;
 import org.apache.drill.common.exceptions.UserException;
+import org.apache.drill.common.expression.FieldReference;
+import org.apache.drill.common.expression.LogicalExpression;
+import org.apache.drill.common.expression.PathSegment;
 import org.apache.drill.common.expression.SchemaPath;
+import org.apache.drill.common.expression.parser.ExprLexer;
+import org.apache.drill.common.expression.parser.ExprParser;
+import org.apache.drill.common.logical.data.NamedExpression;
 import org.apache.drill.common.types.TypeProtos;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.ops.OperatorContext;
 import org.apache.drill.exec.physical.base.LateralContract;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.LateralJoinPOP;
+import org.apache.drill.exec.physical.config.Project;
 import org.apache.drill.exec.physical.config.UnnestPOP;
 import org.apache.drill.exec.physical.impl.MockRecordBatch;
 import org.apache.drill.exec.physical.impl.join.LateralJoinBatch;
+import org.apache.drill.exec.physical.impl.project.ProjectRecordBatch;
 import org.apache.drill.exec.physical.impl.sort.RecordBatchData;
 import org.apache.drill.exec.record.RecordBatch;
 import org.apache.drill.exec.record.metadata.TupleMetadata;
@@ -466,6 +478,27 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
 
   }
 
+  protected LogicalExpression parseExpr(String expr) {
+    ExprLexer lexer = new ExprLexer(new ANTLRStringStream(expr));
+    CommonTokenStream tokens = new CommonTokenStream(lexer);
+    ExprParser parser = new ExprParser(tokens);
+    try {
+      return parser.parse().e;
+    } catch (RecognitionException e) {
+      throw new RuntimeException("Error parsing expression: " + expr);
+    }
+  }
+
+  protected List<NamedExpression> parseExprs(String... expressionsAndOutputNames) {
+    Preconditions.checkArgument(expressionsAndOutputNames.length %2 ==0, "List of expressions and output field names" +
+        " is not complete, each expression must explicitly give and output name,");
+    List<NamedExpression> ret = new ArrayList<>();
+    for (int i = 0; i < expressionsAndOutputNames.length; i += 2) {
+      ret.add(new NamedExpression(parseExpr(expressionsAndOutputNames[i]),
+          new FieldReference(new SchemaPath(new PathSegment.NameSegment(expressionsAndOutputNames[i+1])))));
+    }
+    return ret;
+  }
 
   @Test
   public void testUnnestNonArrayColumn() {
@@ -555,8 +588,15 @@ public class TestUnnestWithLateralCorrectness extends SubOperatorTest {
     final UnnestRecordBatch unnestBatch =
         new UnnestRecordBatch(unnestPopConfig, fixture.getFragmentContext());
 
+    // project is required to rename the columns so as to disambiguate the same column name from
+    // unnest operator and the regular scan.
+    final Project projectPopConfig = new Project(parseExprs("unnestColumn", "unnestColumn1"), null);
+
+    final ProjectRecordBatch projectBatch =
+        new ProjectRecordBatch( projectPopConfig, unnestBatch, fixture.getFragmentContext());
+
     final LateralJoinBatch lateralJoinBatch =
-        new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(), incomingMockBatch, unnestBatch);
+        new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(), incomingMockBatch, projectBatch);
 
     // set pointer to Lateral in unnest
     unnestBatch.setIncoming((LateralContract) lateralJoinBatch);
