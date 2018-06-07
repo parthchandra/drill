@@ -147,9 +147,15 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // Setup the references of left, right and outgoing container in generated operator
     state = BatchState.NOT_FIRST;
 
-    // Update the memory manager
-    updateMemoryManager(LEFT_INPUT);
-    updateMemoryManager(RIGHT_INPUT);
+    // Update the memory manager only if its a brand new incoming i.e. leftJoinIndex and rightJoinIndex is 0
+    // Otherwise there will be a case where while filling last output batch, some records from previous left or
+    // right batch are still left to be sent in output for which we will count this batch twice.
+    if (leftJoinIndex == 0) {
+      updateMemoryManager(LEFT_INPUT);
+    }
+    if (rightJoinIndex == 0) {
+      updateMemoryManager(RIGHT_INPUT);
+    }
 
     // allocate space for the outgoing batch
     allocateVectors();
@@ -756,6 +762,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     // Check if right batch is empty since we have to handle left join case
     Preconditions.checkState(rightJoinIndex != -1, "Right batch record count is >0 but index is -1");
+    
     // For every record in right side just emit left and right records in output container
     for (int i = rightJoinIndex; i < rightRecordCount; ++i) {
       emitLeft(leftJoinIndex, outputIndex);
@@ -766,6 +773,31 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         break;
       }
     }
+
+    /*
+
+    int currentOutIndex = outputIndex;
+    // Number of rows that can be copied in output batch
+    final int maxAvailableRowSlot = maxOutputRowCount - currentOutIndex;
+    // Find minimum of rightRecordCount and number of output rows available
+    final int rowsToCopy = Math.min(maxAvailableRowSlot, rightRecordCount);
+
+    // First copy all the left vectors data. Doing it in this way since it's the same data being copied over may be
+    // we will have performance gain from JVM
+    for (int i = 0; i < rowsToCopy; ++i) {
+      emitLeft(leftJoinIndex, currentOutIndex++);
+    }
+
+    // reset the output index before copying right sie
+    currentOutIndex = outputIndex;
+    // Copy all the right side vectors data
+    for (int i = rightJoinIndex; i < rowsToCopy; ++i) {
+      emitRight(i, currentOutIndex++);
+    }
+
+    // Update outputIndex
+    outputIndex = currentOutIndex;
+    */
   }
 
   /**
