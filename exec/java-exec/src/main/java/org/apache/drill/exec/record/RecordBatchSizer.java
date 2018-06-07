@@ -615,7 +615,7 @@ public class RecordBatchSizer {
    * 100% bogus. Do not use it.
    */
   @Deprecated
-  private int stdRowWidth;
+  //private int stdRowWidth;
   /**
    * Actual batch size summing all buffers used to store data
    * for the batch.
@@ -691,7 +691,7 @@ public class RecordBatchSizer {
     for (VectorWrapper<?> vw : va) {
       ColumnSize colSize = measureColumn(vw.getValueVector(), "");
       columnSizes.put(vw.getField().getName(), colSize);
-      stdRowWidth += colSize.getStdDataSizePerEntry();
+      //stdRowWidth += colSize.getStdDataSizePerEntry();
       netBatchSize += colSize.getTotalNetSize();
       maxSize = Math.max(maxSize, colSize.getTotalDataSize());
       if (colSize.metadata.isNullable()) {
@@ -823,7 +823,7 @@ public class RecordBatchSizer {
   }
 
   public int rowCount() { return rowCount; }
-  public int stdRowWidth() { return stdRowWidth; }
+  //public int stdRowWidth() { return stdRowWidth; }
   public int grossRowWidth() { return grossRowWidth; }
   public int netRowWidth() { return netRowWidth; }
   public int getRowAllocSize() { return rowAllocSize; }
