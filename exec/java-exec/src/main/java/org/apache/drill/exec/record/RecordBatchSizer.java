@@ -200,7 +200,7 @@ public class RecordBatchSizer {
      */
     public int getStdNetSizePerEntry() {
       return getStdNetSizePerEntryCommon(metadata.getType(), isOptional, isRepeated, isRepeatedList(), children);
-    }
+      }
 
     /**
      * This is the average actual per entry data size in bytes. Does not
@@ -626,7 +626,7 @@ public class RecordBatchSizer {
       return columnSize;
     } else {
       return getComplexColumn(name);
-    }
+  }
   }
 
   // This keeps information for only top level columns. Information for nested
@@ -723,7 +723,7 @@ public class RecordBatchSizer {
       netRowWidth += colSize.getNetSizePerEntry();
     }
     this.sv2 = sv2;
-  }
+    }
 
   public void applySv2() {
     if (sv2 == null) {

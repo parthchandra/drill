@@ -278,8 +278,8 @@ public abstract class HashAggTemplate implements HashAggregator {
           outputRecordValues(i, i);
         }
         catch (SchemaChangeException sc) { throw new UnsupportedOperationException(sc);}
+        }
       }
-    }
 
     private void clear() {
       aggrValuesContainer.clear();
@@ -622,30 +622,30 @@ public abstract class HashAggTemplate implements HashAggregator {
         outcome = IterOutcome.NONE; // finished behaving like OK, now behave like NONE
       }
       else {
-        //
-        // Get the NEXT input batch, initially from the upstream, later (if there was a spill)
-        // from one of the spill files (The spill case is handled differently here to avoid
-        // collecting stats on the spilled records)
-        //
-        long memAllocBeforeNext = allocator.getAllocatedMemory();
-        if (handlingSpills) {
-          outcome = incoming.next(); // get it from the SpilledRecordBatch
-        } else {
-          // Get the next RecordBatch from the incoming (i.e. upstream operator)
-          outcome = outgoing.next(0, incoming);
-        }
-        long memAllocAfterNext = allocator.getAllocatedMemory();
-        long incomingBatchSize = memAllocAfterNext - memAllocBeforeNext;
+      //
+      // Get the NEXT input batch, initially from the upstream, later (if there was a spill)
+      // from one of the spill files (The spill case is handled differently here to avoid
+      // collecting stats on the spilled records)
+      //
+      long memAllocBeforeNext = allocator.getAllocatedMemory();
+      if ( handlingSpills ) {
+        outcome = incoming.next(); // get it from the SpilledRecordBatch
+      } else {
+        // Get the next RecordBatch from the incoming (i.e. upstream operator)
+        outcome = outgoing.next(0, incoming);
+      }
+      long memAllocAfterNext = allocator.getAllocatedMemory();
+      long incomingBatchSize = memAllocAfterNext - memAllocBeforeNext;
 
-        // If incoming batch is bigger than our estimate - adjust the estimate to match
-        if (estMaxBatchSize < incomingBatchSize) {
+      // If incoming batch is bigger than our estimate - adjust the estimate to match
+      if ( estMaxBatchSize < incomingBatchSize) {
           logger.debug("Found a bigger next {} batch: {} , prior estimate was: {}, mem allocated {}", handlingSpills ? "spill" : "incoming", incomingBatchSize, estMaxBatchSize, memAllocAfterNext);
-          estMaxBatchSize = incomingBatchSize;
-        }
+        estMaxBatchSize = incomingBatchSize;
+      }
 
-        if (EXTRA_DEBUG_1) {
-          logger.debug("Received IterOutcome of {}", outcome);
-        }
+      if (EXTRA_DEBUG_1) {
+        logger.debug("Received IterOutcome of {}", outcome);
+      }
       }
       // Handle various results from getting the next batch
       switch (outcome) {
@@ -697,8 +697,8 @@ public abstract class HashAggTemplate implements HashAggregator {
 
           switch ( aggOutcome ) {
             case AGG_RESTART:
-              // Output of first batch returned a RESTART (all new partitions were spilled)
-              return AggOutcome.CALL_WORK_AGAIN; // need to read/process the next partition
+            // Output of first batch returned a RESTART (all new partitions were spilled)
+            return AggOutcome.CALL_WORK_AGAIN; // need to read/process the next partition
             case AGG_EMIT:
               // Following an incoming EMIT, if the output was only a single batch
               // outcome is set to IterOutcome.EMIT;
