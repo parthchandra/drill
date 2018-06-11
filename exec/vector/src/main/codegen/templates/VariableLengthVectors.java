@@ -611,6 +611,23 @@ public final class ${minor.class}Vector extends BaseDataValueVector implements V
     }
 
     /**
+     * Set len number of values, starting at (and including) index, in the vector to empty
+     *
+     * @param index  starting position to set
+     * @param len    number of values to set to zero
+     */
+    protected void setZero(int index, int len) {
+      assert index >= 0;
+      final int currentOffset = offsetVector.getAccessor().get(index);
+      while (data.capacity() < currentOffset + len) {
+        reAlloc();
+      }
+      for( int i = index; i < index + len; i++) {
+        offsetVector.getMutator().set(i + 1, currentOffset);
+      }
+    }
+
+    /**
      * Copies the bulk input into this value vector and extends its capacity if necessary.
      * @param input bulk input
      */
