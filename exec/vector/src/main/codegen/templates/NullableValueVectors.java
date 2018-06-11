@@ -572,7 +572,9 @@ public final class ${className} extends BaseDataValueVector implements <#if type
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       final UInt1Vector.Mutator bitsMutator = bits.getMutator();
       <#if type.major == "VarLen">
-      valuesMutator.setZero(lastSet + 1, index - lastSet - 1);
+      for (int i = lastSet + 1; i < index; i++) {
+        valuesMutator.set(i, emptyByteArray);
+      }
       </#if>
       bitsMutator.set(index, 1);
       valuesMutator.set(index, value);
@@ -582,7 +584,9 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     <#if type.major == "VarLen">
     private void fillEmpties(int index) {
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
-      valuesMutator.setZero(lastSet + 1, index - lastSet );
+      for (int i = lastSet; i < index; i++) {
+        valuesMutator.setSafe(i + 1, emptyByteArray);
+      }
       while(index > bits.getValueCapacity()) {
         bits.reAlloc();
       }
@@ -633,7 +637,9 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     public void set(int index, Nullable${minor.class}Holder holder) {
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
-      valuesMutator.setZero(lastSet + 1, index - lastSet - 1);
+      for (int i = lastSet + 1; i < index; i++) {
+        valuesMutator.set(i, emptyByteArray);
+      }
       </#if>
       bits.getMutator().set(index, holder.isSet);
       valuesMutator.set(index, holder);
@@ -643,7 +649,9 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     public void set(int index, ${minor.class}Holder holder) {
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
-      valuesMutator.setZero(lastSet + 1, index - lastSet - 1);
+      for (int i = lastSet + 1; i < index; i++) {
+        valuesMutator.set(i, emptyByteArray);
+      }
       </#if>
       bits.getMutator().set(index, 1);
       valuesMutator.set(index, holder);
@@ -658,7 +666,9 @@ public final class ${className} extends BaseDataValueVector implements <#if type
     public void set(int index, int isSet<#list fields as field><#if field.include!true >, ${field.type} ${field.name}Field</#if></#list> ) {
       final ${valuesName}.Mutator valuesMutator = values.getMutator();
       <#if type.major == "VarLen">
-      valuesMutator.setZero(lastSet + 1, index - lastSet - 1);
+      for (int i = lastSet + 1; i < index; i++) {
+        valuesMutator.set(i, emptyByteArray);
+      }
       </#if>
       bits.getMutator().set(index, isSet);
       valuesMutator.set(index<#list fields as field><#if field.include!true >, ${field.name}Field</#if></#list>);
