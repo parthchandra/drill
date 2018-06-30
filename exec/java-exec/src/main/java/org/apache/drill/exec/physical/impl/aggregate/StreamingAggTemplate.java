@@ -48,9 +48,13 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
   // End of all data
   private boolean done = false;
 
-  private int previousIndex = -1;
+  // index in the incoming (sv4/sv2/vector)
   private int underlyingIndex = 0;
-  private int currentIndex;
+  // The indexes below refer to the actual record indexes in input batch
+  // (i.e if a selection vector the sv4/sv2 entry has been dereferenced or if a vector then the record index itself)
+  private int previousIndex = -1;  // the last index that has been processed. Initialized to -1 every time a new
+                                   // aggregate group begins (including every time a new data set begins)
+  private int currentIndex; // current index being processed
   /**
    * Number of records added to the current aggregation group.
    */
@@ -58,6 +62,7 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
   // There are two outcomes from the aggregator. One is the aggregator's outcome defined in
   // StreamingAggregator.AggOutcome. The other is the outcome from the last call to incoming.next
   private IterOutcome outcome;
+  // Number of aggregation groups added into the output batch
   private int outputCount = 0;
   private RecordBatch incoming;
   // the Streaming Agg Batch that this aggregator belongs to
@@ -244,7 +249,6 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
                     outputToBatchPrev(previous, previousIndex, outputCount);
                   }
                   resetIndex();
-                  previousIndex = -1;
                   return setOkAndReturn(out);
                 } else {
                   resetIndex();
@@ -262,7 +266,6 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
                     // currentIndex has been reset to int_max so use previous index.
                     outputToBatch(previousIndex);
                     resetIndex();
-                    previousIndex = -1;
                     return setOkAndReturn(out);
                   } else { // not the same
                     if (EXTRA_DEBUG) {
@@ -273,7 +276,6 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
                         if (EXTRA_DEBUG) {
                           logger.debug("Output container is full. flushing it.");
                         }
-                        previousIndex = -1;
                         return setOkAndReturn(out);
                       }
                     }
@@ -281,7 +283,6 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
                     processRemainingRecordsInBatch();
                     outputToBatch(previousIndex); // currentIndex has been reset to int_max so use previous index.
                     resetIndex();
-                    previousIndex = -1;
                     return setOkAndReturn(out);
                   }
                 }
@@ -436,6 +437,7 @@ public abstract class StreamingAggTemplate implements StreamingAggregator {
     IterOutcome outcomeToReturn;
     if (outcome == EMIT) {
       firstBatchForDataSet = true;
+      previousIndex = -1;
     } else {
       firstBatchForDataSet = false;
     }
