@@ -190,6 +190,7 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
    */
 
   private SortResults resultsIterator;
+  private SortResults prevResultsIterator = null;
   private enum SortState { START, LOAD, DELIVER, DONE }
   private SortState sortState = SortState.START;
 
@@ -578,15 +579,34 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
     }
     if (incoming instanceof ExternalSortBatch) {
       ExternalSortBatch esb = (ExternalSortBatch) incoming;
-      esb.releaseResources();
+      esb.actuallyReleaseResources();
+
+      if (esb.sortImpl != null) {
+        esb.sortImpl.close();
+      }
     }
+  }
+
+  private void actuallyReleaseResources() {
+    if (resultsIterator != null) {
+      resultsIterator.close();
+    }
+    if (prevResultsIterator != null) {
+      prevResultsIterator.close();
+      prevResultsIterator = null;
+    }
+
+    // We only zero vectors for actual output container
+    outputWrapperContainer.clear();
+    outputSV4.clear();
+    container.zeroVectors();
   }
 
   private void releaseResources() {
     // This means if it has received NONE outcome and flag to retain is false OR if it has seen an EMIT
     // then release the resources
-    if ((sortState == SortState.DONE && !this.retainInMemoryBatchesOnNone) ||
-      (sortState == SortState.LOAD)) {
+    if (!this.retainInMemoryBatchesOnNone) {
+      actuallyReleaseResources();
 
       // Close the iterator here to release any remaining resources such
       // as spill files. This is important when a query has a join: the
@@ -599,13 +619,14 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
       // the StreamingAgg retains a reference to that data that it will use
       // after receiving a NONE result code. See DRILL-5656.
       //zeroResources();
-      if (resultsIterator != null) {
-        resultsIterator.close();
-      }
-      // We only zero vectors for actual output container
-      outputWrapperContainer.clear();
-      outputSV4.clear();
-      container.zeroVectors();
+
+//      if (resultsIterator != null) {
+//        resultsIterator.close();
+//      }
+//      // We only zero vectors for actual output container
+//      outputWrapperContainer.clear();
+//      outputSV4.clear();
+//      container.zeroVectors();
     }
 
     // Close sortImpl for this boundary
@@ -626,6 +647,8 @@ public class ExternalSortBatch extends AbstractRecordBatch<ExternalSort> {
       sortImpl = createNewSortImpl();
       // Set the schema again since with reset we create new instance of SortImpl
       sortImpl.setSchema(schema);
+      // keep a reference to this results iterator so it can be freed later
+      prevResultsIterator = resultsIterator;
       resultsIterator = new SortImpl.EmptyResults(outputWrapperContainer);
     }
   }
