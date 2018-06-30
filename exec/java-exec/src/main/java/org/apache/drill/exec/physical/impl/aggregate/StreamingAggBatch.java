@@ -259,6 +259,19 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
     } else {
       if ( lastKnownOutcome != NONE && firstBatchForDataSet && !aggregator.isDone()) {
         lastKnownOutcome = incoming.next();
+        if (!first && firstBatchForDataSet) {
+          //Setup needs to be called again. During setup, generated code saves a reference to the vectors
+          // pointed to by the incoming batch so that the dereferencing of the vector wrappers to get to
+          // the vectors  does not have to be done at each call to eval. However, after an EMIT is seen,
+          // the vectors are replaced and the reference to the old vectors is no longer valid
+          try {
+            aggregator.setup(oContext, incoming, this);
+          } catch (SchemaChangeException e) {
+            UserException.Builder exceptionBuilder = UserException.functionError(e)
+                .message("A Schema change exception occured in calling setup() in generated code.");
+            throw exceptionBuilder.build(logger);
+          }
+        }
       }
       // We sent an EMIT in the previous iteration, so we must be starting a new data set
       if (firstBatchForDataSet) {
@@ -283,6 +296,18 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
         ExternalSortBatch.releaseBatches(incoming);
         return lastKnownOutcome;
       case RETURN_AND_RESET:
+        //WE could have got a string of batches, all empty, until we hit an emit
+        if (firstBatchForDataSet && popConfig.getKeys().size() == 0 && recordCount == 0) {
+          // if we have a straight aggregate and empty input batch, we need to handle it in a different way
+          constructSpecialBatch();
+          // set state to indicate the fact that we have sent a special batch and input is empty
+          specialBatchSent = true;
+          firstBatchForDataSet = true; // reset on the next iteration
+          // If outcome is NONE then we send the special batch in the first iteration and the NONE
+          // outcome in the next iteration. If outcome is EMIT, we can send the special
+          // batch and the EMIT outcome at the same time.
+          return getFinalOutcome();
+        }
         firstBatchForDataSet = true;
         if(first) {
           first = false;
@@ -290,6 +315,8 @@ public class StreamingAggBatch extends AbstractRecordBatch<StreamingAggregate> {
         if(lastKnownOutcome == OK_NEW_SCHEMA) {
           sendEmit = true;
         }
+        // Release external sort batches after EMIT is seen
+        ExternalSortBatch.releaseBatches(incoming);
         return lastKnownOutcome;
       case RETURN_OUTCOME:
         // In case of complex writer expression, vectors would be added to batch run-time.
