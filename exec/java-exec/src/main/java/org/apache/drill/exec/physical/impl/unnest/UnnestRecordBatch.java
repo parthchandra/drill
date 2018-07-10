@@ -24,6 +24,7 @@ import org.apache.drill.common.expression.FieldReference;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.exception.OutOfMemoryException;
 import org.apache.drill.exec.exception.SchemaChangeException;
+import org.apache.drill.exec.expr.TypeHelper;
 import org.apache.drill.exec.ops.FragmentContext;
 import org.apache.drill.exec.ops.MetricDef;
 import org.apache.drill.exec.physical.config.UnnestPOP;
@@ -235,8 +236,23 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
             return IterOutcome.STOP;
           }
           return OK_NEW_SCHEMA;
-        }
-        // else
+        } else { // Unnest field schema didn't changed but new left empty/nonempty batch might come with OK_NEW_SCHEMA
+          try {
+            // This means even though there is no schema change for unnest field the reference of unnest field
+            // ValueVector must have changed hence we should just refresh the transfer pairs and keep output vector
+            // same as before. In case when new left batch is received with SchemaChange but was empty Lateral will
+            // not call next on unnest and will change it's left outcome to OK. Whereas for non-empty batch next will
+            // be called on unnest by Lateral. Hence UNNEST cannot rely on lateral current outcome to setup transfer
+            // pair. It should do for each new left incoming batch.
+            resetUnnestTransferPair();
+            container.zeroVectors();
+          } catch (SchemaChangeException ex) {
+            kill(false);
+            logger.error("Failure during query", ex);
+            context.getExecutorState().fail(ex);
+            return IterOutcome.STOP;
+          }
+        } // else
         unnest.resetGroupIndex();
         memoryManager.update();
       }
@@ -354,26 +370,27 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
     return tp;
   }
 
+  private TransferPair resetUnnestTransferPair() throws SchemaChangeException {
+    final List<TransferPair> transfers = Lists.newArrayList();
+    final FieldReference fieldReference = new FieldReference(popConfig.getColumn());
+    final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
+    transfers.add(transferPair);
+    logger.debug("Added transfer for unnest expression.");
+
+    unnest.setup(context, incoming, this, transfers, lateral);
+    setUnnestVector();
+    return transferPair;
+  }
+
   @Override
   protected boolean setupNewSchema() throws SchemaChangeException {
     Preconditions.checkNotNull(lateral);
     container.clear();
     recordCount = 0;
-    final List<TransferPair> transfers = Lists.newArrayList();
-
-    final FieldReference fieldReference = new FieldReference(popConfig.getColumn());
-
-    final TransferPair transferPair = getUnnestFieldTransferPair(fieldReference);
-
-    final ValueVector unnestVector = transferPair.getTo();
-    transfers.add(transferPair);
-    container.add(unnestVector);
-    logger.debug("Added transfer for unnest expression.");
+    unnest = new UnnestImpl();
+    final TransferPair tp = resetUnnestTransferPair();
+    container.add(TypeHelper.getNewVector(tp.getTo().getField(), oContext.getAllocator()));
     container.buildSchema(SelectionVectorMode.NONE);
-
-    this.unnest = new UnnestImpl();
-    unnest.setup(context, incoming, this, transfers, lateral);
-    setUnnestVector();
     return true;
   }
 
