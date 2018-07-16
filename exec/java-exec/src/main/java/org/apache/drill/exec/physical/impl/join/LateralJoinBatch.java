@@ -169,6 +169,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
     // reset this state after calling processLeftBatch above.
     processLeftBatchInFuture = false;
+    hasRemainderForLeftJoin = false;
 
     // If the left batch doesn't have any record in the incoming batch (with OK_NEW_SCHEMA/EMIT) or the state returned
     // from left side is terminal state then just return the IterOutcome and don't call next() on right branch
@@ -717,34 +718,30 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       // rightJoinIndex should move by number of records in output batch for current right batch only.
       final boolean isRightProcessed = rightJoinIndex == -1 || rightJoinIndex >= right.getRecordCount();
 
-      // Check if above join to produce output was based on empty right batch or
-      // it resulted in right side batch to be fully consumed. In this scenario only if rightUpstream
-      // is EMIT then increase the leftJoinIndex.
-      // Otherwise it means for the given right batch there is still some record left to be processed.
+      // Check if above join to produce output resulted in fully consuming right side batch
       if (isRightProcessed) {
         // Release vectors of right batch. This will happen for both rightUpstream = EMIT/OK
         VectorAccessibleUtilities.clear(right);
         rightJoinIndex = -1;
       }
 
-      // Check if all rows in right batch is processed and there was a match for that rowId and this is last
-      // right batch for this left batch, then increment the leftJoinIndex
+      // Check if all rows in right batch is processed and there was a match for last rowId and this is last
+      // right batch for this left batch, then increment the leftJoinIndex. If this is not the last right batch we
+      // cannot increase the leftJoinIndex even though a match is found because next right batch can contain more
+      // records for the same rowId
       if (isRightProcessed && rightUpstream == EMIT && matchedRecordFound) {
         ++leftJoinIndex;
         matchedRecordFound = false;
       }
 
-      // TODO: Check for case when rightIsNotProcessed fully and rightJoinIndex is in between and outgoing batch is
-      // full.
+      // left is only declared as processed if this is last right batch for current left batch and we have processed
+      // all the rows in it.
       isLeftProcessed = (rightUpstream == EMIT) && leftJoinIndex >= left.getRecordCount();
 
       // Even though if left batch is not fully processed but we have received EMIT outcome from right side.
       // In this case if left batch has some unprocessed rows and it's left join emit left side for these rows.
       // If it's inner join then just set treat left batch as processed.
       if (rightUpstream == EMIT && isRightProcessed && !isLeftProcessed) {
-
-        // IN this case when outgoing batch becomes full then we will have some spill over of left rows which needs
-        // to be output in next output batch without getting the next right batch. So handle that.
         if (popConfig.getJoinType() == JoinRelType.LEFT) {
           while (leftJoinIndex < left.getRecordCount() && !isOutgoingBatchFull()) {
             emitLeft(leftJoinIndex, outputIndex, 1);
@@ -1084,6 +1081,27 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   }
 
   // SORABH: Prototype change
+  private Map<Integer, Integer> getRowIdToFreqMap() {
+    final ValueVector rowId = right.getContainer().getValueVector(0).getValueVector();
+    Map<Integer, Integer> indexToFreq = new HashMap<>();
+
+    int prevRowId = (int)(rowId.getAccessor().getObject(rightJoinIndex));
+    int countRows = 1;
+    for (int i=rightJoinIndex + 1; i < right.getRecordCount(); ++i) {
+      int currentRowId = (int)(rowId.getAccessor().getObject(i));
+      if (prevRowId == currentRowId) {
+        ++countRows;
+      } else {
+        indexToFreq.put(prevRowId, countRows);
+        prevRowId = currentRowId;
+        countRows = 1;
+      }
+    }
+    indexToFreq.put(prevRowId, countRows);
+    return indexToFreq;
+  }
+
+  // SORABH: Prototype change
   private void crossJoinAndOutputRecords_Proto() {
     final int rightRecordCount = right.getRecordCount();
 
@@ -1098,7 +1116,6 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     int currentOutIndex = outputIndex;
     // Number of rows that can be copied in output batch
     int maxAvailableRowSlot = maxOutputRowCount - currentOutIndex;
-    int numRowsCopied = 0;
 
     if (logger.isDebugEnabled()) {
       logger.debug("Producing output for leftIndex: {}, rightIndex: {}, rightRecordCount: {}, outputIndex: {} and " +
@@ -1107,62 +1124,53 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     }
 
     // SORABH: Prototype change
-    // Iterate over right batch and get the RowId for the current row. Loop will have hardLimit on maxAvailableRowSpot
-    // Keep a counter for numRowsCopied = 0;
-    // While (numRowsCopied < maxAvailableRowSpot && rightJoinIndex < rightRecordCount)
-    // If !leftMatch && LeftJoin && leftJoinIndex < currentRowId then emitLeft, increment numRowsCopied, outputIndex,
-    // and
-    // leftJoinIndex.
-    // If !leftMatch && not LeftJoin && leftJoinIndex < currentRowId then just increment leftJoinIndex
-    // If leftJoinIndex == currentRowId then emit right, emit left, increment numRowsCopied and outputIndex and
-    // increment rightJoinIndex and set leftMatch = true
-    // If leftJoinIndex < currentRowId && leftMatch then increment leftJoinIndex and leftMatch=false;
-    //boolean leftMatchFound = false;
     // Assuming that first vector in right batch is for IMPLICIT_COLUMN.
     final ValueVector rowId = right.getContainer().getValueVector(0).getValueVector();
-    Map<Integer, Integer> indexToFreq = new HashMap<>();
+    // get a mapping of number of rows for each rowId present in current right side batch
+    final Map<Integer, Integer> indexToFreq = getRowIdToFreqMap();
 
-    for (int i=rightJoinIndex; i<rightRecordCount; ++i) {
-      int currentRowId = (int)(rowId.getAccessor().getObject(i));
-      int prevValue = indexToFreq.getOrDefault(currentRowId, 0);
-      indexToFreq.put(currentRowId, ++prevValue);
-    }
-
-    do {
+    // we need to have both conditions because in left join case we can exceed the maxAvailableRowSlot before reaching
+    // rightBatch end or vice-versa
+    while(maxAvailableRowSlot > 0 && rightJoinIndex < rightRecordCount) {
       // Get rowId from current right row
       int currentRowId = (int)(rowId.getAccessor().getObject(rightJoinIndex));
       int leftRowId = leftJoinIndex + 1;
+      int numRowsCopied = 0;
 
       // If leftRowId matches the rowId in right row then emit left and right row. Increment outputIndex, rightJoinIndex
       // and numRowsCopied. Also set leftMatchFound to true to indicate when to increase leftJoinIndex.
       if (leftRowId == currentRowId) {
         // there is a match
         matchedRecordFound = true;
-        int rowsToCopy = Math.min(indexToFreq.get(currentRowId), maxAvailableRowSlot);
-        emitRight(rightJoinIndex, outputIndex, rowsToCopy);
-        emitLeft(leftJoinIndex, outputIndex, rowsToCopy);
-        outputIndex += rowsToCopy;
-        rightJoinIndex += rowsToCopy;
-        numRowsCopied += rowsToCopy;
-      } else if (leftRowId < currentRowId && matchedRecordFound) { // if leftMatchFound i.e. row was output in previous
-        // iteration and hence new rowId from right row is greater than leftRowId. so increase the leftJoinIndex and
-        // reset the leftMatchFound flag
-        matchedRecordFound = false;
-        ++leftJoinIndex;
-      } else if (!matchedRecordFound) { // if leftMatch is not found that means leftRowId may be <> to currentRowId
-        if (leftRowId < currentRowId) { // if leftRowId < currentRowId emit left row only in case of left join.
+        numRowsCopied = Math.min(indexToFreq.get(currentRowId), maxAvailableRowSlot);
+        emitRight(rightJoinIndex, outputIndex, numRowsCopied);
+        emitLeft(leftJoinIndex, outputIndex, numRowsCopied);
+        outputIndex += numRowsCopied;
+        rightJoinIndex += numRowsCopied;
+      } else if (leftRowId < currentRowId) {
+        // If a matching record for leftRowId was found in right batch in previous iteration, increase the leftJoinIndex
+        // and reset the matchedRecordFound flag
+        if (matchedRecordFound) {
+          matchedRecordFound = false;
+          ++leftJoinIndex;
+          continue;
+        } else { // If no matching row was found in right batch then in case of left join produce left row in output
+          // and increase the indexes properly to reflect that
           if (JoinRelType.LEFT == popConfig.getJoinType()) {
-            emitLeft(leftJoinIndex, outputIndex, 1);
+            numRowsCopied = 1;
+            emitLeft(leftJoinIndex, outputIndex, numRowsCopied);
             ++outputIndex;
-            ++numRowsCopied;
           }
           ++leftJoinIndex;
         }
+      } else {
+        Preconditions.checkState(leftRowId <= currentRowId, "Unexpected case where rowId " +
+          "%s in right batch of lateral is smaller than rowId %s in left batch being processed",
+          currentRowId, leftRowId);
       }
+      // Update the max available rows slot in output batch
       maxAvailableRowSlot -= numRowsCopied;
-    } while (maxAvailableRowSlot > 0 && rightJoinIndex < rightRecordCount); // we need to have both
-    // conditions because in left join case we can exceed the AvailableRowSlot before reaching rightBatch end or
-    // vice-versa
+    }
   }
 
   /**
