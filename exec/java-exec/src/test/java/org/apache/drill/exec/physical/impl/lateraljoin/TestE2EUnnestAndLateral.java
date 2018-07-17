@@ -180,11 +180,11 @@ public class TestE2EUnnestAndLateral extends ClusterTest {
     testBuilder()
         .sqlQuery(sql)
         .unOrdered()
-        .baselineColumns("item")
+        .baselineColumns("item", "$implicit_row$")
         .baselineValues(
             TestBuilder.mapOf("i_name", "paper towel",
                 "i_number", 2.0,
-                "i_supplier", "oregan"))
+                "i_supplier", "oregan"), null)
         .go();
   }
 
@@ -198,8 +198,8 @@ public class TestE2EUnnestAndLateral extends ClusterTest {
     testBuilder()
         .sqlQuery(sql)
         .unOrdered()
-        .baselineColumns("o_amount")
-        .baselineValues(4.5)
+        .baselineColumns("o_amount", "$implicit_row$")
+        .baselineValues(4.5, null)
         .go();
   }
 
@@ -213,11 +213,11 @@ public class TestE2EUnnestAndLateral extends ClusterTest {
     testBuilder()
         .sqlQuery(sql)
         .unOrdered()
-        .baselineColumns("item")
+        .baselineColumns("item", "$implicit_row$")
         .baselineValues(
             TestBuilder.mapOf("i_name", "paper towel",
                 "i_number", 2.0,
-                "i_supplier", "oregan"))
+                "i_supplier", "oregan"), null)
         .go();
   }
 
@@ -232,11 +232,11 @@ public class TestE2EUnnestAndLateral extends ClusterTest {
     testBuilder()
         .sqlQuery(sql)
         .unOrdered()
-        .baselineColumns("item")
+        .baselineColumns("item", "$implicit_row$")
         .baselineValues(
             TestBuilder.mapOf("i_name", "paper towel",
                 "i_number", 2.0,
-                "i_supplier", "oregan"))
+                "i_supplier", "oregan"), null)
         .go();
   }
 
@@ -252,8 +252,8 @@ public class TestE2EUnnestAndLateral extends ClusterTest {
     testBuilder()
         .sqlQuery(sql)
         .unOrdered()
-        .baselineColumns("id")
-        .baselineValues(1.0)
+        .baselineColumns("id", "$implicit_row$")
+        .baselineValues(1.0, null)
         .go();
   }
 
