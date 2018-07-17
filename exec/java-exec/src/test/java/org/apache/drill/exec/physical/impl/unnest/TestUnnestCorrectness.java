@@ -83,13 +83,14 @@ import static org.junit.Assert.assertTrue;
     // Create input schema
     TupleMetadata incomingSchema =
         new SchemaBuilder()
-            .add("rowNumber", TypeProtos.MinorType.INT)
+            .add("otherColumn", TypeProtos.MinorType.INT)
             .addArray("unnestColumn", TypeProtos.MinorType.INT)
             .buildSchema();
     TupleMetadata[] incomingSchemas = { incomingSchema, incomingSchema };
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
-    Integer[][] baseline = {{}, {1, 2}, {3, 4, 5}, {6, 7, 8, 9}, {10, 11, 12, 13, 14}};
+    Integer[][] baseline = {{}, {}, {1, 1, 2, 2, 2}, {1, 2, 3, 4, 5}, {1, 1, 1, 1, 2, 2, 2, 2, 2}, {6, 7, 8, 9, 10, 11,
+        12, 13, 14}};
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
@@ -118,8 +119,11 @@ import static org.junit.Assert.assertTrue;
     TupleMetadata[] incomingSchemas = {incomingSchema, incomingSchema};
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
-    String[][] baseline = {{}, {"", "zero"}, {"one", "two", "three"}, {"four", "five", "six", "seven"},
-        {"eight", "nine", "ten", "eleven", "twelve"}};
+    Object[][] baseline = {
+        {}, {},
+        {1, 1, 2, 2, 2}, {"", "zero", "one", "two", "three"},
+        { 1, 1, 1, 1, 2, 2, 2, 2, 2}, {"four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"}
+    };
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
@@ -173,7 +177,7 @@ import static org.junit.Assert.assertTrue;
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
     // All subsequent batches are also empty
-    String[][] baseline = {{}, {}, {}, {}, {}};
+    String[][] baseline = {{}, {}, {}, {}, {}, {}};
 
     RecordBatch.IterOutcome[] iterOutcomes = {RecordBatch.IterOutcome.OK_NEW_SCHEMA, RecordBatch.IterOutcome.OK};
 
@@ -210,7 +214,13 @@ import static org.junit.Assert.assertTrue;
     TupleMetadata[] incomingSchemas = {incomingSchema, incomingSchema, incomingSchema};
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
-    String[][] baseline = {{}, {"0", "1"}, {"2", "3", "4"}, {"5", "6" }, {"9"} };
+    Object[][] baseline = {
+        {}, {},
+        {1, 1, 2, 2, 2}, {"0", "1", "2", "3", "4"},
+        {1, 1},
+        {"5", "6" },
+        {1}, {"9"}
+    };
 
     RecordBatch.IterOutcome[] iterOutcomes = {
         RecordBatch.IterOutcome.OK_NEW_SCHEMA,
@@ -252,7 +262,13 @@ import static org.junit.Assert.assertTrue;
 
     // First batch in baseline is an empty batch corresponding to OK_NEW_SCHEMA
     // Another empty batch introduced by the schema change in the last batch
-    Object[][] baseline = {{}, {"0", "1"}, {"2", "3", "4"}, {"5", "6" }, {}, {9} };
+    Object[][] baseline = {
+        {}, {},
+        {1, 1, 2, 2, 2}, {"0", "1", "2", "3", "4"},
+        {1, 1}, {"5", "6" },
+        {}, {},
+        {1}, {9}
+    };
 
     RecordBatch.IterOutcome[] iterOutcomes = {
         RecordBatch.IterOutcome.OK_NEW_SCHEMA,
@@ -286,18 +302,23 @@ import static org.junit.Assert.assertTrue;
         }
       }
     }
-    Integer[][] baseline = new Integer[3][];
+    Integer[][] baseline = new Integer[6][];
     baseline[0] = new Integer[] {};
-    baseline[1] = new Integer[limitedOutputBatchSize];
-    baseline[2] = new Integer[1];
+    baseline[1] = new Integer[] {};
+    baseline[2] = new Integer[limitedOutputBatchSize];
+    baseline[3] = new Integer[limitedOutputBatchSize];
+    baseline[4] = new Integer[1];
+    baseline[5] = new Integer[1];
     for (int i = 0; i < limitedOutputBatchSize; i++) {
-      baseline[1][i] = i;
+      baseline[2][i] = 1;
+      baseline[3][i] = i;
     }
-    baseline[2][0] = limitedOutputBatchSize;
+    baseline[4][0] = 1;
+    baseline[5][0] = limitedOutputBatchSize;
 
     // Create input schema
     TupleMetadata incomingSchema = new SchemaBuilder()
-        .add("rowNumber", TypeProtos.MinorType.INT)
+        .add("otherColumn", TypeProtos.MinorType.INT)
         .addArray("unnestColumn", TypeProtos.MinorType.INT).buildSchema();
 
     TupleMetadata[] incomingSchemas = {incomingSchema};
@@ -342,18 +363,23 @@ import static org.junit.Assert.assertTrue;
         }
       }
     }
-    Integer[][] baseline = new Integer[3][];
+    Integer[][] baseline = new Integer[6][];
     baseline[0] = new Integer[] {};
-    baseline[1] = new Integer[limitedOutputBatchSize];
-    baseline[2] = new Integer[1];
+    baseline[1] = new Integer[] {};
+    baseline[2] = new Integer[limitedOutputBatchSize];
+    baseline[3] = new Integer[limitedOutputBatchSize];
+    baseline[4] = new Integer[1];
+    baseline[5] = new Integer[1];
     for (int i = 0; i < limitedOutputBatchSize; i++) {
-      baseline[1][i] = i;
+      baseline[2][i] = 1;
+      baseline[3][i] = i;
     }
-    baseline[2] = new Integer[] {}; // because of kill the next batch is an empty batch
+    baseline[4] = new Integer[] {}; // because of kill the next batch is an empty batch
+    baseline[5] = new Integer[] {}; // because of kill the next batch is an empty batch
 
     // Create input schema
     TupleMetadata incomingSchema = new SchemaBuilder()
-        .add("rowNumber", TypeProtos.MinorType.INT)
+        .add("otherColumn", TypeProtos.MinorType.INT)
         .addArray("unnestColumn", TypeProtos.MinorType.INT).buildSchema();
 
     TupleMetadata[] incomingSchemas = {incomingSchema};
@@ -398,11 +424,14 @@ import static org.junit.Assert.assertTrue;
         }
       }
     }
-    Integer[][] baseline = new Integer[2][];
+    Integer[][] baseline = new Integer[4][];
     baseline[0] = new Integer[] {};
-    baseline[1] = new Integer[limitedOutputBatchSize];
+    baseline[1] = new Integer[] {};
+    baseline[2] = new Integer[limitedOutputBatchSize];
+    baseline[3] = new Integer[limitedOutputBatchSize];
     for (int i = 0; i < limitedOutputBatchSize; i++) {
-      baseline[1][i] = i;
+      baseline[2][i] = 1;
+      baseline[3][i] = i;
     }
 
     // Create input schema
@@ -661,16 +690,16 @@ import static org.junit.Assert.assertTrue;
 
     Object[][] d = {
         new Object[] {},    // Empty record batch returned by OK_NEW_SCHEMA
-        new Object[] {},    // First incoming batch is empty
+        new Object[] {},    // Empty record batch returned by OK_NEW_SCHEMA
+        new Object[] {2, 2, 3, 3, 3}, // rowId 1 has no corresponding rows in the unnest array
         new Object[] {
             "{\"colA\":11,\"colB\":[\"1.1.1\",\"1.1.2\"]}",
-            "{\"colA\":12,\"colB\":[\"1.2.1\",\"1.2.2\"]}"
-        },
-        new Object[] {
+            "{\"colA\":12,\"colB\":[\"1.2.1\",\"1.2.2\"]}",
             "{\"colA\":21,\"colB\":[\"2.1.1\",\"2.1.2\"]}",
             "{\"colA\":22,\"colB\":[]}",
             "{\"colA\":23,\"colB\":[\"2.3.1\",\"2.3.2\"]}"
         },
+        new Object[] {1, 1},
         new Object[] {
             "{\"colA\":31,\"colB\":[\"3.1.1\",\"3.1.2\"]}",
             "{\"colA\":32,\"colB\":[\"3.2.1\",\"3.2.2\"]}"
