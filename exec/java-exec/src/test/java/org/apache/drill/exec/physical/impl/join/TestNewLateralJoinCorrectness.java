@@ -79,6 +79,9 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
   // Empty right RowSet
   private static RowSet.SingleRowSet emptyRightRowSet;
 
+  // Non-Empty right RowSet
+  private static RowSet.SingleRowSet nonEmptyRightRowSet;
+
   // List of right incoming containers
   private static final List<VectorContainer> rightContainer = new ArrayList<>(5);
 
@@ -141,6 +144,16 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
   public void beforeTest() throws Exception {
     nonEmptyLeftRowSet = fixture.rowSetBuilder(leftSchema)
       .addRow(1, 10, "item1")
+      .addRow(2, 20, "item2")
+      .addRow(3, 30, "item3")
+      .addRow(4, 40, "item4")
+      .build();
+
+    nonEmptyRightRowSet = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, 110, "item11")
+      .addRow(2, 22, 220, "item22")
+      .addRow(3, 33, 330, "item33")
+      .addRow(4, 44, 440, "item44")
       .build();
   }
 
@@ -149,21 +162,14 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     nonEmptyLeftRowSet.clear();
     leftContainer.clear();
     leftOutcomes.clear();
+    nonEmptyRightRowSet.clear();
     rightContainer.clear();
     rightOutcomes.clear();
   }
 
   @Test
   public void testLeftAndRightAllMatchingRows_SingleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -171,14 +177,6 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     // Create Left MockRecordBatch
     final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
-
-    // Get the right container with dummy data
-    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
-      .addRow(1, 11, 110, "item11")
-      .addRow(2, 22, 220, "item22")
-      .addRow(3, 33, 330, "item33")
-      .addRow(4, 44, 440, "item44")
-      .build();
 
     final RowSet.SingleRowSet expectedRowSet = fixture.rowSetBuilder(expectedSchema)
       .addRow(1, 10, "item1", 11, 110, "item11")
@@ -188,7 +186,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       .build();
 
     rightContainer.add(emptyRightRowSet.container());
-    rightContainer.add(nonEmptyRightRowSet2.container());
+    rightContainer.add(nonEmptyRightRowSet.container());
 
     rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
     rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
@@ -202,7 +200,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     try {
       assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
-      assertTrue(ljBatch.getRecordCount() == nonEmptyLeftRowSet2.rowCount());
+      assertTrue(ljBatch.getRecordCount() == nonEmptyLeftRowSet.rowCount());
 
       // verify results
       RowSet actualRowSet = DirectRowSet.fromContainer(ljBatch.getContainer());
@@ -214,23 +212,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       ljBatch.close();
       leftMockBatch.close();
       rightMockBatch.close();
-      nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightAllMatchingRows_MultipleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -239,19 +227,12 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
 
-    // Get the right container with dummy data
-    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
-      .addRow(1, 11, 110, "item11")
-      .addRow(2, 22, 220, "item22")
-      .addRow(3, 33, 330, "item33")
-      .addRow(4, 44, 440, "item44")
-      .build();
     final RowSet.SingleRowSet nonEmptyRightRowSet3 = fixture.rowSetBuilder(rightSchema)
       .addRow(4, 44, 440, "item44")
       .build();
 
     rightContainer.add(emptyRightRowSet.container());
-    rightContainer.add(nonEmptyRightRowSet2.container());
+    rightContainer.add(nonEmptyRightRowSet.container());
     rightContainer.add(nonEmptyRightRowSet3.container());
 
     final RowSet.SingleRowSet expectedRowSet = fixture.rowSetBuilder(expectedSchema)
@@ -276,7 +257,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
       assertTrue(ljBatch.getRecordCount() ==
-        (nonEmptyLeftRowSet2.rowCount() + nonEmptyRightRowSet3.rowCount()));
+        (nonEmptyLeftRowSet.rowCount() + nonEmptyRightRowSet3.rowCount()));
 
       // verify results
       RowSet actualRowSet = DirectRowSet.fromContainer(ljBatch.getContainer());
@@ -288,23 +269,14 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       ljBatch.close();
       leftMockBatch.close();
       rightMockBatch.close();
-      nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
+      nonEmptyRightRowSet3.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightAllMatchingRows_SecondBatch_Empty() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -312,14 +284,6 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     // Create Left MockRecordBatch
     final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
-
-    // Get the right container with dummy data
-    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
-      .addRow(1, 11, 110, "item11")
-      .addRow(2, 22, 220, "item22")
-      .addRow(3, 33, 330, "item33")
-      .addRow(4, 44, 440, "item44")
-      .build();
 
     final RowSet.SingleRowSet expectedRowSet = fixture.rowSetBuilder(expectedSchema)
       .addRow(1, 10, "item1", 11, 110, "item11")
@@ -329,7 +293,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       .build();
 
     rightContainer.add(emptyRightRowSet.container());
-    rightContainer.add(nonEmptyRightRowSet2.container());
+    rightContainer.add(nonEmptyRightRowSet.container());
     rightContainer.add(emptyRightRowSet.container());
 
     rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -345,7 +309,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     try {
       assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
-      assertTrue(ljBatch.getRecordCount() == nonEmptyLeftRowSet2.rowCount());
+      assertTrue(ljBatch.getRecordCount() == nonEmptyLeftRowSet.rowCount());
 
       // verify results
       RowSet actualRowSet = DirectRowSet.fromContainer(ljBatch.getContainer());
@@ -357,23 +321,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       ljBatch.close();
       leftMockBatch.close();
       rightMockBatch.close();
-      nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightWithMissingRows_SingleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -421,22 +375,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightWithMissingRows_LeftJoin_SingleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -474,7 +419,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     try {
       assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
-      assertTrue(ljBatch.getRecordCount() == nonEmptyLeftRowSet2.rowCount());
+      assertTrue(ljBatch.getRecordCount() == nonEmptyLeftRowSet.rowCount());
 
       // verify results
       RowSet actualRowSet = DirectRowSet.fromContainer(ljBatch.getContainer());
@@ -487,22 +432,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightWithInitialMissingRows_MultipleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -560,22 +496,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightWithInitialMissingRows_LeftJoin_MultipleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -635,22 +562,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightWithLastMissingRows_MultipleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -708,22 +626,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRightWithLastMissingRows_LeftJoin_MultipleBatch() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -783,22 +692,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRight_OutputFull_InRightBatchMiddle() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -808,13 +708,6 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
 
     // Get the right container with dummy data
-    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
-      .addRow(1, 11, 110, "item11")
-      .addRow(2, 22, 220, "item22")
-      .addRow(3, 33, 330, "item33")
-      .addRow(4, 44, 440, "item44_1")
-      .build();
-
     final RowSet.SingleRowSet nonEmptyRightRowSet3 = fixture.rowSetBuilder(rightSchema)
       .addRow(4, 44, 440, "item44_2_1")
       .addRow(4, 44, 440, "item44_2_2")
@@ -826,7 +719,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       .addRow(1, 10, "item1", 11, 110, "item11")
       .addRow(2, 20, "item2", 22, 220, "item22")
       .addRow(3, 30, "item3", 33, 330, "item33")
-      .addRow(4, 40, "item4", 44, 440, "item44_1")
+      .addRow(4, 40, "item4", 44, 440, "item44")
       .addRow(4, 40, "item4", 44, 440, "item44_2_1")
       .addRow(4, 40, "item4", 44, 440, "item44_2_2")
       .build();
@@ -837,7 +730,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       .build();
 
     rightContainer.add(emptyRightRowSet.container());
-    rightContainer.add(nonEmptyRightRowSet2.container());
+    rightContainer.add(nonEmptyRightRowSet.container());
     rightContainer.add(nonEmptyRightRowSet3.container());
 
     rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -866,7 +759,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
 
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
       assertTrue(ljBatch.getRecordCount() ==
-        (nonEmptyRightRowSet2.rowCount() + nonEmptyRightRowSet3.rowCount() - 6));
+        (nonEmptyRightRowSet.rowCount() + nonEmptyRightRowSet3.rowCount() - 6));
 
 
       // verify results
@@ -879,8 +772,6 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       ljBatch.close();
       leftMockBatch.close();
       rightMockBatch.close();
-      nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
       expectedRowSet1.clear();
     }
@@ -888,15 +779,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
 
   @Test
   public void testLeftAndRight_OutputFull_WithPendingLeftRow() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -949,22 +832,13 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
-      nonEmptyLeftRowSet2.clear();
       expectedRowSet.clear();
     }
   }
 
   @Test
   public void testLeftAndRight_OutputFull_WithPendingLeftRow_LeftJoin() throws Exception {
-    // Get the left container with dummy data for Lateral Join
-    RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
-      .addRow(1, 10, "item1")
-      .addRow(2, 20, "item2")
-      .addRow(3, 30, "item3")
-      .addRow(4, 40, "item4")
-      .build();
-
-    leftContainer.add(nonEmptyLeftRowSet2.container());
+    leftContainer.add(nonEmptyLeftRowSet.container());
 
     // Get the left IterOutcomes for Lateral Join
     leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
@@ -1019,7 +893,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
 
       assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
       assertTrue(ljBatch.getRecordCount() ==
-        (nonEmptyLeftRowSet2.rowCount() - 3));
+        (nonEmptyLeftRowSet.rowCount() - 3));
 
       // verify results
       RowSet actualRowSet2 = DirectRowSet.fromContainer(ljBatch.getContainer());
@@ -1032,7 +906,94 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       leftMockBatch.close();
       rightMockBatch.close();
       nonEmptyRightRowSet2.clear();
+      expectedRowSet.clear();
+      expectedRowSet1.clear();
+    }
+  }
+
+  @Test
+  public void testMultipleLeftAndRight_OutputFull_WithPendingLeftRow_LeftJoin() throws Exception {
+    // Get the right container with dummy data
+    final RowSet.SingleRowSet nonEmptyLeftRowSet2 = fixture.rowSetBuilder(leftSchema)
+      .addRow(5, 50, "item5")
+      .addRow(6, 60, "item6")
+      .build();
+
+    leftContainer.add(nonEmptyLeftRowSet.container());
+    leftContainer.add(nonEmptyLeftRowSet2.container());
+
+    // Get the left IterOutcomes for Lateral Join
+    leftOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    leftOutcomes.add(RecordBatch.IterOutcome.OK);
+
+    // Create Left MockRecordBatch
+    final CloseableRecordBatch leftMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      leftContainer, leftOutcomes, leftContainer.get(0).getSchema());
+
+    // Get the right container with dummy data
+    final RowSet.SingleRowSet nonEmptyRightRowSet2 = fixture.rowSetBuilder(rightSchema)
+      .addRow(1, 11, 110, "item11")
+      .addRow(2, 22, 220, "item22")
+      .build();
+
+    final RowSet.SingleRowSet expectedRowSet = fixture.rowSetBuilder(expectedSchemaLeftJoin)
+      .addRow(1, 10, "item1", 11, 110, "item11")
+      .addRow(2, 20, "item2", 22, 220, "item22")
+      .addRow(3, 30, "item3", null, null, null)
+      .build();
+
+    final RowSet.SingleRowSet expectedRowSet1 = fixture.rowSetBuilder(expectedSchemaLeftJoin)
+      .addRow(4, 40, "item4", null, null, null)
+      .addRow(5, 50, "item5", null, null, null)
+      .addRow(6, 60, "item6", null, null, null)
+      .build();
+
+    rightContainer.add(emptyRightRowSet.container());
+    rightContainer.add(nonEmptyRightRowSet2.container());
+    rightContainer.add(emptyRightRowSet.container());
+
+    rightOutcomes.add(RecordBatch.IterOutcome.OK_NEW_SCHEMA);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+    rightOutcomes.add(RecordBatch.IterOutcome.EMIT);
+
+    final CloseableRecordBatch rightMockBatch = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
+      rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
+
+    LateralJoinPOP ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.LEFT, Lists.newArrayList());
+    final LateralJoinBatch ljBatch = new LateralJoinBatch(ljPopConfig, fixture.getFragmentContext(),
+      leftMockBatch, rightMockBatch);
+
+    ljBatch.setMaxOutputRowCount(3);
+    ljBatch.setUseMemoryManager(false);
+
+    try {
+      assertTrue(RecordBatch.IterOutcome.OK_NEW_SCHEMA == ljBatch.next());
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      assertTrue(ljBatch.getRecordCount() == 3);
+
+      // verify results
+      RowSet actualRowSet = DirectRowSet.fromContainer(ljBatch.getContainer());
+      new RowSetComparison(expectedRowSet).verify(actualRowSet);
+
+      // Release output container memory for this batch as other operators will do
+      VectorAccessibleUtilities.clear(ljBatch);
+
+      assertTrue(RecordBatch.IterOutcome.OK == ljBatch.next());
+      assertTrue(ljBatch.getRecordCount() ==
+        (nonEmptyLeftRowSet.rowCount() + nonEmptyLeftRowSet2.rowCount() - 3));
+
+      // verify results
+      RowSet actualRowSet2 = DirectRowSet.fromContainer(ljBatch.getContainer());
+      new RowSetComparison(expectedRowSet1).verify(actualRowSet2);
+
+      assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
+    } finally {
+      // Close all the resources for this test case
+      ljBatch.close();
+      leftMockBatch.close();
+      rightMockBatch.close();
       nonEmptyLeftRowSet2.clear();
+      nonEmptyRightRowSet2.clear();
       expectedRowSet.clear();
       expectedRowSet1.clear();
     }

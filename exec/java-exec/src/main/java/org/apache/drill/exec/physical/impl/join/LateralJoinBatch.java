@@ -752,8 +752,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
           // If outgoing batch got full that means we still have some leftJoinIndex to output but right side is done
           // producing the batches. So mark hasRemainderForLeftJoin=true and we will take care of it in future next call.
           if (isOutgoingBatchFull()) {
-            hasRemainderForLeftJoin = true;
             isLeftProcessed = leftJoinIndex >= left.getRecordCount();
+            hasRemainderForLeftJoin = !isLeftProcessed;
           } else {
             // if outgoing is not full that means all rows in left batch is processed
             isLeftProcessed = true;
