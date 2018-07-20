@@ -39,6 +39,8 @@ import static org.apache.drill.exec.proto.UserBitShared.CoreOperatorType.UNNEST_
 public class UnnestPOP extends AbstractBase implements Leaf {
   static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UnnestPOP.class);
 
+  private final String implicitColumn = "$drill_implicit_field$";
+
   private SchemaPath column;
 
   @JsonIgnore
@@ -81,6 +83,8 @@ public class UnnestPOP extends AbstractBase implements Leaf {
   public UnnestRecordBatch getUnnestBatch() {
     return this.unnestBatch;
   }
+
+  public String getImplicitColumn() { return this.implicitColumn; }
 
   @Override
   public int getOperatorType() {

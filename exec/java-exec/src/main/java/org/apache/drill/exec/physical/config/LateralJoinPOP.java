@@ -38,6 +38,9 @@ public class LateralJoinPOP extends AbstractJoinPop {
   @JsonProperty("excludedColumns")
   private List<SchemaPath> excludedColumns;
 
+  @JsonProperty("implicitColumns")
+  final private String implicitColumn = "$drill_implicit_field$";
+
   @JsonProperty("unnestForLateralJoin")
   private UnnestPOP unnestForLateralJoin;
 
@@ -76,6 +79,10 @@ public class LateralJoinPOP extends AbstractJoinPop {
 
   public void setUnnestForLateralJoin(UnnestPOP unnest) {
     this.unnestForLateralJoin = unnest;
+  }
+
+  public String getImplicitColumn() {
+    return this.implicitColumn;
   }
 
   @Override
