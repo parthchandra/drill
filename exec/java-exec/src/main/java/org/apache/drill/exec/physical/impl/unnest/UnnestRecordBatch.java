@@ -52,7 +52,7 @@ import static org.apache.drill.exec.record.RecordBatch.IterOutcome.OK_NEW_SCHEMA
 public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPOP> {
   private static final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(UnnestRecordBatch.class);
 
-  private static final String rowIdColumnName = "$implicit_row$"; // name of the field holding the rowId implicit column
+  private final String rowIdColumnName; // name of the field holding the rowId implicit column
   private IntVector rowIdVector; // vector to keep the implicit rowId column in
 
   private Unnest unnest = new UnnestImpl();
@@ -150,6 +150,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
     // get the output batch size from config.
     int configuredBatchSize = (int) context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
     memoryManager = new UnnestMemoryManager(configuredBatchSize);
+    rowIdColumnName = pop.getImplicitColumn();
   }
 
   @Override
