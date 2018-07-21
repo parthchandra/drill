@@ -95,6 +95,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
   public static void setUpBeforeClass() throws Exception {
     PhysicalOperator mockPopConfig = new MockStorePOP(null);
     operatorContext = fixture.newOperatorContext(mockPopConfig);
+    ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     leftSchema = new SchemaBuilder()
       .add("id_left", TypeProtos.MinorType.INT)
@@ -104,7 +105,7 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
     emptyLeftRowSet = fixture.rowSetBuilder(leftSchema).build();
 
     rightSchema = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(ljPopConfig.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right", TypeProtos.MinorType.INT)
       .add("cost_right", TypeProtos.MinorType.INT)
       .add("name_right", TypeProtos.MinorType.VARCHAR)
@@ -128,8 +129,6 @@ public class TestNewLateralJoinCorrectness extends SubOperatorTest {
       .add("cost_right", TypeProtos.MinorType.INT, TypeProtos.DataMode.OPTIONAL)
       .add("name_right", TypeProtos.MinorType.VARCHAR, TypeProtos.DataMode.OPTIONAL)
       .buildSchema();
-
-    ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
   }
 
   @AfterClass

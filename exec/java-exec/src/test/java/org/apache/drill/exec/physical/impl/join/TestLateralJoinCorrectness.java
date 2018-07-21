@@ -97,6 +97,8 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     PhysicalOperator mockPopConfig = new MockStorePOP(null);
     operatorContext = fixture.newOperatorContext(mockPopConfig);
 
+    ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     leftSchema = new SchemaBuilder()
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
@@ -105,14 +107,14 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
     emptyLeftRowSet = fixture.rowSetBuilder(leftSchema).build();
 
     rightSchema = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(ljPopConfig.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right", TypeProtos.MinorType.INT)
       .add("cost_right", TypeProtos.MinorType.INT)
       .add("name_right", TypeProtos.MinorType.VARCHAR)
       .buildSchema();
     emptyRightRowSet = fixture.rowSetBuilder(rightSchema).build();
 
-    ljPopConfig = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
   }
 
   @AfterClass
@@ -690,7 +692,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create right input schema
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(ljPopConfig.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right", TypeProtos.MinorType.INT)
       .add("cost_right", TypeProtos.MinorType.VARCHAR)
       .add("name_right", TypeProtos.MinorType.VARCHAR)
@@ -757,7 +759,8 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
           leftRowSet2.rowCount() * nonEmptyRightRowSet2.rowCount()));
       assertTrue(RecordBatch.IterOutcome.NONE == ljBatch.next());
     } catch (AssertionError | Exception error) {
-      fail();
+      //fail();
+      throw error;
     } finally {
       // Close all the resources for this test case
       ljBatch.close();
@@ -786,7 +789,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create right input schema
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(ljPopConfig.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right", TypeProtos.MinorType.INT)
       .add("cost_right", TypeProtos.MinorType.VARCHAR)
       .add("name_right", TypeProtos.MinorType.VARCHAR)
@@ -1765,7 +1768,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create right input schema
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right_1", TypeProtos.MinorType.INT)
       .add("cost_right_1", TypeProtos.MinorType.INT)
       .add("name_right_1", TypeProtos.MinorType.VARCHAR)
@@ -1831,9 +1834,11 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   public void testMultiLevelLateral() throws Exception {
 
     // ** Prepare first pair of left batch and right batch for Lateral_1 **
+    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     // Create a left batch with implicit column for lower lateral left unnest
     TupleMetadata leftSchemaWithImplicit = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
       .add("name_left", TypeProtos.MinorType.VARCHAR)
@@ -1877,8 +1882,6 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     final CloseableRecordBatch rightMockBatch_1 = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
-
-    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     final LateralJoinBatch lowerLateral = new LateralJoinBatch(popConfig_1, fixture.getFragmentContext(),
       leftMockBatch_1, rightMockBatch_1);
@@ -1946,8 +1949,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   public void testMultiLevelLateral_MultipleOutput() throws Exception {
 
     // ** Prepare first pair of left batch and right batch for lower level LATERAL Lateral_1 **
+    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     TupleMetadata leftSchemaWithImplicit = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
       .add("name_left", TypeProtos.MinorType.VARCHAR)
@@ -1991,8 +1996,6 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     final CloseableRecordBatch rightMockBatch_1 = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
-
-    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     final LateralJoinBatch lowerLateral = new LateralJoinBatch(popConfig_1, fixture.getFragmentContext(),
       leftMockBatch_1, rightMockBatch_1);
@@ -2075,8 +2078,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   public void testMultiLevelLateral_SchemaChange_LeftUnnest() throws Exception {
 
     // ** Prepare first pair of left batch and right batch for lower level LATERAL Lateral_1 **
+    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     TupleMetadata leftSchemaWithImplicit = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
       .add("name_left", TypeProtos.MinorType.VARCHAR)
@@ -2093,7 +2098,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create left input schema2 for schema change batch
     TupleMetadata leftSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("new_id_left", TypeProtos.MinorType.INT)
       .add("new_cost_left", TypeProtos.MinorType.INT)
       .add("new_name_left", TypeProtos.MinorType.VARCHAR)
@@ -2132,8 +2137,6 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     final CloseableRecordBatch rightMockBatch_1 = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
-
-    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     final LateralJoinBatch lowerLevelLateral = new LateralJoinBatch(popConfig_1, fixture.getFragmentContext(),
       leftMockBatch_1, rightMockBatch_1);
@@ -2223,8 +2226,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testMultiLevelLateral_SchemaChange_RightUnnest() throws Exception {
     // ** Prepare first pair of left batch and right batch for lower level LATERAL Lateral_1 **
+    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     TupleMetadata leftSchemaWithImplicit = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
       .add("name_left", TypeProtos.MinorType.VARCHAR)
@@ -2253,7 +2258,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Get the right container with dummy data
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right_new", TypeProtos.MinorType.INT)
       .add("cost_right_new", TypeProtos.MinorType.VARCHAR)
       .add("name_right_new", TypeProtos.MinorType.VARCHAR)
@@ -2278,8 +2283,6 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     final CloseableRecordBatch rightMockBatch_1 = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
-
-    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     final LateralJoinBatch lowerLevelLateral = new LateralJoinBatch(popConfig_1, fixture.getFragmentContext(),
       leftMockBatch_1, rightMockBatch_1);
@@ -2369,8 +2372,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testMultiLevelLateral_SchemaChange_LeftRightUnnest() throws Exception {
     // ** Prepare first pair of left batch and right batch for lower level LATERAL Lateral_1 **
+    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     TupleMetadata leftSchemaWithImplicit = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
       .add("name_left", TypeProtos.MinorType.VARCHAR)
@@ -2384,7 +2389,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create left input schema for first batch
     TupleMetadata leftSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left_new", TypeProtos.MinorType.INT)
       .add("cost_left_new", TypeProtos.MinorType.INT)
       .add("name_left_new", TypeProtos.MinorType.VARCHAR)
@@ -2411,7 +2416,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Get the right container with dummy data
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right_new", TypeProtos.MinorType.INT)
       .add("cost_right_new", TypeProtos.MinorType.VARCHAR)
       .add("name_right_new", TypeProtos.MinorType.VARCHAR)
@@ -2436,8 +2441,6 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     final CloseableRecordBatch rightMockBatch_1 = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
-
-    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     final LateralJoinBatch lowerLevelLateral = new LateralJoinBatch(popConfig_1, fixture.getFragmentContext(),
       leftMockBatch_1, rightMockBatch_1);
@@ -2650,7 +2653,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create right input schema
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(ljPopConfig.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right", TypeProtos.MinorType.INT)
       .add("cost_right", TypeProtos.MinorType.VARCHAR)
       .add("name_right", TypeProtos.MinorType.VARCHAR)
@@ -2738,8 +2741,10 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
   @Test
   public void testMultiLevelLateral_SchemaChange_LeftRightUnnest_NonEmptyBatch() throws Exception {
     // ** Prepare first pair of left batch and right batch for lower level LATERAL Lateral_1 **
+    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
+
     TupleMetadata leftSchemaWithImplicit = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left", TypeProtos.MinorType.INT)
       .add("cost_left", TypeProtos.MinorType.INT)
       .add("name_left", TypeProtos.MinorType.VARCHAR)
@@ -2753,7 +2758,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Create left input schema for first batch
     TupleMetadata leftSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_left_new", TypeProtos.MinorType.INT)
       .add("cost_left_new", TypeProtos.MinorType.INT)
       .add("name_left_new", TypeProtos.MinorType.VARCHAR)
@@ -2780,7 +2785,7 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     // Get the right container with dummy data
     TupleMetadata rightSchema2 = new SchemaBuilder()
-      .add(LateralJoinBatch.IMPLICIT_COLUMN, TypeProtos.MinorType.INT)
+      .add(popConfig_1.getImplicitColumn(), TypeProtos.MinorType.INT)
       .add("id_right_new", TypeProtos.MinorType.INT)
       .add("cost_right_new", TypeProtos.MinorType.VARCHAR)
       .add("name_right_new", TypeProtos.MinorType.VARCHAR)
@@ -2805,8 +2810,6 @@ public class TestLateralJoinCorrectness extends SubOperatorTest {
 
     final CloseableRecordBatch rightMockBatch_1 = new MockRecordBatch(fixture.getFragmentContext(), operatorContext,
       rightContainer, rightOutcomes, rightContainer.get(0).getSchema());
-
-    final LateralJoinPOP popConfig_1 = new LateralJoinPOP(null, null, JoinRelType.INNER, Lists.newArrayList());
 
     final LateralJoinBatch lowerLevelLateral = new LateralJoinBatch(popConfig_1, fixture.getFragmentContext(),
       leftMockBatch_1, rightMockBatch_1);

@@ -93,13 +93,11 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
 
   private final HashSet<String> excludedFieldNames = new HashSet<>();
 
-  // SORABH: Prototype change
-  public static final String IMPLICIT_COLUMN = "$implicit_row$";
+  private final String implicitColumn;
 
-  // SORABH: Prototype change
   private boolean hasRemainderForLeftJoin = false;
 
-  private ValueVector IMPLICIT_VECTOR;
+  private ValueVector implicitVector;
 
   // Map to cache reference of input and corresponding output vectors for left and right batches
   private final Map<ValueVector, ValueVector> leftInputOutputVector = new HashMap<>();
@@ -115,7 +113,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     Preconditions.checkNotNull(left);
     Preconditions.checkNotNull(right);
     final int configOutputBatchSize = (int) context.getOptions().getOption(ExecConstants.OUTPUT_BATCH_SIZE_VALIDATOR);
-    // Prepare Schema Path Mapping
+    implicitColumn = popConfig.getImplicitColumn();
+
     populateExcludedField(popConfig);
     batchMemoryManager = new JoinBatchMemoryManager(configOutputBatchSize, left, right, excludedFieldNames);
 
@@ -782,7 +781,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       // Don't ignore implicit column from left side in multilevel case where plan is generated such that lower lateral
       // is on the right side of upper lateral.
       if (!excludedFieldNames.contains(field.getName()) ||
-        (field.getName().equals(IMPLICIT_COLUMN) && !isRightBatch)) {
+        (field.getName().equals(implicitColumn) && !isRightBatch)) {
         newSchemaBuilder.addField(field);
       }
     }
@@ -818,7 +817,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     // case if plan is generated such that lower lateral is right child of upper lateral
     for (final VectorWrapper<?> vectorWrapper : left) {
       final MaterializedField leftField = vectorWrapper.getField();
-      if (excludedFieldNames.contains(leftField.getName()) && !(leftField.getName().equals(IMPLICIT_COLUMN))) {
+      if (excludedFieldNames.contains(leftField.getName()) && !(leftField.getName().equals(implicitColumn))) {
         continue;
       }
       container.addOrGet(leftField);
@@ -828,8 +827,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
     for (final VectorWrapper<?> vectorWrapper : right) {
       MaterializedField rightField = vectorWrapper.getField();
       if (excludedFieldNames.contains(rightField.getName())) {
-        if (rightField.getName().equals(IMPLICIT_COLUMN)) {
-          IMPLICIT_VECTOR = vectorWrapper.getValueVector();
+        if (rightField.getName().equals(implicitColumn)) {
+          implicitVector = vectorWrapper.getValueVector();
         }
         continue;
       }
@@ -849,8 +848,8 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       container.addOrGet(rightField);
     }
 
-    Preconditions.checkState(IMPLICIT_VECTOR != null,
-      "Implicit column vector %s not found in right incoming batch", IMPLICIT_COLUMN);
+    Preconditions.checkState(implicitVector != null,
+      "Implicit column vector %s not found in right incoming batch", implicitColumn);
 
     // Let's build schema for the container
     outputIndex = 0;
@@ -911,7 +910,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
    */
   private Map<Integer, Integer> getRowIdToRowCountMapping() {
     final Map<Integer, Integer> indexToFreq = new HashMap<>();
-    final IntVector rowIdVector = (IntVector) IMPLICIT_VECTOR;
+    final IntVector rowIdVector = (IntVector) implicitVector;
     int prevRowId = rowIdVector.getAccessor().get(rightJoinIndex);
     int countRows = 1;
     for (int i=rightJoinIndex + 1; i < right.getRecordCount(); ++i) {
@@ -955,10 +954,10 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
       logger.debug("Output Batch stats before copying new data: {}", new RecordBatchSizer(this));
     }
 
-    // Assuming that first vector in right batch is for IMPLICIT_COLUMN.
+    // Assuming that first vector in right batch is for implicitColumn.
     // get a mapping of number of rows for each rowId present in current right side batch
     //final Map<Integer, Integer> indexToFreq = getRowIdToRowCountMapping();
-    final IntVector rowIdVector = (IntVector) IMPLICIT_VECTOR;
+    final IntVector rowIdVector = (IntVector) implicitVector;
 
     // we need to have both conditions because in left join case we can exceed the maxAvailableRowSlot before reaching
     // rightBatch end or vice-versa
@@ -1043,7 +1042,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
         inputFieldName = inputVector.getField().getName();
 
         // If implicit column is in left batch then preserve it
-        if (inputFieldName.equals(IMPLICIT_COLUMN) && !isRightBatch) {
+        if (inputFieldName.equals(implicitColumn) && !isRightBatch) {
           ++inputIndex;
           break;
         }
@@ -1157,8 +1156,7 @@ public class LateralJoinBatch extends AbstractBinaryRecordBatch<LateralJoinPOP> 
   }
 
   private void populateExcludedField(PhysicalOperator lateralPop) {
-    // SORABH: Prototype change
-    excludedFieldNames.add(IMPLICIT_COLUMN);
+    excludedFieldNames.add(implicitColumn);
     final List<SchemaPath> excludedCols = ((LateralJoinPOP)lateralPop).getExcludedColumns();
     if (excludedCols != null) {
       for (SchemaPath currentPath : excludedCols) {
