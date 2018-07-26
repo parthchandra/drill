@@ -549,6 +549,10 @@ public final class UserBitShared {
      * <code>REGEX_SUB_SCAN = 45;</code>
      */
     REGEX_SUB_SCAN(45, 45),
+    /**
+     * <code>PARTITION_LIMIT = 46;</code>
+     */
+    PARTITION_LIMIT(46, 46),
     ;
 
     /**
@@ -735,6 +739,10 @@ public final class UserBitShared {
      * <code>REGEX_SUB_SCAN = 45;</code>
      */
     public static final int REGEX_SUB_SCAN_VALUE = 45;
+    /**
+     * <code>PARTITION_LIMIT = 46;</code>
+     */
+    public static final int PARTITION_LIMIT_VALUE = 46;
 
 
     public final int getNumber() { return value; }
@@ -787,6 +795,7 @@ public final class UserBitShared {
         case 43: return HIVE_DRILL_NATIVE_PARQUET_ROW_GROUP_SCAN;
         case 44: return JDBC_SCAN;
         case 45: return REGEX_SUB_SCAN;
+        case 46: return PARTITION_LIMIT;
         default: return null;
       }
     }
@@ -24323,7 +24332,7 @@ public final class UserBitShared {
       "TATEMENT\020\005*\207\001\n\rFragmentState\022\013\n\007SENDING\020" +
       "\000\022\027\n\023AWAITING_ALLOCATION\020\001\022\013\n\007RUNNING\020\002\022" +
       "\014\n\010FINISHED\020\003\022\r\n\tCANCELLED\020\004\022\n\n\006FAILED\020\005" +
-      "\022\032\n\026CANCELLATION_REQUESTED\020\006*\223\007\n\020CoreOpe" +
+      "\022\032\n\026CANCELLATION_REQUESTED\020\006*\250\007\n\020CoreOpe" +
       "ratorType\022\021\n\rSINGLE_SENDER\020\000\022\024\n\020BROADCAS" +
       "T_SENDER\020\001\022\n\n\006FILTER\020\002\022\022\n\016HASH_AGGREGATE" +
       "\020\003\022\r\n\tHASH_JOIN\020\004\022\016\n\nMERGE_JOIN\020\005\022\031\n\025HAS" +
@@ -24346,11 +24355,11 @@ public final class UserBitShared {
       "N\020&\022\021\n\rKUDU_SUB_SCAN\020\'\022\013\n\007FLATTEN\020(\022\020\n\014L" +
       "ATERAL_JOIN\020)\022\n\n\006UNNEST\020*\022,\n(HIVE_DRILL_" +
       "NATIVE_PARQUET_ROW_GROUP_SCAN\020+\022\r\n\tJDBC_" +
-      "SCAN\020,\022\022\n\016REGEX_SUB_SCAN\020-*g\n\nSaslStatus" +
-      "\022\020\n\014SASL_UNKNOWN\020\000\022\016\n\nSASL_START\020\001\022\024\n\020SA" +
-      "SL_IN_PROGRESS\020\002\022\020\n\014SASL_SUCCESS\020\003\022\017\n\013SA" +
-      "SL_FAILED\020\004B.\n\033org.apache.drill.exec.pro",
-      "toB\rUserBitSharedH\001"
+      "SCAN\020,\022\022\n\016REGEX_SUB_SCAN\020-\022\023\n\017PARTITION_" +
+      "LIMIT\020.*g\n\nSaslStatus\022\020\n\014SASL_UNKNOWN\020\000\022" +
+      "\016\n\nSASL_START\020\001\022\024\n\020SASL_IN_PROGRESS\020\002\022\020\n" +
+      "\014SASL_SUCCESS\020\003\022\017\n\013SASL_FAILED\020\004B.\n\033org.",
+      "apache.drill.exec.protoB\rUserBitSharedH\001"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {

@@ -334,6 +334,7 @@ enum CoreOperatorType {
   HIVE_DRILL_NATIVE_PARQUET_ROW_GROUP_SCAN = 43;
   JDBC_SCAN = 44;
   REGEX_SUB_SCAN = 45;
+  PARTITION_LIMIT = 46;
 }
 
 /* Registry that contains list of jars, each jar contains its name and list of function signatures.
