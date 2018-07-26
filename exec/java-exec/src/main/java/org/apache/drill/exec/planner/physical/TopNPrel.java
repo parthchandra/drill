@@ -124,7 +124,7 @@ public class TopNPrel extends SinglePrel {
                 this.getCluster().getTypeFactory().createSqlType(SqlTypeName.INTEGER));
     RexNode limit = this.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(this.limit),
                 this.getCluster().getTypeFactory().createSqlType(SqlTypeName.INTEGER));
-    LimitPrel limitPrel = new LimitPrel(this.getCluster(), traits, sortprel, offset, limit);
+    LimitPrel limitPrel = new LimitPrel(this.getCluster(), traits, sortprel, offset, limit, false, true);
     return limitPrel;
   }
 }

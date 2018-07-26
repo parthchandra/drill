@@ -20,6 +20,7 @@ package org.apache.drill.exec.physical.impl.lateraljoin;
 import org.apache.drill.categories.OperatorTest;
 import org.apache.drill.exec.ExecConstants;
 import org.apache.drill.exec.planner.physical.PlannerSettings;
+import org.apache.drill.test.ClientFixture;
 import org.apache.drill.test.ClusterFixture;
 import org.apache.drill.test.ClusterFixtureBuilder;
 import org.apache.drill.test.ClusterTest;
@@ -83,25 +84,35 @@ public class TestE2EUnnestAndLateral extends ClusterTest {
 
   @Test
   public void testLateral_WithTopNInSubQuery() throws Exception {
+
     String Sql = "SELECT customer.c_name, orders.o_id, orders.o_amount " +
       "FROM cp.`lateraljoin/nested-customer.parquet` customer, LATERAL " +
       "(SELECT t.ord.o_id as o_id, t.ord.o_amount as o_amount FROM UNNEST(customer.orders) t(ord) ORDER BY " +
       "o_amount DESC LIMIT 1) orders";
 
-    testBuilder()
-      .sqlQuery(Sql)
-      .unOrdered()
-      .baselineColumns("c_name", "o_id", "o_amount")
-      .baselineValues("customer1", 3.0,  294.5)
-      .baselineValues("customer2", 10.0,  724.5)
-      .baselineValues("customer3", 23.0,  772.2)
-      .baselineValues("customer4", 32.0,  1030.1)
-      .go();
+    ClusterFixtureBuilder builder = ClusterFixture.builder(dirTestWatcher)
+            .setOptionDefault(ExecConstants.ENABLE_UNNEST_LATERAL_KEY, true)
+            .setOptionDefault("planner.enable_topn", true);
 
+    try (ClusterFixture cluster = builder.build();
+         ClientFixture client = cluster.clientFixture()) {
+      System.out.println(client.queryBuilder()
+              .sql(Sql)
+              .explainText());
+      client.testBuilder()            .sqlQuery(Sql)
+              .unOrdered()
+              .baselineColumns("c_name", "o_id", "o_amount")
+              .baselineValues("customer1", 3.0,  294.5)
+              .baselineValues("customer2", 10.0,  724.5)
+              .baselineValues("customer3", 23.0,  772.2)
+              .baselineValues("customer4", 32.0,  1030.1)
+              .go();
+
+  }
   }
 
   /**
-   * Test which disables the TopN operator from planner settings before running query using SORT and LIMIT in
+   * Test which disables the TopN operator from planner settintestLateral_WithTopNInSubQuerygs before running query using SORT and LIMIT in
    * subquery. The same query as in above test is executed and same result is expected.
    */
   @Test
