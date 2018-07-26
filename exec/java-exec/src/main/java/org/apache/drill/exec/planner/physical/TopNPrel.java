@@ -18,11 +18,14 @@
 package org.apache.drill.exec.planner.physical;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 
 import com.google.common.collect.Lists;
 import org.apache.calcite.rel.RelCollationImpl;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.drill.exec.physical.base.PhysicalOperator;
 import org.apache.drill.exec.physical.config.TopN;
 import org.apache.drill.exec.planner.cost.DrillCostBase;
@@ -115,6 +118,13 @@ public class TopNPrel extends SinglePrel {
                                     .replace(this.getTraitSet().getTrait(DrillDistributionTraitDef.INSTANCE))
                                     .replace(collationTrait)
                                     .replace(DRILL_PHYSICAL);
-    return (Prel) this.copy(traits, children);
+
+    SortPrel sortprel = new SortPrel(this.getCluster(), traits, children.get(0), collationTrait);
+    RexNode offset = this.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(0),
+                this.getCluster().getTypeFactory().createSqlType(SqlTypeName.INTEGER));
+    RexNode limit = this.getCluster().getRexBuilder().makeExactLiteral(BigDecimal.valueOf(this.limit),
+                this.getCluster().getTypeFactory().createSqlType(SqlTypeName.INTEGER));
+    LimitPrel limitPrel = new LimitPrel(this.getCluster(), traits, sortprel, offset, limit);
+    return limitPrel;
   }
 }
