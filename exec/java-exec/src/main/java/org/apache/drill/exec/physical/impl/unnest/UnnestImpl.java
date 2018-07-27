@@ -37,11 +37,9 @@ import static org.apache.drill.exec.record.BatchSchema.SelectionVectorMode.NONE;
 
 /**
  * Contains the actual unnest operation. Unnest is a simple transfer operation in this implementation.
- * For use as a table function, we will need to change the logic of the unnest method to operate on
- * more than one row at a time and remove any dependence on Lateral
  * Additionally, unnest produces an implicit rowId column that allows unnest to output batches with many
  * rows of incoming data being unnested in a single call to innerNext(). Downstream blocking operators need
- * to be aware of this rowId column and include the rowId a sort or group by key.
+ * to be aware of this rowId column and include the rowId as the sort or group by key.
  * This class follows the pattern of other operators that generate code at runtime. Normally this class
  * would be abstract and have placeholders for doSetup and doEval. Unnest however, doesn't require code
  * generation so we can simply implement the code in a simple class that looks similar to the code gen
@@ -83,9 +81,9 @@ public class UnnestImpl implements Unnest {
    *
    */
   private int valueIndex; // index in the incoming record being processed
-  // The index in the unnest column that is being processed. We start at zero and continue until
-  // InnerValueCount is reached or  if the batch limit is reached
-  // this allows for groups to be written between batches if we run out of space, for cases where we have finished
+  // The index of the array element in the unnest column at row pointed by valueIndex which is currently being
+  // processed. It starts at zero and continue until InnerValueCount is reached or the batch limit is reached. It
+  // allows for groups to be written across batches if we run out of space. For cases where we have finished
   // a batch on the boundary it will be set to 0
   private int innerValueIndex = 0;
   // The index in the "values" vector of the current value being processed.
@@ -143,7 +141,6 @@ public class UnnestImpl implements Unnest {
 
           } finally {
             outputIndex++;
-            //currentInnerValueIndexLocal++;
             runningInnerValueIndex++;
           }
         }

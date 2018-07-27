@@ -289,7 +289,7 @@ import static org.junit.Assert.assertTrue;
 
     final int limitedOutputBatchSize = 1023; // one less than the power of two. See RecordBatchMemoryManager
                                              // .adjustOutputRowCount
-    final int limitedOutputBatchSizeBytes = 1024*4*1; // (num rows+1) * size of int
+    final int limitedOutputBatchSizeBytes = 1024*4*2; // (num rows+1) * size of int * num of columns (rowId, unnest_col)
     final int inputBatchSize = 1023+1;
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output
@@ -350,7 +350,7 @@ import static org.junit.Assert.assertTrue;
 
     final int limitedOutputBatchSize = 1023; // one less than the power of two. See RecordBatchMemoryManager
                                              // .adjustOutputRowCount
-    final int limitedOutputBatchSizeBytes = 1024*4*1; // (num rows+1) * size of int
+    final int limitedOutputBatchSizeBytes = 1024*4*2; // (num rows+1) * size of int * num of columns (rowId, unnest_col)
     final int inputBatchSize = 1023+1;
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output
@@ -411,7 +411,7 @@ import static org.junit.Assert.assertTrue;
     // similar to previous test but the size of the array fits exactly into the record batch;
     final int limitedOutputBatchSize = 1023; // one less than the power of two. See RecordBatchMemoryManager
                                              // .adjustOutputRowCount
-    final int limitedOutputBatchSizeBytes = 1024*4*1; // (num rows+1) * size of int
+    final int limitedOutputBatchSizeBytes = 1024*4*2; // (num rows+1) * size of int * num of columns (rowId, unnest_col)
     final int inputBatchSize = 1023;
     // single record batch with single row. The unnest column has one
     // more record than the batch size we want in the output

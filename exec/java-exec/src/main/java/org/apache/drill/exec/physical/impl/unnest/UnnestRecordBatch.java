@@ -112,7 +112,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
 
       RecordBatchSizer.ColumnSize columnSize = getRecordBatchSizer().getColumn(field.getName());
 
-      RecordBatchSizer.ColumnSize rowIdColumnSize = getRecordBatchSizer().new ColumnSize(rowIdVector, null);
+      final int rowIdColumnSize = TypeHelper.getSize(rowIdVector.getField().getType());
 
       // Average rowWidth of single element in the unnest list.
       // subtract the offset vector size from column data size.
@@ -121,7 +121,7 @@ public class UnnestRecordBatch extends AbstractTableFunctionRecordBatch<UnnestPO
               .getElementCount());
 
       // Average rowWidth of outgoing batch.
-      final int avgOutgoingRowWidth = avgRowWidthSingleUnnestEntry + rowIdColumnSize.getDataSizePerEntry();
+      final int avgOutgoingRowWidth = avgRowWidthSingleUnnestEntry + rowIdColumnSize;
 
       // Number of rows in outgoing batch
       final int outputBatchSize = getOutputBatchSize();
