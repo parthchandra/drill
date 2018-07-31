@@ -36,7 +36,7 @@ import java.util.Iterator;
 import java.util.List;
 
 public class LimitPrel extends DrillLimitRelBase implements Prel {
-  private boolean isParitioned = false;
+  private boolean isPartitioned = false;
 
   public LimitPrel(RelOptCluster cluster, RelTraitSet traitSet, RelNode child, RexNode offset, RexNode fetch) {
     super(cluster, traitSet, child, offset, fetch);
@@ -48,12 +48,12 @@ public class LimitPrel extends DrillLimitRelBase implements Prel {
 
   public LimitPrel(RelOptCluster cluster, RelTraitSet traitSet, RelNode child, RexNode offset, RexNode fetch, boolean pushDown, boolean isPartitioned) {
     super(cluster, traitSet, child, offset, fetch, pushDown);
-    this.isParitioned = isPartitioned;
+    this.isPartitioned = isPartitioned;
   }
 
   @Override
   public RelNode copy(RelTraitSet traitSet, List<RelNode> inputs) {
-    return new LimitPrel(getCluster(), traitSet, sole(inputs), offset, fetch, isPushDown(), isParitioned);
+    return new LimitPrel(getCluster(), traitSet, sole(inputs), offset, fetch, isPushDown(), isPartitioned);
   }
 
   @Override
@@ -70,7 +70,7 @@ public class LimitPrel extends DrillLimitRelBase implements Prel {
     Integer last = fetch != null ? Math.max(0, RexLiteral.intValue(fetch)) + first : null;
 
     Limit limit;
-    if (isParitioned) {
+    if (isPartitioned) {
       limit = new PartitionLimit(childPOP, first, last, DrillRelOptUtil.IMPLICIT_COLUMN);
     } else {
       limit = new Limit(childPOP, first, last);
@@ -91,7 +91,7 @@ public class LimitPrel extends DrillLimitRelBase implements Prel {
   @Override
   public RelWriter explainTerms(RelWriter pw) {
     super.explainTerms(pw);
-    pw.itemIf("partitioned", isParitioned, isParitioned);
+    pw.itemIf("partitioned", isPartitioned, isPartitioned);
     return pw;
   }
 
